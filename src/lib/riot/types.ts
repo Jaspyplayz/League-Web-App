@@ -25,15 +25,27 @@ export type LeagueEntry = {
 
 export type Participant = {
   puuid: string;
+  // 1 to 10. The match timeline uses this number instead of the PUUID.
+  participantId: number;
+  // The player's Riot ID when the game was played. Can be missing in old games.
+  riotIdGameName?: string;
+  riotIdTagline?: string;
   teamId: number; // 100 = blue side, 200 = red side
+  championId: number;
   championName: string;
   teamPosition: string; // "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY" or ""
+  // Riot's guess at the position from where the player spent the game. Used
+  // when teamPosition is empty.
+  individualPosition: string;
   win: boolean;
   kills: number;
   deaths: number;
   assists: number;
   totalMinionsKilled: number;
   neutralMinionsKilled: number;
+  goldEarned: number;
+  totalDamageDealtToChampions: number;
+  visionScore: number;
   item0: number;
   item1: number;
   item2: number;
@@ -49,6 +61,8 @@ export type Participant = {
 export type Match = {
   metadata: { matchId: string };
   info: {
+    platformId: string; // "NA1"
+    gameVersion: string; // "16.20.712.3456"
     queueId: number;
     gameStartTimestamp: number; // ms since 1970
     gameEndTimestamp?: number;
@@ -56,5 +70,41 @@ export type Match = {
     // exists), milliseconds for older ones.
     gameDuration: number;
     participants: Participant[];
+  };
+};
+
+// match-v5 timeline: a snapshot of every player once a minute, plus every
+// event in between. Only the fields the analyzer reads are listed.
+// See docs/match-analyzer.md, "What's inside a timeline".
+
+export type MapPosition = { x: number; y: number };
+
+export type TimelineParticipantFrame = {
+  participantId: number;
+  totalGold: number;
+  xp: number;
+  level: number;
+  minionsKilled: number;
+  jungleMinionsKilled: number;
+  position?: MapPosition;
+  damageStats?: { totalDamageDoneToChampions: number };
+};
+
+// Riot sends dozens of event types with different fields. The trimming step
+// (src/lib/analyzer/trim.ts) checks `type` and picks the fields it needs.
+export type TimelineEvent = { type: string; timestamp: number } & Record<string, unknown>;
+
+export type TimelineFrame = {
+  timestamp: number; // ms since the game started
+  // Keyed "1" to "10" by participantId.
+  participantFrames: Record<string, TimelineParticipantFrame>;
+  events: TimelineEvent[];
+};
+
+export type Timeline = {
+  metadata: { matchId: string };
+  info: {
+    frameInterval: number; // 60000: one frame per minute
+    frames: TimelineFrame[];
   };
 };

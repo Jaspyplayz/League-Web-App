@@ -43,6 +43,17 @@ describe("buildDiffChart", () => {
     expect(chart.yTicks.at(-1)).toBeLessThan(0);
   });
 
+  it("uses small ticks for small differences, like CS", () => {
+    const chart = buildDiffChart(
+      [
+        { minute: 0, diff: 0 },
+        { minute: 10, diff: -18 },
+      ],
+      box,
+    );
+    expect(chart.yTicks).toEqual([10, 0, -10, -20]);
+  });
+
   it("needs at least two points", () => {
     expect(() => buildDiffChart([{ minute: 0, diff: 0 }], box)).toThrow();
   });

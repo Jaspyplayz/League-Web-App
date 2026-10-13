@@ -6,7 +6,7 @@ import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
-import { fromSlug, type RiotId } from "@/lib/riot-id";
+import { fromSlug, toSlug, type RiotId } from "@/lib/riot-id";
 import { ProfileHeader } from "./profile-header";
 import { RecentMatches } from "./recent-matches";
 
@@ -48,7 +48,11 @@ async function Player({ params }: { params: Params }) {
         <ProfileHeader region={region} puuid={puuid} gameName={gameName} tagLine={tagLine} />
       </Suspense>
       <Suspense fallback={<p className="text-zinc-500">Loading recent matches…</p>}>
-        <RecentMatches region={region} puuid={puuid} />
+        <RecentMatches
+          region={region}
+          puuid={puuid}
+          playerPath={`/player/${region}/${toSlug(account.value)}`}
+        />
       </Suspense>
     </>
   );

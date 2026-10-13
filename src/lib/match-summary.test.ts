@@ -15,15 +15,21 @@ import type { Match, Participant } from "./riot/types";
 function participant(overrides: Partial<Participant>): Participant {
   return {
     puuid: "someone",
+    participantId: 1,
     teamId: 100,
+    championId: 103,
     championName: "Ahri",
     teamPosition: "MIDDLE",
+    individualPosition: "MIDDLE",
     win: true,
     kills: 0,
     deaths: 0,
     assists: 0,
     totalMinionsKilled: 0,
     neutralMinionsKilled: 0,
+    goldEarned: 0,
+    totalDamageDealtToChampions: 0,
+    visionScore: 0,
     item0: 0,
     item1: 0,
     item2: 0,
@@ -41,6 +47,8 @@ function participant(overrides: Partial<Participant>): Participant {
 const match: Match = {
   metadata: { matchId: "NA1_1" },
   info: {
+    platformId: "NA1",
+    gameVersion: "16.20.712.3456",
     queueId: 420,
     gameStartTimestamp: 1_700_000_000_000,
     gameEndTimestamp: 1_700_001_800_000,
