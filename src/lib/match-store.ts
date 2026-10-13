@@ -40,6 +40,52 @@ export async function loadMatch(region: Region, matchId: string): Promise<Match>
   return match;
 }
 
+// Many matches at once, for the insights page. Like loadTimelines below:
+// cached ones come from one database query, and at most `budget` missing
+// ones are fetched from Riot per call, so a 100-game window can't use up the
+// rate limit in one page view. Returns the loaded matches in the order of
+// `ids`; `waiting` counts the ones still to fetch or that failed.
+export async function loadMatches(
+  region: Region,
+  ids: string[],
+  budget: number,
+): Promise<{ matches: Match[]; waiting: number; error: RiotApiError | null }> {
+  const found = new Map<string, Match>();
+  const rows = ids.length
+    ? await readCache((db) =>
+        db.query.matches.findMany({
+          where: inArray(tables.matches.matchId, ids),
+          columns: { matchId: true, raw: true },
+        }),
+      )
+    : undefined;
+  for (const row of rows ?? []) found.set(row.matchId, row.raw as Match);
+
+  // Without a database nothing is remembered between page views, so fetch
+  // everything now, as loadTimelines does.
+  const limit = database() ? budget : ids.length;
+  const missing = ids.filter((id) => !found.has(id)).slice(0, limit);
+  const fetched = await mapWithLimit(missing, MATCH_CONCURRENCY, (id) =>
+    settle(getMatch(region, id)),
+  );
+  let error: RiotApiError | null = null;
+  for (const result of fetched) {
+    if (!result.ok) {
+      error ??= result.error;
+      continue;
+    }
+    const match = result.value;
+    found.set(match.metadata.matchId, match);
+    saveLater((db) => saveMatch(db, match));
+  }
+
+  const matches = ids.flatMap((id) => found.get(id) ?? []);
+  return { matches, waiting: ids.length - matches.length, error };
+}
+
+// Riot allows 20 requests a second, so ask for at most 5 matches at a time.
+const MATCH_CONCURRENCY = 5;
+
 // Costs one Riot call the first time anyone opens a match, and none after.
 export async function loadTimeline(region: Region, match: Match): Promise<TrimmedTimeline> {
   const { matchId } = match.metadata;

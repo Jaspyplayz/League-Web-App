@@ -20,12 +20,15 @@ export function CompareWithPlayer({
   chosen,
   comparison,
   clearHref,
+  keep,
   dd,
 }: {
   chosen: ChosenPlayer | null;
   // Null when nothing could be compared (or no one is picked yet).
   comparison: Comparison | null;
   clearHref: string; // this page without ?vs=
+  // The filters at the top, carried along so comparing doesn't reset them.
+  keep: Record<string, string>;
   dd: DataDragon | null;
 }) {
   return (
@@ -33,15 +36,26 @@ export function CompareWithPlayer({
       <PanelHeading id="compare-player-heading">
         {chosen?.status === "ok" ? `You vs ${chosen.name}` : "Compare with a player"}
       </PanelHeading>
-      <PlayerForm choice={chosen?.choice ?? null} clearHref={clearHref} />
+      <PlayerForm choice={chosen?.choice ?? null} clearHref={clearHref} keep={keep} />
       {chosen && <Result chosen={chosen} comparison={comparison} dd={dd} />}
     </section>
   );
 }
 
-function PlayerForm({ choice, clearHref }: { choice: Choice | null; clearHref: string }) {
+function PlayerForm({
+  choice,
+  clearHref,
+  keep,
+}: {
+  choice: Choice | null;
+  clearHref: string;
+  keep: Record<string, string>;
+}) {
   return (
     <Form action="" aria-label="Compare with a player" className="flex max-w-[600px] flex-col gap-2">
+      {Object.entries(keep).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <div className="flex flex-wrap gap-2 rounded-[14px] border border-line-strong bg-surface p-2 focus-within:border-ahead">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col px-3 py-1.5 max-sm:basis-full">
           <label htmlFor="vs" className={fieldLabel}>

@@ -7,6 +7,9 @@ import type { GameTrend, Trends } from "@/lib/analyzer/trends";
 // the rest, and never shorter, so +40 doesn't look like a lead of thousands.
 const MIN_SCALE = 500;
 const MAX_SCALE = 3000;
+// With more games than this, bars get thin, so the gaps shrink and the W/L
+// letters under each bar are left out (each bar's tooltip still says it).
+const DENSE_GAMES = 30;
 
 // Gold difference at 10 minutes in each game, oldest on the left. Bars above
 // the line are games you were ahead in (blue), below are games you were
@@ -25,6 +28,7 @@ export function LaningChart({
   const withGold = games.filter((g) => g.goldAt10 !== null);
   const biggest = Math.max(...withGold.map((g) => Math.abs(g.goldAt10!)), 0);
   const scale = Math.min(Math.max(biggest, MIN_SCALE), MAX_SCALE);
+  const dense = withGold.length > DENSE_GAMES;
 
   return (
     <section aria-labelledby="laning-heading" className="flex flex-col gap-3.5">
@@ -51,7 +55,7 @@ export function LaningChart({
         </dl>
 
         <ol
-          className="flex h-56 items-stretch gap-1.5"
+          className={`flex h-56 items-stretch ${dense ? "gap-px" : "gap-1.5"}`}
           aria-label="Gold difference at 10 minutes, per game"
         >
           {withGold.map((g) => {
@@ -87,12 +91,14 @@ export function LaningChart({
                       />
                     )}
                   </span>
-                  <span
-                    aria-hidden="true"
-                    className={`pt-1.5 text-center font-mono text-[11px] ${g.win ? "text-ahead-soft" : "text-behind"}`}
-                  >
-                    {g.win ? "W" : "L"}
-                  </span>
+                  {!dense && (
+                    <span
+                      aria-hidden="true"
+                      className={`pt-1.5 text-center font-mono text-[11px] ${g.win ? "text-ahead-soft" : "text-behind"}`}
+                    >
+                      {g.win ? "W" : "L"}
+                    </span>
+                  )}
                 </Link>
               </li>
             );
