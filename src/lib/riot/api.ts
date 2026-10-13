@@ -4,7 +4,7 @@ import { mapWithLimit } from "@/lib/concurrency";
 import { accountRegional, REGIONS, type Region } from "@/lib/regions";
 import type { RiotId } from "@/lib/riot-id";
 import { RiotApiError, riotGet } from "./client";
-import type { Account, LeagueEntry, Match, Summoner } from "./types";
+import type { Account, LeagueEntry, Match, Summoner, Timeline } from "./types";
 
 // One function per Riot endpoint the app uses. Each picks the right host:
 // account and match data live on regional clusters ("americas"), player data
@@ -68,6 +68,16 @@ export async function getMatch(region: Region, matchId: string): Promise<Match> 
     matchCache.delete(matchCache.keys().next().value!);
   }
   return match;
+}
+
+// The minute-by-minute timeline of a match. Large (a few hundred KB), so it's
+// only fetched when someone opens that match, then trimmed and stored; see
+// src/lib/match-store.ts.
+export function getTimeline(region: Region, matchId: string) {
+  return riotGet<Timeline>(
+    REGIONS[region].regional,
+    `/lol/match/v5/matches/${encodeURIComponent(matchId)}/timeline`,
+  );
 }
 
 // Riot allows 20 requests per second, so fetch at most 5 matches at a time.
