@@ -30,8 +30,9 @@ src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (rate limits, retries) and one function per endpoint
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
                   trends.ts rolls games up into the Insights page, and compare.ts
-                  sets them against Challenger benchmark games
+                  sets them against Challenger games or one chosen player's
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
+src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/db/           Drizzle schema, connection, and cache freshness rules
 scripts/          Command-line jobs run with tsx (npm run benchmarks)
 drizzle/          Generated SQL migrations (never edit by hand)

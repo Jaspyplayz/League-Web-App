@@ -1,5 +1,5 @@
+import Link from "next/link";
 import { ChampionIcon } from "@/components/game-icons";
-import { PanelHeading } from "@/components/ui/panel-heading";
 import type {
   BenchmarkComparison as Comparison,
   ChampionComparison,
@@ -23,21 +23,37 @@ const STAT_ROWS: Record<StatKey, { label: string; format: (v: number) => string;
   earlyDeaths: { label: "Deaths before 14:00", format: (v) => v.toFixed(1), lowerIsBetter: true },
 };
 
-// "You vs the top of solo queue": your averages next to Challenger players',
-// matched champion by champion (see src/lib/analyzer/compare.ts).
+// Who your games are compared with: Challenger players on KR, EUW and NA, or
+// one player you picked (see compare-with-player.tsx).
+export type Against = { kind: "challenger" } | { kind: "player"; name: string; href: string };
+
+// "You vs the top of solo queue": your averages next to theirs, matched
+// champion by champion (see src/lib/analyzer/compare.ts).
 export function BenchmarkComparison({
   comparison,
+  against,
   dd,
 }: {
   comparison: Comparison;
+  against: Against;
   dd: DataDragon | null;
 }) {
+  const them = against.kind === "challenger" ? "Challenger" : against.name;
   return (
-    <section aria-labelledby="benchmark-heading" className="flex flex-col gap-3.5">
-      <PanelHeading id="benchmark-heading">You vs Challenger</PanelHeading>
+    <div className="flex flex-col gap-3.5">
       <p className="text-[15px] text-muted">
-        Each of your games is compared with Challenger players on KR, EUW and NA, using one-tricks
-        on your champion when there are enough of their games.
+        {against.kind === "challenger" ? (
+          "Each of your games is compared with Challenger players on KR, EUW and NA, using one-tricks on your champion when there are enough of their games."
+        ) : (
+          <>
+            Each of your games is compared with{" "}
+            <Link href={against.href} className="text-ink underline underline-offset-2">
+              {against.name}
+            </Link>
+            &apos;s last ranked solo games on the same champion, then the same class, then the same
+            role.
+          </>
+        )}
       </p>
       <div className={`overflow-x-auto ${card}`}>
         <table className="w-full text-left text-sm">
@@ -50,7 +66,7 @@ export function BenchmarkComparison({
                 You
               </th>
               <th scope="col" className="px-5 py-3 text-right font-medium">
-                Challenger
+                {them}
               </th>
             </tr>
           </thead>
@@ -61,12 +77,14 @@ export function BenchmarkComparison({
           </tbody>
         </table>
       </div>
-      <ChampionList champions={comparison.champions} dd={dd} />
+      <ChampionList champions={comparison.champions} against={against} dd={dd} />
       <p className="text-[13px] text-faint">
-        Leads are against each player&apos;s own lane opponent, so a Challenger player&apos;s lead
-        is over another Challenger player. Support games are left out of CS.
+        {against.kind === "challenger"
+          ? "Leads are against each player's own lane opponent, so a Challenger player's lead is over another Challenger player."
+          : `${against.name}'s leads are against their own lane opponents, at their own rank.`}{" "}
+        Support games are left out of CS.
       </p>
-    </section>
+    </div>
   );
 }
 
@@ -91,7 +109,15 @@ function StatRow({ stat }: { stat: StatComparison }) {
 
 // Who each of your champions was compared with, so a number based on 12
 // games isn't mistaken for one based on 300.
-function ChampionList({ champions, dd }: { champions: ChampionComparison[]; dd: DataDragon | null }) {
+function ChampionList({
+  champions,
+  against,
+  dd,
+}: {
+  champions: ChampionComparison[];
+  against: Against;
+  dd: DataDragon | null;
+}) {
   return (
     <ul className={`flex flex-col divide-y divide-line ${card}`}>
       {champions.map((c) => {
@@ -110,7 +136,7 @@ function ChampionList({ champions, dd }: { champions: ChampionComparison[]; dd: 
                   · {positionName(c.position) ?? c.position} · {plural(c.games, "game")}
                 </span>
               </span>
-              <span className="text-[13px] text-muted">{comparedWith(c, dd)}</span>
+              <span className="text-[13px] text-muted">{comparedWith(c, against, dd)}</span>
             </div>
             {gold && (
               // Below the name on phones, on the right on wider screens.
@@ -125,18 +151,35 @@ function ChampionList({ champions, dd }: { champions: ChampionComparison[]; dd: 
   );
 }
 
-// "vs 3 Lee Sin one-tricks (45 games)", "vs Challenger Fighters in Jungle (80 games)".
-function comparedWith(c: ChampionComparison, dd: DataDragon | null): string {
+// "vs 3 Lee Sin one-tricks (45 games)", "vs Challenger Fighters in Jungle (80 games)",
+// "vs Faker on Ahri (6 games)".
+function comparedWith(c: ChampionComparison, against: Against, dd: DataDragon | null): string {
   const name = championName(dd, c.championName);
   const role = positionName(c.position) ?? c.position;
   const games = `(${plural(c.sample.games, "game")})`;
+  const champClass = championClass(dd, c.championName);
+  if (against.kind === "player") {
+    const them = against.name;
+    switch (c.level) {
+      // One player's games on your champion, whether or not they one-trick it.
+      case "one-trick":
+      case "champion":
+        return `vs ${them} on ${name} ${games}`;
+      case "class":
+        return `vs ${them} on ${champClass}s in ${role} ${games}`;
+      case "role":
+        return `vs ${them} in ${role} ${games}`;
+      case null:
+        return `Not compared: ${them} has too few recent ${role} games`;
+    }
+  }
   switch (c.level) {
     case "one-trick":
       return `vs ${plural(c.sample.players, `${name} one-trick`)} ${games}`;
     case "champion":
       return `vs Challenger ${name} players ${games}`;
     case "class":
-      return `vs Challenger ${championClass(dd, c.championName)}s in ${role} ${games}`;
+      return `vs Challenger ${champClass}s in ${role} ${games}`;
     case "role":
       return `vs all Challenger ${role} players ${games}`;
     case null:

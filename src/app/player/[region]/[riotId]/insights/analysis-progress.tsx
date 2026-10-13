@@ -17,9 +17,12 @@ export function AnalysisProgress({
   analyzed,
   total,
   retryAfterS,
+  whose = "your games",
 }: {
   analyzed: number;
   total: number;
+  // Whose games are loading, e.g. "your and Faker's games".
+  whose?: string;
   // Set when Riot asked us to slow down: wait this long before the next try.
   retryAfterS: number | null;
 }) {
@@ -51,8 +54,8 @@ export function AnalysisProgress({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-semibold">
           {stalled
-            ? "Riot isn't sending the rest of your games right now"
-            : `Analyzing your games: ${analyzed} of ${total} done`}
+            ? `Riot isn't sending the rest of ${whose} right now`
+            : `Analyzing ${whose}: ${analyzed} of ${total} done`}
         </p>
         {stalled && (
           <button
