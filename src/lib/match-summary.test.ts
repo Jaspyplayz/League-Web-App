@@ -31,6 +31,8 @@ function participant(overrides: Partial<Participant>): Participant {
     item4: 0,
     item5: 0,
     item6: 0,
+    summoner1Id: 4,
+    summoner2Id: 14,
     ...overrides,
   };
 }
@@ -79,6 +81,7 @@ describe("summarizeMatch", () => {
       csPerMin: 7,
       killParticipation: 0.5, // (4 + 6) / 20 team kills; enemy kills don't count
       items: [3089, 0, 0, 0, 0, 0, 3340],
+      spells: [4, 14],
     });
   });
 

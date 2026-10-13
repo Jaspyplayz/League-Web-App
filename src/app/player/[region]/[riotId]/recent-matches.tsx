@@ -1,17 +1,10 @@
-import Image from "next/image";
+import { ChampionIcon } from "@/components/game-icons";
+import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { championName, getDataDragon } from "@/lib/ddragon";
 import {
-  championIconUrl,
-  championName,
-  getDataDragon,
-  itemIconUrl,
-  type DataDragon,
-} from "@/lib/ddragon";
-import {
-  formatDuration,
   summarizeMatch,
   summarizeRecord,
-  timeAgo,
   topChampions,
   type MatchSummary,
 } from "@/lib/match-summary";
@@ -71,7 +64,7 @@ export async function RecentMatches({ region, puuid }: { region: Region; puuid: 
           <ul className="flex flex-col gap-2">
             {topChampions(matches, 4).map((c) => (
               <li key={c.championName} className="flex items-center gap-3 text-sm">
-                <ChampionIcon dd={dd} name={c.championName} size={32} />
+                <ChampionIcon dd={dd} name={c.championName} size={36} className="rounded-[9px]" />
                 <span className="flex-1 font-medium">{championName(dd, c.championName)}</span>
                 <span className="font-mono text-zinc-600 dark:text-zinc-400">
                   {c.wins}W {c.games - c.wins}L · {c.kda.toFixed(1)}
@@ -102,88 +95,5 @@ function Stat({ label, value }: { label: string; value: string }) {
       <dt className="text-zinc-500">{label}</dt>
       <dd className="font-mono text-lg">{value}</dd>
     </div>
-  );
-}
-
-function MatchRow({
-  match: m,
-  dd,
-  now,
-}: {
-  match: MatchSummary;
-  dd: DataDragon | null;
-  now: number;
-}) {
-  const result = m.remake ? "Remake" : m.win ? "Win" : "Loss";
-  const resultColor = m.remake ? "text-zinc-500" : m.win ? "text-blue-500" : "text-amber-500";
-
-  return (
-    <li className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800">
-      <div className="flex w-28 flex-col text-xs whitespace-nowrap text-zinc-500">
-        <span className={`text-base font-semibold uppercase ${resultColor}`}>{result}</span>
-        <span>{m.queue}</span>
-        <span className="font-mono">
-          {timeAgo(m.startedAt, now)} · {formatDuration(m.durationS)}
-        </span>
-      </div>
-
-      <div className="flex min-w-36 flex-1 items-center gap-3">
-        <ChampionIcon dd={dd} name={m.championName} size={44} />
-        <div>
-          <p className="font-medium">{championName(dd, m.championName)}</p>
-          {m.position && <p className="text-sm text-zinc-500">{m.position}</p>}
-        </div>
-      </div>
-
-      <div className="w-24 font-mono whitespace-nowrap">
-        <p>
-          {m.kills} / {m.deaths} / {m.assists}
-        </p>
-        <p className="text-xs text-zinc-500">{m.kda.toFixed(1)} KDA</p>
-      </div>
-
-      <div className="w-24 font-mono whitespace-nowrap">
-        <p>{m.cs} CS</p>
-        <p className="text-xs text-zinc-500">{m.csPerMin.toFixed(1)}/min</p>
-      </div>
-
-      {dd && <Items dd={dd} items={m.items} />}
-    </li>
-  );
-}
-
-function Items({ dd, items }: { dd: DataDragon; items: number[] }) {
-  return (
-    <ul aria-label="Items" className="flex gap-1">
-      {items.map((id, slot) => (
-        // Slots can repeat item ids (two of the same item), so key by slot.
-        <li key={slot} className="size-7 overflow-hidden rounded bg-zinc-200 dark:bg-zinc-800">
-          {id > 0 && <Image src={itemIconUrl(dd, id)} alt="" width={28} height={28} unoptimized />}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function ChampionIcon({ dd, name, size }: { dd: DataDragon | null; name: string; size: number }) {
-  if (!dd) {
-    return (
-      <div
-        style={{ width: size, height: size }}
-        className="flex shrink-0 items-center justify-center rounded-lg bg-zinc-200 text-xs font-semibold dark:bg-zinc-800"
-      >
-        {name.slice(0, 2)}
-      </div>
-    );
-  }
-  return (
-    <Image
-      src={championIconUrl(dd, name)}
-      alt=""
-      width={size}
-      height={size}
-      unoptimized
-      className="shrink-0 rounded-lg"
-    />
   );
 }
