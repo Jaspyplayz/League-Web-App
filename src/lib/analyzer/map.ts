@@ -43,3 +43,31 @@ export function laneOf(position: string): "top" | "mid" | "bot" | null {
 
 // Riot's laneType on tower and plate events, for each lane.
 export const LANE_TYPES = { top: "TOP_LANE", mid: "MID_LANE", bot: "BOT_LANE" } as const;
+
+// Distance either side of the river's center line that still counts as river.
+// Wide enough to include the Dragon and Baron pits.
+const RIVER_HALF_WIDTH = 1300;
+// mapArea's mid lane is generous so that fights spilling out of lane still
+// count, but that would put the raptor camps "in mid lane". For describing
+// where a jungler stood, only the lane itself counts.
+const MID_LANE_CORE = 1100;
+
+// A short, plain description of a spot from one team's point of view, like
+// "top lane", "your bot side jungle" or "river (top side)". Used for the
+// jungle map's captions and screen-reader text.
+//
+// "Top side" is the half of the map above the mid lane diagonal (where top
+// lane is), "bot side" the half below it. The river runs the other way,
+// splitting each side into the blue team's jungle and the red team's.
+export function describeSpot(position: MapPosition, myTeamId: number): string {
+  const area = mapArea(position);
+  const { x, y } = position;
+  const blueHalf = x + y < MAP_SIZE;
+  const mine = blueHalf === (myTeamId === 100);
+  if (area === "base") return mine ? "your base" : "enemy base";
+  const inMidCore = Math.abs(x - y) < MID_LANE_CORE;
+  if (area === "top" || area === "bot" || (area === "mid" && inMidCore)) return `${area} lane`;
+  const side = y > x ? "top side" : "bot side";
+  if (Math.abs(x + y - MAP_SIZE) < RIVER_HALF_WIDTH) return `river (${side})`;
+  return mine ? `your ${side} jungle` : `enemy ${side} jungle`;
+}
