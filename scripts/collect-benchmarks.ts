@@ -17,7 +17,7 @@
 
 import { parseArgs } from "node:util";
 import { loadEnvConfig } from "@next/env";
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, inArray, lt, notInArray } from "drizzle-orm";
 import { getDb, tables, type Db } from "@/db";
 import { benchmarkRow } from "@/db/rows";
 import { findOneTricks, ONE_TRICK_WINDOW, topPlayers } from "@/lib/analyzer/benchmarks";
@@ -40,8 +40,9 @@ loadEnvConfig(process.cwd());
 
 const CALLS_PER_WINDOW = 70;
 const WINDOW_MS = 2 * 60 * 1000;
-// Games older than this are deleted at the end of each run, so the benchmarks
-// follow the current patches.
+// Games older than this are deleted at the end of each run. That clears out
+// players who have dropped out of the top, and keeps the benchmarks on recent
+// patches.
 const MAX_AGE_DAYS = 60;
 
 const { values: args } = parseArgs({
@@ -119,6 +120,12 @@ async function collectRegion(db: Db, region: Region) {
         }
         throw error;
       }
+    }
+    // Keep only the games in their current last 20, so every player counts
+    // the same and the table stays small however often this runs.
+    if (ids.length > 0) {
+      const t = tables.benchmarkGames;
+      await db.delete(t).where(and(eq(t.puuid, puuid), notInArray(t.matchId, ids)));
     }
     log(`Player ${i + 1}/${players.length}: ${added} new games (${saved.size} already saved)`);
   }

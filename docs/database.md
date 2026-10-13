@@ -12,7 +12,7 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `match_participants` | player × game (the scoreboard) | never (filled from `matches.raw`) |
 | `match_timelines` | game, trimmed timeline | never, fetched only when the match is opened |
 | `match_insights` | player × game, analyzer output | never; recomputed locally when `version` changes |
-| `benchmark_games` | Challenger player × game, summary only | filled by `npm run benchmarks`; games older than 60 days are deleted |
+| `benchmark_games` | Challenger player × game, summary only | filled by `npm run benchmarks`; keeps each player's last 20, deletes games older than 60 days |
 
 The schema lives in [`src/db/schema.ts`](../src/db/schema.ts), with a comment on every column that isn't obvious. The refresh rules live in [`src/db/freshness.ts`](../src/db/freshness.ts).
 
@@ -106,7 +106,7 @@ npm run benchmarks                               # KR, EUW and NA, top 30 player
 npm run benchmarks -- --regions kr --players 5   # a quick test
 ```
 
-- Each row is the small per-game summary from `summarizeGame`, the same one Insights makes of your games. The match and timeline aren't stored, so thousands of games take a few MB.
+- Each row is the small per-game summary from `summarizeGame`, the same one Insights makes of your games. The match and timeline aren't stored. Each player keeps only their last 20 ranked games, so the table holds at most about 1,800 rows per run (3 servers × 30 players × 20 games), plus older players' games until they pass 60 days.
 - The script stays under 70 Riot calls per 2 minutes per server, leaving the live site part of the key's allowance. A first full run takes roughly half an hour. Later runs skip games already saved, and a stopped run loses nothing.
 - One-tricks aren't stored. They're worked out from the rows (`findOneTricks` in `src/lib/analyzer/benchmarks.ts`): someone with at least 60% of their last 20 games on one champion.
 - PUUIDs are tied to the Riot app that issued the key. When Turnpoint switches to a production key, empty this table (`delete from benchmark_games`) and run the script again.
