@@ -20,6 +20,7 @@ import {
   type Snapshot,
 } from "./matchup";
 import { findObjectives, type Objective } from "./objectives";
+import { pathingVsLanes, type Pathing } from "./pathing";
 import type { TrimmedTimeline } from "./trim";
 import { findTurningPoints, type TurningPoint } from "./turning-points";
 
@@ -45,6 +46,9 @@ export type MatchAnalysis = {
   objectives: Objective[];
   // Where both junglers were each minute. Null unless you played jungle.
   jungleReplay: JungleReplay | null;
+  // Which lane you played near each early minute, and how it was doing. Null
+  // unless you played jungle.
+  pathing: Pathing | null;
 };
 
 export function isAnalyzable(match: Match): boolean {
@@ -116,6 +120,7 @@ export function analyzeMatch(
     });
   }
 
+  const replay = jungleReplay(timeline, participants, me, opponent);
   return {
     me,
     opponent,
@@ -126,6 +131,7 @@ export function analyzeMatch(
     deaths,
     teamGold: teamGoldSeries(frames, participants, me.teamId),
     objectives: findObjectives(events, me.teamId),
-    jungleReplay: jungleReplay(timeline, participants, me, opponent),
+    jungleReplay: replay,
+    pathing: replay ? pathingVsLanes(replay) : null,
   };
 }

@@ -21,6 +21,15 @@ export const LANES: Lane[] = ["top", "mid", "bot"];
 // gold plus XP, so 500 is roughly one kill's worth either way.
 export const EVEN_LANE_LEAD = 500;
 
+export type LaneTone = "ahead" | "behind" | "even";
+
+// How a lane was doing for your team. A lane that can't be matched up counts
+// as even, since there's nothing to show either way.
+export function laneTone(lead: number | null): LaneTone {
+  if (lead === null || Math.abs(lead) < EVEN_LANE_LEAD) return "even";
+  return lead > 0 ? "ahead" : "behind";
+}
+
 export type ReplayFrame = {
   // Positions are a snapshot at this time, once a minute. The last frame is
   // the end of the game, so it usually isn't on a whole minute.

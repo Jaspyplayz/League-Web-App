@@ -7,6 +7,7 @@ import { Deaths } from "./deaths";
 import { JungleMap, type MapPlayer } from "./jungle-map";
 import { LeadChart } from "./lead-chart";
 import { Matchup } from "./match-header";
+import { PathingGrid } from "./pathing";
 import { Scoreboard } from "./scoreboard";
 import { SnapshotTiles } from "./snapshot-tiles";
 import { TeamGold } from "./team-gold";
@@ -15,7 +16,7 @@ import { TurningPoints } from "./turning-points";
 // Everything below the match header, once the match has been analyzed: the
 // matchup, @10 and @15 stats, the lead chart with turning points, team gold
 // with objectives, deaths, and the scoreboard. In the same order as the mockup,
-// plus the jungle map for junglers.
+// plus the jungle map and early pathing for junglers.
 export function AnalysisSections({
   match,
   analysis: a,
@@ -69,6 +70,7 @@ export function AnalysisSections({
       {a.jungleReplay && (
         <JungleMap replay={a.jungleReplay} players={mapPlayers} myTeamId={a.me.teamId} />
       )}
+      {a.pathing && <PathingGrid pathing={a.pathing} />}
 
       <div className="flex flex-wrap items-start gap-5">
         <TeamGold points={a.teamGold} objectives={a.objectives} />
