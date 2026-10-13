@@ -29,7 +29,8 @@ src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (rate limits, retries) and one function per endpoint
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
-                  and trends.ts rolls games up into the Insights page
+                  trends.ts rolls games up into the Insights page, and compare.ts
+                  sets them against Challenger benchmark games
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/db/           Drizzle schema, connection, and cache freshness rules
 scripts/          Command-line jobs run with tsx (npm run benchmarks)

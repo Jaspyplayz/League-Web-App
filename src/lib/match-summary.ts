@@ -29,6 +29,11 @@ const POSITIONS: Record<string, string> = {
   UTILITY: "Support",
 };
 
+// "JUNGLE" -> "Jungle". Null for an empty or unknown position.
+export function positionName(position: string): string | null {
+  return POSITIONS[position] ?? null;
+}
+
 // Games shorter than this are treated as remakes when Riot doesn't say.
 const REMAKE_SECONDS = 5 * 60;
 
@@ -83,7 +88,7 @@ export function summarizeMatch(match: Match, puuid: string): MatchSummary | null
     remake: me.gameEndedInEarlySurrender ?? durationS < REMAKE_SECONDS,
     win: me.win,
     championName: me.championName,
-    position: POSITIONS[me.teamPosition] ?? null,
+    position: positionName(me.teamPosition),
     kills: me.kills,
     deaths: me.deaths,
     assists: me.assists,

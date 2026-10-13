@@ -7,7 +7,9 @@ import { cacheLife } from "next/cache";
 
 const BASE = "https://ddragon.leagueoflegends.com";
 
-type Champion = { id: string; name: string };
+// `tags` are Riot's champion classes, most fitting first: ["Fighter",
+// "Assassin"] for Lee Sin, ["Mage", "Support"] for Lux.
+type Champion = { id: string; name: string; tags: string[] };
 type SummonerSpell = { id: string; name: string };
 
 export type DataDragon = {
@@ -23,7 +25,7 @@ export type DataDragon = {
 };
 
 // The parts of Data Dragon's JSON files we read.
-type ChampionFile = { data: Record<string, { id: string; name: string }> };
+type ChampionFile = { data: Record<string, { id: string; name: string; tags?: string[] }> };
 type ItemFile = { data: Record<string, { name: string }> };
 type SummonerFile = { data: Record<string, { id: string; key: string; name: string }> };
 
@@ -62,8 +64,8 @@ export function buildDataDragon(
   summonerFile: SummonerFile,
 ): DataDragon {
   const champions: DataDragon["champions"] = {};
-  for (const { id, name } of Object.values(championFile.data)) {
-    champions[id.toLowerCase()] = { id, name };
+  for (const { id, name, tags = [] } of Object.values(championFile.data)) {
+    champions[id.toLowerCase()] = { id, name, tags };
   }
 
   const items: DataDragon["items"] = {};
@@ -81,6 +83,12 @@ export function buildDataDragon(
 
 export function championName(dd: DataDragon | null, championName: string): string {
   return dd?.champions[championName.toLowerCase()]?.name ?? championName;
+}
+
+// The champion's main class ("Fighter", "Mage", "Marksman"...), used to find
+// similar champions. Null when Data Dragon isn't loaded or doesn't know it.
+export function championClass(dd: DataDragon | null, championName: string): string | null {
+  return dd?.champions[championName.toLowerCase()]?.tags[0] ?? null;
 }
 
 export function championIconUrl(dd: DataDragon, championName: string): string {

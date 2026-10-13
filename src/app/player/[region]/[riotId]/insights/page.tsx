@@ -3,9 +3,11 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { compareWithBenchmarks } from "@/lib/analyzer/compare";
 import { computeTrends, isTrendGame, summarizeGame, type GameTrend } from "@/lib/analyzer/trends";
+import { loadBenchmarks } from "@/lib/benchmark-store";
 import { mapWithLimit } from "@/lib/concurrency";
-import { championName, getDataDragon } from "@/lib/ddragon";
+import { championClass, championName, getDataDragon } from "@/lib/ddragon";
 import { loadMatch, loadTimelines } from "@/lib/match-store";
 import { isRegion } from "@/lib/regions";
 import { getAccount, getMatchIds } from "@/lib/riot/api";
@@ -13,6 +15,7 @@ import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
 import { fromSlug, toSlug } from "@/lib/riot-id";
 import { AnalysisProgress } from "./analysis-progress";
+import { BenchmarkComparison } from "./benchmark-comparison";
 import { LaningChart } from "./laning-chart";
 import { CsPhases, EarlyDeaths, LeadsAndDeficits } from "./trend-sections";
 import { Weaknesses } from "./weaknesses";
@@ -82,9 +85,10 @@ async function Insights({ params }: { params: Params }) {
   // Matches cost one Riot call the first time and come from Postgres after
   // that. One that fails to load is retried on the next reload, like a
   // missing timeline.
-  const [loaded, dd] = await Promise.all([
+  const [loaded, dd, benchmarks] = await Promise.all([
     mapWithLimit(ids.value, 5, (matchId) => settle(loadMatch(region, matchId))),
     getDataDragon().catch(() => null),
+    loadBenchmarks(),
   ]);
   const matches = loaded.flatMap((m) => (m.ok ? [m.value] : []));
   const trendMatches = matches.filter((m) => isTrendGame(m, puuid));
@@ -118,6 +122,9 @@ async function Insights({ params }: { params: Params }) {
 
   const trends = computeTrends(games);
   const label = (name: string) => championName(dd, name);
+  // Null until `npm run benchmarks` has filled the table, or when none of
+  // your games has enough Challenger games to compare with.
+  const comparison = compareWithBenchmarks(games, benchmarks, (name) => championClass(dd, name));
   return (
     <>
       {header}
@@ -134,6 +141,7 @@ async function Insights({ params }: { params: Params }) {
         <EarlyDeaths earlyDeaths={trends.earlyDeaths} games={games.length} />
         <CsPhases csPerMin={trends.csPerMin} />
       </div>
+      {comparison && <BenchmarkComparison comparison={comparison} dd={dd} />}
       <Footnote games={games.length} matches={matches} trendMatches={trendMatches} />
     </>
   );
