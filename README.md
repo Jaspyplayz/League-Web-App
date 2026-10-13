@@ -7,14 +7,7 @@
 
 **Live site:** https://league-web-app.vercel.app
 
-> **Status:** early development. Player search and the app's foundations are live. Real match data and the match analyzer are being built now. Everything below marked _planned_ isn't built yet.
-
-<!--
-  SCREENSHOTS: add them once the UI polish lands. See docs/screenshots/README.md
-  for the shot list and file names, then replace this block with e.g.
-  ![Match analysis](docs/screenshots/match-analysis.png)
--->
-_Screenshots coming soon. The UI is being polished; see [docs/screenshots](docs/screenshots/README.md)._
+![Match analysis: gold lead against the enemy jungler, minute by minute, with three numbered turning points explained on the right](docs/screenshots/match-analysis.png)
 
 ## Why Turnpoint
 
@@ -30,12 +23,20 @@ Across your recent games it turns those moments into patterns you can act on, li
 |---|---|
 | Search any player by Riot ID (`GameName#TAG`) and region | ✅ Built |
 | Shareable player URLs (`/player/kr/Faker-KR1`) | ✅ Built |
-| Player profile: rank, level and recent matches from the Riot API | ✅ Built |
-| Match detail: full scoreboard for all 10 players | Planned |
-| **Match analyzer:** gold, CS and XP difference vs your role opponent, per minute | Planned |
-| **Turning points:** the 1 to 3 biggest swings in a game, each with a plain-English reason | Planned |
-| Death breakdown: solo killed, ganked, teamfight or caught | Planned |
-| Insights tab: trends and recurring weaknesses across your last 20 games | Planned |
+| Player profile: rank, level, champions and recent matches | ✅ Built |
+| Match detail: full scoreboard for all 10 players | ✅ Built |
+| **Match analyzer:** gold, CS, XP and damage difference vs your role opponent, per minute | ✅ Built |
+| **Turning points:** the 1 to 3 biggest swings in a game, each with a plain-English reason | ✅ Built |
+| Death breakdown: solo killed, ganked, teamfight or caught | ✅ Built |
+| Team gold over time, with dragons, Baron, towers and other objectives | ✅ Built |
+| **Insights tab:** trends and recurring weaknesses across your last 20 games | ✅ Built |
+| Shareable match card image | Planned |
+
+![Player profile with ranked standing, champions and recent matches](docs/screenshots/player-profile.png)
+
+The **Insights** tab looks across your last 20 games: your gold against your opponent at 10 minutes in each game, how often you win when ahead or behind, how you die early, and how your CS holds up later in games. Simple, tested rules turn those into a "recurring weaknesses" card.
+
+![Insights: gold at 10 minutes in each of the last 20 games, and win rate when ahead or behind](docs/screenshots/insights.png)
 
 ## How the match analyzer works
 
@@ -58,10 +59,10 @@ The analyzer is the core of the project. The full research and design is in [doc
 | [Vitest](https://vitest.dev) | Unit tests | Fast, TypeScript-native, and a natural fit for testing the analyzer's pure functions. | ✅ In use |
 | [GitHub Actions](https://github.com/features/actions) | CI | Lint, type check, test and build on every pull request. | ✅ In use |
 | [Vercel](https://vercel.com) | Hosting | Zero-config Next.js hosting, automatic deploys from `main`, and a preview link for every PR. | ✅ In use |
-| [Riot Games API](https://developer.riotgames.com) | Player and match data | The official source for accounts, ranks, matches and timelines. | 🚧 In progress |
-| [Supabase](https://supabase.com) Postgres + [Drizzle ORM](https://orm.drizzle.team) | Match cache | Matches never change once played, so storing them avoids refetching and keeps us inside Riot's rate limits. | Planned |
-| [Sentry](https://sentry.io) | Error tracking | Reports crashes on the live site with the exact error and stack trace. | Planned |
-| [Recharts](https://recharts.org) | Charts | Simple line charts for the gold, CS and XP curves. | Planned |
+| [Riot Games API](https://developer.riotgames.com) | Player and match data | The official source for accounts, ranks, matches and timelines. | ✅ In use |
+| [Supabase](https://supabase.com) Postgres + [Drizzle ORM](https://orm.drizzle.team) | Match cache | Matches never change once played, so storing them avoids refetching and keeps us inside Riot's rate limits. | ✅ In use |
+| [Sentry](https://sentry.io) | Error tracking | Reports crashes on the live site with the exact error and stack trace. | ✅ In use |
+| Hand-written SVG | Charts | The gold, CS and XP curves are simple enough that a chart library wasn't worth the extra JavaScript. | ✅ In use |
 | [Playwright](https://playwright.dev) | End-to-end tests | One browser test of the search flow. | Planned |
 
 Everything runs on free tiers.
@@ -81,20 +82,18 @@ flowchart LR
     end
 
     Q -->|account, summoner,<br/>league, match-v5| R[(Riot Games API)]
-    N <-->|cached players,<br/>matches, timelines,<br/>insights| DB[(Supabase<br/>Postgres)]
+    N <-->|cached matches<br/>and timelines| DB[(Supabase<br/>Postgres)]
     N -.->|errors| S[Sentry]
     N -.->|champion and<br/>item images| DD[Data Dragon CDN]
 ```
-
-Today the app is the search page and player route on Vercel. The Riot client, database and Sentry are being added now, and the analyzer comes after them.
 
 **Key design decisions**
 
 - **The API key never reaches the browser.** All Riot calls happen on the server, in server components and server actions.
 - **Cache forever what never changes.** A finished match and its timeline are permanent, so they're stored once in Postgres. Only things that do change (rank, the latest match list) get short cache lifetimes.
-- **One rate-limited queue for every Riot call.** A personal API key allows 100 requests every 2 minutes, and loading one new player can take 20+ calls. The client reads Riot's rate-limit headers and backs off on `429` responses instead of hard-coding limits.
+- **One client for every Riot call, and a budget per page.** A development or personal API key allows 100 requests every 2 minutes, and loading one new player can take 20+ calls. The client backs off for as long as Riot asks after a `429`, and the Insights page fetches at most 5 new timelines per load, filling in the rest over a few automatic reloads.
 - **The analyzer is pure functions.** Match JSON in, insights out: no network, no database. That makes it easy to unit-test against saved real games.
-- **Insights are versioned.** Each stored result records the algorithm version that produced it, so improving the analyzer means recomputing from stored data, not refetching from Riot.
+- **Analysis is recomputed, not stored.** The analyzer runs on the stored match and timeline every time, so improving it never means refetching anything from Riot.
 
 The data model and the reasoning behind each choice are in [docs/SCOPE.md](docs/SCOPE.md).
 
@@ -106,9 +105,14 @@ src/
     page.tsx                    Home page with the search form
     actions.ts                  Server action that validates a search and redirects
     player/[region]/[riotId]/   Player profile page
-  components/                   React components (search form, Riot error messages)
+      match/[matchId]/          Match analysis page
+      insights/                 Trends across the last 20 games
+  components/                   React components (charts, match rows, icons, tabs)
+  db/                           Drizzle schema and database connection
   lib/                          Plain TypeScript helpers, most with a .test.ts
+    analyzer/                   The match analyzer: pure functions, match JSON in, insights out
     riot/                       Server-only Riot API client and one function per endpoint
+    match-store.ts              Load matches and timelines from Postgres, falling back to Riot
     match-summary.ts            Turn match JSON into KDA, CS/min, records and labels
     ddragon.ts                  Champion names and image URLs from Data Dragon
     regions.ts                  Region list and Riot's platform/regional routing
@@ -116,6 +120,7 @@ src/
 docs/
   SCOPE.md                      Scope, data model, stack and build order
   match-analyzer.md             Analyzer research: Riot data, insights, rate limits
+  database.md                   Database tables and setup
 ```
 
 ## Running locally
@@ -148,7 +153,7 @@ The key is only read on the server and never sent to the browser. For the live s
 
 [GitHub Actions](.github/workflows/ci.yml) runs lint, type check, tests and a production build on every pull request and every push to `main`. Vercel deploys `main` to the live site and builds a preview for each pull request.
 
-Current tests cover Riot ID parsing and URL slugs, region routing, the Riot client (errors, retries, rate limits) and match summaries. The analyzer's tests will run against saved real match and timeline JSON files, one per role plus edge cases like remakes.
+Current tests cover Riot ID parsing and URL slugs, region routing, the Riot client (errors, retries, rate limits), match summaries, cache freshness, and every part of the analyzer: finding your opponent, labeling deaths, turning points, objectives and the cross-game trends. The analyzer tests use small made-up games; testing against saved real games is next.
 
 ## Roadmap
 
@@ -156,12 +161,13 @@ Current tests cover Riot ID parsing and URL slugs, region routing, the Riot clie
 - [x] Research the match analyzer ([match-analyzer.md](docs/match-analyzer.md))
 - [x] Scaffold Next.js, TypeScript, Tailwind, tests and CI
 - [x] Deploy to Vercel
-- [ ] Riot API client with rate limiting, and a real player profile
-- [ ] Supabase schema and match caching
-- [ ] Sentry error tracking
-- [ ] Match detail page with the scoreboard
-- [ ] Match analyzer: opponent comparison chart, @10/@15 snapshot, turning points
-- [ ] Insights tab with cross-game trends
+- [x] Riot API client with rate limiting, and a real player profile
+- [x] Supabase schema and match caching
+- [x] Sentry error tracking
+- [x] Match detail page with the scoreboard
+- [x] Match analyzer: opponent comparison chart, @10/@15 snapshot, turning points
+- [x] Insights tab with cross-game trends
+- [ ] Analyzer tests against saved real games
 - [ ] End-to-end test of the search flow
 - [ ] Riot production API key and a custom domain
 
