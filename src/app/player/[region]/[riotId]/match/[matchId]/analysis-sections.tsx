@@ -1,9 +1,10 @@
 import type { TurningPointMarker } from "@/components/diff-chart";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
-import type { DataDragon } from "@/lib/ddragon";
+import { championIconUrl, type DataDragon } from "@/lib/ddragon";
 import type { Match } from "@/lib/riot/types";
 import { Deaths } from "./deaths";
+import { JungleMap, type MapPlayer } from "./jungle-map";
 import { LeadChart } from "./lead-chart";
 import { Matchup } from "./match-header";
 import { Scoreboard } from "./scoreboard";
@@ -13,7 +14,8 @@ import { TurningPoints } from "./turning-points";
 
 // Everything below the match header, once the match has been analyzed: the
 // matchup, @10 and @15 stats, the lead chart with turning points, team gold
-// with objectives, deaths, and the scoreboard. In the same order as the mockup.
+// with objectives, deaths, and the scoreboard. In the same order as the mockup,
+// plus the jungle map for junglers.
 export function AnalysisSections({
   match,
   analysis: a,
@@ -32,6 +34,12 @@ export function AnalysisSections({
     minute: p.timestamp / 60_000,
     label: `${formatClock(p.timestamp)} ${p.title}`,
     tone: p.swing > 0 ? "ahead" : "behind",
+  }));
+  const mapPlayers: MapPlayer[] = participants.map((p) => ({
+    participantId: p.participantId,
+    name: label(p.championName),
+    iconUrl: dd ? championIconUrl(dd, p.championName) : null,
+    ours: p.teamId === a.me.teamId,
   }));
 
   return (
@@ -56,6 +64,10 @@ export function AnalysisSections({
           />
           <TurningPoints points={a.turningPoints} />
         </div>
+      )}
+
+      {a.jungleReplay && (
+        <JungleMap replay={a.jungleReplay} players={mapPlayers} myTeamId={a.me.teamId} />
       )}
 
       <div className="flex flex-wrap items-start gap-5">

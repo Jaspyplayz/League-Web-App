@@ -9,6 +9,7 @@ import type { DiffPoint } from "@/lib/diff-chart";
 import { gameDurationSeconds } from "../match-summary";
 import type { Match, Participant } from "@/lib/riot/types";
 import { findDeaths, type Death } from "./deaths";
+import { jungleReplay, type JungleReplay } from "./jungle-replay";
 import {
   diffSeries,
   findOpponent,
@@ -42,6 +43,8 @@ export type MatchAnalysis = {
   // Your team's gold minus the enemy team's, per minute.
   teamGold: DiffPoint[];
   objectives: Objective[];
+  // Where both junglers were each minute. Null unless you played jungle.
+  jungleReplay: JungleReplay | null;
 };
 
 export function isAnalyzable(match: Match): boolean {
@@ -123,5 +126,6 @@ export function analyzeMatch(
     deaths,
     teamGold: teamGoldSeries(frames, participants, me.teamId),
     objectives: findObjectives(events, me.teamId),
+    jungleReplay: jungleReplay(timeline, participants, me, opponent),
   };
 }
