@@ -3,25 +3,28 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
-import { compareWithBenchmarks } from "@/lib/analyzer/compare";
-import { computeTrends, isTrendGame, summarizeGame, type GameTrend } from "@/lib/analyzer/trends";
+import { PanelHeading } from "@/components/ui/panel-heading";
+import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
+import { computeTrends } from "@/lib/analyzer/trends";
 import { loadBenchmarks } from "@/lib/benchmark-store";
-import { mapWithLimit } from "@/lib/concurrency";
 import { championClass, championName, getDataDragon } from "@/lib/ddragon";
-import { loadMatch, loadTimelines } from "@/lib/match-store";
 import { isRegion } from "@/lib/regions";
-import { getAccount, getMatchIds } from "@/lib/riot/api";
+import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
 import { fromSlug, toSlug } from "@/lib/riot-id";
+import { loadTrendGames } from "@/lib/trend-games";
 import { AnalysisProgress } from "./analysis-progress";
 import { BenchmarkComparison } from "./benchmark-comparison";
+import { loadChosenPlayer, readChoice } from "./chosen-player";
+import { CompareWithPlayer } from "./compare-with-player";
 import { LaningChart } from "./laning-chart";
 import { CsPhases, EarlyDeaths, LeadsAndDeficits } from "./trend-sections";
 import { Weaknesses } from "./weaknesses";
 
 // The insights page: trends across a player's last 20 games.
-// URL: /player/na/Name-TAG/insights
+// URL: /player/na/Name-TAG/insights, plus ?vs=Name%23TAG&vsRegion=kr when
+// comparing with another player.
 //
 // Every game needs its timeline, which costs one Riot call the first time.
 // A new player's 20 timelines would eat a fifth of the dev key's allowance
@@ -30,6 +33,7 @@ import { Weaknesses } from "./weaknesses";
 // far, and <AnalysisProgress> reloads it until every game is in.
 
 type Params = Promise<{ region: string; riotId: string }>;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = { title: "Insights" };
 
@@ -38,17 +42,23 @@ const TIMELINES_PER_VIEW = 5;
 // Trends from one or two games would be noise, so wait for a few.
 const MIN_GAMES = 3;
 
-export default function InsightsPage({ params }: { params: Params }) {
+export default function InsightsPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   return (
     <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-7 px-6 pb-20 pt-7">
       <Suspense fallback={<p className="text-muted">Loading insights…</p>}>
-        <Insights params={params} />
+        <Insights params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-async function Insights({ params }: { params: Params }) {
+async function Insights({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { region, riotId } = await params;
   const id = fromSlug(riotId);
   if (!isRegion(region) || !id) notFound();
@@ -72,42 +82,36 @@ async function Insights({ params }: { params: Params }) {
     </>
   );
 
-  const ids = await settle(getMatchIds(region, puuid, GAME_COUNT));
-  if (!ids.ok) {
-    return (
-      <>
-        {header}
-        <RiotErrorNotice error={ids.error} />
-      </>
-    );
-  }
-
-  // Matches cost one Riot call the first time and come from Postgres after
-  // that. One that fails to load is retried on the next reload, like a
-  // missing timeline.
   const [loaded, dd, benchmarks] = await Promise.all([
-    mapWithLimit(ids.value, 5, (matchId) => settle(loadMatch(region, matchId))),
+    settle(loadTrendGames(region, puuid, { count: GAME_COUNT, budget: TIMELINES_PER_VIEW })),
     getDataDragon().catch(() => null),
     loadBenchmarks(),
   ]);
-  const matches = loaded.flatMap((m) => (m.ok ? [m.value] : []));
-  const trendMatches = matches.filter((m) => isTrendGame(m, puuid));
+  if (!loaded.ok) {
+    return (
+      <>
+        {header}
+        <RiotErrorNotice error={loaded.error} />
+      </>
+    );
+  }
+  const { matches, trendMatches, games } = loaded.value;
 
-  const { timelines, error } = await loadTimelines(region, trendMatches, TIMELINES_PER_VIEW);
-  const games = trendMatches
-    .map((m) => {
-      const timeline = timelines.get(m.metadata.matchId);
-      return timeline ? summarizeGame(m, timeline, puuid) : null;
-    })
-    .filter((g): g is GameTrend => g !== null);
+  // The player picked in "Compare with a player", if any. Loaded after your
+  // games rather than alongside them, so the two don't hit Riot at once.
+  const choice = readChoice(await searchParams);
+  const chosen = choice ? await loadChosenPlayer(choice) : null;
+  const theirs = chosen?.status === "ok" ? chosen : null;
 
-  const waiting = trendMatches.length - games.length + (loaded.length - matches.length);
-  const firstError = error ?? loaded.find((m) => !m.ok)?.error ?? null;
+  // One progress bar for both players' games.
+  const waiting = loaded.value.waiting + (theirs?.waiting ?? 0);
+  const firstError = loaded.value.error ?? theirs?.error ?? null;
   const progress = (
     <AnalysisProgress
-      analyzed={games.length}
-      total={games.length + waiting}
+      analyzed={games.length + (theirs?.games.length ?? 0)}
+      total={games.length + (theirs?.games.length ?? 0) + waiting}
       retryAfterS={firstError?.kind === "rate-limited" ? (firstError.retryAfter ?? null) : null}
+      whose={theirs ? `your and ${theirs.name}'s games` : undefined}
     />
   );
 
@@ -122,9 +126,13 @@ async function Insights({ params }: { params: Params }) {
 
   const trends = computeTrends(games);
   const label = (name: string) => championName(dd, name);
+  const classOf = (name: string) => championClass(dd, name);
   // Null until `npm run benchmarks` has filled the table, or when none of
   // your games has enough Challenger games to compare with.
-  const comparison = compareWithBenchmarks(games, benchmarks, (name) => championClass(dd, name));
+  const comparison = compareWithBenchmarks(games, benchmarks, classOf);
+  const playerComparison = theirs
+    ? compareWithBenchmarks(games, theirs.games, classOf, MIN_PLAYER_GAMES)
+    : null;
   return (
     <>
       {header}
@@ -141,7 +149,18 @@ async function Insights({ params }: { params: Params }) {
         <EarlyDeaths earlyDeaths={trends.earlyDeaths} games={games.length} />
         <CsPhases csPerMin={trends.csPerMin} />
       </div>
-      {comparison && <BenchmarkComparison comparison={comparison} dd={dd} />}
+      {comparison && (
+        <section aria-labelledby="benchmark-heading" className="flex flex-col gap-3.5">
+          <PanelHeading id="benchmark-heading">You vs Challenger</PanelHeading>
+          <BenchmarkComparison comparison={comparison} against={{ kind: "challenger" }} dd={dd} />
+        </section>
+      )}
+      <CompareWithPlayer
+        chosen={chosen}
+        comparison={playerComparison}
+        clearHref={`${playerPath}/insights`}
+        dd={dd}
+      />
       <Footnote games={games.length} matches={matches} trendMatches={trendMatches} />
     </>
   );

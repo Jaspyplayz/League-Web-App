@@ -1,5 +1,6 @@
 // "You vs the top of solo queue": compares your recent games with benchmark
-// games from Challenger players (collected by scripts/collect-benchmarks.ts).
+// games from Challenger players (collected by scripts/collect-benchmarks.ts),
+// or with the recent games of one player you pick, such as a pro.
 //
 // Champions play very differently, so each of your games is compared with the
 // closest group of benchmark games that's big enough, in this order:
@@ -20,6 +21,9 @@ export type BenchmarkLevel = "one-trick" | "champion" | "class" | "role";
 
 // A group needs at least this many games before its averages mean much.
 export const MIN_BENCHMARK_GAMES = 10;
+// One player has only about 20 recent games, spread over a few champions, so
+// a group of their games can be smaller. The page shows how many it used.
+export const MIN_PLAYER_GAMES = 3;
 
 export type StatKey =
   | "goldAt10"
@@ -68,11 +72,13 @@ export type BenchmarkComparison = {
 type Pool = { level: BenchmarkLevel; games: BenchmarkGame[] };
 
 // `classOf` gives a champion's class, or null if unknown (see championClass in
-// src/lib/ddragon.ts). Returns null when none of your games could be compared.
+// src/lib/ddragon.ts). `minGames` is the smallest group worth comparing with.
+// Returns null when none of your games could be compared.
 export function compareWithBenchmarks(
   games: GameTrend[],
   benchmarks: BenchmarkGame[],
   classOf: (championName: string) => string | null,
+  minGames = MIN_BENCHMARK_GAMES,
 ): BenchmarkComparison | null {
   const oneTricks = findOneTricks(benchmarks);
   const byPosition = Map.groupBy(benchmarks, (b) => b.position);
@@ -81,7 +87,7 @@ export function compareWithBenchmarks(
   const pools = new Map<string, Pool | null>();
   const poolFor = (game: GameTrend): Pool | null => {
     const key = `${game.position}|${game.championName}`;
-    if (!pools.has(key)) pools.set(key, findPool(game, byPosition, oneTricks, classOf));
+    if (!pools.has(key)) pools.set(key, findPool(game, byPosition, oneTricks, classOf, minGames));
     return pools.get(key)!;
   };
 
@@ -117,6 +123,7 @@ function findPool(
   byPosition: Map<string, BenchmarkGame[]>,
   oneTricks: Map<string, string>,
   classOf: (championName: string) => string | null,
+  minGames: number,
 ): Pool | null {
   const inRole = byPosition.get(game.position) ?? [];
   const champion = game.championName;
@@ -129,7 +136,7 @@ function findPool(
   ];
   for (const [level, keep] of levels) {
     const pool = inRole.filter(keep);
-    if (pool.length >= MIN_BENCHMARK_GAMES) return { level, games: pool };
+    if (pool.length >= minGames) return { level, games: pool };
   }
   return null;
 }

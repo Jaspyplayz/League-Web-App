@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { compareWithBenchmarks, MIN_BENCHMARK_GAMES, type BenchmarkGame } from "./compare";
+import {
+  compareWithBenchmarks,
+  MIN_BENCHMARK_GAMES,
+  MIN_PLAYER_GAMES,
+  type BenchmarkGame,
+} from "./compare";
 import type { GameTrend } from "./trends";
 
 function game(overrides: Partial<GameTrend> = {}): GameTrend {
@@ -150,5 +155,18 @@ describe("compareWithBenchmarks", () => {
       classOf,
     )!;
     expect(result.stats.map((s) => s.key)).not.toContain("goldAt15");
+  });
+
+  it("can compare with one player's few games on a champion", () => {
+    // One player's last 20: 4 Lee Sin games and 16 Vi games.
+    const player = [
+      ...bench("pro", 4, { goldAt10: 500 }),
+      ...bench("pro", 16, { championName: "Vi", goldAt10: 100 }),
+    ];
+    const [lee] = compareWithBenchmarks([game()], player, classOf, MIN_PLAYER_GAMES)!.champions;
+    expect(lee.level).toBe("champion");
+    expect(lee.sample).toEqual({ games: 4, players: 1 });
+    // With the Challenger minimum, 4 games is too few, so it uses the class.
+    expect(compareWithBenchmarks([game()], player, classOf)!.champions[0].level).toBe("class");
   });
 });
