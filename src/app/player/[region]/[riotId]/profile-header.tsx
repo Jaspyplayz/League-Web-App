@@ -1,6 +1,6 @@
-import Image from "next/image";
+import { ProfileIcon } from "@/components/game-icons";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
-import { getDataDragon, profileIconUrl } from "@/lib/ddragon";
+import { getDataDragon } from "@/lib/ddragon";
 import { findQueue, formatTier, winRate } from "@/lib/match-summary";
 import { REGIONS, type Region } from "@/lib/regions";
 import { getRankedEntries, getSummoner } from "@/lib/riot/api";
@@ -21,16 +21,12 @@ export async function ProfileHeader({ region, puuid, gameName, tagLine }: Props)
   return (
     <section aria-label="Player summary" className="flex flex-col gap-6">
       <div className="flex items-center gap-5">
-        {summoner.ok && dd && (
-          <Image
-            src={profileIconUrl(dd, summoner.value.profileIconId)}
-            alt=""
-            width={80}
-            height={80}
-            unoptimized
-            className="rounded-2xl"
-          />
-        )}
+        <ProfileIcon
+          dd={dd}
+          iconId={summoner.ok ? summoner.value.profileIconId : null}
+          level={summoner.ok ? summoner.value.summonerLevel : null}
+          name={gameName}
+        />
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-semibold">
             {gameName}

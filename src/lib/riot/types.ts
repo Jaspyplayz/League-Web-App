@@ -41,6 +41,8 @@ export type Participant = {
   item4: number;
   item5: number;
   item6: number; // trinket
+  summoner1Id: number; // summoner spells, e.g. 4 = Flash (names come from Data Dragon)
+  summoner2Id: number;
   gameEndedInEarlySurrender?: boolean;
 };
 

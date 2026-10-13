@@ -49,6 +49,7 @@ export type MatchSummary = {
   csPerMin: number;
   killParticipation: number; // 0 to 1
   items: number[]; // 7 slots, 0 = empty, the last one is the trinket
+  spells: [number, number]; // summoner spell ids
 };
 
 export function gameDurationSeconds(info: Match["info"]): number {
@@ -91,6 +92,7 @@ export function summarizeMatch(match: Match, puuid: string): MatchSummary | null
     csPerMin: durationS > 0 ? cs / (durationS / 60) : 0,
     killParticipation: teamKills > 0 ? (me.kills + me.assists) / teamKills : 0,
     items: [me.item0, me.item1, me.item2, me.item3, me.item4, me.item5, me.item6],
+    spells: [me.summoner1Id, me.summoner2Id],
   };
 }
 
