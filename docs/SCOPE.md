@@ -6,7 +6,7 @@ This doc is the plan for the first version. It will change as we build.
 
 ## Standout feature
 
-The one feature that makes this more than another op.gg clone. Pick one.
+**Chosen: A, the match analyzer.** The table keeps the alternatives for reference.
 
 | Option | What it does | Why it's interesting | Effort |
 |---|---|---|---|
@@ -14,14 +14,14 @@ The one feature that makes this more than another op.gg clone. Pick one.
 | **B. Champion pool advisor** | Looks at a player's history and recommends which champions to focus on, which to drop, and their worst matchups. | Fun recommendation logic, but needs a lot of matches per player before it says anything useful. | Medium |
 | **C. Live game scout** | During loading screen, shows each opponent's recent form, main champions and win streaks. | Very visible, but depends on the spectator API and on someone being in a game when a recruiter clicks the link. Hard to demo. | Medium-high |
 
-**Recommendation: A.** It works for any player at any time (good for demos), it builds on the same match data the core app needs anyway, and it naturally adds B-style insights later.
+**Why A:** It works for any player at any time (good for demos), it builds on the same match data the core app needs anyway, and it naturally adds B-style insights later.
 
 ## MVP pages
 
 1. **Home / search**: search by Riot ID (`GameName#TAG`) and region.
 2. **Player profile**: name, icon, level, ranked tier, and the last 20 matches (champion, KDA, CS, result, game length).
 3. **Match detail**: all 10 players, items, damage, and the standout analysis for the searched player (lead/deficit chart and turning points).
-4. **Insights tab** on the profile: trends across recent games (only if A is chosen).
+4. **Insights tab** on the profile: trends across recent games.
 
 Out of scope for v1: user accounts, live game data, mobile app, every queue type beyond ranked solo/flex and normal draft.
 
@@ -86,5 +86,5 @@ All free tiers. Local development runs with `npm run dev` against the free Supab
 1. Scaffold Next.js + TypeScript + Tailwind, CI, deploy "hello world" to Vercel.
 2. Riot client with rate limiting, player lookup, profile page.
 3. Database schema, match caching, match detail page.
-4. Standout feature.
+4. Match analyzer: lane-opponent comparison, turning points, insights tab.
 5. Tests, README with screenshots and architecture diagram, production key application.
