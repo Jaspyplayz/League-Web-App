@@ -97,7 +97,7 @@ export function EarlyDeaths({
                     style={{ width: `${(count / total) * 100}%` }}
                   />
                 </div>
-                <span className="w-16 flex-none text-right font-mono text-faint">
+                <span className="w-24 flex-none whitespace-nowrap text-right font-mono text-faint">
                   {count} · {Math.round((count / total) * 100)}%
                 </span>
               </li>
