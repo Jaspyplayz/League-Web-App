@@ -1,0 +1,97 @@
+# Database
+
+Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for the same thing twice. The plan behind this is in [match-analyzer.md](./match-analyzer.md#rate-limits-and-caching); this doc covers the tables, the setup, and how to use them from code.
+
+## Tables
+
+| Table | One row per | Refetch from Riot |
+|---|---|---|
+| `players` | searched player (by PUUID) | profile after 24 h, rank after 15 min, match list on "Update" (2 min cooldown) |
+| `ranked_entries` | player × ranked queue | with the player's rank |
+| `matches` | game, with the full match-v5 JSON in `raw` | never |
+| `match_participants` | player × game (the scoreboard) | never (filled from `matches.raw`) |
+| `match_timelines` | game, trimmed timeline | never, fetched only when the match is opened |
+| `match_insights` | player × game, analyzer output | never; recomputed locally when `version` changes |
+
+The schema lives in [`src/db/schema.ts`](../src/db/schema.ts), with a comment on every column that isn't obvious. The refresh rules live in [`src/db/freshness.ts`](../src/db/freshness.ts).
+
+Row level security is on for every table with no policies. The app connects to Postgres directly from the server, which isn't affected by RLS, while Supabase's public REST API can't read or write anything. Turnpoint has no user accounts, so nothing needs that API.
+
+## Setup
+
+The Supabase project is `turnpoint` (free tier, `us-east-1`, same region as Vercel's default functions). The tables already exist there.
+
+1. In the Supabase dashboard, open the project, then **Project Settings → Database → Reset database password**. Save the new password in a password manager.
+2. Click **Connect** at the top of the dashboard and copy two connection strings, putting your password in place of `[YOUR-PASSWORD]`:
+   - **Transaction pooler** (port `6543`) → `DATABASE_URL`
+   - **Session pooler** (port `5432`) → `DATABASE_URL_DIRECT`
+3. Put both in `.env.local` (see `.env.example`).
+4. In Vercel, **Project → Settings → Environment Variables**, add `DATABASE_URL` (transaction pooler) for Production and Preview. Vercel doesn't need `DATABASE_URL_DIRECT`.
+
+Use the pooler URLs, not the "Direct connection" one: on the free tier the direct host is IPv6-only, which many home networks and Vercel can't reach.
+
+## Changing the schema
+
+1. Edit `src/db/schema.ts`.
+2. `npm run db:generate` writes a new SQL file in `drizzle/`. Read it: it's the exact SQL that will run.
+3. `npm run db:migrate` applies any SQL files the database hasn't seen yet (it uses `DATABASE_URL_DIRECT`).
+4. Commit the schema change and the new `drizzle/` files together.
+
+`npm run db:studio` opens a browser view of the tables, handy for checking what got cached.
+
+## Using it from code
+
+Import from `@/db` in server code only (Server Components, Server Actions, route handlers). The file starts with `import "server-only"`, so importing it into a Client Component fails the build.
+
+```ts
+import { desc, eq, inArray } from "drizzle-orm";
+import { getDb, tables } from "@/db";
+import { isFresh, TTL_MS } from "@/db/freshness";
+
+const db = getDb();
+
+// Is this player cached and recent enough?
+const player = await db.query.players.findFirst({
+  where: eq(tables.players.puuid, puuid),
+});
+if (!isFresh(player?.fetchedAt, TTL_MS.profile)) {
+  // call Riot, then upsert:
+  await db
+    .insert(tables.players)
+    .values({ puuid, gameName, tagLine, region, profileIconId, summonerLevel })
+    .onConflictDoUpdate({
+      target: tables.players.puuid,
+      set: { gameName, tagLine, profileIconId, summonerLevel, fetchedAt: new Date() },
+    });
+}
+
+// Which of these match IDs do we still need to fetch?
+const known = await db
+  .select({ id: tables.matches.matchId })
+  .from(tables.matches)
+  .where(inArray(tables.matches.matchId, matchIds));
+
+// Store a match once. It never changes, so a duplicate is ignored.
+await db.transaction(async (tx) => {
+  await tx.insert(tables.matches).values({ matchId, platformId, queueId, gameVersion, gameStartAt, durationS, raw }).onConflictDoNothing();
+  await tx.insert(tables.matchParticipants).values(participantRows).onConflictDoNothing();
+});
+
+// A player's last 20 games, newest first.
+const games = await db
+  .select()
+  .from(tables.matchParticipants)
+  .innerJoin(tables.matches, eq(tables.matches.matchId, tables.matchParticipants.matchId))
+  .where(eq(tables.matchParticipants.puuid, puuid))
+  .orderBy(desc(tables.matches.gameStartAt))
+  .limit(20);
+```
+
+### Wiring it into the Riot client
+
+The suggested shape is a thin "cached" layer in front of each Riot call, so pages never call Riot directly:
+
+- **Player lookup:** check `players` by Riot ID (the `players_riot_id_idx` index makes this case-insensitive) or PUUID; call `account-v1` and `summoner-v4` only when the row is missing or older than `TTL_MS.profile`.
+- **Rank:** same, using `ranked_fetched_at` and `TTL_MS.ranked`. Replace the player's `ranked_entries` rows in one transaction, and set `ranked_fetched_at` even when they're unranked.
+- **Match list:** refresh the ID list only when the user clicks "Update" and `match_ids_fetched_at` is older than `TTL_MS.matchIdsCooldown`; fetch `match-v5` only for IDs not already in `matches`.
+- **Timeline:** fetch when a match is opened and there's no `match_timelines` row; store the trimmed version with a `trim_version`.
