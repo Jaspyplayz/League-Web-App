@@ -16,6 +16,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  real,
   smallint,
   text,
   timestamp,
@@ -174,5 +175,43 @@ export const matchInsights = pgTable(
   (t) => [
     primaryKey({ columns: [t.matchId, t.puuid] }),
     index("match_insights_puuid_idx").on(t.puuid),
+  ],
+).enableRLS();
+
+// Benchmark games: one row per game from a top solo queue player (Challenger
+// on KR, EUW or NA), collected by `npm run benchmarks`. Insights compares your
+// games with these. Only the small per-game summary from summarizeGame is
+// kept, not the match or timeline, so thousands of games stay a few MB.
+//
+// PUUIDs are tied to the Riot API key's app. If Turnpoint moves to a new key
+// (a production key), delete every row here and collect again.
+export const benchmarkGames = pgTable(
+  "benchmark_games",
+  {
+    matchId: text("match_id").notNull(),
+    puuid: text("puuid").notNull(),
+    // Our region key from src/lib/regions.ts: "kr", "euw" or "na".
+    region: text("region").notNull(),
+    gameStartAt: timestamptz("game_start_at").notNull(),
+    championName: text("champion_name").notNull(),
+    // "TOP", "JUNGLE", "MIDDLE", "BOTTOM" or "UTILITY".
+    position: text("position").notNull(),
+    win: boolean("win").notNull(),
+    // You minus your opponent, as in GameTrend. Null when the game ended earlier.
+    goldAt10: integer("gold_at_10"),
+    csAt10: integer("cs_at_10"),
+    goldAt15: integer("gold_at_15"),
+    // DeathLabel[] for each death before 14:00, e.g. ["gank", "solo"].
+    earlyDeaths: jsonb("early_deaths").notNull(),
+    csPerMinEarly: real("cs_per_min_early").notNull(),
+    csPerMinMid: real("cs_per_min_mid"),
+    csPerMinLate: real("cs_per_min_late"),
+    collectedAt: timestamptz("collected_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.matchId, t.puuid] }),
+    // Insights looks benchmarks up by role, then champion.
+    index("benchmark_games_position_idx").on(t.position, t.championName),
+    index("benchmark_games_puuid_idx").on(t.puuid),
   ],
 ).enableRLS();

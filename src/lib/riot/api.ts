@@ -4,7 +4,7 @@ import { mapWithLimit } from "@/lib/concurrency";
 import { accountRegional, REGIONS, type Region } from "@/lib/regions";
 import type { RiotId } from "@/lib/riot-id";
 import { RiotApiError, riotGet } from "./client";
-import type { Account, LeagueEntry, Match, Summoner, Timeline } from "./types";
+import type { Account, LeagueEntry, LeagueList, Match, Summoner, Timeline } from "./types";
 
 // One function per Riot endpoint the app uses. Each picks the right host:
 // account and match data live on regional clusters ("americas"), player data
@@ -39,10 +39,23 @@ export function getRankedEntries(region: Region, puuid: string) {
   );
 }
 
-export function getMatchIds(region: Region, puuid: string, count: number) {
+// Ranked solo/duo is queue 420. Leave `queue` out to get every game mode.
+export const RANKED_SOLO_QUEUE = 420;
+
+export function getMatchIds(region: Region, puuid: string, count: number, queue?: number) {
+  const onlyQueue = queue === undefined ? "" : `&queue=${queue}`;
   return riotGet<string[]>(
     REGIONS[region].regional,
-    `/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=${count}`,
+    `/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=${count}${onlyQueue}`,
+  );
+}
+
+// The Challenger tier of ranked solo/duo on one server: its top ~300 players
+// (200 on smaller servers).
+export function getChallengerLeague(region: Region) {
+  return riotGet<LeagueList>(
+    REGIONS[region].platform,
+    "/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5",
   );
 }
 

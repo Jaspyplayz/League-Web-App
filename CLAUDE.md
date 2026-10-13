@@ -32,6 +32,7 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   and trends.ts rolls games up into the Insights page
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/db/           Drizzle schema, connection, and cache freshness rules
+scripts/          Command-line jobs run with tsx (npm run benchmarks)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
 ```
@@ -46,6 +47,7 @@ docs/             Design and research docs
 | `npm test` | Vitest unit tests |
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
+| `npm run benchmarks` | Collect Challenger games for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.**
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { match, participants } from "../lib/analyzer/test-fixtures";
-import { matchRow, participantRows } from "./rows";
+import { benchmarkRow, matchRow, participantRows } from "./rows";
 
 describe("matchRow", () => {
   it("copies the match details and keeps the whole payload", () => {
@@ -52,6 +52,43 @@ describe("participantRows", () => {
       damageToChampions: 22_700,
       visionScore: 18,
       items: [3089, 0, 0, 0, 0, 0, 3340],
+    });
+  });
+});
+
+describe("benchmarkRow", () => {
+  it("flattens a game summary into a row", () => {
+    const row = benchmarkRow(
+      {
+        matchId: "KR_1",
+        startedAt: 1_700_000_000_000,
+        win: true,
+        championName: "LeeSin",
+        position: "JUNGLE",
+        goldAt10: 350,
+        csAt10: 4,
+        goldAt15: null,
+        earlyDeaths: ["caught"],
+        csPerMin: { early: 6.1, mid: 6.8, late: null },
+      },
+      "puuid-1",
+      "kr",
+    );
+    expect(row).toEqual({
+      matchId: "KR_1",
+      puuid: "puuid-1",
+      region: "kr",
+      gameStartAt: new Date(1_700_000_000_000),
+      championName: "LeeSin",
+      position: "JUNGLE",
+      win: true,
+      goldAt10: 350,
+      csAt10: 4,
+      goldAt15: null,
+      earlyDeaths: ["caught"],
+      csPerMinEarly: 6.1,
+      csPerMinMid: 6.8,
+      csPerMinLate: null,
     });
   });
 });
