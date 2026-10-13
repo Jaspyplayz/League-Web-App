@@ -73,6 +73,7 @@ Dark "scouting report" style. Tokens live in `src/app/globals.css`: **blue = you
 - Finished matches and timelines are cached forever; only rank and match lists expire (see `src/db/freshness.ts`).
 - Keep the analyzer as pure functions (match JSON in, results out) with Vitest tests.
 - Write comments that explain *why* in plain language, matching the existing code.
+- `/privacy` and `/terms` are what Riot reviews for production keys and Riot sign-in. A change that stores new data (accounts, analytics, cookies) updates `src/app/privacy/page.tsx` in the same PR.
 
 ## Working conventions
 

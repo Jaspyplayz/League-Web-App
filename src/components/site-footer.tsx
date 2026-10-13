@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { REPO_URL } from "./site-header";
 
 export function SiteFooter() {
@@ -15,7 +16,15 @@ export function SiteFooter() {
           Built by Jasper ·{" "}
           <a href={REPO_URL} className="text-ahead-soft hover:text-ahead-bright">
             Source on GitHub
-          </a>
+          </a>{" "}
+          ·{" "}
+          <Link href="/privacy" className="text-ahead-soft hover:text-ahead-bright">
+            Privacy
+          </Link>{" "}
+          ·{" "}
+          <Link href="/terms" className="text-ahead-soft hover:text-ahead-bright">
+            Terms
+          </Link>
         </p>
       </div>
     </footer>
