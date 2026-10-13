@@ -1,0 +1,79 @@
+import "server-only";
+
+import { mapWithLimit } from "@/lib/concurrency";
+import { accountRegional, REGIONS, type Region } from "@/lib/regions";
+import type { RiotId } from "@/lib/riot-id";
+import { RiotApiError, riotGet } from "./client";
+import type { Account, LeagueEntry, Match, Summoner } from "./types";
+
+// One function per Riot endpoint the app uses. Each picks the right host:
+// account and match data live on regional clusters ("americas"), player data
+// on platform servers ("na1"). See src/lib/regions.ts.
+
+// Riot ID -> account (with the PUUID every other endpoint needs). Returns null
+// when no such player exists, since that's an answer rather than a failure.
+export async function getAccount(
+  region: Region,
+  { gameName, tagLine }: RiotId,
+): Promise<Account | null> {
+  const path = `/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
+  try {
+    return await riotGet<Account>(accountRegional(region), path);
+  } catch (error) {
+    if (error instanceof RiotApiError && error.kind === "not-found") return null;
+    throw error;
+  }
+}
+
+export function getSummoner(region: Region, puuid: string) {
+  return riotGet<Summoner>(
+    REGIONS[region].platform,
+    `/lol/summoner/v4/summoners/by-puuid/${puuid}`,
+  );
+}
+
+export function getRankedEntries(region: Region, puuid: string) {
+  return riotGet<LeagueEntry[]>(
+    REGIONS[region].platform,
+    `/lol/league/v4/entries/by-puuid/${puuid}`,
+  );
+}
+
+export function getMatchIds(region: Region, puuid: string, count: number) {
+  return riotGet<string[]>(
+    REGIONS[region].regional,
+    `/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=${count}`,
+  );
+}
+
+// A finished match never changes, so once we've downloaded one we keep it in
+// memory and never ask Riot for it again. The Map holds the newest
+// MAX_CACHED_MATCHES; on Vercel each server instance has its own, so this is a
+// stopgap until matches are stored in the database.
+const MAX_CACHED_MATCHES = 500;
+const matchCache = new Map<string, Match>();
+
+export async function getMatch(region: Region, matchId: string): Promise<Match> {
+  const cached = matchCache.get(matchId);
+  if (cached) return cached;
+
+  const match = await riotGet<Match>(
+    REGIONS[region].regional,
+    `/lol/match/v5/matches/${encodeURIComponent(matchId)}`,
+  );
+
+  matchCache.set(matchId, match);
+  if (matchCache.size > MAX_CACHED_MATCHES) {
+    // Maps remember insertion order, so the first key is the oldest.
+    matchCache.delete(matchCache.keys().next().value!);
+  }
+  return match;
+}
+
+// Riot allows 20 requests per second, so fetch at most 5 matches at a time.
+const MATCH_CONCURRENCY = 5;
+
+export async function getRecentMatches(region: Region, puuid: string, count: number) {
+  const ids = await getMatchIds(region, puuid, count);
+  return mapWithLimit(ids, MATCH_CONCURRENCY, (id) => getMatch(region, id));
+}
