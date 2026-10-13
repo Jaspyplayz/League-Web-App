@@ -28,7 +28,7 @@ export function LaningChart({
 
   return (
     <section aria-labelledby="laning-heading" className="flex flex-col gap-3.5">
-      <PanelHeading id="laning-heading">Laning: gold at 10 minutes</PanelHeading>
+      <PanelHeading id="laning-heading">Early game: gold at 10 minutes</PanelHeading>
       <div className="flex flex-col gap-5 rounded-2xl border border-line-strong bg-surface p-[22px]">
         <dl className="flex flex-wrap gap-x-10 gap-y-3">
           <Stat
