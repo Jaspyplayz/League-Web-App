@@ -78,8 +78,17 @@ async function saveMatch(db: Db, match: Match) {
   });
 }
 
+// Null when there's no usable database, so callers go straight to Riot.
+// A malformed DATABASE_URL (say, a password with a "#" that isn't
+// URL-encoded) makes getDb() throw; that must not break the page either.
 function database(): Db | null {
-  return process.env.DATABASE_URL ? getDb() : null;
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    return getDb();
+  } catch (error) {
+    Sentry.captureException(error);
+    return null;
+  }
 }
 
 // Runs a cache lookup. Any failure counts as a cache miss.
