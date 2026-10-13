@@ -21,6 +21,7 @@ import { and, eq, inArray, lt, notInArray } from "drizzle-orm";
 import { getDb, tables, type Db } from "@/db";
 import { benchmarkRow } from "@/db/rows";
 import { findOneTricks, ONE_TRICK_WINDOW, topPlayers } from "@/lib/analyzer/benchmarks";
+import { plural } from "@/lib/analyzer/format";
 import { isTrendGame, summarizeGame } from "@/lib/analyzer/trends";
 import { trimTimeline } from "@/lib/analyzer/trim";
 import { createPacer } from "@/lib/pace";
@@ -193,10 +194,6 @@ async function printSummary(db: Db) {
         `${plural(theirOneTricks.length, "one-trick")}${champions}`,
     );
   }
-}
-
-function plural(count: number, word: string) {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
 main().catch((error: unknown) => {
