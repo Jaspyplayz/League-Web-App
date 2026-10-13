@@ -17,7 +17,11 @@ import { settle } from "@/lib/riot/client";
 // the database and repeat visits stop costing calls.
 const MATCH_COUNT = 10;
 
-export async function RecentMatches({ region, puuid }: { region: Region; puuid: string }) {
+// playerPath is this player's page, e.g. "/player/na/Name-TAG". Each row
+// links to its match analysis under it.
+type Props = { region: Region; puuid: string; playerPath: string };
+
+export async function RecentMatches({ region, puuid, playerPath }: Props) {
   const [result, dd] = await Promise.all([
     settle(getRecentMatches(region, puuid, MATCH_COUNT)),
     getDataDragon().catch(() => null),
@@ -81,7 +85,13 @@ export async function RecentMatches({ region, puuid }: { region: Region; puuid: 
         </h2>
         <ul className="flex flex-col gap-2">
           {matches.map((m) => (
-            <MatchRow key={m.matchId} match={m} dd={dd} now={now} />
+            <MatchRow
+              key={m.matchId}
+              match={m}
+              dd={dd}
+              now={now}
+              href={`${playerPath}/match/${m.matchId}`}
+            />
           ))}
         </ul>
       </section>
