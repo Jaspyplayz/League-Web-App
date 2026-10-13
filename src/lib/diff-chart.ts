@@ -108,6 +108,9 @@ export function formatDiff(value: number): string {
 }
 
 function tickStep(span: number): number {
+  // Small steps for small numbers, like a CS difference of 20.
+  if (span <= 40) return 10;
+  if (span <= 100) return 25;
   if (span <= 400) return 100;
   if (span <= 2000) return 500;
   if (span <= 6000) return 1000;
