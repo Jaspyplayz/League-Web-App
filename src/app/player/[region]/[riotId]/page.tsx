@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
@@ -42,17 +43,15 @@ async function Player({ params }: { params: Params }) {
   if (!account.value) return <PlayerNotFound region={region} id={id} />;
 
   const { puuid, gameName, tagLine } = account.value;
+  const playerPath = `/player/${region}/${toSlug(account.value)}`;
   return (
     <>
       <Suspense fallback={<HeaderPlaceholder gameName={gameName} tagLine={tagLine} />}>
         <ProfileHeader region={region} puuid={puuid} gameName={gameName} tagLine={tagLine} />
       </Suspense>
+      <ProfileTabs playerPath={playerPath} current="matches" />
       <Suspense fallback={<p className="text-zinc-500">Loading recent matches…</p>}>
-        <RecentMatches
-          region={region}
-          puuid={puuid}
-          playerPath={`/player/${region}/${toSlug(account.value)}`}
-        />
+        <RecentMatches region={region} puuid={puuid} playerPath={playerPath} />
       </Suspense>
     </>
   );
