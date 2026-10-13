@@ -30,7 +30,7 @@ Across your recent games it turns those moments into patterns you can act on, li
 |---|---|
 | Search any player by Riot ID (`GameName#TAG`) and region | ✅ Built |
 | Shareable player URLs (`/player/kr/Faker-KR1`) | ✅ Built |
-| Player profile: rank, level and recent matches from the Riot API | 🚧 In progress |
+| Player profile: rank, level and recent matches from the Riot API | ✅ Built |
 | Match detail: full scoreboard for all 10 players | Planned |
 | **Match analyzer:** gold, CS and XP difference vs your role opponent, per minute | Planned |
 | **Turning points:** the 1 to 3 biggest swings in a game, each with a plain-English reason | Planned |
@@ -106,8 +106,11 @@ src/
     page.tsx                    Home page with the search form
     actions.ts                  Server action that validates a search and redirects
     player/[region]/[riotId]/   Player profile page
-  components/                   React components (search form)
-  lib/                          Plain TypeScript helpers, each with a .test.ts
+  components/                   React components (search form, Riot error messages)
+  lib/                          Plain TypeScript helpers, most with a .test.ts
+    riot/                       Server-only Riot API client and one function per endpoint
+    match-summary.ts            Turn match JSON into KDA, CS/min, records and labels
+    ddragon.ts                  Champion names and image URLs from Data Dragon
     regions.ts                  Region list and Riot's platform/regional routing
     riot-id.ts                  Parse and validate "GameName#TAG", build URL slugs
 docs/
@@ -131,6 +134,8 @@ Open http://localhost:3000.
 
 `.env.local` is ignored by git, so your key is never committed. Development keys expire every 24 hours; regenerate one in the portal when requests start failing.
 
+The key is only read on the server and never sent to the browser. For the live site, add `RIOT_API_KEY` in Vercel under Project → Settings → Environment Variables (Production and Preview), then redeploy.
+
 ## Testing and CI
 
 | Command | What it does |
@@ -143,7 +148,7 @@ Open http://localhost:3000.
 
 [GitHub Actions](.github/workflows/ci.yml) runs lint, type check, tests and a production build on every pull request and every push to `main`. Vercel deploys `main` to the live site and builds a preview for each pull request.
 
-Current tests cover Riot ID parsing and URL slugs, and region routing. The analyzer's tests will run against saved real match and timeline JSON files, one per role plus edge cases like remakes.
+Current tests cover Riot ID parsing and URL slugs, region routing, the Riot client (errors, retries, rate limits) and match summaries. The analyzer's tests will run against saved real match and timeline JSON files, one per role plus edge cases like remakes.
 
 ## Roadmap
 
