@@ -1,0 +1,30 @@
+# Dependabot opens PRs when our dependencies publish new versions.
+# CI runs on each PR, so a breaking update shows up as a red check before it reaches main.
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  # npm packages from package.json (Next.js, Sentry, Drizzle, ...)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Minor and patch updates land together in one PR a week instead of one PR per package.
+    # Major versions are left out of the group so each gets its own PR, since those can break things.
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 5
+
+  # Versions of the actions used in .github/workflows (checkout, setup-node, ...)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
