@@ -149,7 +149,7 @@ describe("weaknesses", () => {
     expect(weakness.detail).toBe("10 of your 15 deaths before 14:00 came from ganks (67%).");
   });
 
-  it("flags CS dropping off after laning", () => {
+  it("flags CS dropping off after the early game", () => {
     const games = many(5, { csPerMin: { early: 8, mid: 7, late: 5 } });
     expect(computeTrends(games).weaknesses[0].detail).toBe(
       "You farm 8.0 CS a minute in the first 10 minutes but 5.0 after 20 minutes.",

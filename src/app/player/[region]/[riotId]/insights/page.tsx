@@ -166,7 +166,7 @@ function Footnote({
       Based on {games} of your last {matches.length} games, each compared with the enemy who played
       your role.
       {skipped > 0 &&
-        ` ${skipped} ${skipped === 1 ? "game was" : "games were"} skipped: ARAM, Arena, remakes and games under 15 minutes have no laning to compare.`}
+        ` ${skipped} ${skipped === 1 ? "game was" : "games were"} skipped: ARAM, Arena, remakes and games under 15 minutes have no role matchup to compare.`}
     </p>
   );
 }

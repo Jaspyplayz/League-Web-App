@@ -244,7 +244,7 @@ export function findWeaknesses(trends: Trends, farming: GameTrend[]): Weakness[]
         : null;
   if (later && csPerMin.early && later.rate < csPerMin.early * CS_DROP) {
     found.push({
-      title: "CS drops after laning",
+      title: "CS drops after the early game",
       detail: `You farm ${csPerMin.early.toFixed(1)} CS a minute in the first 10 minutes but ${later.rate.toFixed(1)} ${later.when}.`,
       strength: 1 - later.rate / csPerMin.early,
     });
@@ -267,7 +267,9 @@ const EARLY_DEATH_CAUSES: Record<DeathLabel, string> = {
   gank: "ganks",
   solo: "your opponent killing you alone",
   lane: "losing 2v2s in bot lane",
-  caught: "getting caught away from your lane",
+  // Junglers have no lane, so every death to one or two enemies other than
+  // the enemy jungler counts as caught for them. Keep this role-neutral.
+  caught: "getting caught out by one or two enemies",
   teamfight: "teamfights",
   executed: "towers or minions",
 };
