@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDataDragon,
+  championClass,
   championIconUrl,
   championName,
   itemIconUrl,
@@ -14,7 +15,7 @@ const dd = buildDataDragon(
   "15.20.1",
   {
     data: {
-      Ahri: { id: "Ahri", name: "Ahri" },
+      Ahri: { id: "Ahri", name: "Ahri", tags: ["Mage", "Assassin"] },
       Fiddlesticks: { id: "Fiddlesticks", name: "Fiddlesticks" },
       MonkeyKing: { id: "MonkeyKing", name: "Wukong" },
     },
@@ -37,6 +38,12 @@ describe("champions", () => {
 
   it("matches ids whatever their capitals", () => {
     expect(championIconUrl(dd, "FiddleSticks")).toBe(`${CDN}/champion/Fiddlesticks.png`);
+  });
+
+  it("uses the first tag as the champion's class", () => {
+    expect(championClass(dd, "Ahri")).toBe("Mage");
+    expect(championClass(dd, "MonkeyKing")).toBeNull();
+    expect(championClass(null, "Ahri")).toBeNull();
   });
 
   it("falls back to the raw name for unknown champions or no Data Dragon", () => {
