@@ -11,7 +11,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatClock, formatSigned } from "@/lib/analyzer/format";
-import { EVEN_LANE_LEAD, LANES, type JungleReplay, type Lane } from "@/lib/analyzer/jungle-replay";
+import { LANES, laneTone, type JungleReplay, type Lane } from "@/lib/analyzer/jungle-replay";
 import { describeSpot } from "@/lib/analyzer/map";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
 import type { MapPosition } from "@/lib/riot/types";
@@ -239,11 +239,6 @@ export function JungleMap({ replay, players, myTeamId }: Props) {
       </div>
     </section>
   );
-}
-
-function laneTone(lead: number | null): "ahead" | "behind" | "even" {
-  if (lead === null || Math.abs(lead) < EVEN_LANE_LEAD) return "even";
-  return lead > 0 ? "ahead" : "behind";
 }
 
 const TONE_COLOR = {
