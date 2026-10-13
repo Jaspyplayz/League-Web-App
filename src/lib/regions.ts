@@ -19,3 +19,10 @@ export type Region = keyof typeof REGIONS;
 export function isRegion(value: string): value is Region {
   return Object.hasOwn(REGIONS, value);
 }
+
+// account-v1 isn't served from the "sea" cluster. Any cluster can look up any
+// account, so OCE players go through the nearest one instead.
+export function accountRegional(region: Region): string {
+  const { regional } = REGIONS[region];
+  return regional === "sea" ? "asia" : regional;
+}

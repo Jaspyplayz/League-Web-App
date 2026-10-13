@@ -16,6 +16,15 @@ npm run dev
 
 Open http://localhost:3000.
 
+### Riot API key
+
+Player pages call the Riot API, so they need a key in `RIOT_API_KEY`. It's only read on the server and never sent to the browser.
+
+- **Local:** put it in `.env.local` (git ignores this file), then restart `npm run dev`.
+- **Vercel:** Project → Settings → Environment Variables → add `RIOT_API_KEY` for Production and Preview, then redeploy.
+
+Get a key at https://developer.riotgames.com. Development keys expire every 24 hours; a personal key doesn't.
+
 ## Scripts
 
 | Command | What it does |
