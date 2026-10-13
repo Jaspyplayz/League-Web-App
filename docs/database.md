@@ -12,6 +12,7 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `match_participants` | player × game (the scoreboard) | never (filled from `matches.raw`) |
 | `match_timelines` | game, trimmed timeline | never, fetched only when the match is opened |
 | `match_insights` | player × game, analyzer output | never; recomputed locally when `version` changes |
+| `benchmark_games` | Challenger player × game, summary only | filled by `npm run benchmarks`; games older than 60 days are deleted |
 
 The schema lives in [`src/db/schema.ts`](../src/db/schema.ts), with a comment on every column that isn't obvious. The refresh rules live in [`src/db/freshness.ts`](../src/db/freshness.ts).
 
@@ -95,3 +96,17 @@ The suggested shape is a thin "cached" layer in front of each Riot call, so page
 - **Rank:** same, using `ranked_fetched_at` and `TTL_MS.ranked`. Replace the player's `ranked_entries` rows in one transaction, and set `ranked_fetched_at` even when they're unranked.
 - **Match list:** refresh the ID list only when the user clicks "Update" and `match_ids_fetched_at` is older than `TTL_MS.matchIdsCooldown`; fetch `match-v5` only for IDs not already in `matches`.
 - **Timeline:** fetch when a match is opened and there's no `match_timelines` row; store the trimmed version with a `trim_version`.
+
+## Benchmark games
+
+`benchmark_games` holds the games Insights compares you with: recent ranked solo games from the top Challenger players on KR, EUW and NA. Nothing on the site writes to it. `npm run benchmarks` ([`scripts/collect-benchmarks.ts`](../scripts/collect-benchmarks.ts)) fills it, using the `RIOT_API_KEY` and `DATABASE_URL` in `.env.local`:
+
+```sh
+npm run benchmarks                               # KR, EUW and NA, top 30 players each
+npm run benchmarks -- --regions kr --players 5   # a quick test
+```
+
+- Each row is the small per-game summary from `summarizeGame`, the same one Insights makes of your games. The match and timeline aren't stored, so thousands of games take a few MB.
+- The script stays under 70 Riot calls per 2 minutes per server, leaving the live site part of the key's allowance. A first full run takes roughly half an hour. Later runs skip games already saved, and a stopped run loses nothing.
+- One-tricks aren't stored. They're worked out from the rows (`findOneTricks` in `src/lib/analyzer/benchmarks.ts`): someone with at least 60% of their last 20 games on one champion.
+- PUUIDs are tied to the Riot app that issued the key. When Turnpoint switches to a production key, empty this table (`delete from benchmark_games`) and run the script again.

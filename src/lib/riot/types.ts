@@ -23,6 +23,12 @@ export type LeagueEntry = {
   losses: number;
 };
 
+// league-v4's Challenger list for one queue. Entries carry the PUUID, so no
+// account lookup is needed to fetch their games.
+export type LeagueList = {
+  entries: { puuid: string; leaguePoints: number; wins: number; losses: number }[];
+};
+
 export type Participant = {
   puuid: string;
   // 1 to 10. The match timeline uses this number instead of the PUUID.
