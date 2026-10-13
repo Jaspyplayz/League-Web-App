@@ -22,12 +22,14 @@ Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Driz
 ## Layout
 
 ```
-src/app/          Routes. player/[region]/[riotId]/ is the player page,
-                  and .../match/[matchId]/ under it is the match analysis page
+src/app/          Routes. player/[region]/[riotId]/ is the player page;
+                  .../match/[matchId]/ under it is the match analysis page
+                  and .../insights/ the trends across the last 20 games
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (rate limits, retries) and one function per endpoint
-src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths
+src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
+                  and trends.ts rolls games up into the Insights page
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/db/           Drizzle schema, connection, and cache freshness rules
 drizzle/          Generated SQL migrations (never edit by hand)
