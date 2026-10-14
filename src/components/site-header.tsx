@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { AccountMenu } from "./account-menu";
 import { LogoMark } from "./logo";
 import { GitHubIcon } from "./icons";
 
@@ -20,7 +22,7 @@ export function SiteHeader() {
             Turnpoint
           </span>
         </Link>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Link href="/#how" className={navLink}>
             How it works
           </Link>
@@ -28,6 +30,11 @@ export function SiteHeader() {
             <GitHubIcon />
             GitHub
           </a>
+          {/* Who's signed in depends on the visitor's cookies, so it streams in
+              after the rest of the header, which stays prerendered. */}
+          <Suspense>
+            <AccountMenu linkClassName={navLink} />
+          </Suspense>
         </div>
       </nav>
     </header>
