@@ -32,8 +32,10 @@ export default function PrivacyPage() {
         <li>The analysis Turnpoint computes from those matches</li>
       </ul>
       <p>
-        Turnpoint also saves recent ranked games of top players on the Challenger ladder, so
-        it can compare your games with theirs.
+        Turnpoint also saves recent ranked games of players sampled from every rank, so it can
+        compare your games with theirs. From those games it keeps every player&apos;s
+        end-of-game numbers, such as kills and damage, without names or player IDs, to train
+        its game score.
       </p>
       <p>
         Finished matches never change, so they are kept. A player&apos;s rank and lists of recent

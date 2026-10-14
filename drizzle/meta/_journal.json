@@ -36,6 +36,13 @@
       "when": 1791987100736,
       "tag": "0004_player_seasons",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791988532924,
+      "tag": "0005_score_games",
+      "breakpoints": true
     }
   ]
 }
