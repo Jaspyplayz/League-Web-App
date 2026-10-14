@@ -36,6 +36,25 @@ export function ArrowRightIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+// Outlined by default; `filled` fills it in, for an "on" state like a pin.
+export function StarIcon({ size = 16, filled = false }: { size?: number; filled?: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5-4.8-4.6 6.6-.9z" />
+    </svg>
+  );
+}
+
 // Brand logos for the sign-in buttons. They keep their own colors instead of
 // the site's tokens, because Google and Discord ask apps not to recolor them.
 
