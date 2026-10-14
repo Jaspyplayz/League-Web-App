@@ -159,6 +159,21 @@ export function summarizeRecord(matches: MatchSummary[]): RecentRecord {
   };
 }
 
+// Highlights shown as small badges on a match row, like op.gg's: the
+// player's biggest multikill (only the biggest, so a pentakill doesn't also
+// list a double kill) and first blood.
+export function matchBadges(match: Match, puuid: string): string[] {
+  const me = match.info.participants.find((p) => p.puuid === puuid);
+  if (!me) return [];
+  const badges: string[] = [];
+  if (me.pentaKills) badges.push("Pentakill");
+  else if (me.quadraKills) badges.push("Quadra kill");
+  else if (me.tripleKills) badges.push("Triple kill");
+  else if (me.doubleKills) badges.push("Double kill");
+  if (me.firstBloodKill) badges.push("First blood");
+  return badges;
+}
+
 // The five roles in map order, as positionName() spells them.
 export const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"] as const;
 

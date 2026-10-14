@@ -24,6 +24,7 @@ export function MatchRow({
   now,
   score,
   teams,
+  badges = [],
   details,
 }: {
   match: MatchSummary;
@@ -31,6 +32,7 @@ export function MatchRow({
   now: number; // the current time, for "2h ago"
   score?: PlayerScore; // missing for games that aren't scored, like ARAM
   teams?: { region: Region; players: [TeamPlayer[], TeamPlayer[]] };
+  badges?: string[]; // highlights like "Double kill", from matchBadges()
   details?: ReactNode;
 }) {
   const result = m.remake ? "Remake" : m.win ? "Win" : "Loss";
@@ -71,6 +73,18 @@ export function MatchRow({
           {m.kills} / {m.deaths} / {m.assists}
         </p>
         <p className="text-xs text-faint">{m.kda.toFixed(1)} KDA</p>
+        {badges.length > 0 && (
+          <ul aria-label="Highlights" className="mt-1 flex flex-wrap gap-1 font-sans">
+            {badges.map((badge) => (
+              <li
+                key={badge}
+                className="rounded-full border border-ahead-soft px-1.5 text-[10px] whitespace-nowrap text-ahead-soft"
+              >
+                {badge}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="w-[84px] shrink-0 font-mono whitespace-nowrap">
