@@ -2,8 +2,8 @@ import "server-only";
 
 import { accountRegional, REGIONS, type Region } from "@/lib/regions";
 import type { RiotId } from "@/lib/riot-id";
-import { RiotApiError, riotGet } from "./client";
 import type { ApexTier, Division, Tier } from "@/lib/tiers";
+import { RiotApiError, riotGet } from "./client";
 import type { Account, LeagueEntry, LeagueList, Match, Summoner, Timeline } from "./types";
 
 // One function per Riot endpoint the app uses. Each picks the right host:

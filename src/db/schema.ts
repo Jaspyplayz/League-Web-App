@@ -183,8 +183,9 @@ export const matchInsights = pgTable(
 
 // Benchmark games: one row per game from a sampled solo queue player of some
 // rank (Iron to Challenger, on KR, EUW or NA), collected by
-// `npm run benchmarks`. Insights compares your games with these. Only the small per-game summary from summarizeGame is
-// kept, not the match or timeline, so thousands of games stay a few MB.
+// `npm run benchmarks`. Insights compares your games with these. Only the
+// small per-game summary from summarizeGame is kept, not the match or
+// timeline, so thousands of games stay a few MB.
 //
 // PUUIDs are tied to the Riot API key's app. If Turnpoint moves to a new key
 // (a production key), delete every row here and collect again.
