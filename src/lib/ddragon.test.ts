@@ -6,6 +6,8 @@ import {
   championName,
   itemIconUrl,
   itemName,
+  runeIconUrl,
+  statShardName,
   summonerSpell,
   summonerSpellIconUrl,
 } from "./ddragon";
@@ -27,6 +29,30 @@ const dd = buildDataDragon(
       SummonerDot: { id: "SummonerDot", key: "14", name: "Ignite" },
     },
   },
+  [
+    {
+      id: 8100,
+      name: "Domination",
+      icon: "perk-images/Styles/7200_Domination.png",
+      slots: [
+        {
+          runes: [
+            {
+              id: 8112,
+              name: "Electrocute",
+              icon: "perk-images/Styles/Domination/Electrocute.png",
+            },
+            { id: 8128, name: "Dark Harvest", icon: "perk-images/Styles/Domination/Dark.png" },
+          ],
+        },
+        {
+          runes: [
+            { id: 8126, name: "Cheap Shot", icon: "perk-images/Styles/Domination/Cheap.png" },
+          ],
+        },
+      ],
+    },
+  ],
 );
 
 const CDN = "https://ddragon.leagueoflegends.com/cdn/15.20.1/img";
@@ -72,5 +98,23 @@ describe("summoner spells", () => {
 
   it("returns null for unknown spells", () => {
     expect(summonerSpell(dd, 0)).toBeNull();
+  });
+});
+
+describe("runes", () => {
+  it("keeps each tree's rows of rune ids, keystones first", () => {
+    expect(dd.runeStyles[8100].slots).toEqual([[8112, 8128], [8126]]);
+    expect(dd.runes[8112].name).toBe("Electrocute");
+  });
+
+  it("builds image URLs without a patch version", () => {
+    expect(runeIconUrl(dd.runes[8112])).toBe(
+      "https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/Domination/Electrocute.png",
+    );
+  });
+
+  it("names stat shards, which Data Dragon leaves out", () => {
+    expect(statShardName(5008)).toBe("Adaptive force");
+    expect(statShardName(1)).toBe("Unknown shard");
   });
 });

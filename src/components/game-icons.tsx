@@ -5,13 +5,14 @@ import {
   itemIconUrl,
   itemName,
   profileIconUrl,
+  runeIconUrl,
   summonerSpell,
   summonerSpellIconUrl,
   type DataDragon,
 } from "@/lib/ddragon";
 
-// Square game images from Data Dragon: champions, items, summoner spells and
-// profile icons. Every one takes `dd`, the result of getDataDragon(), which is
+// Square game images from Data Dragon: champions, items, summoner spells,
+// runes and profile icons. Every one takes `dd`, the result of getDataDragon(), which is
 // null when Data Dragon couldn't be reached. Then they draw a plain box of the
 // same size instead, so the layout doesn't jump and the page still works.
 //
@@ -41,9 +42,7 @@ export function ChampionIcon({
   }
   // alt="" because the champion's name is always written next to the icon,
   // so a screen reader would otherwise read it twice.
-  return (
-    <GameImage src={championIconUrl(dd, name)} alt="" size={size} className={className} />
-  );
+  return <GameImage src={championIconUrl(dd, name)} alt="" size={size} className={className} />;
 }
 
 export function ItemIcon({
@@ -117,6 +116,32 @@ export function SummonerSpellIcon({
       title={spell.name}
       size={size}
       className={className}
+    />
+  );
+}
+
+// A rune (like Electrocute) or a rune tree (like Domination), by the id in
+// match data's `perks`. Runes are round in the game, so they're drawn round.
+export function RuneIcon({
+  dd,
+  runeId,
+  size,
+  className = "",
+}: {
+  dd: DataDragon | null;
+  runeId: number;
+  size: number;
+  className?: string;
+}) {
+  const rune = dd ? (dd.runes[runeId] ?? dd.runeStyles[runeId]) : null;
+  if (!rune) return <Placeholder size={size} className={`rounded-full ${className}`} />;
+  return (
+    <GameImage
+      src={runeIconUrl(rune)}
+      alt={rune.name}
+      title={rune.name}
+      size={size}
+      className={`rounded-full ${className}`}
     />
   );
 }

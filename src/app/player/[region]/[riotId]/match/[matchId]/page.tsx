@@ -6,7 +6,7 @@ import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { analyzeMatch, findPlayer, findPlayerByRiotId, isAnalyzable } from "@/lib/analyzer";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { loadMatch, loadTimeline } from "@/lib/match-store";
-import { isRegion, REGIONS, type Region } from "@/lib/regions";
+import { isMatchIdFor, isRegion, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match, Participant } from "@/lib/riot/types";
@@ -30,14 +30,6 @@ export default function MatchPage({ params }: { params: Params }) {
       </Suspense>
     </main>
   );
-}
-
-// Riot match IDs are the platform and a number, like "NA1_5012345678".
-const MATCH_ID = /^([A-Z0-9]+)_\d+$/;
-
-function isMatchIdFor(region: Region, matchId: string): boolean {
-  const platform = MATCH_ID.exec(matchId)?.[1];
-  return platform === REGIONS[region].platform.toUpperCase();
 }
 
 async function Analysis({ params }: { params: Params }) {
