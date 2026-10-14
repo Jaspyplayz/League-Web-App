@@ -16,6 +16,16 @@ export function parseRiotId(input: string): RiotId | null {
   return { gameName, tagLine };
 }
 
+// A player's Riot ID from match data, or null when it's missing or invalid.
+// Old games and some bots have no Riot ID, so there's no profile to link to.
+export function participantRiotId(p: {
+  riotIdGameName?: string;
+  riotIdTagline?: string;
+}): RiotId | null {
+  if (!p.riotIdGameName || !p.riotIdTagline) return null;
+  return parseRiotId(`${p.riotIdGameName}#${p.riotIdTagline}`);
+}
+
 // URL slugs use "GameName-TAG". Tag lines never contain "-", so the last
 // dash always splits the two parts even if the game name has one.
 export function toSlug({ gameName, tagLine }: RiotId): string {

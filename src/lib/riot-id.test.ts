@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fromSlug, parseRiotId, toSlug } from "./riot-id";
+import { fromSlug, parseRiotId, participantRiotId, toSlug } from "./riot-id";
 
 describe("parseRiotId", () => {
   it("splits a game name and tag line", () => {
@@ -34,5 +34,20 @@ describe("slugs", () => {
   it("rejects malformed slugs", () => {
     expect(fromSlug("nodash")).toBeNull();
     expect(fromSlug("%E0%A4%A")).toBeNull();
+  });
+});
+
+describe("participantRiotId", () => {
+  it("reads the Riot ID from match data", () => {
+    expect(participantRiotId({ riotIdGameName: "Faker", riotIdTagline: "KR1" })).toEqual({
+      gameName: "Faker",
+      tagLine: "KR1",
+    });
+  });
+
+  it("returns null when either half is missing", () => {
+    expect(participantRiotId({})).toBeNull();
+    expect(participantRiotId({ riotIdGameName: "Faker", riotIdTagline: "" })).toBeNull();
+    expect(participantRiotId({ riotIdGameName: "", riotIdTagline: "KR1" })).toBeNull();
   });
 });

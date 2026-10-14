@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   findQueue,
   formatDuration,
+  formatThousands,
   formatTier,
   gameDurationSeconds,
   summarizeMatch,
@@ -201,6 +202,12 @@ describe("formatting", () => {
   it("formats durations as m:ss", () => {
     expect(formatDuration(1902)).toBe("31:42");
     expect(formatDuration(65)).toBe("1:05");
+  });
+
+  it("shortens big numbers to thousands", () => {
+    expect(formatThousands(12400)).toBe("12.4k");
+    expect(formatThousands(1000)).toBe("1.0k");
+    expect(formatThousands(999)).toBe("999");
   });
 
   it("formats how long ago", () => {
