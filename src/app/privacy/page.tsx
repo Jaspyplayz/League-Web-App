@@ -65,8 +65,8 @@ export default function PrivacyPage() {
 
       <h2>Stored in your browser</h2>
       <p>
-        Turnpoint remembers the last few players you looked up, so you can click back to them
-        from the home page. That list is kept in your own browser&apos;s local storage: it
+        Turnpoint remembers the last few players you searched for, so you can click back to
+        them from the home page. That list is kept in your own browser&apos;s local storage: it
         stays on your device and is never sent to Turnpoint. Remove a player with the ×
         next to their name, or the whole list with the Clear button.
       </p>
