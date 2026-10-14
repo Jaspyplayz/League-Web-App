@@ -68,7 +68,18 @@ export type Participant = {
   item6: number; // trinket
   summoner1Id: number; // summoner spells, e.g. 4 = Flash (names come from Data Dragon)
   summoner2Id: number;
+  champLevel: number; // level at the end of the game
+  // Runes. Missing in some game modes, like Arena.
+  perks?: Perks;
   gameEndedInEarlySurrender?: boolean;
+};
+
+// A player's rune page. Every number is a rune id from Data Dragon's
+// runesReforged.json, except statPerks, which are the three small stat shards.
+export type Perks = {
+  statPerks: { offense: number; flex: number; defense: number };
+  // Two entries: description "primaryStyle" (keystone first) and "subStyle".
+  styles: { description: string; style: number; selections: { perk: number }[] }[];
 };
 
 export type Match = {

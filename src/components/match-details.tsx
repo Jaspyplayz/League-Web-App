@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { ChampionIcon, ItemIcon } from "@/components/game-icons";
+import { ChampionIcon, ItemIcon, RuneIcon, SummonerSpellIcon } from "@/components/game-icons";
+import { MatchTabs } from "@/components/match-tabs";
+import { RunePage } from "@/components/rune-page";
 import { findPlayer, isAnalyzable } from "@/lib/analyzer";
 import { findOpponent } from "@/lib/analyzer/matchup";
 import { championName, type DataDragon } from "@/lib/ddragon";
@@ -8,12 +10,13 @@ import type { Region } from "@/lib/regions";
 import type { Match, Participant } from "@/lib/riot/types";
 import { participantRiotId, toSlug } from "@/lib/riot-id";
 
-// The panel that opens under a match row on the profile: both teams'
-// scoreboard and a link to the full analysis. It's a smaller version of the
-// scoreboard on the match page, sized to fit next to the profile's sidebar.
+// The panel that opens under a match row on the profile, with op.gg-style
+// tabs: Overview (both teams' scoreboard), Build and Runes, plus a link out
+// to the full analysis page.
 //
-// Everything here comes from the match the profile already loaded, so opening
-// a row costs no extra Riot calls.
+// Overview and Runes come from the match the profile already loaded, so
+// opening a row costs no Riot calls. Only the Build tab needs more data; see
+// MatchTabs.
 export function MatchDetails({
   region,
   dd,
@@ -26,6 +29,46 @@ export function MatchDetails({
   match: Match;
   puuid: string; // whose profile this is
   analysisHref: string;
+}) {
+  const { participants } = match.info;
+  const me = findPlayer(match, puuid);
+
+  return (
+    <MatchTabs
+      region={region}
+      matchId={match.metadata.matchId}
+      overview={<MatchOverview region={region} dd={dd} match={match} puuid={puuid} />}
+      runePages={Object.fromEntries(
+        participants.map((p) => [
+          p.participantId,
+          <RunePage key={p.participantId} dd={dd} perks={p.perks} />,
+        ]),
+      )}
+      players={participants.map((p) => ({
+        participantId: p.participantId,
+        teamId: p.teamId,
+        ally: p.teamId === me?.teamId,
+        label: [championName(dd, p.championName), p.riotIdGameName].filter(Boolean).join(", "),
+        icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="rounded-md" />,
+      }))}
+      defaultPlayerId={me?.participantId ?? 1}
+      analysisHref={isAnalyzable(match) ? analysisHref : null}
+    />
+  );
+}
+
+// Both teams' end-of-game numbers. A smaller version of the scoreboard on the
+// match page, sized to fit next to the profile's sidebar.
+function MatchOverview({
+  region,
+  dd,
+  match,
+  puuid,
+}: {
+  region: Region;
+  dd: DataDragon | null;
+  match: Match;
+  puuid: string;
 }) {
   const { participants } = match.info;
   const me = findPlayer(match, puuid);
@@ -43,7 +86,7 @@ export function MatchDetails({
         const gold = team.reduce((sum, p) => sum + p.goldEarned, 0);
         return (
           <div key={teamId} className="overflow-x-auto">
-            <table className="w-full min-w-[560px] table-fixed border-collapse text-[13px]">
+            <table className="w-full min-w-[600px] table-fixed border-collapse text-[13px]">
               <caption className="pb-1.5 text-left text-xs text-muted">
                 <span
                   className={`font-display text-base font-bold tracking-[0.04em] uppercase ${mine ? "text-ahead" : "text-behind"}`}
@@ -66,7 +109,7 @@ export function MatchDetails({
                   <th scope="col" className="w-[52px] px-2 py-1 font-medium">
                     CS
                   </th>
-                  <th scope="col" className="w-[120px] px-2 py-1 font-medium">
+                  <th scope="col" className="w-[104px] px-2 py-1 font-medium">
                     Damage
                   </th>
                   <th scope="col" className="w-[172px] py-1 pl-2 font-medium">
@@ -98,14 +141,7 @@ export function MatchDetails({
         );
       })}
 
-      {isAnalyzable(match) ? (
-        <Link
-          href={analysisHref}
-          className="self-start rounded-lg border border-ahead/40 px-3.5 py-1.5 text-sm font-semibold text-ahead-soft transition-colors hover:bg-ahead/10"
-        >
-          Full analysis →
-        </Link>
-      ) : (
+      {!isAnalyzable(match) && (
         <p className="text-[13px] text-faint">
           This game ended before 15 minutes, too short for a full analysis.
         </p>
@@ -133,9 +169,29 @@ function PlayerRow({
   const riotId = participantRiotId(p);
   const name = p.riotIdGameName || championName(dd, p.championName);
 
+  const primary = p.perks?.styles.find((st) => st.description === "primaryStyle");
+  const secondary = p.perks?.styles.find((st) => st.description === "subStyle");
+
   const who = (
     <>
-      <ChampionIcon dd={dd} name={p.championName} size={26} className="rounded-md" />
+      {/* Champion with their final level in the corner, like in the game. */}
+      <span className="relative shrink-0">
+        <ChampionIcon dd={dd} name={p.championName} size={28} className="rounded-md" />
+        <span className="absolute -right-1 -bottom-1 rounded bg-page px-0.5 font-mono text-[9px] leading-tight text-ink-soft">
+          {p.champLevel}
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col gap-0.5">
+        <SummonerSpellIcon dd={dd} spellId={p.summoner1Id} size={13} className="rounded-sm" />
+        <SummonerSpellIcon dd={dd} spellId={p.summoner2Id} size={13} className="rounded-sm" />
+      </span>
+      {/* Keystone and second rune tree; the Runes tab has the full page. */}
+      {primary && secondary && (
+        <span className="flex shrink-0 flex-col gap-0.5">
+          <RuneIcon dd={dd} runeId={primary.selections[0]?.perk ?? primary.style} size={13} />
+          <RuneIcon dd={dd} runeId={secondary.style} size={13} />
+        </span>
+      )}
       <span className="min-w-0 truncate underline-offset-2 group-hover:text-ink group-hover:underline">
         {name}
       </span>
@@ -158,12 +214,12 @@ function PlayerRow({
           <Link
             href={`/player/${region}/${toSlug(riotId)}`}
             title={`${riotId.gameName}#${riotId.tagLine} · ${championName(dd, p.championName)}`}
-            className="group flex items-center gap-2 rounded-md text-ink-soft"
+            className="group flex items-center gap-1.5 rounded-md text-ink-soft"
           >
             {who}
           </Link>
         ) : (
-          <div className="flex items-center gap-2 text-ink-soft">{who}</div>
+          <div className="flex items-center gap-1.5 text-ink-soft">{who}</div>
         )}
       </th>
       <td className="px-2 py-1.5 font-mono whitespace-nowrap">

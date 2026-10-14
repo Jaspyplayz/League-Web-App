@@ -41,6 +41,21 @@ const timeline: Timeline = {
             bounty: 300,
           },
           { type: "ITEM_PURCHASED", timestamp: 50_000, participantId: 2, itemId: 1055 },
+          { type: "ITEM_SOLD", timestamp: 51_000, participantId: 2, itemId: 1055 },
+          {
+            type: "SKILL_LEVEL_UP",
+            timestamp: 52_000,
+            participantId: 4,
+            skillSlot: 1,
+            levelUpType: "NORMAL",
+          },
+          {
+            type: "SKILL_LEVEL_UP",
+            timestamp: 53_000,
+            participantId: 4,
+            skillSlot: 1,
+            levelUpType: "EVOLVE",
+          },
           {
             type: "ELITE_MONSTER_KILL",
             timestamp: 55_000,
@@ -97,6 +112,8 @@ describe("trimTimeline", () => {
         assistingParticipantIds: [7],
         position: { x: 7000, y: 7100 },
       },
+      { type: "ITEM_PURCHASED", timestamp: 50_000, participantId: 2, itemId: 1055 },
+      { type: "SKILL_LEVEL_UP", timestamp: 52_000, participantId: 4, skillSlot: 1 },
       {
         type: "ELITE_MONSTER_KILL",
         timestamp: 55_000,

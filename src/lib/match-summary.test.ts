@@ -40,6 +40,7 @@ function participant(overrides: Partial<Participant>): Participant {
     item6: 0,
     summoner1Id: 4,
     summoner2Id: 14,
+    champLevel: 18,
     ...overrides,
   };
 }

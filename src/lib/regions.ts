@@ -26,3 +26,12 @@ export function accountRegional(region: Region): string {
   const { regional } = REGIONS[region];
   return regional === "sea" ? "asia" : regional;
 }
+
+// Riot match IDs are the platform and a number, like "NA1_5012345678".
+const MATCH_ID = /^([A-Z0-9]+)_\d+$/;
+
+// Whether a match ID is well formed and was played in this region.
+export function isMatchIdFor(region: Region, matchId: string): boolean {
+  const platform = MATCH_ID.exec(matchId)?.[1];
+  return platform === REGIONS[region].platform.toUpperCase();
+}

@@ -1,6 +1,6 @@
 // Shrinks a raw match-v5 timeline down to what the analyzer reads, so it can
 // be stored in Postgres. A raw timeline is a few hundred KB; most of that is
-// event types we never use (wards, skill level-ups, ...) and per-frame stats
+// event types we never use (wards placed, items sold, ...) and per-frame stats
 // like armor and ability haste.
 //
 // The trimmed shape is what gets saved in the match_timelines table, so
@@ -9,7 +9,8 @@
 
 import type { MapPosition, Timeline, TimelineEvent } from "@/lib/riot/types";
 
-export const TRIM_VERSION = 1;
+// Version 2 added item purchases and skill level-ups, for the Build tab.
+export const TRIM_VERSION = 2;
 
 // One player at one moment of the game.
 export type PlayerFrame = {
@@ -27,7 +28,7 @@ export type TrimmedFrame = {
   players: PlayerFrame[];
 };
 
-// The four event types the analyzer uses, with only the fields it reads. The
+// The event types the analyzer uses, with only the fields it reads. The
 // names match Riot's so they're easy to look up in the API docs.
 export type ChampionKill = {
   type: "CHAMPION_KILL";
@@ -68,7 +69,38 @@ export type TurretPlateDestroyed = {
   laneType: string;
 };
 
-export type TrimmedEvent = ChampionKill | EliteMonsterKill | BuildingKill | TurretPlateDestroyed;
+export type ItemPurchased = {
+  type: "ITEM_PURCHASED";
+  timestamp: number;
+  participantId: number;
+  itemId: number;
+};
+
+// Clicking undo in the shop. Undoing a purchase has beforeId = the item and
+// afterId = 0; undoing a sale is the other way round.
+export type ItemUndo = {
+  type: "ITEM_UNDO";
+  timestamp: number;
+  participantId: number;
+  beforeId: number;
+  afterId: number;
+};
+
+export type SkillLevelUp = {
+  type: "SKILL_LEVEL_UP";
+  timestamp: number;
+  participantId: number;
+  skillSlot: number; // 1 = Q, 2 = W, 3 = E, 4 = R
+};
+
+export type TrimmedEvent =
+  | ChampionKill
+  | EliteMonsterKill
+  | BuildingKill
+  | TurretPlateDestroyed
+  | ItemPurchased
+  | ItemUndo
+  | SkillLevelUp;
 
 export type TrimmedTimeline = {
   frames: TrimmedFrame[];
@@ -139,6 +171,31 @@ function trimEvent(e: TimelineEvent): TrimmedEvent | null {
         timestamp: e.timestamp,
         teamId: num(e.teamId),
         laneType: str(e.laneType),
+      };
+    case "ITEM_PURCHASED":
+      return {
+        type: e.type,
+        timestamp: e.timestamp,
+        participantId: num(e.participantId),
+        itemId: num(e.itemId),
+      };
+    case "ITEM_UNDO":
+      return {
+        type: e.type,
+        timestamp: e.timestamp,
+        participantId: num(e.participantId),
+        beforeId: num(e.beforeId),
+        afterId: num(e.afterId),
+      };
+    case "SKILL_LEVEL_UP":
+      // "EVOLVE" level-ups (Kha'Zix, Viktor...) aren't skill points, so
+      // they're left out of the skill order.
+      if (e.levelUpType !== "NORMAL") return null;
+      return {
+        type: e.type,
+        timestamp: e.timestamp,
+        participantId: num(e.participantId),
+        skillSlot: num(e.skillSlot),
       };
     default:
       return null;
