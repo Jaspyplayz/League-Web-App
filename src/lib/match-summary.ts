@@ -177,6 +177,11 @@ export function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// 12400 -> "12.4k", for gold and damage on scoreboards.
+export function formatThousands(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
 // How long ago, rounded down to the biggest whole unit: "5m ago", "3h ago".
 export function timeAgo(timestamp: number, now: number): string {
   const minutes = Math.floor((now - timestamp) / 60_000);

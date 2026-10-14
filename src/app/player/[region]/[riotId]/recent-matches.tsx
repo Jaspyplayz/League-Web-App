@@ -1,4 +1,5 @@
 import { ChampionIcon } from "@/components/game-icons";
+import { MatchDetails } from "@/components/match-details";
 import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { championName, getDataDragon } from "@/lib/ddragon";
@@ -10,10 +11,11 @@ import {
 } from "@/lib/match-summary";
 import { loadMatches } from "@/lib/match-store";
 import type { Region } from "@/lib/regions";
+import type { Match } from "@/lib/riot/types";
 
 // matchIds come from the player's saved profile, newest first. playerPath is
-// this player's page, e.g. "/player/na/Name-TAG"; each row links to its match
-// analysis under it.
+// this player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with
+// both teams' scoreboard and a link to the match analysis under that path.
 type Props = { region: Region; puuid: string; matchIds: string[]; playerPath: string };
 
 export async function RecentMatches({ region, puuid, matchIds, playerPath }: Props) {
@@ -27,9 +29,12 @@ export async function RecentMatches({ region, puuid, matchIds, playerPath }: Pro
     return <RiotErrorNotice error={result.error} />;
   }
 
-  const matches = result.matches
-    .map((match) => summarizeMatch(match, puuid))
-    .filter((m): m is MatchSummary => m !== null);
+  // Keep each full match next to its summary: the row shows the summary, and
+  // the panel under it needs every player's numbers.
+  const games = result.matches
+    .map((match) => ({ match, summary: summarizeMatch(match, puuid) }))
+    .filter((g): g is { match: Match; summary: MatchSummary } => g.summary !== null);
+  const matches = games.map((g) => g.summary);
 
   if (matches.length === 0) {
     return <p className="text-zinc-600 dark:text-zinc-400">No recent games found.</p>;
@@ -83,13 +88,21 @@ export async function RecentMatches({ region, puuid, matchIds, playerPath }: Pro
           Recent matches
         </h2>
         <ul className="flex flex-col gap-2">
-          {matches.map((m) => (
+          {games.map(({ match, summary: m }) => (
             <MatchRow
               key={m.matchId}
               match={m}
               dd={dd}
               now={now}
-              href={`${playerPath}/match/${m.matchId}`}
+              details={
+                <MatchDetails
+                  region={region}
+                  dd={dd}
+                  match={match}
+                  puuid={puuid}
+                  analysisHref={`${playerPath}/match/${m.matchId}`}
+                />
+              }
             />
           ))}
         </ul>
