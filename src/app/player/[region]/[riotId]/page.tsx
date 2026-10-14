@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
-import { RememberPlayer } from "@/components/recent-players";
+import { RememberPlayer } from "@/components/saved-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { loadProfile } from "@/lib/profile-store";
 import { readQueueFilter } from "@/lib/queue-filters";
