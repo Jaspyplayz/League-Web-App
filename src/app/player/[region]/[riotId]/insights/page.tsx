@@ -7,7 +7,8 @@ import { PanelHeading } from "@/components/ui/panel-heading";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
 import { computeTrends } from "@/lib/analyzer/trends";
 import { loadBenchmarks } from "@/lib/benchmark-store";
-import { championClass, championName, getDataDragon } from "@/lib/ddragon";
+import { championsPlayed, readFilters, type InsightsFilters } from "@/lib/insights-filters";
+import { championClass, championName, getDataDragon, type DataDragon } from "@/lib/ddragon";
 import { isRegion } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
@@ -18,26 +19,27 @@ import { AnalysisProgress } from "./analysis-progress";
 import { BenchmarkComparison } from "./benchmark-comparison";
 import { loadChosenPlayer, readChoice } from "./chosen-player";
 import { CompareWithPlayer } from "./compare-with-player";
+import { InsightsFilterBar } from "./insights-filters";
 import { LaningChart } from "./laning-chart";
 import { CsPhases, EarlyDeaths, LeadsAndDeficits } from "./trend-sections";
 import { Weaknesses } from "./weaknesses";
 
-// The insights page: trends across a player's last 20 games.
-// URL: /player/na/Name-TAG/insights, plus ?vs=Name%23TAG&vsRegion=kr when
+// The insights page: trends across a player's last 20, 50 or 100 games.
+// URL: /player/na/Name-TAG/insights, plus ?games=50&champion=Ahri to filter
+// (see src/lib/insights-filters.ts) and ?vs=Name%23TAG&vsRegion=kr when
 // comparing with another player.
 //
-// Every game needs its timeline, which costs one Riot call the first time.
-// A new player's 20 timelines would eat a fifth of the dev key's allowance
-// (100 calls per 2 minutes) in one go, so each page view fetches at most
-// TIMELINES_PER_VIEW new ones. The page shows trends from the games it has so
-// far, and <AnalysisProgress> reloads it until every game is in.
+// Every game needs its match and timeline, each one Riot call the first
+// time. A new player's 100 games would be 200 calls, twice the dev key's
+// allowance (100 calls per 2 minutes), so each page view fetches only a few
+// (see src/lib/trend-games.ts). The page shows trends from the games it has
+// so far, and <AnalysisProgress> reloads it until every game is in.
 
 type Params = Promise<{ region: string; riotId: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = { title: "Insights" };
 
-const GAME_COUNT = 20;
 const TIMELINES_PER_VIEW = 5;
 // Trends from one or two games would be noise, so wait for a few.
 const MIN_GAMES = 3;
@@ -82,8 +84,10 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
     </>
   );
 
+  const query = await searchParams;
+  const filters = readFilters(query);
   const [loaded, dd, benchmarks] = await Promise.all([
-    settle(loadTrendGames(region, puuid, { count: GAME_COUNT, budget: TIMELINES_PER_VIEW })),
+    settle(loadTrendGames(region, puuid, { count: filters.games, budget: TIMELINES_PER_VIEW })),
     getDataDragon().catch(() => null),
     loadBenchmarks(),
   ]);
@@ -95,11 +99,12 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       </>
     );
   }
-  const { matches, trendMatches, games } = loaded.value;
+  const { matches, trendMatches } = loaded.value;
+  const allGames = loaded.value.games;
 
   // The player picked in "Compare with a player", if any. Loaded after your
   // games rather than alongside them, so the two don't hit Riot at once.
-  const choice = readChoice(await searchParams);
+  const choice = readChoice(query);
   const chosen = choice ? await loadChosenPlayer(choice) : null;
   const theirs = chosen?.status === "ok" ? chosen : null;
 
@@ -108,18 +113,61 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const firstError = loaded.value.error ?? theirs?.error ?? null;
   const progress = (
     <AnalysisProgress
-      analyzed={games.length + (theirs?.games.length ?? 0)}
-      total={games.length + (theirs?.games.length ?? 0) + waiting}
+      analyzed={allGames.length + (theirs?.games.length ?? 0)}
+      total={allGames.length + (theirs?.games.length ?? 0) + waiting}
       retryAfterS={firstError?.kind === "rate-limited" ? (firstError.retryAfter ?? null) : null}
       whose={theirs ? `your and ${theirs.name}'s games` : undefined}
     />
+  );
+
+  if (allGames.length < MIN_GAMES) {
+    return (
+      <>
+        {header}
+        {waiting > 0 ? (
+          progress
+        ) : (
+          <NotEnoughGames window={filters.games} skipped={matches.length - trendMatches.length} />
+        )}
+      </>
+    );
+  }
+
+  // Everything below uses only the chosen champion's games, if one is picked.
+  const games = filters.champion
+    ? allGames.filter((g) => g.championName === filters.champion)
+    : allGames;
+  const champions = championsPlayed(allGames).map((c) => ({
+    ...c,
+    label: championName(dd, c.championName),
+  }));
+  // Keep a picked champion in the menu even before any of its games are in.
+  if (filters.champion && !champions.some((c) => c.championName === filters.champion)) {
+    champions.push({
+      championName: filters.champion,
+      label: championName(dd, filters.champion),
+      games: 0,
+    });
+  }
+  // Each form carries the other's choices along (see InsightsFilterBar).
+  const filterParams = {
+    games: String(filters.games),
+    ...(filters.champion && { champion: filters.champion }),
+  };
+  const choiceParams: Record<string, string> = choice
+    ? { vs: choice.input, vsRegion: choice.region }
+    : {};
+  const filterBar = (
+    <InsightsFilterBar filters={filters} champions={champions} keep={choiceParams} />
   );
 
   if (games.length < MIN_GAMES) {
     return (
       <>
         {header}
-        {waiting > 0 ? progress : <NotEnoughGames skipped={matches.length - trendMatches.length} />}
+        {waiting > 0 && progress}
+        {filterBar}
+        <TooFewOnChampion filters={filters} games={games.length} dd={dd} />
       </>
     );
   }
@@ -137,6 +185,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
     <>
       {header}
       {waiting > 0 && progress}
+      {filterBar}
       <Weaknesses weaknesses={trends.weaknesses} games={games.length} />
       <LaningChart
         games={trends.games}
@@ -158,40 +207,71 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       <CompareWithPlayer
         chosen={chosen}
         comparison={playerComparison}
-        clearHref={`${playerPath}/insights`}
+        clearHref={`${playerPath}/insights?${new URLSearchParams(filterParams)}`}
+        keep={filterParams}
         dd={dd}
       />
-      <Footnote games={games.length} matches={matches} trendMatches={trendMatches} />
+      <Footnote
+        games={games.length}
+        filters={filters}
+        matches={matches}
+        trendMatches={trendMatches}
+        dd={dd}
+      />
     </>
   );
 }
 
-function NotEnoughGames({ skipped }: { skipped: number }) {
+function NotEnoughGames({ window, skipped }: { window: number; skipped: number }) {
   return (
     <p className="rounded-[14px] border border-line-strong bg-surface px-5 py-4 text-muted">
       Not enough games to spot trends yet. Insights need at least {MIN_GAMES} recent games on
       Summoner&apos;s Rift that lasted 15 minutes or more
-      {skipped > 0 &&
-        ` (${skipped} of the last ${GAME_COUNT} were ARAM, Arena, remakes or similar)`}
-      .
+      {skipped > 0 && ` (${skipped} of the last ${window} were ARAM, Arena, remakes or similar)`}.
+    </p>
+  );
+}
+
+function TooFewOnChampion({
+  filters,
+  games,
+  dd,
+}: {
+  filters: InsightsFilters;
+  games: number;
+  dd: DataDragon | null;
+}) {
+  const name = championName(dd, filters.champion ?? "");
+  return (
+    <p className="rounded-[14px] border border-line-strong bg-surface px-5 py-4 text-muted">
+      {games === 0
+        ? `No ${name} games in your last ${filters.games}.`
+        : `Only ${games} ${name} ${games === 1 ? "game" : "games"} in your last ${filters.games}, and trends need at least ${MIN_GAMES}.`}{" "}
+      {filters.games < 100 && "Try a bigger window, or pick another champion."}
     </p>
   );
 }
 
 function Footnote({
   games,
+  filters,
   matches,
   trendMatches,
+  dd,
 }: {
   games: number;
+  filters: InsightsFilters;
   matches: Match[];
   trendMatches: Match[];
+  dd: DataDragon | null;
 }) {
   const skipped = matches.length - trendMatches.length;
+  const which = filters.champion ? ` ${championName(dd, filters.champion)}` : "";
   return (
     <p className="text-[13px] text-faint">
-      Based on {games} of your last {matches.length} games, each compared with the enemy who played
-      your role.
+      Based on {games}
+      {which} games out of your last {matches.length}, each compared with the enemy who played your
+      role.
       {skipped > 0 &&
         ` ${skipped} ${skipped === 1 ? "game was" : "games were"} skipped: ARAM, Arena, remakes and games under 15 minutes have no role matchup to compare.`}
     </p>
