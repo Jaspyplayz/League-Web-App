@@ -306,3 +306,22 @@ export const userPlayers = pgTable("user_players", {
     .references(() => players.puuid, { onDelete: "cascade" }),
   linkedAt: timestamptz("linked_at").notNull().defaultNow(),
 }).enableRLS();
+
+// Private notes a signed-in player writes on a match ("ward river before
+// 3:15"). One note per account per game, only ever shown to that account.
+export const matchNotes = pgTable(
+  "match_notes",
+  {
+    // Deleting the account in Supabase Auth deletes its notes.
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    matchId: text("match_id")
+      .notNull()
+      .references(() => matches.matchId, { onDelete: "cascade" }),
+    // Up to MAX_NOTE_LENGTH characters (src/lib/match-note.ts).
+    text: text("text").notNull(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.matchId] })],
+).enableRLS();
