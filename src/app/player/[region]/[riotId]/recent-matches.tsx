@@ -1,8 +1,8 @@
-import { ChampionIcon } from "@/components/game-icons";
+import { Suspense } from "react";
 import { MatchDetails } from "@/components/match-details";
 import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
-import { championName, getDataDragon } from "@/lib/ddragon";
+import { getDataDragon } from "@/lib/ddragon";
 import {
   summarizeMatch,
   summarizeRecord,
@@ -10,24 +10,40 @@ import {
   type MatchSummary,
 } from "@/lib/match-summary";
 import { loadMatches } from "@/lib/match-store";
+import { PROFILE_MATCH_COUNT, type Profile } from "@/lib/profile-store";
+import type { QueueFilter } from "@/lib/queue-filters";
 import type { Region } from "@/lib/regions";
+import { getMatchIds } from "@/lib/riot/api";
+import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
+import { QueueTabs } from "./queue-tabs";
+import { SeasonChampions } from "./season-champions";
 
-// matchIds come from the player's saved profile, newest first. playerPath is
-// this player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with
+// `profile` is the player's saved snapshot, whose match IDs are the All tab.
+// `queue` is the game-mode tab picked above the list. playerPath is this
+// player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with
 // both teams' scoreboard and a link to the match analysis under that path.
-type Props = { region: Region; puuid: string; matchIds: string[]; playerPath: string };
+type Props = {
+  region: Region;
+  puuid: string;
+  profile: Profile;
+  queue: QueueFilter;
+  playerPath: string;
+};
 
-export async function RecentMatches({ region, puuid, matchIds, playerPath }: Props) {
-  const [result, dd] = await Promise.all([
-    // Stored matches come from the database; only new ones cost a Riot call.
-    loadMatches(region, matchIds, matchIds.length),
+export async function RecentMatches({ region, puuid, profile, queue, playerPath }: Props) {
+  const [ids, dd] = await Promise.all([
+    // The All tab lists the snapshot's games for free. The other tabs ask
+    // Riot for that mode's latest games, one call per view.
+    queue.id === "all"
+      ? { ok: true as const, value: profile.matchIds }
+      : settle(getMatchIds(region, puuid, PROFILE_MATCH_COUNT, queue.filter)),
     getDataDragon().catch(() => null),
   ]);
-  // Show whatever loaded; the error only matters if nothing did.
-  if (result.matches.length === 0 && result.error) {
-    return <RiotErrorNotice error={result.error} />;
-  }
+  // Stored matches come from the database; only new ones cost a Riot call.
+  const result = ids.ok
+    ? await loadMatches(region, ids.value, ids.value.length)
+    : { matches: [], error: ids.error };
 
   // Keep each full match next to its summary: the row shows the summary, and
   // the panel under it needs every player's numbers.
@@ -35,10 +51,6 @@ export async function RecentMatches({ region, puuid, matchIds, playerPath }: Pro
     .map((match) => ({ match, summary: summarizeMatch(match, puuid) }))
     .filter((g): g is { match: Match; summary: MatchSummary } => g.summary !== null);
   const matches = games.map((g) => g.summary);
-
-  if (matches.length === 0) {
-    return <p className="text-zinc-600 dark:text-zinc-400">No recent games found.</p>;
-  }
 
   const record = summarizeRecord(matches);
   // React's lint rule warns that reading the clock makes a component give
@@ -50,62 +62,72 @@ export async function RecentMatches({ region, puuid, matchIds, playerPath }: Pro
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <aside className="flex flex-col gap-4 lg:w-72 lg:shrink-0">
-        <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-          <h2 className="font-mono text-xs tracking-widest text-zinc-500 uppercase">
-            Last {record.games} games
-          </h2>
-          <p className="text-3xl font-semibold">
-            <span className="text-blue-500">{record.wins}W</span>{" "}
-            <span className="text-amber-500">{record.losses}L</span>
-          </p>
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <Stat label="KDA" value={record.kda.toFixed(1)} />
-            <Stat label="CS per min" value={record.csPerMin.toFixed(1)} />
-            <Stat
-              label="Kill participation"
-              value={`${Math.round(record.killParticipation * 100)}%`}
-            />
-          </dl>
-        </section>
-        <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-          <h2 className="font-mono text-xs tracking-widest text-zinc-500 uppercase">Champions</h2>
-          <ul className="flex flex-col gap-2">
-            {topChampions(matches, 4).map((c) => (
-              <li key={c.championName} className="flex items-center gap-3 text-sm">
-                <ChampionIcon dd={dd} name={c.championName} size={36} className="rounded-[9px]" />
-                <span className="flex-1 font-medium">{championName(dd, c.championName)}</span>
-                <span className="font-mono text-zinc-600 dark:text-zinc-400">
-                  {c.wins}W {c.games - c.wins}L · {c.kda.toFixed(1)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+        {record.games > 0 && (
+          <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <h2 className="font-mono text-xs tracking-widest text-zinc-500 uppercase">
+              Last {record.games} games
+            </h2>
+            <p className="text-3xl font-semibold">
+              <span className="text-blue-500">{record.wins}W</span>{" "}
+              <span className="text-amber-500">{record.losses}L</span>
+            </p>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <Stat label="KDA" value={record.kda.toFixed(1)} />
+              <Stat label="CS per min" value={record.csPerMin.toFixed(1)} />
+              <Stat
+                label="Kill participation"
+                value={`${Math.round(record.killParticipation * 100)}%`}
+              />
+            </dl>
+          </section>
+        )}
+        <Suspense fallback={<p className="text-sm text-zinc-500">Loading season champions…</p>}>
+          <SeasonChampions
+            region={region}
+            puuid={puuid}
+            profileUpdatedAt={profile.updatedAt}
+            queue={queue}
+            dd={dd}
+            recent={topChampions(matches, 4)}
+          />
+        </Suspense>
       </aside>
 
-      <section aria-labelledby="matches-heading" className="flex min-w-0 flex-1 flex-col gap-2">
+      <section aria-labelledby="matches-heading" className="flex min-w-0 flex-1 flex-col gap-3">
         <h2 id="matches-heading" className="text-xl font-semibold">
           Recent matches
         </h2>
-        <ul className="flex flex-col gap-2">
-          {games.map(({ match, summary: m }) => (
-            <MatchRow
-              key={m.matchId}
-              match={m}
-              dd={dd}
-              now={now}
-              details={
-                <MatchDetails
-                  region={region}
-                  dd={dd}
-                  match={match}
-                  puuid={puuid}
-                  analysisHref={`${playerPath}/match/${m.matchId}`}
-                />
-              }
-            />
-          ))}
-        </ul>
+        <QueueTabs playerPath={playerPath} current={queue} />
+        {matches.length === 0 ? (
+          // Show whatever loaded; an error only matters if nothing did.
+          result.error ? (
+            <RiotErrorNotice error={result.error} />
+          ) : (
+            <p className="text-zinc-600 dark:text-zinc-400">
+              {queue.id === "all" ? "No recent games found." : `No recent ${queue.label} games.`}
+            </p>
+          )
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {games.map(({ match, summary: m }) => (
+              <MatchRow
+                key={m.matchId}
+                match={m}
+                dd={dd}
+                now={now}
+                details={
+                  <MatchDetails
+                    region={region}
+                    dd={dd}
+                    match={match}
+                    puuid={puuid}
+                    analysisHref={`${playerPath}/match/${m.matchId}`}
+                  />
+                }
+              />
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

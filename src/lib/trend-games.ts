@@ -32,7 +32,7 @@ export async function loadTrendGames(
   puuid: string,
   { count, budget, queue }: { count: number; budget: number; queue?: number },
 ): Promise<TrendGames> {
-  const ids = await getMatchIds(region, puuid, count, queue);
+  const ids = await getMatchIds(region, puuid, count, { queue });
 
   // A match that fails to load is retried on the next reload, like a
   // missing timeline.

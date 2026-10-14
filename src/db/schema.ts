@@ -135,6 +135,25 @@ export const matchParticipants = pgTable(
   ],
 ).enableRLS();
 
+// Every match ID a player played this season, for the season champion stats
+// on their profile. Riot lists 100 IDs per call, so the list is refreshed
+// only when the profile snapshot is (see src/lib/season-store.ts). The games
+// themselves are loaded a few per visit into matches.
+export const playerSeasons = pgTable(
+  "player_seasons",
+  {
+    puuid: text("puuid")
+      .notNull()
+      .references(() => players.puuid, { onDelete: "cascade" }),
+    // SEASON.id from src/lib/season.ts, e.g. "2026".
+    season: text("season").notNull(),
+    // Newest first, every game mode.
+    matchIds: text("match_ids").array().notNull(),
+    fetchedAt: timestamptz("fetched_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.puuid, t.season] })],
+).enableRLS();
+
 // A trimmed match-v5 timeline, fetched only when someone opens the match.
 // Raw timelines are several hundred KB, so we keep just what the analyzer
 // reads (see docs/match-analyzer.md, "Don't store raw timelines").

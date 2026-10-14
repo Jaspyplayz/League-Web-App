@@ -6,6 +6,7 @@ import { ProfileTabs } from "@/components/profile-tabs";
 import { RememberPlayer } from "@/components/recent-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { loadProfile } from "@/lib/profile-store";
+import { readQueueFilter } from "@/lib/queue-filters";
 import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
@@ -14,15 +15,22 @@ import { ProfileHeader } from "./profile-header";
 import { RecentMatches } from "./recent-matches";
 
 type Params = Promise<{ region: string; riotId: string }>;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export default function PlayerPage({ params }: { params: Params }) {
+export default function PlayerPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-12">
       <Link href="/" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
         ← New search
       </Link>
       <Suspense fallback={<p className="text-zinc-500">Looking up player…</p>}>
-        <Player params={params} />
+        <Player params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );
@@ -32,8 +40,10 @@ export default function PlayerPage({ params }: { params: Params }) {
 // the profile (rank and the latest match IDs), which comes from the saved
 // snapshot when there is one; see src/lib/profile-store.ts. The match list
 // loads in its own Suspense boundary, so the header shows while it's loading.
-async function Player({ params }: { params: Params }) {
+async function Player({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { region, riotId } = await params;
+  // ?queue=solo picks a game-mode tab above the match list.
+  const queue = readQueueFilter((await searchParams).queue);
   const id = fromSlug(riotId);
   if (!isRegion(region) || !id) notFound();
 
@@ -66,7 +76,8 @@ async function Player({ params }: { params: Params }) {
             <RecentMatches
               region={region}
               puuid={puuid}
-              matchIds={profile.value.matchIds}
+              profile={profile.value}
+              queue={queue}
               playerPath={playerPath}
             />
           </Suspense>
