@@ -1,13 +1,13 @@
 # Turnpoint
 
-**Find out why you won or lost.** Turnpoint looks up any League of Legends player by Riot ID and breaks each game down minute by minute against the opponent in their role, so you can see exactly where it turned.
+**Find out why you won or lost.** Turnpoint looks up any League of Legends player by Riot ID and breaks each game down minute by minute: each team's chance to win, your lead over the enemy in your role, and the turning points that decided it.
 
 [![CI](https://github.com/Jaspyplayz/League-Web-App/actions/workflows/ci.yml/badge.svg)](https://github.com/Jaspyplayz/League-Web-App/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Live site:** https://league-web-app.vercel.app
 
-![Match analysis: gold lead against the enemy jungler, minute by minute, with three numbered turning points explained on the right](docs/screenshots/match-analysis.png)
+![Match page: your team's win chance at every minute with its biggest swings, above the gold lead against the enemy in your role](docs/screenshots/hero.png)
 
 ## Why Turnpoint
 
@@ -15,55 +15,95 @@ Stats sites tell you *what* happened: your KDA, your CS, whether you won. Turnpo
 
 > **8:00 to 12:00:** you fell from +300 to −900 gold. You died twice, both times to the enemy jungler.
 
-Across your recent games it turns those moments into patterns you can act on, like "you're behind in CS at 10 minutes in 14 of your last 20 games."
+Across your recent games it turns those moments into patterns you can act on, like "you're behind in CS at 10 minutes in 14 of your last 20 games", and lets you pick one to work on.
 
 ## Features
 
-| Feature | Status |
-|---|---|
-| Search any player by Riot ID (`GameName#TAG`) and region | ✅ Built |
-| Shareable player URLs (`/player/kr/Faker-KR1`) | ✅ Built |
-| Player profile: rank, level, champions and recent matches | ✅ Built |
-| Match detail: full scoreboard for all 10 players | ✅ Built |
-| **Match analyzer:** gold, CS, XP and damage difference vs your role opponent, per minute | ✅ Built |
-| **Turning points:** the 1 to 3 biggest swings in a game, each with a plain-English reason | ✅ Built |
-| Death breakdown: solo killed, ganked, teamfight or caught | ✅ Built |
-| Team gold over time, with dragons, Baron, towers and other objectives | ✅ Built |
-| **Insights tab:** trends and recurring weaknesses across your last 20 games | ✅ Built |
-| Shareable match card image | Planned |
+### Match analysis
 
-![Player profile with ranked standing, champions and recent matches](docs/screenshots/player-profile.png)
+- **Win chance:** each team's chance to win at every minute, from a model trained on 4,000+ ranked games, with the three biggest swings and what caused them ("Baron took you from 41% to 68%").
+- **Lead over your role opponent:** gold, CS, XP and damage difference, minute by minute.
+- **Turning points:** the 1 to 3 biggest swings in your lane, each with a plain-English reason.
+- **Deaths:** each one labeled solo killed, ganked, teamfight or caught.
+- **Team gold** over time with dragons, Baron, towers and other objectives marked.
+- **Jungle replay map and pathing:** where both junglers went in the first minutes.
+- Full scoreboard for all 10 players, and private notes on any game when signed in.
 
-The **Insights** tab looks across your last 20 games: your gold against your opponent at 10 minutes in each game, how often you win when ahead or behind, how you die early, and how your CS holds up later in games. Simple, tested rules turn those into a "recurring weaknesses" card.
+![A match row expanded on the profile, with the game score and badges for every player](docs/screenshots/match-panel.png)
 
-![Insights: gold at 10 minutes in each of the last 20 games, and win rate when ahead or behind](docs/screenshots/insights.png)
+### Every game at a glance
 
-## How the match analyzer works
+- **Expandable match rows** with Overview, Team analysis, Build and Runes tabs, without leaving the profile.
+- **Game score:** a trained 0 to 100 rating for every player, with **MVP** for the best winner and **ACE** for the best loser.
+- **Badges** for standout games, and the winning team in blue, the losing team in red, with your row outlined.
 
-The analyzer is the core of the project. The full research and design is in [docs/match-analyzer.md](docs/match-analyzer.md); here's the short version.
+![Team analysis: every champion in the game compared with their opponent](docs/screenshots/team-analysis.png)
 
-1. **Get the data.** Riot's match timeline API has a snapshot of every player's gold, CS, XP and position for every minute of a game, plus a timestamped list of every kill, objective and item purchase.
+### Player profile
+
+- Rank emblems and a **30-day LP graph** for Solo/Duo and Flex.
+- Win-rate ring and a summary of recent games.
+- **Season champion stats** with champion search, and filters by game mode.
+- Older games up to two months back, and an **Update** button for fresh data.
+- Shareable URLs like `/player/kr/Faker-KR1`.
+
+![Player profile with rank, LP graph, win rate and recent matches](docs/screenshots/profile.png)
+
+### Insights
+
+- Trends across your last 20 to 100 games, and the **recurring weaknesses** they point to.
+- **Compare with any rank**, Iron to Challenger, or with any player by Riot ID.
+- Role-specific stats, including map control for junglers and supports (gank takedowns, objective share, time in the enemy half).
+- **Focus goals:** pick one thing to improve and track it game by game.
+
+![Insights: your stats against one rank's games, including jungle map stats](docs/screenshots/insights.png)
+
+![Focus goals: one measurable goal tracked across the games since you picked it](docs/screenshots/focus-goals.png)
+
+### Accounts
+
+- Sign in with Google or Discord, then mark a profile as **This is me**.
+- Pinned players and recently viewed players, one click away.
+
+## How it works
+
+### The match analyzer
+
+The analyzer is the core of the project: pure TypeScript functions, match JSON in, results out. The full research and design is in [docs/match-analyzer.md](docs/match-analyzer.md).
+
+1. **Get the data.** Riot's match timeline has a snapshot of every player's gold, CS, XP and position for every minute of a game, plus a timestamped list of every kill, objective and item purchase.
 2. **Find your opponent.** The player on the enemy team in the same role (top, jungle, mid, bot or support).
 3. **Build the difference curves.** Your gold, CS and XP minus theirs, minute by minute. Above zero means you're ahead.
 4. **Find turning points.** Slide a window over the gold curve, keep the biggest swings, and explain each one from the events inside that window (deaths, ganks, tower plates, objectives).
-5. **Roll it up.** Across your recent games, apply simple, tested rules like "behind at 10 minutes in most games" to surface recurring weaknesses.
+5. **Roll it up.** Across your recent games, simple tested rules like "behind at 10 minutes in most games" surface recurring weaknesses.
 
-**Why compare to the opponent in your role?** Riot's API has no ready-made "average Gold-rank player" numbers. The enemy in your role is at roughly the same rank, on the same patch, in the same game. It's also how pro analysts talk about laning. For a wider view, Insights also compares you with players sampled from any rank, Iron to Challenger, which a script collects through Riot's league endpoints (`npm run benchmarks`).
+**Why compare to the opponent in your role?** The enemy in your role is at roughly the same rank, on the same patch, in the same game. It's also how analysts talk about laning. For a wider view, Insights compares you with games sampled from every rank, which a script collects through Riot's league endpoints (`npm run benchmarks`).
+
+### Two small machine learning models
+
+Both are logistic regression trained on games saved in the database, written from scratch in TypeScript (gradient descent, no ML library) and checked with 5-fold cross-validation on games they haven't seen.
+
+| Model | What it reads | What it gives | How good |
+|---|---|---|---|
+| **Win chance** ([docs](docs/win-chance.md)) | Both teams' gold, XP, kills, towers, inhibitors, dragons, Baron and Elder at each minute | Each team's chance to win at that minute | Picks the winner 80% of the time at 20 minutes, and is well calibrated |
+| **Game score** ([docs](docs/game-score.md)) | Ten stats per player (KDA, kill participation, damage share, CS, vision...), compared with the player's role | A 0 to 100 score: where the player ranks among everyone in that role | Predicts the winner from stats alone 84% of the time |
+
+The win chance's learned weights are worth a look: kills and towers are worth almost nothing on their own, because the gold they pay is already in the gold lead. [docs/win-chance.md](docs/win-chance.md) walks through one real minute of a game by hand. Retrain either model with `npm run train-win-chance` or `npm run train-score`. Win chance only ever runs on finished games, since Riot's policy doesn't allow predictions during a live game.
 
 ## Tech stack
 
-| Technology | Role | Why | Status |
-|---|---|---|---|
-| [Next.js 16](https://nextjs.org) (App Router) + TypeScript | UI and server code | One codebase for pages and API logic. Server components keep the Riot API key off the browser. | ✅ In use |
-| [Tailwind CSS 4](https://tailwindcss.com) | Styling | Fast to build a consistent UI without writing a design system from scratch. | ✅ In use |
-| [Vitest](https://vitest.dev) | Unit tests | Fast, TypeScript-native, and a natural fit for testing the analyzer's pure functions. | ✅ In use |
-| [GitHub Actions](https://github.com/features/actions) | CI | Lint, type check, test and build on every pull request. | ✅ In use |
-| [Vercel](https://vercel.com) | Hosting | Zero-config Next.js hosting, automatic deploys from `main`, and a preview link for every PR. | ✅ In use |
-| [Riot Games API](https://developer.riotgames.com) | Player and match data | The official source for accounts, ranks, matches and timelines. | ✅ In use |
-| [Supabase](https://supabase.com) Postgres + [Drizzle ORM](https://orm.drizzle.team) | Match cache | Matches never change once played, so storing them avoids refetching and keeps us inside Riot's rate limits. | ✅ In use |
-| [Sentry](https://sentry.io) | Error tracking | Reports crashes on the live site with the exact error and stack trace. | ✅ In use |
-| Hand-written SVG | Charts | The gold, CS and XP curves are simple enough that a chart library wasn't worth the extra JavaScript. | ✅ In use |
-| [Playwright](https://playwright.dev) | End-to-end tests | One browser test of the search flow. | Planned |
+| Technology | Role | Why |
+|---|---|---|
+| [Next.js 16](https://nextjs.org) (App Router) + TypeScript | UI and server code | One codebase for pages and API logic. Server components keep the Riot API key off the browser. |
+| [Tailwind CSS 4](https://tailwindcss.com) | Styling | A consistent dark theme from a small set of design tokens. |
+| [Riot Games API](https://developer.riotgames.com) | Player and match data | The official source for accounts, ranks, matches and timelines. |
+| [Supabase](https://supabase.com) Postgres + [Drizzle ORM](https://orm.drizzle.team) | Match cache, profiles, notes | Matches never change once played, so storing them avoids refetching and keeps us inside Riot's rate limits. |
+| [Supabase Auth](https://supabase.com/auth) | Google and Discord sign-in | Sign-in without storing any passwords ourselves. |
+| [Vitest](https://vitest.dev) | Unit tests | Fast, TypeScript-native, and a natural fit for the analyzer's pure functions. |
+| [GitHub Actions](https://github.com/features/actions) | CI | Lint, type check, test and build on every pull request. |
+| [Vercel](https://vercel.com) | Hosting and analytics | Automatic deploys from `main`, a preview link for every PR, and page view counts. |
+| [Sentry](https://sentry.io) | Error tracking | Reports crashes on the live site with the exact error and stack trace. |
+| Hand-written SVG | Charts | The curves are simple enough that a chart library wasn't worth the extra JavaScript. |
 
 Everything runs on free tiers.
 
@@ -75,14 +115,17 @@ flowchart LR
 
     subgraph V[Vercel]
         N[Next.js app<br/>server components<br/>and server actions]
-        A[Analyzer<br/>pure TypeScript]
+        A[Analyzer and models<br/>pure TypeScript]
         Q[Rate-limited<br/>Riot client]
         N --> A
         N --> Q
     end
 
     Q -->|account, summoner,<br/>league, match-v5| R[(Riot Games API)]
-    N <-->|cached matches<br/>and timelines| DB[(Supabase<br/>Postgres)]
+    N <-->|matches, timelines,<br/>profiles, notes| DB[(Supabase<br/>Postgres)]
+    N <-->|Google and<br/>Discord sign-in| AU[Supabase Auth]
+    T[Training scripts<br/>npm run train-*] -->|saved games| DB
+    T -->|model weights<br/>JSON| A
     N -.->|errors| S[Sentry]
     N -.->|champion and<br/>item images| DD[Data Dragon CDN]
 ```
@@ -90,10 +133,11 @@ flowchart LR
 **Key design decisions**
 
 - **The API key never reaches the browser.** All Riot calls happen on the server, in server components and server actions.
-- **Cache forever what never changes.** A finished match and its timeline are permanent, so they're stored once in Postgres. Only things that do change (rank, the latest match list) get short cache lifetimes.
-- **One client for every Riot call, and a budget per page.** A development or personal API key allows 100 requests every 2 minutes, and loading one new player can take 20+ calls. The client backs off for as long as Riot asks after a `429`, and the Insights page fetches at most 5 new timelines per load, filling in the rest over a few automatic reloads.
-- **The analyzer is pure functions.** Match JSON in, insights out: no network, no database. That makes it easy to unit-test against saved real games.
-- **Analysis is recomputed, not stored.** The analyzer runs on the stored match and timeline every time, so improving it never means refetching anything from Riot.
+- **Cache forever what never changes.** A finished match and its timeline are permanent, so they're stored once in Postgres. Only things that do change (rank, the latest match list) expire, after a day or when you press Update.
+- **One client for every Riot call, and a budget per page.** A development or personal API key allows 100 requests every 2 minutes, and loading one new player can take 20+ calls. The client backs off for as long as Riot asks after a `429`, and slower pages like Insights fetch a few timelines per load, filling in the rest over a few automatic reloads.
+- **The analyzer is pure functions.** Match JSON in, results out: no network, no database. That makes it easy to unit-test.
+- **Analysis is recomputed, not stored.** The analyzer runs on the stored match every time, so improving it never means refetching anything from Riot.
+- **Models ship as JSON.** Training runs offline from a script; the site only loads the learned weights, so a prediction is a few multiplications.
 
 The data model and the reasoning behind each choice are in [docs/SCOPE.md](docs/SCOPE.md).
 
@@ -103,25 +147,23 @@ The data model and the reasoning behind each choice are in [docs/SCOPE.md](docs/
 src/
   app/                          Next.js routes (App Router)
     page.tsx                    Home page with the search form
-    actions.ts                  Server action that validates a search and redirects
-    player/[region]/[riotId]/   Player profile page
+    player/[region]/[riotId]/   Player profile
       match/[matchId]/          Match analysis page
-      insights/                 Trends across the last 20 games
-  components/                   React components (charts, match rows, icons, tabs)
-  db/                           Drizzle schema and database connection
+      insights/                 Trends across the last 20 to 100 games
+    privacy/, terms/            Legal pages
+  components/                   React components; ui/ holds small shared pieces
+  db/                           Drizzle schema, connection and cache freshness rules
   lib/                          Plain TypeScript helpers, most with a .test.ts
-    analyzer/                   The match analyzer: pure functions, match JSON in, insights out
+    analyzer/                   The match analyzer, game score and win chance (pure functions)
     riot/                       Server-only Riot API client and one function per endpoint
+    supabase/                   Sign-in clients
     match-store.ts              Load matches and timelines from Postgres, falling back to Riot
-    match-summary.ts            Turn match JSON into KDA, CS/min, records and labels
-    ddragon.ts                  Champion names and image URLs from Data Dragon
-    regions.ts                  Region list and Riot's platform/regional routing
-    riot-id.ts                  Parse and validate "GameName#TAG", build URL slugs
-docs/
-  SCOPE.md                      Scope, data model, stack and build order
-  match-analyzer.md             Analyzer research: Riot data, insights, rate limits
-  database.md                   Database tables and setup
-  SETUP.md                      Requirements and setup on a new computer
+    profile-store.ts            A player's saved profile, the Update button and rank history
+    trend-games.ts              Recent games summarized for Insights
+    season-store.ts             Season champion stats
+scripts/                        Benchmarks collection and model training
+drizzle/                        Generated SQL migrations
+docs/                           Design and research docs
 ```
 
 ## Getting started
@@ -161,28 +203,28 @@ The keys are only read on the server and never sent to the browser. For the live
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript type check |
 | `npm test` | Unit tests (Vitest) |
+| `npm run benchmarks` | Collect games from every rank for Insights' comparisons |
+| `npm run train-score` / `npm run train-win-chance` | Retrain the two models on saved games |
 
 [GitHub Actions](.github/workflows/ci.yml) runs lint, type check, tests and a production build on every pull request and every push to `main`. Vercel deploys `main` to the live site and builds a preview for each pull request.
 
-Current tests cover Riot ID parsing and URL slugs, region routing, the Riot client (errors, retries, rate limits), match summaries, cache freshness, and every part of the analyzer: finding your opponent, labeling deaths, turning points, objectives and the cross-game trends. The analyzer tests use small made-up games; testing against saved real games is next.
+Around 40 test files cover Riot ID parsing and region routing, the Riot client (errors, retries, rate limits), cache freshness, rank history, filters, and every part of the analyzer: finding your opponent, labeling deaths, turning points, objectives, jungle pathing, cross-game trends, rank comparisons, the game score and the win chance.
 
 ## Roadmap
 
-- [x] Scope the app and pick the standout feature ([SCOPE.md](docs/SCOPE.md))
-- [x] Research the match analyzer ([match-analyzer.md](docs/match-analyzer.md))
-- [x] Scaffold Next.js, TypeScript, Tailwind, tests and CI
-- [x] Deploy to Vercel
-- [x] Riot API client with rate limiting, and a real player profile
-- [x] Supabase schema and match caching
-- [x] Sentry error tracking
-- [x] Match detail page with the scoreboard
-- [x] Match analyzer: opponent comparison chart, @10/@15 snapshot, turning points
-- [x] Insights tab with cross-game trends
+- [x] Match analyzer, turning points and Insights
+- [x] Database cache, error tracking and CI
+- [x] Expandable match rows, team analysis and the game score
+- [x] Compare with any rank or any player, and Focus goals
+- [x] Sign-in, This is me, pinned players and match notes
+- [x] LP graph, season champions and older games
+- [x] Win chance graph
 - [ ] Analyzer tests against saved real games
 - [ ] End-to-end test of the search flow
+- [ ] Loading skeletons and a shareable match card image
 - [ ] Riot production API key and a custom domain
 
-**Later ideas:** where-you-die heatmaps, item timing vs your own average, vision timelines, champion-specific advice.
+The full list lives in [GitHub Issues](https://github.com/Jaspyplayz/League-Web-App/issues/23).
 
 ## Legal
 

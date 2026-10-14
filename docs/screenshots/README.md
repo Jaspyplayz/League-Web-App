@@ -1,14 +1,17 @@
 # Screenshots
 
-Images for the main [README](../../README.md). Add them once the UI is polished and showing real data.
+Images for the main [README](../../README.md).
 
 ## Shots
 
 | File | What it shows | Where it goes in the README |
 |---|---|---|
-| `match-analysis.png` | The lead chart against the enemy in your role, with the turning points beside it. The hero shot, so pick a game with a clear swing. | Top of the README |
-| `player-profile.png` | A player profile with rank, champions and recent matches | Features section |
-| `insights.png` | The Insights tab: gold at 10 per game and win rate when ahead or behind | Features section |
+| `hero.png` | A match page: the Win chance panel with its biggest swings, and the lead chart below. Pick a game with a clear comeback or throw. | Top of the README |
+| `match-panel.png` | A profile with one match row expanded on its Overview tab, game scores and badges showing | Every game at a glance |
+| `team-analysis.png` | The same expanded row on the Team analysis tab | Every game at a glance |
+| `profile.png` | The top of a profile: rank emblem, LP graph, win-rate ring and the first few matches | Player profile |
+| `insights.png` | Insights with "Compare with a rank" open, ideally for a jungle player so the jungle stats show | Insights |
+| `focus-goals.png` | The Focus goals card with a goal picked | Insights |
 
 ## Retaking them
 
