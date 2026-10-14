@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
 import { loadBuildsAction } from "@/app/player/[region]/[riotId]/actions";
 import { BuildView } from "@/components/build-view";
+import { teamOrder } from "@/lib/analyzer/team-analysis";
 import type { BuildsResult } from "@/lib/match-builds";
 
 type Tab = "overview" | "team" | "build" | "runes";
@@ -18,6 +19,7 @@ export type PickerPlayer = {
   participantId: number;
   teamId: number;
   ally: boolean; // on the profile player's team
+  won: boolean; // on the winning team, which decides the ring color
   label: string; // "Ahri (Player#NA1)", for the button's accessible name
   icon: ReactNode; // the champion icon, drawn on the server
 };
@@ -130,8 +132,9 @@ function BuildTab({ result, playerId }: { result: BuildsResult | null; playerId:
   return build ? <BuildView build={build} /> : null;
 }
 
-// Ten champion icons, blue side then red side, to pick whose build or runes
-// to show.
+// Ten champion icons, your team then the enemy's, to pick whose build or
+// runes to show. The picked one gets a ring in its team's color: blue for the
+// winners, red for the losers, like the scoreboards.
 function PlayerPicker({
   players,
   selected,
@@ -143,7 +146,7 @@ function PlayerPicker({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-4">
-      {[100, 200].map((teamId) => (
+      {teamOrder(players.find((p) => p.ally)?.teamId).map((teamId) => (
         <div key={teamId} className="flex gap-1.5">
           {players
             .filter((p) => p.teamId === teamId)
@@ -155,7 +158,7 @@ function PlayerPicker({
                 aria-label={p.label}
                 title={p.label}
                 onClick={() => onSelect(p.participantId)}
-                className={`rounded-lg p-0.5 transition-opacity ${p.participantId === selected ? (p.ally ? "ring-2 ring-ahead" : "ring-2 ring-behind") : "opacity-50 hover:opacity-100"}`}
+                className={`rounded-lg p-0.5 transition-opacity ${p.participantId === selected ? (p.won ? "ring-2 ring-ahead" : "ring-2 ring-behind") : "opacity-50 hover:opacity-100"}`}
               >
                 {p.icon}
               </button>

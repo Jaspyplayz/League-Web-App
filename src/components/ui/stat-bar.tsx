@@ -3,7 +3,7 @@
 // across rows: a bar twice as long is twice the value.
 //
 // `tone` follows the team rule: the winning team's bars are blue ("ahead")
-// and the losing team's amber ("behind").
+// and the losing team's red ("behind").
 export function StatBar({
   value,
   max,

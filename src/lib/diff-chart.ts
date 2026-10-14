@@ -83,7 +83,7 @@ export function buildDiffChart(points: DiffPoint[], box: ChartBox = DEFAULT_BOX)
 }
 
 // Where the line crosses zero, add a point exactly on zero so the blue and
-// amber areas meet cleanly instead of overlapping.
+// red areas meet cleanly instead of overlapping.
 export function insertZeroCrossings(points: DiffPoint[]): DiffPoint[] {
   const out: DiffPoint[] = [points[0]];
   for (let i = 1; i < points.length; i++) {

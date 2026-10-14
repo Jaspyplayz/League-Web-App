@@ -3,7 +3,7 @@ import { buildDiffChart, DEFAULT_BOX, formatDiff, type DiffPoint } from "@/lib/d
 export type TurningPointMarker = {
   minute: number;
   label: string;
-  // "behind" (amber) when the moment cost you the lead, "ahead" (blue) when it won it.
+  // "behind" (red) when the moment cost you the lead, "ahead" (blue) when it won it.
   tone: "ahead" | "behind";
 };
 
@@ -17,7 +17,7 @@ type Props = {
 const TONE_COLOR = { ahead: "var(--color-ahead)", behind: "var(--color-behind)" };
 
 // Line chart of "you minus your opponent" over a game. Blue fill is time
-// spent ahead, amber fill is time spent behind. Numbered circles mark the
+// spent ahead, red fill is time spent behind. Numbered circles mark the
 // turning points, matching the numbered list next to the chart.
 export function DiffChart({ points, markers = [], description }: Props) {
   const chart = buildDiffChart(points);
