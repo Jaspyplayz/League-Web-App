@@ -35,14 +35,22 @@ export type DiffChart = {
   xTicks: number[];
 };
 
-export function buildDiffChart(points: DiffPoint[], box: ChartBox = DEFAULT_BOX): DiffChart {
+// A fixed y range, for charts whose scale shouldn't depend on the game (the
+// win chance always runs from 0% to 100%). Otherwise the range fits the data.
+export type ChartRange = { min: number; max: number; step: number };
+
+export function buildDiffChart(
+  points: DiffPoint[],
+  box: ChartBox = DEFAULT_BOX,
+  range?: ChartRange,
+): DiffChart {
   if (points.length < 2) throw new Error("A diff chart needs at least two points.");
 
   const diffs = points.map((p) => p.diff);
-  const step = tickStep(Math.max(...diffs, 0) - Math.min(...diffs, 0));
+  const step = range?.step ?? tickStep(Math.max(...diffs, 0) - Math.min(...diffs, 0));
   // Round the range outward to whole ticks and always include zero.
-  const maxDiff = Math.max(step, Math.ceil(Math.max(...diffs) / step) * step);
-  const minDiff = Math.min(-step, Math.floor(Math.min(...diffs) / step) * step);
+  const maxDiff = range?.max ?? Math.max(step, Math.ceil(Math.max(...diffs) / step) * step);
+  const minDiff = range?.min ?? Math.min(-step, Math.floor(Math.min(...diffs) / step) * step);
   const firstMinute = points[0].minute;
   const lastMinute = points[points.length - 1].minute;
 

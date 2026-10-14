@@ -328,6 +328,83 @@ export function winChanceCurve(
   }));
 }
 
+// One team's chance of winning at every saved minute, for drawing: 0.5 is
+// even. `teamId` is 100 (blue) or 200 (red). Null when the model can't be
+// used (see winChanceCurve).
+export function teamWinChance(
+  game: WinChanceGame,
+  model: WinChanceModel,
+  teamId: number,
+): { minute: number; chance: number }[] | null {
+  const curve = winChanceCurve(game, model);
+  if (!curve) return null;
+  return curve.map((p) => ({ minute: p.t / 60, chance: teamId === 100 ? p.blue : 1 - p.blue }));
+}
+
+// A minute where one team's win chance moved a lot, and what happened in it.
+export type WinChanceSwing = {
+  // When the minute ended, in ms since the start.
+  timestamp: number;
+  // The team's chance before and after, 0 to 1.
+  from: number;
+  to: number;
+  // What each side got during that minute, like ["Baron", "2 kills"].
+  ours: string[];
+  theirs: string[];
+};
+
+// A one-minute move smaller than this (in chance, so 0.08 is 8 points) is
+// normal back and forth and isn't called out.
+export const MIN_SWING = 0.08;
+
+// The biggest one-minute moves in a team's win chance, in game order. At
+// most `limit`, each at least MIN_SWING.
+export function biggestSwings(
+  game: WinChanceGame,
+  chances: { minute: number; chance: number }[],
+  teamId: number,
+  limit = 3,
+): WinChanceSwing[] {
+  const swings: WinChanceSwing[] = [];
+  for (let i = 1; i < game.frames.length && i < chances.length; i++) {
+    const before = game.frames[i - 1];
+    const after = game.frames[i];
+    const ours = (f: WinChanceFrame) => readTeam(teamId === 100 ? f.blue : f.red);
+    const theirs = (f: WinChanceFrame) => readTeam(teamId === 100 ? f.red : f.blue);
+    swings.push({
+      timestamp: after.t * 1000,
+      from: chances[i - 1].chance,
+      to: chances[i].chance,
+      ours: whatHappened(ours(before), ours(after)),
+      theirs: whatHappened(theirs(before), theirs(after)),
+    });
+  }
+  return swings
+    .filter((s) => Math.abs(s.to - s.from) >= MIN_SWING)
+    .sort((a, b) => Math.abs(b.to - b.from) - Math.abs(a.to - a.from))
+    .slice(0, limit)
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
+// What one team got between two frames, biggest things first:
+// ["Baron", "1 inhibitor", "2 towers", "3 kills"].
+export function whatHappened(before: TeamState, after: TeamState): string[] {
+  const gained = (stat: TeamStat) => Math.max(0, after[stat] - before[stat]);
+  const counted = (n: number, one: string, many: string) =>
+    n === 0 ? [] : [n === 1 ? `1 ${one}` : `${n} ${many}`];
+  return [
+    ...(gained("elderBuff") ? ["Elder Dragon"] : []),
+    ...(gained("baronBuff") ? ["Baron"] : []),
+    ...(gained("atakhans") ? ["Atakhan"] : []),
+    ...counted(gained("inhibitors"), "inhibitor", "inhibitors"),
+    ...counted(gained("dragons"), "dragon", "dragons"),
+    ...(gained("heralds") ? ["Rift Herald"] : []),
+    ...counted(gained("grubs"), "void grub", "void grubs"),
+    ...counted(gained("towers"), "tower", "towers"),
+    ...counted(gained("kills"), "kill", "kills"),
+  ];
+}
+
 // Training: learns the weights on every example, and checks them with
 // cross-validation first. `games` is how many games the examples came from.
 export function trainWinChanceModel(

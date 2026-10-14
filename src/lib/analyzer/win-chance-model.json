@@ -1,0 +1,263 @@
+{
+  "trainedAt": "2026-10-14T19:10:32.615Z",
+  "games": 4185,
+  "patches": [
+    "16.16",
+    "16.17",
+    "16.18",
+    "16.19",
+    "16.20"
+  ],
+  "features": [
+    "gold",
+    "goldLate",
+    "xp",
+    "kills",
+    "towers",
+    "inhibitors",
+    "dragons",
+    "soul",
+    "elderBuff",
+    "baronBuff",
+    "grubs",
+    "heralds",
+    "atakhans"
+  ],
+  "weights": [
+    0.406,
+    -0.2124,
+    0.092,
+    0.0018,
+    0,
+    0.3792,
+    0.2522,
+    0.0197,
+    0.2159,
+    0.1276,
+    0.0073,
+    0.0886,
+    0
+  ],
+  "evaluation": {
+    "examples": 119943,
+    "accuracy": 0.731,
+    "logLoss": 0.513,
+    "brier": 0.1731,
+    "byMinute": [
+      {
+        "minute": 10,
+        "examples": 4185,
+        "accuracy": 0.696,
+        "goldRule": 0.7
+      },
+      {
+        "minute": 15,
+        "examples": 4340,
+        "accuracy": 0.774,
+        "goldRule": 0.767
+      },
+      {
+        "minute": 20,
+        "examples": 3779,
+        "accuracy": 0.801,
+        "goldRule": 0.782
+      },
+      {
+        "minute": 25,
+        "examples": 3155,
+        "accuracy": 0.826,
+        "goldRule": 0.815
+      },
+      {
+        "minute": 30,
+        "examples": 1839,
+        "accuracy": 0.824,
+        "goldRule": 0.806
+      }
+    ],
+    "calibration": [
+      {
+        "from": 0,
+        "to": 0.1,
+        "examples": 12674,
+        "predicted": 0.043,
+        "actual": 0.051
+      },
+      {
+        "from": 0.1,
+        "to": 0.2,
+        "examples": 8692,
+        "predicted": 0.15,
+        "actual": 0.152
+      },
+      {
+        "from": 0.2,
+        "to": 0.3,
+        "examples": 8615,
+        "predicted": 0.251,
+        "actual": 0.231
+      },
+      {
+        "from": 0.3,
+        "to": 0.4,
+        "examples": 11151,
+        "predicted": 0.353,
+        "actual": 0.319
+      },
+      {
+        "from": 0.4,
+        "to": 0.5,
+        "examples": 18808,
+        "predicted": 0.457,
+        "actual": 0.446
+      },
+      {
+        "from": 0.5,
+        "to": 0.6,
+        "examples": 19699,
+        "predicted": 0.541,
+        "actual": 0.558
+      },
+      {
+        "from": 0.6,
+        "to": 0.7,
+        "examples": 11398,
+        "predicted": 0.647,
+        "actual": 0.664
+      },
+      {
+        "from": 0.7,
+        "to": 0.8,
+        "examples": 8752,
+        "predicted": 0.748,
+        "actual": 0.768
+      },
+      {
+        "from": 0.8,
+        "to": 0.9,
+        "examples": 8235,
+        "predicted": 0.851,
+        "actual": 0.847
+      },
+      {
+        "from": 0.9,
+        "to": 1,
+        "examples": 11919,
+        "predicted": 0.956,
+        "actual": 0.958
+      }
+    ]
+  },
+  "newestPatch": {
+    "patch": "16.20",
+    "games": 1765,
+    "examples": 49640,
+    "accuracy": 0.73,
+    "logLoss": 0.5137,
+    "brier": 0.174,
+    "byMinute": [
+      {
+        "minute": 10,
+        "examples": 1765,
+        "accuracy": 0.7,
+        "goldRule": 0.697
+      },
+      {
+        "minute": 15,
+        "examples": 1845,
+        "accuracy": 0.776,
+        "goldRule": 0.777
+      },
+      {
+        "minute": 20,
+        "examples": 1565,
+        "accuracy": 0.802,
+        "goldRule": 0.785
+      },
+      {
+        "minute": 25,
+        "examples": 1292,
+        "accuracy": 0.827,
+        "goldRule": 0.815
+      },
+      {
+        "minute": 30,
+        "examples": 714,
+        "accuracy": 0.825,
+        "goldRule": 0.801
+      }
+    ],
+    "calibration": [
+      {
+        "from": 0,
+        "to": 0.1,
+        "examples": 5084,
+        "predicted": 0.043,
+        "actual": 0.048
+      },
+      {
+        "from": 0.1,
+        "to": 0.2,
+        "examples": 3557,
+        "predicted": 0.15,
+        "actual": 0.158
+      },
+      {
+        "from": 0.2,
+        "to": 0.3,
+        "examples": 3576,
+        "predicted": 0.251,
+        "actual": 0.248
+      },
+      {
+        "from": 0.3,
+        "to": 0.4,
+        "examples": 4650,
+        "predicted": 0.352,
+        "actual": 0.316
+      },
+      {
+        "from": 0.4,
+        "to": 0.5,
+        "examples": 7976,
+        "predicted": 0.458,
+        "actual": 0.445
+      },
+      {
+        "from": 0.5,
+        "to": 0.6,
+        "examples": 8160,
+        "predicted": 0.541,
+        "actual": 0.566
+      },
+      {
+        "from": 0.6,
+        "to": 0.7,
+        "examples": 4745,
+        "predicted": 0.647,
+        "actual": 0.66
+      },
+      {
+        "from": 0.7,
+        "to": 0.8,
+        "examples": 3615,
+        "predicted": 0.748,
+        "actual": 0.762
+      },
+      {
+        "from": 0.8,
+        "to": 0.9,
+        "examples": 3340,
+        "predicted": 0.852,
+        "actual": 0.847
+      },
+      {
+        "from": 0.9,
+        "to": 1,
+        "examples": 4937,
+        "predicted": 0.957,
+        "actual": 0.965
+      }
+    ]
+  }
+}

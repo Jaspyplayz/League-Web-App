@@ -19,6 +19,19 @@ describe("buildDiffChart", () => {
     expect(chart.zeroY).toBe(25);
   });
 
+  it("uses a fixed range when given one, whatever the data", () => {
+    const chart = buildDiffChart(
+      [
+        { minute: 0, diff: 0 },
+        { minute: 10, diff: 12 },
+      ],
+      box,
+      { min: -50, max: 50, step: 25 },
+    );
+    expect(chart.yTicks).toEqual([50, 25, 0, -25, -50]);
+    expect(chart.zeroY).toBe(50);
+  });
+
   it("spans the first to last minute across the full width", () => {
     const chart = buildDiffChart(
       [
