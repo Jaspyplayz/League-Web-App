@@ -1,8 +1,8 @@
 # Win chance
 
-The win chance is each team's chance of winning at every minute of a finished Summoner's Rift game, like the win probability line on sports broadcasts. The match page will draw it as a line, and its biggest jumps are the game's turning points ("Baron took blue from 41% to 68%").
+The win chance is each team's chance of winning at every minute of a finished Summoner's Rift game, like the win probability line on sports broadcasts. The match page's **Win chance** panel draws your team's chance as a line, and **Biggest swings** lists the minutes that moved it most, with what each team took in that minute ("The enemy team took Baron and 2 kills, 68% → 38%").
 
-The code is in [`src/lib/analyzer/win-chance.ts`](../src/lib/analyzer/win-chance.ts), the trained model will be `src/lib/analyzer/win-chance-model.json`, and [`scripts/train-win-chance.ts`](../scripts/train-win-chance.ts) trains it.
+The code is in [`src/lib/analyzer/win-chance.ts`](../src/lib/analyzer/win-chance.ts), the trained model is [`src/lib/analyzer/win-chance-model.json`](../src/lib/analyzer/win-chance-model.json), and [`scripts/train-win-chance.ts`](../scripts/train-win-chance.ts) trains it. The panel is `match/[matchId]/win-chance.tsx`, fed by `matchWinChance` in [`src/lib/win-chance.ts`](../src/lib/win-chance.ts).
 
 It only ever runs on finished games. Riot's developer policy doesn't allow predictions during a live game.
 
@@ -39,21 +39,54 @@ The first line adds up how much each lead is worth. The second line, the sigmoid
 
 There's no extra constant (bias) in the score, so an even game is always exactly 50%, and swapping the sides gives the mirror answer. Blue side does win slightly more often in real games, but leaving that out keeps the model fair to both sides and easier to read.
 
+### The weights it learned
+
+From 4,185 ranked games on patches 16.16 to 16.20 (trained 2026-10-14):
+
+| Feature | Weight | |
+|---|---|---|
+| `gold` | 0.406 | per 1,000 gold |
+| `goldLate` | −0.212 | per 1,000 gold, times minutes / 30 |
+| `xp` | 0.092 | per 1,000 XP |
+| `kills` | 0.002 | per kill |
+| `towers` | 0 | per tower |
+| `inhibitors` | 0.379 | per inhibitor down |
+| `dragons` | 0.252 | per dragon |
+| `soul` | 0.020 | soul |
+| `elderBuff` | 0.216 | Elder buff |
+| `baronBuff` | 0.128 | Baron buff |
+| `grubs` | 0.007 | per void grub |
+| `heralds` | 0.089 | per Rift Herald |
+| `atakhans` | 0 | per Atakhan |
+
+Two things stand out:
+
+- **Kills and towers are worth almost nothing on their own.** Not because they don't matter, but because they pay gold, and the gold lead already counts that gold. Counting a kill again on top would count it twice. Inhibitors, dragons, Baron and Elder are different: most of what they're worth is the buff or the pressure, not the gold, so they keep a weight of their own.
+- **A gold lead counts for less as the game goes on.** `goldLate` is negative, so 1,000 gold is worth 0.406 − 0.212 × 10/30 = 0.34 at 10 minutes but only 0.406 − 0.212 = 0.19 at 30 minutes, when everyone is close to a full build.
+
 ### A worked example
 
-These weights are made up to show the arithmetic. The real ones come from training and will replace them here.
-
-Say at 15:00 blue is 2,000 gold ahead, 1,000 XP ahead, has 1 more tower and 1 more dragon. With weights of 0.40 per 1,000 gold, −0.10 for `goldLate`, 0.20 per 1,000 XP, 0.30 per tower and 0.15 per dragon:
+A real minute: KR_8414727148 at 20:00. Blue is 2,302 gold and 1,432 XP ahead, with 2 more towers, 3 void grubs and the Rift Herald, but red has 5 more kills and 1 more dragon.
 
 ```
-gold      = 2.0           0.40 × 2.0 = 0.80
-goldLate  = 2.0 × 15/30   −0.10 × 1.0 = −0.10
-xp        = 1.0           0.20 × 1.0 = 0.20
-towers    = 1             0.30 × 1   = 0.30
-dragons   = 1             0.15 × 1   = 0.15
-                          score      = 1.35
-blue chance = 1 / (1 + e^(−1.35)) = 1 / (1 + 0.26) = 79%
+feature    lead                  weight     adds
+gold       2.302                 0.406    0.935
+goldLate   2.302 × 20/30 = 1.535 −0.212   −0.326
+xp         1.432                 0.092    0.132
+kills      −5                    0.002   −0.009
+towers     2                     0        0
+dragons    −1                    0.252   −0.252
+grubs      3                     0.007    0.022
+heralds    1                     0.089    0.089
+                                 score    0.590
+blue chance = 1 / (1 + e^(−0.590)) = 1 / (1 + 0.554) = 64%
 ```
+
+Red's 5 extra kills barely move it, because the gold they earned is already in the gold lead. Blue went on to win.
+
+### Biggest swings
+
+`biggestSwings` compares each minute with the one before. A minute where your team's chance moved by at least 8 points (`MIN_SWING`) counts, and the panel shows the three biggest, in game order. What each side took in that minute comes from the same numbers the model reads (kills, towers, dragons, Baron...), so it describes what happened without saying whether any play was right or wrong. A swing with nothing listed means the gold and XP difference moved on its own, from farm and plates.
 
 ## How it learns
 
@@ -73,6 +106,18 @@ It prints, and saves in the model's `evaluation`:
 - **Log loss** and **Brier score**: lower is better. They reward being confident when right and punish being confident when wrong. Always saying 50% scores 0.693 and 0.25.
 - **By minute**: accuracy at 10, 15, 20, 25 and 30 minutes, next to the simplest rule there is, "the team with more gold wins". The model should beat it, and both should get better as the game goes on.
 - **Calibration**: when the model says 60 to 70%, does blue really win about 65% of the time? A model can be accurate but overconfident, and this table shows it.
+
+The current model, on games it didn't see:
+
+| Minute | Model | More gold wins |
+|---|---|---|
+| 10:00 | 70% | 70% |
+| 15:00 | 77% | 77% |
+| 20:00 | 80% | 78% |
+| 25:00 | 83% | 82% |
+| 30:00 | 82% | 81% |
+
+Log loss 0.513 and Brier score 0.173. It's well calibrated: when it says 90 to 100%, blue wins 96% of the time, and when it says 10 to 20%, blue wins 15%. Gold explains most of a game, so the gold rule is hard to beat early; the model pulls ahead after 20 minutes, when inhibitors, Baron and Elder start deciding games. Patch 16.20 alone scores the same as all five patches, so nothing has changed enough to need a retrain yet.
 
 ## Patches
 

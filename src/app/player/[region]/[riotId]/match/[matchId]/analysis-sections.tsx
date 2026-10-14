@@ -4,6 +4,7 @@ import { formatClock } from "@/lib/analyzer/format";
 import { championIconUrl, type DataDragon } from "@/lib/ddragon";
 import type { Region } from "@/lib/regions";
 import type { Match } from "@/lib/riot/types";
+import type { MatchWinChance } from "@/lib/win-chance";
 import { Deaths } from "./deaths";
 import { JungleMap, type MapPlayer } from "./jungle-map";
 import { LeadChart } from "./lead-chart";
@@ -13,21 +14,26 @@ import { Scoreboard } from "./scoreboard";
 import { SnapshotTiles } from "./snapshot-tiles";
 import { TeamGold } from "./team-gold";
 import { TurningPoints } from "./turning-points";
+import { WinChance } from "./win-chance";
 
 // Everything below the match header, once the match has been analyzed: the
-// matchup, @10 and @15 stats, the lead chart with turning points, team gold
-// with objectives, deaths, and the scoreboard. In the same order as the mockup,
-// plus the jungle map and early pathing for junglers.
+// matchup, @10 and @15 stats, the lead chart with turning points, your team's
+// win chance, team gold with objectives, deaths, and the scoreboard. In the
+// same order as the mockup, plus the win chance and, for junglers, the
+// jungle map and early pathing.
 export function AnalysisSections({
   region,
   match,
   analysis: a,
+  winChance,
   dd,
   label,
 }: {
   region: Region;
   match: Match;
   analysis: MatchAnalysis;
+  // Null for games the win chance model doesn't cover.
+  winChance: MatchWinChance | null;
   dd: DataDragon | null;
   label: (championName: string) => string;
 }) {
@@ -74,6 +80,8 @@ export function AnalysisSections({
         <JungleMap replay={a.jungleReplay} players={mapPlayers} myTeamId={a.me.teamId} />
       )}
       {a.pathing && <PathingGrid pathing={a.pathing} />}
+
+      {winChance && <WinChance {...winChance} />}
 
       <div className="flex flex-wrap items-start gap-5">
         <TeamGold points={a.teamGold} objectives={a.objectives} />

@@ -11,6 +11,7 @@ import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match, Participant } from "@/lib/riot/types";
 import { fromSlug, toSlug, type RiotId } from "@/lib/riot-id";
+import { matchWinChance } from "@/lib/win-chance";
 import { AnalysisSections } from "./analysis-sections";
 import { MatchHeader } from "./match-header";
 import { MatchNotes } from "./match-notes";
@@ -116,11 +117,19 @@ async function Analysis({ params }: { params: Params }) {
 
   const label = (name: string) => championName(dd, name);
   const analysis = analyzeMatch(match, timeline.value, me.puuid, label)!;
+  const winChance = matchWinChance(match, timeline.value, me.teamId);
   return (
     <>
       {back}
       {header}
-      <AnalysisSections region={region} match={match} analysis={analysis} dd={dd} label={label} />
+      <AnalysisSections
+        region={region}
+        match={match}
+        analysis={analysis}
+        winChance={winChance}
+        dd={dd}
+        label={label}
+      />
       {notes}
     </>
   );

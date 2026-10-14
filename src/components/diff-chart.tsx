@@ -1,4 +1,10 @@
-import { buildDiffChart, DEFAULT_BOX, formatDiff, type DiffPoint } from "@/lib/diff-chart";
+import {
+  buildDiffChart,
+  DEFAULT_BOX,
+  formatDiff,
+  type ChartRange,
+  type DiffPoint,
+} from "@/lib/diff-chart";
 
 export type TurningPointMarker = {
   minute: number;
@@ -12,6 +18,10 @@ type Props = {
   markers?: TurningPointMarker[];
   // Read aloud by screen readers in place of the picture, so describe the shape.
   description: string;
+  // A fixed y range and how to label its ticks, instead of fitting the data
+  // and labelling "+1.5k".
+  range?: ChartRange;
+  formatTick?: (value: number) => string;
 };
 
 const TONE_COLOR = { ahead: "var(--color-ahead)", behind: "var(--color-behind)" };
@@ -19,8 +29,14 @@ const TONE_COLOR = { ahead: "var(--color-ahead)", behind: "var(--color-behind)" 
 // Line chart of "you minus your opponent" over a game. Blue fill is time
 // spent ahead, red fill is time spent behind. Numbered circles mark the
 // turning points, matching the numbered list next to the chart.
-export function DiffChart({ points, markers = [], description }: Props) {
-  const chart = buildDiffChart(points);
+export function DiffChart({
+  points,
+  markers = [],
+  description,
+  range,
+  formatTick = formatDiff,
+}: Props) {
+  const chart = buildDiffChart(points, DEFAULT_BOX, range);
   const { width, height, left, right } = DEFAULT_BOX;
   const diffAt = (minute: number) =>
     points.reduce((best, p) =>
@@ -45,7 +61,7 @@ export function DiffChart({ points, markers = [], description }: Props) {
       <g fontSize="22" fill="var(--color-faint)" textAnchor="end">
         {chart.yTicks.map((v) => (
           <text key={v} x={left - 12} y={chart.y(v) + 7}>
-            {formatDiff(v)}
+            {formatTick(v)}
           </text>
         ))}
       </g>

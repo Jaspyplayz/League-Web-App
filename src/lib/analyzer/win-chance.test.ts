@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TrimmedEvent } from "./trim";
 import { clock, frames, kill, match, participants } from "./test-fixtures";
 import {
+  biggestSwings,
   blueWinChance,
   comparePatches,
   crossValidate,
@@ -10,12 +11,15 @@ import {
   patchOf,
   readTeam,
   TEAM_STATS,
+  teamWinChance,
   toWinChanceGame,
   trainWinChanceModel,
   WIN_CHANCE_FEATURES,
   winChanceCurve,
   winChanceExamples,
   winChanceFeatures,
+  whatHappened,
+  type TeamState,
   type WinChanceGame,
 } from "./win-chance";
 
@@ -248,5 +252,63 @@ describe("trainWinChanceModel and winChanceCurve", () => {
 
   it("ignores a model trained on a different feature list", () => {
     expect(winChanceCurve(games[0], { ...model, features: ["gold"] })).toBeNull();
+  });
+});
+
+describe("teamWinChance", () => {
+  const games = fakeGames(50);
+  const model = trainWinChanceModel(games.flatMap(winChanceExamples), games.length, new Date(0));
+
+  it("gives red side 100% minus blue's chance", () => {
+    const blue = teamWinChance(games[0], model, 100)!;
+    const red = teamWinChance(games[0], model, 200)!;
+    expect(blue[10].minute).toBe(10);
+    expect(blue[10].chance + red[10].chance).toBeCloseTo(1);
+  });
+});
+
+describe("whatHappened", () => {
+  const state = (stats: Partial<TeamState>) => readTeam(TEAM_STATS.map((s) => stats[s] ?? 0));
+
+  it("lists what a team gained, biggest things first", () => {
+    const before = state({ kills: 3, towers: 1, baronBuff: 0 });
+    const after = state({ kills: 5, towers: 2, baronBuff: 1, inhibitors: 1 });
+    expect(whatHappened(before, after)).toEqual(["Baron", "1 inhibitor", "1 tower", "2 kills"]);
+  });
+
+  it("ignores things that went away, like a buff running out", () => {
+    expect(whatHappened(state({ baronBuff: 1, inhibitors: 1 }), state({}))).toEqual([]);
+  });
+});
+
+describe("biggestSwings", () => {
+  const team = (stats: Partial<Record<string, number>>) => TEAM_STATS.map((s) => stats[s] ?? 0);
+  const game: WinChanceGame = {
+    matchId: "NA1_1",
+    patch: "16.20",
+    blueWin: false,
+    frames: [0, 1, 2, 3, 4].map((m) => ({
+      t: m * 60,
+      blue: team({ kills: m >= 2 ? 2 : 0 }),
+      red: team({ baronBuff: m === 4 ? 1 : 0 }),
+    })),
+  };
+  // Blue's chance: even, a small wobble, up 15 points, flat, then down 30.
+  const chances = [0.5, 0.53, 0.68, 0.68, 0.38].map((chance, minute) => ({ minute, chance }));
+
+  it("keeps big moves only, in game order, with what each side took", () => {
+    expect(biggestSwings(game, chances, 100)).toEqual([
+      { timestamp: 120_000, from: 0.53, to: 0.68, ours: ["2 kills"], theirs: [] },
+      { timestamp: 240_000, from: 0.68, to: 0.38, ours: [], theirs: ["Baron"] },
+    ]);
+  });
+
+  it("keeps the biggest ones when there are more than the limit", () => {
+    expect(biggestSwings(game, chances, 100, 1).map((s) => s.timestamp)).toEqual([240_000]);
+  });
+
+  it("reads the game from red side's point of view", () => {
+    const red = chances.map((c) => ({ ...c, chance: 1 - c.chance }));
+    expect(biggestSwings(game, red, 200)[1]).toMatchObject({ ours: ["Baron"], theirs: [] });
   });
 });
