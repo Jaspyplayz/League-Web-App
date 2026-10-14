@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
-import { computeTrends } from "@/lib/analyzer/trends";
+import { checkWeaknesses, computeTrends } from "@/lib/analyzer/trends";
 import { loadBenchmarks, loadBenchmarkTiers } from "@/lib/benchmark-store";
 import {
   championsPlayed,
@@ -13,6 +13,7 @@ import {
   type InsightsFilters,
 } from "@/lib/insights-filters";
 import { championClass, championName, getDataDragon, type DataDragon } from "@/lib/ddragon";
+import { playerKey } from "@/lib/focus";
 import { isRegion } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
@@ -22,6 +23,7 @@ import { loadTrendGames } from "@/lib/trend-games";
 import { AnalysisProgress } from "./analysis-progress";
 import { loadChosenPlayer, readChoice } from "./chosen-player";
 import { CompareWithPlayer } from "./compare-with-player";
+import { FocusPanel } from "./focus";
 import { InsightsFilterBar } from "./insights-filters";
 import { TierComparison } from "./tier-comparison";
 import { LaningChart } from "./laning-chart";
@@ -187,6 +189,15 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   }
 
   const trends = computeTrends(games);
+  // Your focus goal is saved in the browser, so the server doesn't know which
+  // weakness it is. Each game is checked against all of them, and the panel
+  // picks out the one you chose.
+  const focusGames = games.map((g) => ({
+    matchId: g.matchId,
+    startedAt: g.startedAt,
+    shows: checkWeaknesses(g),
+  }));
+  const player = playerKey(region, gameName, tagLine);
   const label = (name: string) => championName(dd, name);
   const classOf = (name: string) => championClass(dd, name);
   // Null when none of your games has enough of that rank's games to compare.
@@ -200,7 +211,13 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       {header}
       {waiting > 0 && progress}
       {filterBar}
-      <Weaknesses weaknesses={trends.weaknesses} games={games.length} />
+      <FocusPanel
+        player={player}
+        games={focusGames}
+        current={trends.weaknesses.map((w) => w.id)}
+        playerPath={playerPath}
+      />
+      <Weaknesses weaknesses={trends.weaknesses} games={games.length} player={player} />
       <LaningChart
         games={trends.games}
         laning={trends.laning}
