@@ -12,6 +12,7 @@ import { describeDiff } from "@/lib/analyzer/describe";
 import { METRICS, type Metric } from "@/lib/analyzer/matchup";
 import type { DiffPoint } from "@/lib/diff-chart";
 import { LegendSwatch } from "./legend-swatch";
+import { panelClass } from "@/components/ui/panel";
 
 const METRIC_NAMES: Record<Metric, string> = {
   gold: "Gold",
@@ -34,7 +35,7 @@ export function LeadChart({ series, markers, opponentName }: Props) {
   return (
     <section
       aria-labelledby="lead-heading"
-      className="flex min-w-0 flex-[999_1_600px] flex-col gap-[18px] rounded-[18px] border border-line-strong bg-surface p-6"
+      className={`${panelClass} flex min-w-0 flex-[999_1_600px] flex-col gap-[18px] p-6`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PanelHeading id="lead-heading">Lead vs {opponentName}</PanelHeading>

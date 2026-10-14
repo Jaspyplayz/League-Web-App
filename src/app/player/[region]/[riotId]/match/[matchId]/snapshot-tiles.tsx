@@ -1,6 +1,7 @@
 import { formatSigned } from "@/lib/analyzer/format";
 import type { Metric, Snapshot } from "@/lib/analyzer/matchup";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { panelClass } from "@/components/ui/panel";
 
 const TILE_LABELS: Record<Metric, string> = {
   gold: "Gold",
@@ -37,7 +38,7 @@ function Tile({ label, you, opponent }: { label: string; you: number; opponent: 
   const max = Math.max(you, opponent, 1);
 
   return (
-    <li className="flex min-w-0 flex-[1_1_220px] flex-col gap-2.5 rounded-[14px] border border-line-strong bg-surface px-5 py-[18px]">
+    <li className={`${panelClass} flex min-w-0 flex-[1_1_220px] flex-col gap-2.5 px-5 py-[18px]`}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm text-muted">{label}</span>
         <span className={`font-mono text-2xl font-medium ${color}`}>{formatSigned(diff)}</span>

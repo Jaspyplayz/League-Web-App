@@ -110,7 +110,7 @@ export async function RecentMatches({
         {before === null && record.games > 0 && (
           <RecentSummary record={record} roles={roleCounts(matches)} />
         )}
-        <Suspense fallback={<p className="text-sm text-zinc-500">Loading season champions…</p>}>
+        <Suspense fallback={<p className="text-sm text-faint">Loading season champions…</p>}>
           <SeasonChampions
             region={region}
             puuid={puuid}
@@ -142,7 +142,7 @@ export async function RecentMatches({
           result.error ? (
             <RiotErrorNotice error={result.error} />
           ) : (
-            <p className="text-zinc-600 dark:text-zinc-400">{emptyMessage(queue, before)}</p>
+            <p className="text-muted">{emptyMessage(queue, before)}</p>
           )
         ) : (
           <FilterableMatchList

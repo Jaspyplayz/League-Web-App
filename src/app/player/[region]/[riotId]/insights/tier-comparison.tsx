@@ -5,6 +5,7 @@ import { plural } from "@/lib/analyzer/format";
 import type { DataDragon } from "@/lib/ddragon";
 import { tierName, type Tier } from "@/lib/tiers";
 import { BenchmarkComparison } from "./benchmark-comparison";
+import { panelClass } from "@/components/ui/panel";
 
 const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
 
@@ -62,7 +63,7 @@ export function TierComparison({
       {comparison ? (
         <BenchmarkComparison comparison={comparison} against={{ kind: "tier", tier }} dd={dd} />
       ) : (
-        <p className="rounded-[14px] border border-line-strong bg-surface px-5 py-4 text-muted">
+        <p className={`${panelClass} px-5 py-4 text-muted`}>
           Not enough {tierName(tier)} games in your roles to compare with yet.
         </p>
       )}

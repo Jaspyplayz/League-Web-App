@@ -11,6 +11,7 @@ import type { LeagueEntry } from "@/lib/riot/types";
 import { tierTrack, type TrackStep } from "@/lib/tiers";
 import { LpGraph } from "./lp-graph";
 import { UpdateButton } from "./update-button";
+import { panelClass } from "@/components/ui/panel";
 
 type Props = { region: Region; puuid: string; gameName: string; tagLine: string; profile: Profile };
 
@@ -41,12 +42,12 @@ export async function ProfileHeader({ region, puuid, gameName, tagLine, profile 
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-semibold">
                 {gameName}
-                <span className="text-zinc-500">#{tagLine}</span>
+                <span className="text-faint">#{tagLine}</span>
               </h1>
               <PinButton region={region} gameName={gameName} tagLine={tagLine} />
               <ThisIsMe region={region} puuid={puuid} gameName={gameName} tagLine={tagLine} />
             </div>
-            <p className="text-zinc-600 dark:text-zinc-400">
+            <p className="text-muted">
               {REGIONS[region].label}
               {profile.summonerLevel !== null && ` · Level ${profile.summonerLevel}`}
             </p>
@@ -92,8 +93,8 @@ function RankedCard({
   const track = entry ? tierTrack(entry.tier, entry.rank) : null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-      <p className="font-mono text-xs tracking-widest text-zinc-500 uppercase">{label}</p>
+    <div className={`${panelClass} flex flex-col gap-3 p-4`}>
+      <p className="font-mono text-xs tracking-widest text-faint uppercase">{label}</p>
       {entry ? (
         <>
           <div className="flex items-center gap-4">
@@ -102,7 +103,7 @@ function RankedCard({
               <p className="text-xl font-semibold">{formatTier(entry)}</p>
               <p className="font-mono text-sm">{entry.leaguePoints} LP</p>
             </div>
-            <p className="ml-auto text-right font-mono text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="ml-auto text-right font-mono text-sm text-muted">
               {entry.wins}W {entry.losses}L
               <br />
               {Math.round(winRate(entry.wins, entry.losses) * 100)}% win rate
@@ -112,7 +113,7 @@ function RankedCard({
           <LpGraph points={graph} />
         </>
       ) : (
-        <p className="text-xl font-semibold text-zinc-500">Unranked</p>
+        <p className="text-xl font-semibold text-faint">Unranked</p>
       )}
     </div>
   );

@@ -16,6 +16,7 @@ import { describeSpot } from "@/lib/analyzer/map";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
 import type { MapPosition } from "@/lib/riot/types";
 import { LegendSwatch } from "./legend-swatch";
+import { panelClass } from "@/components/ui/panel";
 
 export type MapPlayer = {
   participantId: number;
@@ -82,7 +83,7 @@ export function JungleMap({ replay, players, myTeamId }: Props) {
   return (
     <section
       aria-labelledby="jungle-map-heading"
-      className="flex flex-col gap-[18px] rounded-[18px] border border-line-strong bg-surface p-6"
+      className={`${panelClass} flex flex-col gap-[18px] p-6`}
     >
       <div className="flex flex-col gap-1.5">
         <PanelHeading id="jungle-map-heading">Jungle map</PanelHeading>

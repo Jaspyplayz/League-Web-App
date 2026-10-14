@@ -26,10 +26,10 @@ export default function PlayerPage({
 }) {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-12">
-      <Link href="/" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
+      <Link href="/" className="text-sm text-muted hover:underline">
         ← New search
       </Link>
-      <Suspense fallback={<p className="text-zinc-500">Looking up player…</p>}>
+      <Suspense fallback={<p className="text-faint">Looking up player…</p>}>
         <Player params={params} searchParams={searchParams} />
       </Suspense>
     </main>
@@ -73,7 +73,7 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
             profile={profile.value}
           />
           <ProfileTabs playerPath={playerPath} current="matches" />
-          <Suspense fallback={<p className="text-zinc-500">Loading recent matches…</p>}>
+          <Suspense fallback={<p className="text-faint">Loading recent matches…</p>}>
             <RecentMatches
               region={region}
               puuid={puuid}
@@ -98,7 +98,7 @@ function PlayerNotFound({ region, id }: { region: Region; id: RiotId }) {
   return (
     <div className="flex flex-col gap-2">
       <h1 className="text-3xl font-semibold">No player found</h1>
-      <p className="text-zinc-600 dark:text-zinc-400">
+      <p className="text-muted">
         There&apos;s no {id.gameName}#{id.tagLine} in {REGIONS[region].label}. Check the spelling
         and the tag after the #, or try another region.
       </p>
@@ -110,7 +110,7 @@ function PlayerName({ gameName, tagLine }: { gameName: string; tagLine: string }
   return (
     <h1 className="text-3xl font-semibold">
       {gameName}
-      <span className="text-zinc-500">#{tagLine}</span>
+      <span className="text-faint">#{tagLine}</span>
     </h1>
   );
 }

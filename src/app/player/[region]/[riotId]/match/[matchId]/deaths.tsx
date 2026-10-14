@@ -1,6 +1,7 @@
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { DEATH_LABEL_TEXT, type Death } from "@/lib/analyzer/deaths";
 import { formatClock, listNames, plural } from "@/lib/analyzer/format";
+import { panelClass } from "@/components/ui/panel";
 
 // Every death with its time, what kind of death it was, and who was involved.
 export function Deaths({ deaths, name }: { deaths: Death[]; name: (id: number) => string }) {
@@ -20,11 +21,11 @@ export function Deaths({ deaths, name }: { deaths: Death[]; name: (id: number) =
         )}
       </div>
       {deaths.length === 0 ? (
-        <p className="rounded-[14px] border border-line-strong bg-surface px-4 py-3.5 text-[15px] text-muted">
+        <p className={`${panelClass} px-4 py-3.5 text-[15px] text-muted`}>
           You didn&apos;t die this game.
         </p>
       ) : (
-        <ol className="flex flex-col divide-y divide-line rounded-[14px] border border-line-strong bg-surface">
+        <ol className={`${panelClass} flex flex-col divide-y divide-line`}>
           {deaths.map((d) => (
             <li key={d.timestamp} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
               <span className="w-12 font-mono text-[15px] text-muted">

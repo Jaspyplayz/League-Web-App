@@ -1,5 +1,6 @@
 import Form from "next/form";
 import { GAME_WINDOWS, type InsightsFilters } from "@/lib/insights-filters";
+import { panelClass } from "@/components/ui/panel";
 
 const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
 const select = "bg-surface py-0.5 text-base text-ink";
@@ -22,7 +23,7 @@ export function InsightsFilterBar({
     <Form
       action=""
       aria-label="Filter insights"
-      className="flex flex-wrap items-end gap-x-5 gap-y-3 rounded-[14px] border border-line-strong bg-surface px-5 py-3"
+      className={`${panelClass} flex flex-wrap items-end gap-x-5 gap-y-3 px-5 py-3`}
     >
       {Object.entries(keep).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />

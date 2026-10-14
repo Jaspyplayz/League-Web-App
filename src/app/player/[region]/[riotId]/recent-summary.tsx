@@ -1,4 +1,5 @@
 import { winRate, type RecentRecord } from "@/lib/match-summary";
+import { panelClass } from "@/components/ui/panel";
 
 // The "Last 20 games" box beside the match list, like the summary at the top
 // of op.gg's and DeepLoL's match history: a win rate ring, the overall
@@ -13,8 +14,8 @@ export function RecentSummary({
   const mostPlayed = Math.max(1, ...roles.map((r) => r.games));
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-      <h2 className="font-mono text-xs tracking-widest text-zinc-500 uppercase">
+    <section className={`${panelClass} flex flex-col gap-4 p-4`}>
+      <h2 className="font-mono text-xs tracking-widest text-faint uppercase">
         Last {record.games} games
       </h2>
 
@@ -40,7 +41,7 @@ export function RecentSummary({
       {/* Only shown when the games had roles; ARAM-only lists have none. */}
       {roles.some((r) => r.games > 0) && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm text-zinc-500">Roles</h3>
+          <h3 className="text-sm text-faint">Roles</h3>
           <ul className="flex h-24 items-end gap-3">
             {roles.map(({ role, games }) => (
               <li
@@ -130,7 +131,7 @@ function WinRateRing({ wins, losses }: { wins: number; losses: number }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-zinc-500">{label}</dt>
+      <dt className="text-faint">{label}</dt>
       <dd className="font-mono text-lg">{value}</dd>
     </div>
   );

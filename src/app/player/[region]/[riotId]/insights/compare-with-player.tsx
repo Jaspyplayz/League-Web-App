@@ -6,9 +6,10 @@ import type { DataDragon } from "@/lib/ddragon";
 import { REGIONS } from "@/lib/regions";
 import { BenchmarkComparison } from "./benchmark-comparison";
 import type { Choice, ChosenPlayer } from "./chosen-player";
+import { panelClass } from "@/components/ui/panel";
 
 const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
-const note = "rounded-[14px] border border-line-strong bg-surface px-5 py-4 text-muted";
+const note = `${panelClass} px-5 py-4 text-muted`;
 
 // "Compare with a player": type any Riot ID, such as a pro's solo queue
 // account, and see your games next to their last 20 ranked solo games.
@@ -56,7 +57,7 @@ function PlayerForm({
       {Object.entries(keep).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      <div className="flex flex-wrap gap-2 rounded-[14px] border border-line-strong bg-surface p-2 focus-within:border-ahead">
+      <div className={`${panelClass} flex flex-wrap gap-2 p-2 focus-within:border-ahead`}>
         <div className="flex min-w-0 flex-[1_1_260px] flex-col px-3 py-1.5 max-sm:basis-full">
           <label htmlFor="vs" className={fieldLabel}>
             Their Riot ID

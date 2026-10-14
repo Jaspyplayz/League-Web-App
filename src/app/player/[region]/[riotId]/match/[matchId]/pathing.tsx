@@ -3,6 +3,7 @@ import { listNames, plural } from "@/lib/analyzer/format";
 import { LANES, type LaneTone } from "@/lib/analyzer/jungle-replay";
 import { PATHING_FROM_MINUTE, PATHING_TO_MINUTE, type Pathing } from "@/lib/analyzer/pathing";
 import { LegendSwatch } from "./legend-swatch";
+import { panelClass } from "@/components/ui/panel";
 
 // Early pathing for junglers: a grid with one row per lane and one column per
 // minute from 3:00 to 14:00. Each cell is tinted by how that lane was doing,
@@ -15,7 +16,7 @@ export function PathingGrid({ pathing }: { pathing: Pathing }) {
   return (
     <section
       aria-labelledby="pathing-heading"
-      className="flex flex-col gap-[18px] rounded-[18px] border border-line-strong bg-surface p-6"
+      className={`${panelClass} flex flex-col gap-[18px] p-6`}
     >
       <div className="flex flex-col gap-1.5">
         <PanelHeading id="pathing-heading">Early pathing</PanelHeading>

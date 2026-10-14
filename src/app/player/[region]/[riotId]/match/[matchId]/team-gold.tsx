@@ -5,6 +5,7 @@ import { formatClock } from "@/lib/analyzer/format";
 import { OBJECTIVE_NAMES, type Objective, type ObjectiveKind } from "@/lib/analyzer/objectives";
 import { buildDiffChart, DEFAULT_BOX, type DiffPoint } from "@/lib/diff-chart";
 import { LegendSwatch } from "./legend-swatch";
+import { panelClass } from "@/components/ui/panel";
 
 // Your team's gold minus the enemy team's, with the objectives each team
 // took lined up underneath. Shows whether the game was won or lost as a team,
@@ -13,7 +14,7 @@ export function TeamGold({ points, objectives }: { points: DiffPoint[]; objectiv
   return (
     <section
       aria-labelledby="team-gold-heading"
-      className="flex min-w-0 flex-[999_1_600px] flex-col gap-[18px] rounded-[18px] border border-line-strong bg-surface p-6"
+      className={`${panelClass} flex min-w-0 flex-[999_1_600px] flex-col gap-[18px] p-6`}
     >
       <PanelHeading id="team-gold-heading">Team gold</PanelHeading>
       <div className="flex flex-wrap gap-[18px] text-[13px] text-muted">

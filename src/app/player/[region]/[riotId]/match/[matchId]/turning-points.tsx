@@ -1,6 +1,7 @@
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatClock, formatSigned } from "@/lib/analyzer/format";
 import { SWING_THRESHOLD, type TurningPoint } from "@/lib/analyzer/turning-points";
+import { panelClass } from "@/components/ui/panel";
 
 // Numbered list next to the chart; the numbers match the circles on it.
 export function TurningPoints({ points }: { points: TurningPoint[] }) {
@@ -11,7 +12,7 @@ export function TurningPoints({ points }: { points: TurningPoint[] }) {
     >
       <PanelHeading id="turning-points">Turning points</PanelHeading>
       {points.length === 0 ? (
-        <p className="rounded-[14px] border border-line-strong bg-surface px-4 py-3.5 text-[15px] text-muted">
+        <p className={`${panelClass} px-4 py-3.5 text-[15px] text-muted`}>
           No big swings: the gold difference never moved more than{" "}
           {SWING_THRESHOLD.toLocaleString("en-US")} in a few minutes. This one was decided slowly.
         </p>
@@ -23,7 +24,7 @@ export function TurningPoints({ points }: { points: TurningPoint[] }) {
             return (
               <li
                 key={p.startMs}
-                className="flex items-start gap-3.5 rounded-[14px] border border-line-strong bg-surface px-4 py-3.5"
+                className={`${panelClass} flex items-start gap-3.5 px-4 py-3.5`}
               >
                 <span
                   aria-hidden="true"
