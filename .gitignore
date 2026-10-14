@@ -153,3 +153,6 @@ next-env.d.ts
 
 # Vercel
 .vercel
+
+# Claude Code personal settings (notifications, status line)
+.claude/settings.local.json
