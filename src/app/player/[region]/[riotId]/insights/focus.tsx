@@ -16,7 +16,7 @@ import {
 // Focus goals: pick one recurring weakness and see every game after that
 // checked against it. The pick is kept in this browser's localStorage (see
 // src/lib/focus.ts), so these components run in the browser ("use client").
-// The reading and writing works like src/components/recent-players.tsx.
+// The reading and writing works like src/components/saved-players.tsx.
 
 const listeners = new Set<() => void>();
 

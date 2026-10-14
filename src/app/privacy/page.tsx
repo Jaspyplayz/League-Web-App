@@ -15,8 +15,8 @@ export default function PrivacyPage() {
     <LegalPage title="Privacy policy" updated="October 14, 2026">
       <p>
         Turnpoint is a free League of Legends stats site built by one student. This page
-        explains what data it handles and why. The short version: there are no accounts, no
-        ads and no tracking cookies.
+        explains what data it handles and why. The short version: accounts are optional, and
+        there are no ads and no tracking cookies.
       </p>
 
       <h2>Game data from Riot</h2>
@@ -44,12 +44,37 @@ export default function PrivacyPage() {
         United States.
       </p>
 
+      <h2>If you sign in</h2>
+      <p>
+        You can use Turnpoint without an account. If you choose to sign in with Google or
+        Discord, that service tells Turnpoint your name, email address and profile picture.
+        Turnpoint never sees your password. Supabase Auth, the sign-in service Turnpoint uses,
+        stores:
+      </p>
+      <ul>
+        <li>Your name, email address and profile picture link from Google or Discord</li>
+        <li>Which service you signed in with, and your account ID there</li>
+        <li>When your account was created and when you last signed in</li>
+        <li>
+          A log of sign-in events, including IP address, which Supabase keeps to protect
+          accounts
+        </li>
+      </ul>
+      <p>
+        While you&apos;re signed in, your browser keeps a sign-in cookie so you don&apos;t have
+        to sign in on every page. Signing out removes it.
+      </p>
+
       <h2>Stored in your browser</h2>
       <p>
         Turnpoint remembers the last few players you looked up, so you can click back to them
         from the home page. That list is kept in your own browser&apos;s local storage: it
         stays on your device and is never sent to Turnpoint. Remove a player with the ×
         next to their name, or the whole list with the Clear button.
+      </p>
+      <p>
+        Players you pin with the star on their profile are saved the same way, so they stay on
+        the home page until you unpin them.
       </p>
       <p>
         If you pick a focus goal on the Insights tab, Turnpoint saves which weakness you
@@ -68,19 +93,22 @@ export default function PrivacyPage() {
           and technical details of the error, so it can be fixed.
         </li>
       </ul>
-      <p>Turnpoint does not sell data, show ads or use cookies to track you.</p>
+      <p>
+        Turnpoint does not sell data, show ads or use cookies to track you. The only cookie
+        it sets is the sign-in cookie above, and only if you sign in.
+      </p>
 
       <h2>Removing your data</h2>
       <p>
-        To ask for a player&apos;s cached data to be removed, or with any other privacy
-        question, open an issue on{" "}
+        To ask for your account to be deleted, for a player&apos;s cached data to be removed,
+        or with any other privacy question, open an issue on{" "}
         <a href={`${REPO_URL}/issues`}>Turnpoint&apos;s GitHub page</a>. Data that has been
         removed may be fetched again from Riot if someone looks the player up later.
       </p>
 
       <h2>Changes</h2>
       <p>
-        If Turnpoint starts handling new kinds of data, for example a sign-in with your Riot
+        If Turnpoint starts handling new kinds of data, for example signing in with your Riot
         account, this page will be updated before that feature goes live.
       </p>
     </LegalPage>
