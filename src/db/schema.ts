@@ -241,3 +241,15 @@ export const benchmarkGames = pgTable(
     index("benchmark_games_puuid_idx").on(t.puuid),
   ],
 ).enableRLS();
+
+// Training data for the game score (src/lib/analyzer/score.ts): the
+// end-of-game numbers of all ten players in each benchmark game, without
+// names or PUUIDs. A whole match is about 60 KB, this is a few KB, so
+// thousands of games stay small. `npm run benchmarks` fills it and
+// `npm run train-score` reads it, along with the matches table.
+export const scoreGames = pgTable("score_games", {
+  matchId: text("match_id").primaryKey(),
+  // A ScoreGame: { matchId, durationS, players: ScorePlayer[] }.
+  game: jsonb("game").notNull(),
+  collectedAt: timestamptz("collected_at").notNull().defaultNow(),
+}).enableRLS();

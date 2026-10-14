@@ -1,22 +1,26 @@
 import type { ReactNode } from "react";
 import { ExpandableRow } from "@/components/expandable-row";
 import { ChampionIcon, ItemSlots, SummonerSpellIcon } from "@/components/game-icons";
+import { GameScore } from "@/components/game-score";
+import type { PlayerScore } from "@/lib/analyzer/score";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import { formatDuration, timeAgo, type MatchSummary } from "@/lib/match-summary";
 
 // One game in the player's match list: result, champion and spells, KDA, CS
-// and items. Render it inside a <ul>. Pass `details` (for example both
+// items and game score. Render it inside a <ul>. Pass `details` (for example both
 // teams' scoreboard) to make the row open a panel with it when clicked;
 // without it the row is plain content.
 export function MatchRow({
   match: m,
   dd,
   now,
+  score,
   details,
 }: {
   match: MatchSummary;
   dd: DataDragon | null;
   now: number; // the current time, for "2h ago"
+  score?: PlayerScore; // missing for games that aren't scored, like ARAM
   details?: ReactNode;
 }) {
   const result = m.remake ? "Remake" : m.win ? "Win" : "Loss";
@@ -63,6 +67,13 @@ export function MatchRow({
         <p>{m.cs} CS</p>
         <p className="text-xs text-faint">{m.csPerMin.toFixed(1)}/min</p>
       </div>
+
+      {score && (
+        <div className="w-[72px] shrink-0">
+          <GameScore score={score} size="lg" />
+          <p className="text-xs text-faint">Score</p>
+        </div>
+      )}
 
       <ItemSlots dd={dd} items={m.items} />
     </div>

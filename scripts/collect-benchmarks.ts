@@ -1,7 +1,8 @@
 // Collects benchmark games: the recent ranked solo games of players sampled
 // from every rank, Iron to Challenger, on KR, EUW and NA. Each game is boiled
 // down by summarizeGame (the same summary Insights makes of your games) and
-// saved to benchmark_games with the player's tier.
+// saved to benchmark_games with the player's tier. Every player's end-of-game
+// numbers go to score_games, as training data for the game score.
 //
 //   npm run benchmarks                                every tier, 3 servers, 10 players per tier
 //   npm run benchmarks -- --tiers gold,diamond        just those tiers
@@ -24,6 +25,7 @@ import { getDb, tables, type Db } from "@/db";
 import { benchmarkRow } from "@/db/rows";
 import { findOneTricks, ONE_TRICK_WINDOW, samplePlayers } from "@/lib/analyzer/benchmarks";
 import { plural } from "@/lib/analyzer/format";
+import { toScoreGame } from "@/lib/analyzer/score";
 import { isTrendGame, summarizeGame } from "@/lib/analyzer/trends";
 import { trimTimeline } from "@/lib/analyzer/trim";
 import { createPacer } from "@/lib/pace";
@@ -146,6 +148,11 @@ async function collectPlayer(
       const match = await call(() => getMatch(region, matchId));
       // Remakes and games under 15 minutes have nothing to compare.
       if (!isTrendGame(match, puuid)) continue;
+      // All ten players' numbers also train the game score (npm run train-score).
+      await db
+        .insert(tables.scoreGames)
+        .values({ matchId, game: toScoreGame(match) })
+        .onConflictDoNothing();
       const timeline = trimTimeline(await call(() => getTimeline(region, matchId)));
       const game = summarizeGame(match, timeline, puuid);
       if (!game) continue;

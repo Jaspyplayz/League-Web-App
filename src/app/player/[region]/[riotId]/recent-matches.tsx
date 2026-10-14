@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import { MatchDetails } from "@/components/match-details";
 import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { findPlayer } from "@/lib/analyzer";
 import { getDataDragon } from "@/lib/ddragon";
+import { scoreGame } from "@/lib/game-score";
 import {
   summarizeMatch,
   summarizeRecord,
@@ -115,6 +117,7 @@ export async function RecentMatches({ region, puuid, profile, queue, playerPath 
                 match={m}
                 dd={dd}
                 now={now}
+                score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
                 details={
                   <MatchDetails
                     region={region}

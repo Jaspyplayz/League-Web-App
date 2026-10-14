@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { ChampionIcon, ItemIcon, RuneIcon, SummonerSpellIcon } from "@/components/game-icons";
+import { GameScore } from "@/components/game-score";
 import { MatchTabs } from "@/components/match-tabs";
 import { RunePage } from "@/components/rune-page";
 import { TeamAnalysis } from "@/components/team-analysis";
 import { findPlayer, isAnalyzable } from "@/lib/analyzer";
 import { findOpponent } from "@/lib/analyzer/matchup";
+import type { PlayerScore } from "@/lib/analyzer/score";
 import { championName, type DataDragon } from "@/lib/ddragon";
+import { scoreGame } from "@/lib/game-score";
 import { formatThousands } from "@/lib/match-summary";
 import type { Region } from "@/lib/regions";
 import type { Match, Participant } from "@/lib/riot/types";
 import { participantRiotId, toSlug } from "@/lib/riot-id";
 
 // The panel that opens under a match row on the profile, with op.gg-style
-// tabs: Overview (both teams' scoreboard), Team analysis, Build and Runes,
-// plus a link out to the full analysis page.
+// tabs: Overview (both teams' scoreboard, with each player's game score),
+// Team analysis, Build and Runes, plus a link out to the full analysis page.
 //
 // Overview, Team analysis and Runes come from the match the profile already loaded, so
 // opening a row costs no Riot calls. Only the Build tab needs more data; see
@@ -76,6 +79,7 @@ function MatchOverview({
   const { participants } = match.info;
   const me = findPlayer(match, puuid);
   const opponent = me ? findOpponent(participants, me) : null;
+  const scores = scoreGame(match);
   // Damage bars are relative to the top damage dealer in the whole game.
   const maxDamage = Math.max(1, ...participants.map((p) => p.totalDamageDealtToChampions));
 
@@ -88,7 +92,7 @@ function MatchOverview({
         const gold = team.reduce((sum, p) => sum + p.goldEarned, 0);
         return (
           <div key={teamId} className="overflow-x-auto">
-            <table className="w-full min-w-[600px] table-fixed border-collapse text-[13px]">
+            <table className="w-full min-w-[680px] table-fixed border-collapse text-[13px]">
               <caption className="pb-1.5 text-left text-xs text-muted">
                 <span
                   className={`font-display text-base font-bold tracking-[0.04em] uppercase ${won ? "text-ahead" : "text-behind"}`}
@@ -105,7 +109,12 @@ function MatchOverview({
                   <th scope="col" className="py-1 pr-3 font-medium">
                     Player
                   </th>
-                  <th scope="col" className="w-[92px] px-2 py-1 font-medium">
+                  {scores.size > 0 && (
+                    <th scope="col" className="w-[76px] px-2 py-1 font-medium">
+                      Score
+                    </th>
+                  )}
+                  <th scope="col" className="w-[108px] px-2 py-1 font-medium">
                     KDA
                   </th>
                   <th scope="col" className="w-[52px] px-2 py-1 font-medium">
@@ -133,6 +142,8 @@ function MatchOverview({
                           ? "Opponent"
                           : null
                     }
+                    score={scores.get(p.participantId)}
+                    showScore={scores.size > 0}
                     damagePct={(p.totalDamageDealtToChampions / maxDamage) * 100}
                     barColor={won ? "bg-ahead" : "bg-behind"}
                   />
@@ -157,6 +168,8 @@ function PlayerRow({
   dd,
   p,
   tag,
+  score,
+  showScore,
   damagePct,
   barColor,
 }: {
@@ -164,6 +177,8 @@ function PlayerRow({
   dd: DataDragon | null;
   p: Participant;
   tag: "You" | "Opponent" | null;
+  score: PlayerScore | undefined;
+  showScore: boolean;
   damagePct: number;
   barColor: string;
 }) {
@@ -224,6 +239,7 @@ function PlayerRow({
           <div className="flex items-center gap-1.5 text-ink-soft">{who}</div>
         )}
       </th>
+      {showScore && <td className="px-2 py-1.5">{score && <GameScore score={score} />}</td>}
       <td className="px-2 py-1.5 font-mono whitespace-nowrap">
         {p.kills} / {p.deaths} / {p.assists}
       </td>

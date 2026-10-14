@@ -59,6 +59,8 @@ export type Participant = {
   goldEarned: number;
   totalDamageDealtToChampions: number;
   totalDamageTaken: number;
+  // Damage to turrets, dragons, Baron and so on. Optional so older test data still fits.
+  damageDealtToObjectives?: number;
   visionScore: number;
   wardsPlaced: number;
   item0: number;

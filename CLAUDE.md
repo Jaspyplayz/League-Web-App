@@ -14,6 +14,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Scope and data model: [docs/SCOPE.md](docs/SCOPE.md)
 - Analyzer research: [docs/match-analyzer.md](docs/match-analyzer.md)
 - Database tables and setup: [docs/database.md](docs/database.md)
+- Game score (the trained 0 to 100 rating): [docs/game-score.md](docs/game-score.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
@@ -30,15 +31,16 @@ src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (rate limits, retries) and one function per endpoint
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
-                  trends.ts rolls games up into the Insights page, and compare.ts
-                  sets them against one rank's games or one chosen player's
+                  trends.ts rolls games up into the Insights page, compare.ts
+                  sets them against one rank's games or one chosen player's,
+                  and score.ts is the trained 0 to 100 game score (score-model.json)
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
-scripts/          Command-line jobs run with tsx (npm run benchmarks)
+scripts/          Command-line jobs run with tsx (npm run benchmarks, npm run train-score)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
 ```
@@ -54,6 +56,7 @@ docs/             Design and research docs
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
+| `npm run train-score` | Retrain the game score on saved games and update `score-model.json` ([docs/game-score.md](docs/game-score.md)) |
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.**
 
