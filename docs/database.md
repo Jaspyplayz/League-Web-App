@@ -8,6 +8,7 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 |---|---|---|
 | `players` | searched player (by PUUID), with their latest match IDs | the whole profile after 24 h, or on "Update" (2 min cooldown) |
 | `ranked_entries` | player × ranked queue | with the player's profile |
+| `rank_history` | player × ranked queue × change, a dated copy of the rank | never; a row is added whenever a profile save finds the rank, LP or games played changed ([`src/lib/rank-history.ts`](../src/lib/rank-history.ts)), for the LP graph |
 | `player_seasons` | player × season, every match ID they played that season | with the player's profile; the games fill into `matches` 10 per profile visit |
 | `matches` | game, with the full match-v5 JSON in `raw` | never |
 | `match_participants` | player × game (the scoreboard) | never (filled from `matches.raw`) |

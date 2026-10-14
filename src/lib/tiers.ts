@@ -62,3 +62,25 @@ export function tierTrack(tier: string, rank: string): TrackStep[] | null {
   steps.push({ label: isApexTier(next) ? tierLetter(next) : `${tierLetter(next)}4`, state: "next" });
   return steps;
 }
+
+// One number for a rank, so ranks can be drawn on a graph: 100 points per
+// division and 400 per tier, plus LP. Iron IV 0 LP is 0, Diamond I 75 LP is
+// 2775, and Master and above start at 2800 and add LP, since their LP keeps
+// climbing on one ladder. Null for a tier we don't recognize.
+export function rankScore(tier: string, rank: string, lp: number): number | null {
+  if (!isTier(tier)) return null;
+  if (isApexTier(tier)) return TIERS.indexOf("MASTER") * 400 + lp;
+  const division = [...DIVISIONS].reverse().indexOf(rank as Division); // IV = 0, I = 3
+  if (division === -1) return null;
+  return TIERS.indexOf(tier) * 400 + division * 100 + lp;
+}
+
+// The reverse, for the graph's labels: 2700 -> "D1", 2800 -> "M". Only
+// meant for scores that land exactly on a division.
+export function scoreLabel(score: number): string {
+  const master = TIERS.indexOf("MASTER") * 400;
+  if (score >= master) return "M";
+  const tier = TIERS[Math.floor(score / 400)];
+  const division = 4 - Math.floor((score % 400) / 100);
+  return `${tierLetter(tier)}${division}`;
+}
