@@ -7,6 +7,7 @@ import { getDataDragon } from "@/lib/ddragon";
 import { scoreGame } from "@/lib/game-score";
 import {
   matchTeams,
+  roleCounts,
   summarizeMatch,
   summarizeRecord,
   topChampions,
@@ -20,6 +21,7 @@ import { getMatchIds } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
 import { QueueTabs } from "./queue-tabs";
+import { RecentSummary } from "./recent-summary";
 import { SeasonChampions } from "./season-champions";
 
 // `profile` is the player's saved snapshot, whose match IDs are the All tab.
@@ -65,25 +67,7 @@ export async function RecentMatches({ region, puuid, profile, queue, playerPath 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <aside className="flex flex-col gap-4 lg:w-72 lg:shrink-0">
-        {record.games > 0 && (
-          <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-            <h2 className="font-mono text-xs tracking-widest text-zinc-500 uppercase">
-              Last {record.games} games
-            </h2>
-            <p className="text-3xl font-semibold">
-              <span className="text-blue-500">{record.wins}W</span>{" "}
-              <span className="text-amber-500">{record.losses}L</span>
-            </p>
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <Stat label="KDA" value={record.kda.toFixed(1)} />
-              <Stat label="CS per min" value={record.csPerMin.toFixed(1)} />
-              <Stat
-                label="Kill participation"
-                value={`${Math.round(record.killParticipation * 100)}%`}
-              />
-            </dl>
-          </section>
-        )}
+        {record.games > 0 && <RecentSummary record={record} roles={roleCounts(matches)} />}
         <Suspense fallback={<p className="text-sm text-zinc-500">Loading season champions…</p>}>
           <SeasonChampions
             region={region}
@@ -134,15 +118,6 @@ export async function RecentMatches({ region, puuid, profile, queue, playerPath 
           </ul>
         )}
       </section>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="font-mono text-lg">{value}</dd>
     </div>
   );
 }
