@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { ChampionIcon, ItemIcon } from "@/components/game-icons";
+import { Panel } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { StatBar } from "@/components/ui/stat-bar";
+import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import { formatThousands } from "@/lib/match-summary";
 import type { Region } from "@/lib/regions";
 import type { Participant } from "@/lib/riot/types";
 import { participantRiotId, toSlug } from "@/lib/riot-id";
 
-// Both teams' end-of-game numbers, blue side first. Each player's name links
-// to their own profile, so you can look up anyone you played with or against.
+// Both teams' end-of-game numbers: your team first, both in role order, so
+// you and your opponent are on the same row of each table. Like the match
+// panel, the winning team is blue and the losing team amber, and you and
+// your opponent are outlined. Each player's name links to their own profile,
+// so you can look up anyone you played with or against.
 export function Scoreboard({
   region,
   dd,
@@ -22,52 +28,51 @@ export function Scoreboard({
   meId: number;
   opponentId: number | null;
 }) {
+  const myTeamId = participants.find((p) => p.participantId === meId)?.teamId;
   // Damage bars are relative to the top damage dealer in the whole game.
   const maxDamage = Math.max(1, ...participants.map((p) => p.totalDamageDealtToChampions));
 
   return (
     <section aria-labelledby="scoreboard-heading" className="flex flex-col gap-3.5">
       <PanelHeading id="scoreboard-heading">Scoreboard</PanelHeading>
-      {[100, 200].map((teamId) => {
-        const team = participants.filter((p) => p.teamId === teamId);
+      {teamOrder(myTeamId).map((teamId) => {
+        const team = byRole(participants.filter((p) => p.teamId === teamId));
         const won = team[0]?.win ?? false;
-        const tone = team.some((p) => p.participantId === meId) ? "ahead" : "behind";
         const kills = team.reduce((sum, p) => sum + p.kills, 0);
         const gold = team.reduce((sum, p) => sum + p.goldEarned, 0);
         return (
-          <div
-            key={teamId}
-            className="overflow-x-auto rounded-2xl border border-line-strong bg-surface"
-          >
-            <table className="w-full min-w-[820px] border-collapse text-sm">
+          <Panel key={teamId} className="overflow-x-auto">
+            <table className="w-full min-w-[820px] table-fixed border-collapse text-sm">
               <caption className="px-5 pb-2.5 pt-4 text-left text-sm text-muted">
                 <span
-                  className={`font-display text-xl font-bold uppercase tracking-[0.04em] ${tone === "ahead" ? "text-ahead" : "text-behind"}`}
+                  className={`font-display text-xl font-bold uppercase tracking-[0.04em] ${won ? "text-ahead" : "text-behind"}`}
                 >
-                  {teamId === 100 ? "Blue side" : "Red side"} · {won ? "Victory" : "Defeat"}
+                  {teamId === myTeamId ? "Your team" : "Enemy team"} · {won ? "Victory" : "Defeat"}
                 </span>
-                <span className="ml-3.5 font-mono text-[13px]">
-                  {kills} kills · {formatThousands(gold)} gold
+                <span className="ml-3.5 font-mono text-note">
+                  {teamId === 100 ? "Blue side" : "Red side"} · {kills} kills ·{" "}
+                  {formatThousands(gold)} gold
                 </span>
               </caption>
+              {/* Fixed column widths, so the two teams' tables line up. */}
               <thead>
                 <tr className="text-left font-mono text-[11px] uppercase tracking-[0.1em] text-faint">
                   <th scope="col" className="px-5 py-2 font-medium">
                     Player
                   </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
+                  <th scope="col" className="w-[112px] px-3 py-2 font-medium">
                     KDA
                   </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
+                  <th scope="col" className="w-[64px] px-3 py-2 font-medium">
                     CS
                   </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
+                  <th scope="col" className="w-[76px] px-3 py-2 font-medium">
                     Gold
                   </th>
                   <th scope="col" className="w-[200px] px-3 py-2 font-medium">
                     Damage to champions
                   </th>
-                  <th scope="col" className="py-2 pl-3 pr-5 font-medium">
+                  <th scope="col" className="w-[230px] py-2 pl-3 pr-5 font-medium">
                     Items
                   </th>
                 </tr>
@@ -86,13 +91,13 @@ export function Scoreboard({
                           ? "Opponent"
                           : null
                     }
-                    damagePct={(p.totalDamageDealtToChampions / maxDamage) * 100}
-                    barColor={tone === "ahead" ? "bg-ahead" : "bg-behind"}
+                    maxDamage={maxDamage}
+                    won={won}
                   />
                 ))}
               </tbody>
             </table>
-          </div>
+          </Panel>
         );
       })}
     </section>
@@ -104,15 +109,15 @@ function Row({
   dd,
   p,
   tag,
-  damagePct,
-  barColor,
+  maxDamage,
+  won,
 }: {
   region: Region;
   dd: DataDragon | null;
   p: Participant;
   tag: "You" | "Opponent" | null;
-  damagePct: number;
-  barColor: string;
+  maxDamage: number;
+  won: boolean;
 }) {
   const items = [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6];
   const name = [p.riotIdGameName, p.riotIdTagline].filter(Boolean).join("#");
@@ -126,7 +131,7 @@ function Row({
           <span className="font-semibold">{championName(dd, p.championName)}</span>
           {tag && (
             <span
-              className={`rounded-full border px-2 font-mono text-[10px] uppercase tracking-[0.1em] ${tag === "You" ? "border-ahead-soft text-ahead-soft" : "border-behind text-behind"}`}
+              className={`rounded-full border px-2 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft ${tag === "You" ? "border-ink-soft" : "border-dashed border-faint"}`}
             >
               {tag}
             </span>
@@ -140,7 +145,11 @@ function Row({
   );
 
   return (
-    <tr className={`border-t border-line ${tag === "You" ? "bg-ahead/10" : ""}`}>
+    // Outlines instead of a tint, so they don't clash with the team colors:
+    // solid for you, dashed for your opponent.
+    <tr
+      className={`border-t border-line ${tag === "You" ? "outline -outline-offset-1 outline-ink" : tag === "Opponent" ? "outline outline-dashed -outline-offset-1 outline-faint" : ""}`}
+    >
       <th scope="row" className="px-5 py-2.5 text-left font-normal">
         {riotId ? (
           // The whole cell (icon, champion and name) is the link, so it's an
@@ -161,13 +170,13 @@ function Row({
       <td className="px-3 py-2.5 font-mono">{p.totalMinionsKilled + p.neutralMinionsKilled}</td>
       <td className="px-3 py-2.5 font-mono">{formatThousands(p.goldEarned)}</td>
       <td className="px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
-          <div className="h-1.5 flex-1 rounded-sm bg-line" aria-hidden="true">
-            <div className={`h-1.5 rounded-sm ${barColor}`} style={{ width: `${damagePct}%` }} />
-          </div>
-          <span className="w-11 flex-none text-right font-mono">
-            {formatThousands(p.totalDamageDealtToChampions)}
-          </span>
+        <div className="flex">
+          <StatBar
+            value={p.totalDamageDealtToChampions}
+            max={maxDamage}
+            label={formatThousands(p.totalDamageDealtToChampions)}
+            tone={won ? "ahead" : "behind"}
+          />
         </div>
       </td>
       <td className="py-2.5 pl-3 pr-5">
