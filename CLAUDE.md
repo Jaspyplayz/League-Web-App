@@ -43,6 +43,7 @@ src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/p
 scripts/          Command-line jobs run with tsx (npm run benchmarks, npm run train-score)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
+.claude/          Claude Code settings; hooks/ runs lint and typecheck before Claude commits
 ```
 
 ## Commands
@@ -58,7 +59,7 @@ docs/             Design and research docs
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
 | `npm run train-score` | Retrain the game score on saved games and update `score-model.json` ([docs/game-score.md](docs/game-score.md)) |
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.**
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass.
 
 ## Environment
 
