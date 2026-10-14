@@ -181,7 +181,7 @@ async function saveMatch(db: Db, match: Match) {
 // Null when there's no usable database, so callers go straight to Riot.
 // A malformed DATABASE_URL (say, a password with a "#" that isn't
 // URL-encoded) makes getDb() throw; that must not break the page either.
-function database(): Db | null {
+export function database(): Db | null {
   if (!process.env.DATABASE_URL) return null;
   try {
     return getDb();
@@ -192,7 +192,7 @@ function database(): Db | null {
 }
 
 // Runs a cache lookup. Any failure counts as a cache miss.
-async function readCache<T>(read: (db: Db) => Promise<T | undefined>): Promise<T | undefined> {
+export async function readCache<T>(read: (db: Db) => Promise<T | undefined>): Promise<T | undefined> {
   const db = database();
   if (!db) return undefined;
   try {

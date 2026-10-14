@@ -36,9 +36,9 @@ export default function PrivacyPage() {
         it can compare your games with theirs.
       </p>
       <p>
-        Finished matches never change, so they are kept. Ranks and match lists are refreshed
-        from Riot after a short time. The data is stored in a Postgres database hosted by
-        Supabase in the United States.
+        Finished matches never change, so they are kept. A player&apos;s rank and list of recent
+        matches are refreshed from Riot after a day, or sooner when someone clicks Update. The
+        data is stored in a Postgres database hosted by Supabase in the United States.
       </p>
 
       <h2>Stored in your browser</h2>
