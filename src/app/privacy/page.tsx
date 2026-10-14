@@ -89,6 +89,14 @@ export default function PrivacyPage() {
           browser and the page requested) for a limited time to run and protect the service.
         </li>
         <li>
+          Vercel Web Analytics counts page views so Turnpoint can see which pages people use.
+          For each view it records the page address (which can include the Riot ID of the
+          player being looked up), the referring site, rough location (country and city),
+          browser, operating system and device type. It uses no cookies and does not identify
+          you: visitors are counted with a short-lived code worked out from the request, which
+          Vercel discards after 24 hours.
+        </li>
+        <li>
           When something breaks, an error report is sent to Sentry with the page, browser type
           and technical details of the error, so it can be fixed.
         </li>
