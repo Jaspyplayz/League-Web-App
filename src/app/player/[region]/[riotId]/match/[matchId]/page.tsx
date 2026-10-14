@@ -13,6 +13,7 @@ import type { Match, Participant } from "@/lib/riot/types";
 import { fromSlug, toSlug, type RiotId } from "@/lib/riot-id";
 import { AnalysisSections } from "./analysis-sections";
 import { MatchHeader } from "./match-header";
+import { MatchNotes } from "./match-notes";
 import { Scoreboard } from "./scoreboard";
 
 // The match analysis page: one game, from one player's point of view.
@@ -82,6 +83,7 @@ async function Analysis({ params }: { params: Params }) {
       opponentId={null}
     />
   );
+  const notes = <MatchNotes region={region} matchId={matchId} />;
 
   if (!isAnalyzable(match)) {
     return (
@@ -93,6 +95,7 @@ async function Analysis({ params }: { params: Params }) {
           scoreboard.
         </p>
         {scoreboard}
+        {notes}
       </>
     );
   }
@@ -105,6 +108,7 @@ async function Analysis({ params }: { params: Params }) {
         {header}
         <RiotErrorNotice error={timeline.error} />
         {scoreboard}
+        {notes}
       </>
     );
   }
@@ -116,6 +120,7 @@ async function Analysis({ params }: { params: Params }) {
       {back}
       {header}
       <AnalysisSections region={region} match={match} analysis={analysis} dd={dd} label={label} />
+      {notes}
     </>
   );
 }

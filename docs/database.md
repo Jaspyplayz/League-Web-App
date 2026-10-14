@@ -17,6 +17,7 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `benchmark_games` | Sampled player (Iron to Challenger) × game, summary only, with the player's tier | filled by `npm run benchmarks`; keeps each player's last 20, deletes games older than 60 days |
 | `score_games` | benchmark game, all ten players' end-of-game numbers (no names or PUUIDs) | never; filled by `npm run benchmarks`, read by `npm run train-score` ([docs/game-score.md](game-score.md)) |
 | `user_players` | signed-in account, the player it marked with "This is me" | never; Supabase deletes the row when the account is deleted |
+| `match_notes` | signed-in account × game, a private note on that game | never; deleted with the account, or when the note is cleared |
 
 The schema lives in [`src/db/schema.ts`](../src/db/schema.ts), with a comment on every column that isn't obvious. The refresh rules live in [`src/db/freshness.ts`](../src/db/freshness.ts).
 

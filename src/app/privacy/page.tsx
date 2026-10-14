@@ -69,6 +69,10 @@ export default function PrivacyPage() {
         button again to remove it.
       </p>
       <p>
+        If you write notes on a match, Turnpoint saves them with your account. Only you see
+        them. Clear a note and save it to delete it.
+      </p>
+      <p>
         While you&apos;re signed in, your browser keeps a sign-in cookie so you don&apos;t have
         to sign in on every page. Signing out removes it.
       </p>
