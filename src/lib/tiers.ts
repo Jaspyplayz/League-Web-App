@@ -38,7 +38,8 @@ export function tierName(tier: Tier): string {
 // "D4 D3 D2 D1 M" line.
 export type TrackStep = { label: string; state: "done" | "current" | "next" };
 
-// "DIAMOND" -> "D". Each tier starts with a different letter.
+// "DIAMOND" -> "D". Gold and Grandmaster share a G, but the track never
+// shows both: it stops at Master, the tier after Diamond.
 function tierLetter(tier: Tier): string {
   return tier[0];
 }
