@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatSigned, listNames, plural, times } from "./format";
+import { formatClock, formatGap, formatSigned, listNames, plural, times } from "./format";
 
 describe("formatSigned", () => {
   it.each([
@@ -9,6 +9,34 @@ describe("formatSigned", () => {
     [0.4, "0"],
   ])("formats %d as %s", (value, text) => {
     expect(formatSigned(value)).toBe(text);
+  });
+});
+
+describe("formatGap", () => {
+  it("says how far ahead or behind you are", () => {
+    expect(formatGap(-194, 420)).toEqual({ text: "614 behind", tone: "worse" });
+    expect(formatGap(1500, 300)).toEqual({ text: "1,200 ahead", tone: "better" });
+  });
+
+  it("keeps the decimals it is asked for", () => {
+    expect(formatGap(5.4, 6.3, { decimals: 1 })).toEqual({ text: "0.9 behind", tone: "worse" });
+    expect(formatGap(7, 6, { decimals: 1 })).toEqual({ text: "1.0 ahead", tone: "better" });
+  });
+
+  it("calls a gap that rounds to nothing even", () => {
+    expect(formatGap(5.41, 5.39, { decimals: 1 })).toEqual({ text: "Even", tone: "even" });
+    expect(formatGap(10, 10)).toEqual({ text: "Even", tone: "even" });
+  });
+
+  it("uses more and fewer when less is better", () => {
+    expect(formatGap(0.3, 0.2, { decimals: 1, lowerIsBetter: true })).toEqual({
+      text: "0.1 more",
+      tone: "worse",
+    });
+    expect(formatGap(1, 2.5, { decimals: 1, lowerIsBetter: true })).toEqual({
+      text: "1.5 fewer",
+      tone: "better",
+    });
   });
 });
 
