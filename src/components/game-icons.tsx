@@ -229,3 +229,19 @@ function Placeholder({
     </div>
   );
 }
+
+// Riot's ranked emblem for a tier, from Community Dragon, which mirrors the
+// game client's images (Data Dragon doesn't include them). alt="" because the
+// tier is always written next to it.
+export function RankEmblem({ tier, size }: { tier: string; size: number }) {
+  return (
+    <Image
+      src={`https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tier.toLowerCase()}.png`}
+      alt=""
+      width={size}
+      height={size}
+      unoptimized
+      className="shrink-0 object-contain"
+    />
+  );
+}
