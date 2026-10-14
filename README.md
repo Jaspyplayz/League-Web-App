@@ -121,25 +121,36 @@ docs/
   SCOPE.md                      Scope, data model, stack and build order
   match-analyzer.md             Analyzer research: Riot data, insights, rate limits
   database.md                   Database tables and setup
+  SETUP.md                      Requirements and setup on a new computer
 ```
 
-## Running locally
+## Getting started
 
-You need [Node.js 22](https://nodejs.org) or newer and a Riot API key from the [Riot developer portal](https://developer.riotgames.com) (a free development key works).
+### Requirements
+
+- [Git](https://git-scm.com/downloads)
+- [Node.js 22](https://nodejs.org) (pinned in [`.nvmrc`](.nvmrc) and `package.json`; CI and Vercel use the same version)
+- A Riot API key from the [Riot developer portal](https://developer.riotgames.com) (a free development key works)
+- Optional: a [Supabase](https://supabase.com) Postgres database for the match cache, and a code editor like [VS Code](https://code.visualstudio.com)
+
+### Run it
 
 ```bash
 git clone https://github.com/Jaspyplayz/League-Web-App.git
 cd League-Web-App
 npm install
-cp .env.example .env.local   # then paste your Riot API key into .env.local
+cp .env.example .env.local   # then fill in .env.local (at least RIOT_API_KEY)
+npm run db:migrate           # only if you set DATABASE_URL_DIRECT
 npm run dev
 ```
 
 Open http://localhost:3000.
 
-`.env.local` is ignored by git, so your key is never committed. Development keys expire every 24 hours; regenerate one in the portal when requests start failing.
+`.env.local` is ignored by git, so your keys are never committed, and a fresh clone doesn't have them: copy them over yourself. Development keys expire every 24 hours; regenerate one in the portal when requests start failing.
 
-The key is only read on the server and never sent to the browser. For the live site, add `RIOT_API_KEY` in Vercel under Project → Settings → Environment Variables (Production and Preview), then redeploy.
+**[docs/SETUP.md](docs/SETUP.md)** walks through every step: what each variable in `.env.local` is for and which are optional, the database, rank benchmarks, and fixes for Windows PowerShell.
+
+The keys are only read on the server and never sent to the browser. For the live site, they're set in Vercel under Project → Settings → Environment Variables (Production and Preview), followed by a redeploy.
 
 ## Testing and CI
 

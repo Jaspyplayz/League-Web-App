@@ -14,10 +14,11 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Scope and data model: [docs/SCOPE.md](docs/SCOPE.md)
 - Analyzer research: [docs/match-analyzer.md](docs/match-analyzer.md)
 - Database tables and setup: [docs/database.md](docs/database.md)
+- Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
 
-Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Drizzle ORM, Riot Games API, Sentry, Vitest, GitHub Actions, Vercel. Node 22.
+Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Drizzle ORM, Riot Games API, Sentry, Vitest, GitHub Actions, Vercel. Node 22, pinned in `.nvmrc` and `package.json` `engines`.
 
 ## Layout
 
