@@ -43,6 +43,9 @@ export const players = pgTable(
     rankedFetchedAt: timestamptz("ranked_fetched_at"),
     // When the match ID list was last refreshed. Drives the "Update" cooldown.
     matchIdsFetchedAt: timestamptz("match_ids_fetched_at"),
+    // The player's latest match IDs, newest first, as of match_ids_fetched_at.
+    // The profile page lists these games until the next update.
+    matchIds: text("match_ids").array(),
   },
   (t) => [
     // Lets a search for "faker#kr1" in "kr" skip the account-v1 call when we

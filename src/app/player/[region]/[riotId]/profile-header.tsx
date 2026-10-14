@@ -1,52 +1,57 @@
 import { ProfileIcon } from "@/components/game-icons";
-import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { secondsUntilUpdate } from "@/db/freshness";
 import { getDataDragon } from "@/lib/ddragon";
-import { findQueue, formatTier, winRate } from "@/lib/match-summary";
+import { findQueue, formatTier, timeAgo, winRate } from "@/lib/match-summary";
+import type { Profile } from "@/lib/profile-store";
 import { REGIONS, type Region } from "@/lib/regions";
-import { getRankedEntries, getSummoner } from "@/lib/riot/api";
-import { settle } from "@/lib/riot/client";
 import type { LeagueEntry } from "@/lib/riot/types";
+import { UpdateButton } from "./update-button";
 
-type Props = { region: Region; puuid: string; gameName: string; tagLine: string };
+type Props = { region: Region; puuid: string; gameName: string; tagLine: string; profile: Profile };
 
-export async function ProfileHeader({ region, puuid, gameName, tagLine }: Props) {
-  // Start all three requests at once rather than one after another.
-  const [summoner, ranked, dd] = await Promise.all([
-    settle(getSummoner(region, puuid)),
-    settle(getRankedEntries(region, puuid)),
-    // Images are nice to have: if Data Dragon is down, show the page without them.
-    getDataDragon().catch(() => null),
-  ]);
+export async function ProfileHeader({ region, puuid, gameName, tagLine, profile }: Props) {
+  // Images are nice to have: if Data Dragon is down, show the page without them.
+  const dd = await getDataDragon().catch(() => null);
+  // A Server Component renders once per request, so reading the clock here is
+  // fine (see recent-matches.tsx for the same note).
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
 
   return (
     <section aria-label="Player summary" className="flex flex-col gap-6">
-      <div className="flex items-center gap-5">
-        <ProfileIcon
-          dd={dd}
-          iconId={summoner.ok ? summoner.value.profileIconId : null}
-          level={summoner.ok ? summoner.value.summonerLevel : null}
-          name={gameName}
-        />
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold">
-            {gameName}
-            <span className="text-zinc-500">#{tagLine}</span>
-          </h1>
-          <p className="text-zinc-600 dark:text-zinc-400">
-            {REGIONS[region].label}
-            {summoner.ok && ` · Level ${summoner.value.summonerLevel}`}
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-5">
+        <div className="flex items-center gap-5">
+          <ProfileIcon
+            dd={dd}
+            iconId={profile.profileIconId}
+            level={profile.summonerLevel}
+            name={gameName}
+          />
+          <div className="flex flex-col gap-1">
+            <h1 className="text-3xl font-semibold">
+              {gameName}
+              <span className="text-zinc-500">#{tagLine}</span>
+            </h1>
+            <p className="text-zinc-600 dark:text-zinc-400">
+              {REGIONS[region].label}
+              {profile.summonerLevel !== null && ` · Level ${profile.summonerLevel}`}
+            </p>
+          </div>
         </div>
+        <UpdateButton
+          // A new snapshot gets a new key, which resets the button's cooldown.
+          key={profile.updatedAt.getTime()}
+          region={region}
+          puuid={puuid}
+          updatedLabel={timeAgo(profile.updatedAt.getTime(), now)}
+          secondsUntilReady={secondsUntilUpdate(profile.updatedAt, new Date(now))}
+        />
       </div>
 
-      {ranked.ok ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <RankedCard label="Ranked Solo/Duo" entry={findQueue(ranked.value, "RANKED_SOLO_5x5")} />
-          <RankedCard label="Ranked Flex" entry={findQueue(ranked.value, "RANKED_FLEX_SR")} />
-        </div>
-      ) : (
-        <RiotErrorNotice error={ranked.error} />
-      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <RankedCard label="Ranked Solo/Duo" entry={findQueue(profile.ranked, "RANKED_SOLO_5x5")} />
+        <RankedCard label="Ranked Flex" entry={findQueue(profile.ranked, "RANKED_FLEX_SR")} />
+      </div>
     </section>
   );
 }

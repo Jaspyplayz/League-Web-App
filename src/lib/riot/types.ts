@@ -15,7 +15,6 @@ export type Summoner = {
 };
 
 export type LeagueEntry = {
-  puuid: string;
   queueType: string; // "RANKED_SOLO_5x5" or "RANKED_FLEX_SR"
   tier: string; // "GOLD"
   rank: string; // "II"
@@ -25,7 +24,7 @@ export type LeagueEntry = {
   inactive?: boolean; // hasn't played in a while
 };
 
-// league-v4's Challenger list for one queue. Entries carry the PUUID, so no
+// league-v4's Master, Grandmaster or Challenger ladder for one queue. Entries carry the PUUID, so no
 // account lookup is needed to fetch their games.
 export type LeagueList = {
   entries: {

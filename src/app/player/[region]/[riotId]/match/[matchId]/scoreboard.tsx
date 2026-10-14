@@ -2,9 +2,10 @@ import Link from "next/link";
 import { ChampionIcon, ItemIcon } from "@/components/game-icons";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { championName, type DataDragon } from "@/lib/ddragon";
+import { formatThousands } from "@/lib/match-summary";
 import type { Region } from "@/lib/regions";
 import type { Participant } from "@/lib/riot/types";
-import { parseRiotId, toSlug } from "@/lib/riot-id";
+import { participantRiotId, toSlug } from "@/lib/riot-id";
 
 // Both teams' end-of-game numbers, blue side first. Each player's name links
 // to their own profile, so you can look up anyone you played with or against.
@@ -46,7 +47,7 @@ export function Scoreboard({
                   {teamId === 100 ? "Blue side" : "Red side"} · {won ? "Victory" : "Defeat"}
                 </span>
                 <span className="ml-3.5 font-mono text-[13px]">
-                  {kills} kills · {thousands(gold)} gold
+                  {kills} kills · {formatThousands(gold)} gold
                 </span>
               </caption>
               <thead>
@@ -115,8 +116,7 @@ function Row({
 }) {
   const items = [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6];
   const name = [p.riotIdGameName, p.riotIdTagline].filter(Boolean).join("#");
-  // Old games and some bots have no Riot ID, so there's no profile to link to.
-  const riotId = parseRiotId(name);
+  const riotId = participantRiotId(p);
 
   const who = (
     <>
@@ -159,14 +159,14 @@ function Row({
         {p.kills} / {p.deaths} / {p.assists}
       </td>
       <td className="px-3 py-2.5 font-mono">{p.totalMinionsKilled + p.neutralMinionsKilled}</td>
-      <td className="px-3 py-2.5 font-mono">{thousands(p.goldEarned)}</td>
+      <td className="px-3 py-2.5 font-mono">{formatThousands(p.goldEarned)}</td>
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-2.5">
           <div className="h-1.5 flex-1 rounded-sm bg-line" aria-hidden="true">
             <div className={`h-1.5 rounded-sm ${barColor}`} style={{ width: `${damagePct}%` }} />
           </div>
           <span className="w-11 flex-none text-right font-mono">
-            {thousands(p.totalDamageDealtToChampions)}
+            {formatThousands(p.totalDamageDealtToChampions)}
           </span>
         </div>
       </td>
@@ -187,9 +187,4 @@ function Row({
       </td>
     </tr>
   );
-}
-
-// 12400 -> "12.4k"
-function thousands(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }

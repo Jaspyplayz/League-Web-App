@@ -32,6 +32,7 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   trends.ts rolls games up into the Insights page, and compare.ts
                   sets them against one rank's games or one chosen player's
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
+src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/db/           Drizzle schema, connection, and cache freshness rules
 scripts/          Command-line jobs run with tsx (npm run benchmarks)
@@ -71,7 +72,7 @@ Dark "scouting report" style. Tokens live in `src/app/globals.css`: **blue = you
 
 - **Riot calls and database access stay on the server.** Modules that touch the API key or `DATABASE_URL` import `"server-only"`.
 - Every Riot request goes through the rate-limited client in `src/lib/riot/client.ts`.
-- Finished matches and timelines are cached forever; only rank and match lists expire (see `src/db/freshness.ts`).
+- Finished matches and timelines are cached forever; a player's profile (rank, match list) expires after a day or on "Update" (see `src/db/freshness.ts`).
 - Keep the analyzer as pure functions (match JSON in, results out) with Vitest tests.
 - Write comments that explain *why* in plain language, matching the existing code.
 - `/privacy` and `/terms` are what Riot reviews for production keys and Riot sign-in. A change that stores new data (accounts, analytics, cookies) updates `src/app/privacy/page.tsx` in the same PR.

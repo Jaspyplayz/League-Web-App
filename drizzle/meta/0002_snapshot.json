@@ -1,5 +1,5 @@
 {
-  "id": "0108483a-62f4-4022-82b2-0495e7b237c7",
+  "id": "2a1b24ee-61f2-4f72-9f5a-f247dba8bba8",
   "prevId": "c6ff32ca-5022-4897-8e3f-12acccc2e70b",
   "version": "7",
   "dialect": "postgresql",
@@ -25,13 +25,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "tier": {
-          "name": "tier",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'CHALLENGER'"
         },
         "game_start_at": {
           "name": "game_start_at",
@@ -108,11 +101,17 @@
         }
       },
       "indexes": {
-        "benchmark_games_tier_idx": {
-          "name": "benchmark_games_tier_idx",
+        "benchmark_games_position_idx": {
+          "name": "benchmark_games_position_idx",
           "columns": [
             {
-              "expression": "tier",
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "champion_name",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -618,6 +617,12 @@
         "match_ids_fetched_at": {
           "name": "match_ids_fetched_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_ids": {
+          "name": "match_ids",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": false
         }

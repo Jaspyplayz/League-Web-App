@@ -6,8 +6,8 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 
 | Table | One row per | Refetch from Riot |
 |---|---|---|
-| `players` | searched player (by PUUID) | profile after 24 h, rank after 15 min, match list on "Update" (2 min cooldown) |
-| `ranked_entries` | player × ranked queue | with the player's rank |
+| `players` | searched player (by PUUID), with their latest match IDs | the whole profile after 24 h, or on "Update" (2 min cooldown) |
+| `ranked_entries` | player × ranked queue | with the player's profile |
 | `matches` | game, with the full match-v5 JSON in `raw` | never |
 | `match_participants` | player × game (the scoreboard) | never (filled from `matches.raw`) |
 | `match_timelines` | game, trimmed timeline | never, fetched only when the match is opened |
@@ -90,11 +90,10 @@ const games = await db
 
 ### Wiring it into the Riot client
 
-The suggested shape is a thin "cached" layer in front of each Riot call, so pages never call Riot directly:
+Pages don't call Riot for cached data directly; they go through a thin layer that checks Postgres first:
 
-- **Player lookup:** check `players` by Riot ID (the `players_riot_id_idx` index makes this case-insensitive) or PUUID; call `account-v1` and `summoner-v4` only when the row is missing or older than `TTL_MS.profile`.
-- **Rank:** same, using `ranked_fetched_at` and `TTL_MS.ranked`. Replace the player's `ranked_entries` rows in one transaction, and set `ranked_fetched_at` even when they're unranked.
-- **Match list:** refresh the ID list only when the user clicks "Update" and `match_ids_fetched_at` is older than `TTL_MS.matchIdsCooldown`; fetch `match-v5` only for IDs not already in `matches`.
+- **Profile** ([`src/lib/profile-store.ts`](../src/lib/profile-store.ts)): the icon, level, rank and latest 10 match IDs are one saved snapshot, like op.gg's. `loadProfile` fetches a new one (`summoner-v4`, `league-v4` and the `match-v5` ID list) when there's none, it's older than `TTL_MS.profile`, or it was saved for another region. The Update button calls `updateProfile`, which refetches it unless `match_ids_fetched_at` is within `TTL_MS.updateCooldown`. The player row and its `ranked_entries` are replaced in one transaction. The Riot ID lookup (`account-v1`) still runs on every visit, since it's how the page finds the PUUID.
+- **Matches** ([`src/lib/match-store.ts`](../src/lib/match-store.ts)): fetch `match-v5` only for IDs not already in `matches`.
 - **Timeline:** fetch when a match is opened and there's no `match_timelines` row; store the trimmed version with a `trim_version`.
 
 ## Benchmark games

@@ -1,6 +1,5 @@
 import "server-only";
 
-import { mapWithLimit } from "@/lib/concurrency";
 import { accountRegional, REGIONS, type Region } from "@/lib/regions";
 import type { RiotId } from "@/lib/riot-id";
 import { RiotApiError, riotGet } from "./client";
@@ -68,7 +67,7 @@ export function getLeagueEntries(
   division: Division,
   page = 1,
 ) {
-  return riotGet<LeagueEntry[]>(
+  return riotGet<(LeagueEntry & { puuid: string })[]>(
     REGIONS[region].platform,
     `/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`,
   );
@@ -106,12 +105,4 @@ export function getTimeline(region: Region, matchId: string) {
     REGIONS[region].regional,
     `/lol/match/v5/matches/${encodeURIComponent(matchId)}/timeline`,
   );
-}
-
-// Riot allows 20 requests per second, so fetch at most 5 matches at a time.
-const MATCH_CONCURRENCY = 5;
-
-export async function getRecentMatches(region: Region, puuid: string, count: number) {
-  const ids = await getMatchIds(region, puuid, count);
-  return mapWithLimit(ids, MATCH_CONCURRENCY, (id) => getMatch(region, id));
 }
