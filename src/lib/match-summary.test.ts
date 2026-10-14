@@ -30,6 +30,8 @@ function participant(overrides: Partial<Participant>): Participant {
     neutralMinionsKilled: 0,
     goldEarned: 0,
     totalDamageDealtToChampions: 0,
+    totalDamageTaken: 0,
+    wardsPlaced: 0,
     visionScore: 0,
     item0: 0,
     item1: 0,

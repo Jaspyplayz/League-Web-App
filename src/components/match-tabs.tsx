@@ -6,9 +6,10 @@ import { loadBuildsAction } from "@/app/player/[region]/[riotId]/actions";
 import { BuildView } from "@/components/build-view";
 import type { BuildsResult } from "@/lib/match-builds";
 
-type Tab = "overview" | "build" | "runes";
+type Tab = "overview" | "team" | "build" | "runes";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "team", label: "Team analysis" },
   { id: "build", label: "Build" },
   { id: "runes", label: "Runes" },
 ];
@@ -22,16 +23,19 @@ export type PickerPlayer = {
 };
 
 // The tabs inside an open match row, like op.gg's: Overview (the
-// scoreboard), Build (items and skill order) and Runes. Build and Runes show
-// one player at a time, picked from a row of champion icons.
+// scoreboard), Team analysis (both teams stat by stat), Build (items and
+// skill order) and Runes. Build and Runes show one player at a time, picked
+// from a row of champion icons.
 //
-// Overview and every rune page are drawn on the server and passed in, since
+// Overview, Team analysis and every rune page are drawn on the server and
+// passed in, since
 // the match data is already there. Builds need the match timeline, which the
 // profile doesn't load, so they're fetched the first time Build is opened.
 export function MatchTabs({
   region,
   matchId,
   overview,
+  teamAnalysis,
   runePages,
   players,
   defaultPlayerId,
@@ -40,6 +44,7 @@ export function MatchTabs({
   region: string;
   matchId: string;
   overview: ReactNode;
+  teamAnalysis: ReactNode;
   runePages: Record<number, ReactNode>; // keyed by participantId
   players: PickerPlayer[];
   defaultPlayerId: number; // the profile's own player
@@ -96,8 +101,9 @@ export function MatchTabs({
 
       <div role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label}>
         {tab === "overview" && overview}
+        {tab === "team" && teamAnalysis}
 
-        {tab !== "overview" && (
+        {(tab === "build" || tab === "runes") && (
           <div className="flex flex-col gap-4">
             <PlayerPicker players={players} selected={playerId} onSelect={setPlayerId} />
             {tab === "runes" && runePages[playerId]}

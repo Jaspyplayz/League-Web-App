@@ -58,7 +58,9 @@ export type Participant = {
   neutralMinionsKilled: number;
   goldEarned: number;
   totalDamageDealtToChampions: number;
+  totalDamageTaken: number;
   visionScore: number;
+  wardsPlaced: number;
   item0: number;
   item1: number;
   item2: number;

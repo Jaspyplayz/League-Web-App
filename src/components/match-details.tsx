@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChampionIcon, ItemIcon, RuneIcon, SummonerSpellIcon } from "@/components/game-icons";
 import { MatchTabs } from "@/components/match-tabs";
 import { RunePage } from "@/components/rune-page";
+import { TeamAnalysis } from "@/components/team-analysis";
 import { findPlayer, isAnalyzable } from "@/lib/analyzer";
 import { findOpponent } from "@/lib/analyzer/matchup";
 import { championName, type DataDragon } from "@/lib/ddragon";
@@ -11,10 +12,10 @@ import type { Match, Participant } from "@/lib/riot/types";
 import { participantRiotId, toSlug } from "@/lib/riot-id";
 
 // The panel that opens under a match row on the profile, with op.gg-style
-// tabs: Overview (both teams' scoreboard), Build and Runes, plus a link out
-// to the full analysis page.
+// tabs: Overview (both teams' scoreboard), Team analysis, Build and Runes,
+// plus a link out to the full analysis page.
 //
-// Overview and Runes come from the match the profile already loaded, so
+// Overview, Team analysis and Runes come from the match the profile already loaded, so
 // opening a row costs no Riot calls. Only the Build tab needs more data; see
 // MatchTabs.
 export function MatchDetails({
@@ -38,6 +39,7 @@ export function MatchDetails({
       region={region}
       matchId={match.metadata.matchId}
       overview={<MatchOverview region={region} dd={dd} match={match} puuid={puuid} />}
+      teamAnalysis={<TeamAnalysis dd={dd} participants={participants} />}
       runePages={Object.fromEntries(
         participants.map((p) => [
           p.participantId,
@@ -58,7 +60,8 @@ export function MatchDetails({
 }
 
 // Both teams' end-of-game numbers. A smaller version of the scoreboard on the
-// match page, sized to fit next to the profile's sidebar.
+// match page, sized to fit next to the profile's sidebar. The winning team
+// is blue and the losing team amber, like op.gg's blue and red.
 function MatchOverview({
   region,
   dd,
@@ -81,7 +84,6 @@ function MatchOverview({
       {[100, 200].map((teamId) => {
         const team = participants.filter((p) => p.teamId === teamId);
         const won = team[0]?.win ?? false;
-        const mine = team.some((p) => p.puuid === puuid);
         const kills = team.reduce((sum, p) => sum + p.kills, 0);
         const gold = team.reduce((sum, p) => sum + p.goldEarned, 0);
         return (
@@ -89,7 +91,7 @@ function MatchOverview({
             <table className="w-full min-w-[600px] table-fixed border-collapse text-[13px]">
               <caption className="pb-1.5 text-left text-xs text-muted">
                 <span
-                  className={`font-display text-base font-bold tracking-[0.04em] uppercase ${mine ? "text-ahead" : "text-behind"}`}
+                  className={`font-display text-base font-bold tracking-[0.04em] uppercase ${won ? "text-ahead" : "text-behind"}`}
                 >
                   {teamId === 100 ? "Blue side" : "Red side"} · {won ? "Victory" : "Defeat"}
                 </span>
@@ -132,7 +134,7 @@ function MatchOverview({
                           : null
                     }
                     damagePct={(p.totalDamageDealtToChampions / maxDamage) * 100}
-                    barColor={mine ? "bg-ahead" : "bg-behind"}
+                    barColor={won ? "bg-ahead" : "bg-behind"}
                   />
                 ))}
               </tbody>
