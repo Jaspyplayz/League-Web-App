@@ -2,6 +2,7 @@
 // page shows. No network calls here, so they're easy to unit test.
 
 import type { LeagueEntry, Match } from "@/lib/riot/types";
+import { participantRiotId, type RiotId } from "@/lib/riot-id";
 
 // Queue IDs: https://static.developer.riotgames.com/docs/lol/queues.json
 const QUEUES: Record<number, string> = {
@@ -99,6 +100,29 @@ export function summarizeMatch(match: Match, puuid: string): MatchSummary | null
     items: [me.item0, me.item1, me.item2, me.item3, me.item4, me.item5, me.item6],
     spells: [me.summoner1Id, me.summoner2Id],
   };
+}
+
+// One player in the two short team lists on each match row.
+export type TeamPlayer = {
+  championName: string;
+  name: string; // their game name, without the #TAG
+  riotId: RiotId | null; // null for old games and bots, which have no profile to link to
+  isMe: boolean; // the player whose profile this is
+};
+
+// Both teams, blue side first. Riot lists each team in role order (top,
+// jungle, mid, bot, support), so the lists line up like op.gg's.
+export function matchTeams(match: Match, puuid: string): [TeamPlayer[], TeamPlayer[]] {
+  const team = (teamId: number): TeamPlayer[] =>
+    match.info.participants
+      .filter((p) => p.teamId === teamId)
+      .map((p) => ({
+        championName: p.championName,
+        name: p.riotIdGameName || "Unknown",
+        riotId: participantRiotId(p),
+        isMe: p.puuid === puuid,
+      }));
+  return [team(100), team(200)];
 }
 
 export type RecentRecord = {

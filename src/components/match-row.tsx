@@ -1,13 +1,21 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { ExpandableRow } from "@/components/expandable-row";
 import { ChampionIcon, ItemSlots, SummonerSpellIcon } from "@/components/game-icons";
 import { GameScore } from "@/components/game-score";
 import type { PlayerScore } from "@/lib/analyzer/score";
 import { championName, type DataDragon } from "@/lib/ddragon";
-import { formatDuration, timeAgo, type MatchSummary } from "@/lib/match-summary";
+import {
+  formatDuration,
+  timeAgo,
+  type MatchSummary,
+  type TeamPlayer,
+} from "@/lib/match-summary";
+import type { Region } from "@/lib/regions";
+import { toSlug } from "@/lib/riot-id";
 
-// One game in the player's match list: result, champion and spells, KDA, CS
-// items and game score. Render it inside a <ul>. Pass `details` (for example both
+// One game in the player's match list: result, champion and spells, KDA, CS,
+// items, game score and both teams' players (each linking to their profile). Render it inside a <ul>. Pass `details` (for example both
 // teams' scoreboard) to make the row open a panel with it when clicked;
 // without it the row is plain content.
 export function MatchRow({
@@ -15,12 +23,14 @@ export function MatchRow({
   dd,
   now,
   score,
+  teams,
   details,
 }: {
   match: MatchSummary;
   dd: DataDragon | null;
   now: number; // the current time, for "2h ago"
   score?: PlayerScore; // missing for games that aren't scored, like ARAM
+  teams?: { region: Region; players: [TeamPlayer[], TeamPlayer[]] };
   details?: ReactNode;
 }) {
   const result = m.remake ? "Remake" : m.win ? "Win" : "Loss";
@@ -76,6 +86,8 @@ export function MatchRow({
       )}
 
       <ItemSlots dd={dd} items={m.items} />
+
+      {teams && <Teams dd={dd} region={teams.region} players={teams.players} />}
     </div>
   );
 
@@ -93,5 +105,54 @@ export function MatchRow({
         <div className={box}>{content}</div>
       )}
     </li>
+  );
+}
+
+// Two columns of five, blue side on the left, like op.gg. Hidden on phones,
+// where the row has no room for them; the panel under the row shows everyone.
+function Teams({
+  dd,
+  region,
+  players,
+}: {
+  dd: DataDragon | null;
+  region: Region;
+  players: [TeamPlayer[], TeamPlayer[]];
+}) {
+  return (
+    <div className="ml-auto hidden shrink-0 gap-3 sm:flex">
+      {players.map((team, side) => (
+        <ul
+          key={side}
+          aria-label={side === 0 ? "Blue side" : "Red side"}
+          className="flex w-[108px] flex-col gap-0.5 text-xs"
+        >
+          {team.map((p, i) => {
+            const inner = (
+              <>
+                <ChampionIcon dd={dd} name={p.championName} size={16} className="rounded-[4px]" />
+                <span className="truncate">{p.name}</span>
+              </>
+            );
+            const look = `flex min-w-0 items-center gap-1.5 ${p.isMe ? "font-semibold text-ink" : "text-faint"}`;
+            return (
+              <li key={i}>
+                {p.riotId ? (
+                  <Link
+                    href={`/player/${region}/${toSlug(p.riotId)}`}
+                    title={`${p.riotId.gameName}#${p.riotId.tagLine}`}
+                    className={`${look} hover:text-ink hover:underline`}
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <span className={look}>{inner}</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ))}
+    </div>
   );
 }

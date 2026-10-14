@@ -5,6 +5,7 @@ import {
   formatThousands,
   formatTier,
   gameDurationSeconds,
+  matchTeams,
   summarizeMatch,
   summarizeRecord,
   timeAgo,
@@ -220,5 +221,39 @@ describe("formatting", () => {
     expect(timeAgo(now - 3 * 3_600_000, now)).toBe("3h ago");
     expect(timeAgo(now - 2 * 86_400_000, now)).toBe("2d ago");
     expect(timeAgo(now - 65 * 86_400_000, now)).toBe("2mo ago");
+  });
+});
+
+describe("matchTeams", () => {
+  it("splits players into blue and red side and marks the searched player", () => {
+    const named = {
+      ...match,
+      info: {
+        ...match.info,
+        participants: [
+          participant({ puuid: "me", riotIdGameName: "Jaspy", riotIdTagline: "CA1" }),
+          participant({ championName: "LeeSin", riotIdGameName: "Ally", riotIdTagline: "NA1" }),
+          participant({ teamId: 200, championName: "Syndra" }),
+        ],
+      },
+    };
+    expect(matchTeams(named, "me")).toEqual([
+      [
+        {
+          championName: "Ahri",
+          name: "Jaspy",
+          riotId: { gameName: "Jaspy", tagLine: "CA1" },
+          isMe: true,
+        },
+        {
+          championName: "LeeSin",
+          name: "Ally",
+          riotId: { gameName: "Ally", tagLine: "NA1" },
+          isMe: false,
+        },
+      ],
+      // No Riot ID (an old game or a bot): shown, but with nothing to link to.
+      [{ championName: "Syndra", name: "Unknown", riotId: null, isMe: false }],
+    ]);
   });
 });

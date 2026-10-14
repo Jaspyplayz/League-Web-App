@@ -27,7 +27,12 @@ export function ExpandableRow({
       <div
         // The button below has no onClick of its own: its click (including
         // Enter or Space on the keyboard) bubbles up to this one.
-        onClick={() => setOpen((wasOpen) => !wasOpen)}
+        onClick={(event) => {
+          // A link inside the row (like a player's name) goes to its page
+          // instead of opening the panel.
+          if (event.target instanceof Element && event.target.closest("a")) return;
+          setOpen((wasOpen) => !wasOpen);
+        }}
         className={`${rowClassName} flex cursor-pointer items-center gap-3 transition-colors hover:bg-[#171c24] ${open ? "rounded-b-none" : ""}`}
       >
         {row}
