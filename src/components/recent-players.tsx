@@ -100,6 +100,15 @@ export function RecentPlayers() {
             </li>
           );
         })}
+        <li>
+          <button
+            type="button"
+            onClick={() => save([])}
+            className="px-1.5 py-2 underline-offset-2 hover:text-ink hover:underline"
+          >
+            Clear
+          </button>
+        </li>
       </ul>
     </div>
   );

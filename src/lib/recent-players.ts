@@ -9,7 +9,7 @@ import { isRegion, type Region } from "./regions";
 export type RecentPlayer = { region: Region; gameName: string; tagLine: string };
 
 export const RECENT_PLAYERS_KEY = "turnpoint:recent-players";
-export const MAX_RECENT_PLAYERS = 6;
+export const MAX_RECENT_PLAYERS = 5;
 
 // Turns the saved text back into a list. Anything unexpected (no saved list
 // yet, a hand-edited value, an older format) gives an empty or shorter list
