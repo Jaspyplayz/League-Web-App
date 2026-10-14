@@ -2,6 +2,7 @@ import type { TurningPointMarker } from "@/components/diff-chart";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
 import { championIconUrl, type DataDragon } from "@/lib/ddragon";
+import type { Region } from "@/lib/regions";
 import type { Match } from "@/lib/riot/types";
 import { Deaths } from "./deaths";
 import { JungleMap, type MapPlayer } from "./jungle-map";
@@ -18,11 +19,13 @@ import { TurningPoints } from "./turning-points";
 // with objectives, deaths, and the scoreboard. In the same order as the mockup,
 // plus the jungle map and early pathing for junglers.
 export function AnalysisSections({
+  region,
   match,
   analysis: a,
   dd,
   label,
 }: {
+  region: Region;
   match: Match;
   analysis: MatchAnalysis;
   dd: DataDragon | null;
@@ -78,6 +81,7 @@ export function AnalysisSections({
       </div>
 
       <Scoreboard
+        region={region}
         dd={dd}
         participants={participants}
         meId={a.me.participantId}
