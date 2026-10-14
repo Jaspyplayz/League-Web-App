@@ -1,8 +1,19 @@
 import type { Weakness } from "@/lib/analyzer/trends";
+import { FocusButton } from "./focus";
 
 // The "recurring weakness" card from the mockup: up to three patterns that
-// show up in most of your recent games, worst first.
-export function Weaknesses({ weaknesses, games }: { weaknesses: Weakness[]; games: number }) {
+// show up in most of your recent games, worst first. Each one can be picked
+// as your focus, which <FocusPanel> then tracks game by game.
+export function Weaknesses({
+  weaknesses,
+  games,
+  player,
+}: {
+  weaknesses: Weakness[];
+  games: number;
+  // Whose focus the buttons set (see playerKey in src/lib/focus.ts).
+  player: string;
+}) {
   if (weaknesses.length === 0) {
     return (
       <section
@@ -39,9 +50,12 @@ export function Weaknesses({ weaknesses, games }: { weaknesses: Weakness[]; game
       </div>
       <ul className="flex flex-col gap-3.5">
         {weaknesses.map((w) => (
-          <li key={w.title} className="flex flex-col gap-0.5">
-            <p className="font-semibold">{w.title}</p>
-            <p className="text-[15px] text-ink-soft">{w.detail}</p>
+          <li key={w.id} className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-0.5">
+              <p className="font-semibold">{w.title}</p>
+              <p className="text-[15px] text-ink-soft">{w.detail}</p>
+            </div>
+            <FocusButton player={player} id={w.id} />
           </li>
         ))}
       </ul>

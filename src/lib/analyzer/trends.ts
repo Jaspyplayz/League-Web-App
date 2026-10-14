@@ -92,7 +92,18 @@ export function csByPhase(frames: TrimmedFrame[], participantId: number): GameTr
 
 export type WinRecord = { games: number; wins: number };
 
+// Each weakness rule has a stable id, so a player can pick one as their focus
+// and see it checked game by game (see src/lib/focus.ts). Early deaths get one
+// id per kind of death, since each kind is its own habit.
+export type WeaknessId =
+  | "behind-at-10"
+  | "behind-in-cs"
+  | "leads-slip"
+  | "cs-drop"
+  | `early-${DeathLabel}`;
+
 export type Weakness = {
+  id: WeaknessId;
   title: string;
   detail: string;
   // How strongly the rule fired, from 0 to 1, used to show the worst first.
@@ -196,6 +207,7 @@ export function findWeaknesses(trends: Trends, farming: GameTrend[]): Weakness[]
 
   if (laning.games >= MIN_GAMES_FOR_WEAKNESSES && laning.behindInGold / laning.games > MAJORITY) {
     found.push({
+      id: "behind-at-10",
       title: "Behind at 10 minutes",
       detail: `You're behind your opponent in gold at 10 minutes in ${laning.behindInGold} of ${laning.games} games.`,
       strength: laning.behindInGold / laning.games,
@@ -204,6 +216,7 @@ export function findWeaknesses(trends: Trends, farming: GameTrend[]): Weakness[]
 
   if (laning.csGames >= MIN_GAMES_FOR_WEAKNESSES && laning.behindInCs / laning.csGames > MAJORITY) {
     found.push({
+      id: "behind-in-cs",
       title: "Losing the CS race",
       detail: `You have less CS than your opponent at 10 minutes in ${laning.behindInCs} of ${laning.csGames} games.`,
       strength: laning.behindInCs / laning.csGames,
@@ -213,6 +226,7 @@ export function findWeaknesses(trends: Trends, farming: GameTrend[]): Weakness[]
   const at15 = conversion.find((c) => c.minute === 15)!.ahead;
   if (at15.games >= MIN_LEADS && at15.wins / at15.games < LOW_CONVERSION) {
     found.push({
+      id: "leads-slip",
       title: "Leads slip away",
       detail: `You were ahead at 15 minutes in ${at15.games} games but won only ${at15.wins} of them.`,
       strength: 1 - at15.wins / at15.games,
@@ -227,6 +241,7 @@ export function findWeaknesses(trends: Trends, farming: GameTrend[]): Weakness[]
   ) {
     const share = Math.round((top.count / earlyDeaths.total) * 100);
     found.push({
+      id: `early-${top.label}`,
       title: EARLY_DEATH_TITLES[top.label],
       detail: `${top.count} of your ${earlyDeaths.total} deaths before 14:00 came from ${EARLY_DEATH_CAUSES[top.label]} (${share}%).`,
       strength: top.count / earlyDeaths.total,
@@ -244,6 +259,7 @@ export function findWeaknesses(trends: Trends, farming: GameTrend[]): Weakness[]
         : null;
   if (later && csPerMin.early && later.rate < csPerMin.early * CS_DROP) {
     found.push({
+      id: "cs-drop",
       title: "CS drops after the early game",
       detail: `You farm ${csPerMin.early.toFixed(1)} CS a minute in the first 10 minutes but ${later.rate.toFixed(1)} ${later.when}.`,
       strength: 1 - later.rate / csPerMin.early,
@@ -251,6 +267,32 @@ export function findWeaknesses(trends: Trends, farming: GameTrend[]): Weakness[]
   }
 
   return found.sort((a, b) => b.strength - a.strength).slice(0, MAX_WEAKNESSES);
+}
+
+// The same rules as findWeaknesses, for one game at a time: true when the
+// game shows the weakness, false when you avoided it, and null when the game
+// can't say (it ended before the minute that matters, you played support for a
+// CS rule, or you weren't ahead at 15 for "leads slip away").
+export function showsWeakness(game: GameTrend, id: WeaknessId): boolean | null {
+  switch (id) {
+    case "behind-at-10":
+      return game.goldAt10 === null ? null : game.goldAt10 < 0;
+    case "behind-in-cs":
+      return game.position === "UTILITY" || game.csAt10 === null ? null : game.csAt10 < 0;
+    case "leads-slip":
+      return game.goldAt15 !== null && game.goldAt15 > 0 ? !game.win : null;
+    case "cs-drop": {
+      if (game.position === "UTILITY") return null;
+      // Like the weakness, use the latest phase the game reached.
+      const later = game.csPerMin.late ?? game.csPerMin.mid;
+      return later === null ? null : later < game.csPerMin.early * CS_DROP;
+    }
+    default: {
+      // Every other id is "early-" plus a kind of death.
+      const label = id.slice("early-".length) as DeathLabel;
+      return game.earlyDeaths.includes(label);
+    }
+  }
 }
 
 const EARLY_DEATH_TITLES: Record<DeathLabel, string> = {
@@ -273,6 +315,24 @@ const EARLY_DEATH_CAUSES: Record<DeathLabel, string> = {
   teamfight: "teamfights",
   executed: "towers or minions",
 };
+
+// Every weakness id, for checking each game against whichever one a player
+// has picked as their focus. The pick lives in the browser, so the server
+// can't know which one it is and checks them all.
+export const WEAKNESS_IDS: WeaknessId[] = [
+  "behind-at-10",
+  "behind-in-cs",
+  "leads-slip",
+  "cs-drop",
+  ...(Object.keys(EARLY_DEATH_TITLES) as DeathLabel[]).map((label) => `early-${label}` as const),
+];
+
+export function checkWeaknesses(game: GameTrend): Record<WeaknessId, boolean | null> {
+  return Object.fromEntries(WEAKNESS_IDS.map((id) => [id, showsWeakness(game, id)])) as Record<
+    WeaknessId,
+    boolean | null
+  >;
+}
 
 function record(games: GameTrend[]): WinRecord {
   return { games: games.length, wins: games.filter((g) => g.win).length };

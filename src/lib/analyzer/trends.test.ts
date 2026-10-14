@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { frames, kill, match, participants, SPOTS } from "./test-fixtures";
-import { computeTrends, csByPhase, isTrendGame, summarizeGame, type GameTrend } from "./trends";
+import {
+  checkWeaknesses,
+  computeTrends,
+  csByPhase,
+  isTrendGame,
+  showsWeakness,
+  summarizeGame,
+  WEAKNESS_IDS,
+  type GameTrend,
+} from "./trends";
 
 // A made-up game summary; tests override only the fields they care about.
 function game(overrides: Partial<GameTrend> = {}, i = 0): GameTrend {
@@ -172,5 +181,58 @@ describe("weaknesses", () => {
       "Losing the CS race",
       "Getting ganked early",
     ]);
+  });
+});
+
+describe("showsWeakness", () => {
+  it("checks gold and CS at 10 against your opponent", () => {
+    expect(showsWeakness(game({ goldAt10: -1 }), "behind-at-10")).toBe(true);
+    expect(showsWeakness(game({ goldAt10: 0 }), "behind-at-10")).toBe(false);
+    expect(showsWeakness(game({ csAt10: -3 }), "behind-in-cs")).toBe(true);
+  });
+
+  it("can't say when the game didn't reach 10 minutes, or for supports' CS", () => {
+    expect(showsWeakness(game({ goldAt10: null }), "behind-at-10")).toBeNull();
+    expect(showsWeakness(game({ position: "UTILITY", csAt10: -3 }), "behind-in-cs")).toBeNull();
+    expect(showsWeakness(game({ position: "UTILITY" }), "cs-drop")).toBeNull();
+  });
+
+  it("only judges a lead slipping in games you led at 15", () => {
+    expect(showsWeakness(game({ goldAt15: 500, win: false }), "leads-slip")).toBe(true);
+    expect(showsWeakness(game({ goldAt15: 500, win: true }), "leads-slip")).toBe(false);
+    expect(showsWeakness(game({ goldAt15: -500, win: false }), "leads-slip")).toBeNull();
+  });
+
+  it("compares the latest phase's CS with the early game, like the weakness", () => {
+    const dropped = { early: 8, mid: 7, late: 5 };
+    expect(showsWeakness(game({ csPerMin: dropped }), "cs-drop")).toBe(true);
+    // No late phase: the mid game counts instead.
+    expect(showsWeakness(game({ csPerMin: { early: 8, mid: 7, late: null } }), "cs-drop")).toBe(
+      false,
+    );
+    expect(showsWeakness(game({ csPerMin: { early: 8, mid: null, late: null } }), "cs-drop")).toBeNull();
+  });
+
+  it("looks for one kind of early death", () => {
+    const ganked = game({ earlyDeaths: ["gank", "solo"] });
+    expect(showsWeakness(ganked, "early-gank")).toBe(true);
+    expect(showsWeakness(ganked, "early-teamfight")).toBe(false);
+  });
+
+  it("gives each weakness in the box its id", () => {
+    const ids = (overrides: Partial<GameTrend>) =>
+      computeTrends(many(6, overrides)).weaknesses.map((w) => w.id);
+    expect(ids({ goldAt10: -100 })).toEqual(["behind-at-10"]);
+    expect(ids({ csAt10: -5 })).toEqual(["behind-in-cs"]);
+    expect(ids({ win: false })).toEqual(["leads-slip"]);
+    expect(ids({ earlyDeaths: ["caught"] })).toEqual(["early-caught"]);
+    expect(ids({ csPerMin: { early: 8, mid: 4, late: 4 } })).toEqual(["cs-drop"]);
+  });
+
+  it("checks every weakness for a game at once", () => {
+    const checks = checkWeaknesses(game({ goldAt10: -100 }));
+    expect(Object.keys(checks)).toHaveLength(WEAKNESS_IDS.length);
+    expect(checks["behind-at-10"]).toBe(true);
+    expect(checks["early-gank"]).toBe(false);
   });
 });

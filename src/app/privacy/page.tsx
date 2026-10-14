@@ -48,6 +48,11 @@ export default function PrivacyPage() {
         stays on your device and is never sent to Turnpoint. Remove a player with the ×
         next to their name, or the whole list with the Clear button.
       </p>
+      <p>
+        If you pick a focus goal on the Insights tab, Turnpoint saves which weakness you
+        picked, for which player, and when, in the same local storage. It also stays on your
+        device. Remove it with the Stop focusing button.
+      </p>
 
       <h2>Technical data</h2>
       <ul>
