@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isApexTier, isTier, tierName, tierTrack } from "./tiers";
+import { isApexTier, isTier, rankScore, scoreLabel, tierName, tierTrack } from "./tiers";
 
 describe("tiers", () => {
   it("recognizes Riot's tier names", () => {
@@ -40,5 +40,30 @@ describe("tierTrack", () => {
     expect(tierTrack("CHALLENGER", "I")).toBeNull();
     expect(tierTrack("WOOD", "IV")).toBeNull();
     expect(tierTrack("GOLD", "V")).toBeNull();
+  });
+});
+
+describe("rankScore", () => {
+  it("puts every rank on one scale", () => {
+    expect(rankScore("IRON", "IV", 0)).toBe(0);
+    expect(rankScore("IRON", "I", 50)).toBe(350);
+    expect(rankScore("DIAMOND", "I", 75)).toBe(2775);
+    expect(rankScore("MASTER", "I", 0)).toBe(2800);
+    expect(rankScore("CHALLENGER", "I", 1200)).toBe(4000);
+  });
+
+  it("gives null for data it doesn't recognize", () => {
+    expect(rankScore("WOOD", "IV", 0)).toBeNull();
+    expect(rankScore("GOLD", "V", 0)).toBeNull();
+  });
+});
+
+describe("scoreLabel", () => {
+  it("names the division a score starts", () => {
+    expect(scoreLabel(0)).toBe("I4");
+    expect(scoreLabel(2700)).toBe("D1");
+    expect(scoreLabel(2400)).toBe("D4");
+    expect(scoreLabel(2800)).toBe("M");
+    expect(scoreLabel(3500)).toBe("M");
   });
 });

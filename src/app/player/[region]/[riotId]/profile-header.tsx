@@ -4,21 +4,28 @@ import { ThisIsMe } from "@/components/this-is-me";
 import { secondsUntilUpdate } from "@/db/freshness";
 import { getDataDragon } from "@/lib/ddragon";
 import { findQueue, formatTier, timeAgo, winRate } from "@/lib/match-summary";
-import type { Profile } from "@/lib/profile-store";
+import { loadRankHistory, type Profile } from "@/lib/profile-store";
+import { graphPoints, type GraphPoint } from "@/lib/rank-history";
 import { REGIONS, type Region } from "@/lib/regions";
 import type { LeagueEntry } from "@/lib/riot/types";
 import { tierTrack, type TrackStep } from "@/lib/tiers";
+import { LpGraph } from "./lp-graph";
 import { UpdateButton } from "./update-button";
 
 type Props = { region: Region; puuid: string; gameName: string; tagLine: string; profile: Profile };
 
 export async function ProfileHeader({ region, puuid, gameName, tagLine, profile }: Props) {
-  // Images are nice to have: if Data Dragon is down, show the page without them.
-  const dd = await getDataDragon().catch(() => null);
   // A Server Component renders once per request, so reading the clock here is
   // fine (see recent-matches.tsx for the same note).
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
+  const [dd, history] = await Promise.all([
+    // Images are nice to have: if Data Dragon is down, show the page without them.
+    getDataDragon().catch(() => null),
+    // Saved ranks for the LP graph. Comes from our database only, never Riot.
+    loadRankHistory(puuid, new Date(now)),
+  ]);
+  const graph = (queueType: string) => graphPoints(history, queueType, new Date(now));
 
   return (
     <section aria-label="Player summary" className="flex flex-col gap-6">
@@ -56,16 +63,32 @@ export async function ProfileHeader({ region, puuid, gameName, tagLine, profile 
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <RankedCard label="Ranked Solo/Duo" entry={findQueue(profile.ranked, "RANKED_SOLO_5x5")} />
-        <RankedCard label="Ranked Flex" entry={findQueue(profile.ranked, "RANKED_FLEX_SR")} />
+        <RankedCard
+          label="Ranked Solo/Duo"
+          entry={findQueue(profile.ranked, "RANKED_SOLO_5x5")}
+          graph={graph("RANKED_SOLO_5x5")}
+        />
+        <RankedCard
+          label="Ranked Flex"
+          entry={findQueue(profile.ranked, "RANKED_FLEX_SR")}
+          graph={graph("RANKED_FLEX_SR")}
+        />
       </div>
     </section>
   );
 }
 
-// One queue's rank: Riot's emblem, tier and LP, wins and losses, and a track
-// showing how far through the tier the player is.
-function RankedCard({ label, entry }: { label: string; entry: LeagueEntry | null }) {
+// One queue's rank: Riot's emblem, tier and LP, wins and losses, a track
+// showing how far through the tier the player is, and the LP graph.
+function RankedCard({
+  label,
+  entry,
+  graph,
+}: {
+  label: string;
+  entry: LeagueEntry | null;
+  graph: GraphPoint[];
+}) {
   const track = entry ? tierTrack(entry.tier, entry.rank) : null;
 
   return (
@@ -86,6 +109,7 @@ function RankedCard({ label, entry }: { label: string; entry: LeagueEntry | null
             </p>
           </div>
           {track && <TierTrack steps={track} />}
+          <LpGraph points={graph} />
         </>
       ) : (
         <p className="text-xl font-semibold text-zinc-500">Unranked</p>

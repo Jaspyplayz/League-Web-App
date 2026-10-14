@@ -50,6 +50,13 @@
       "when": 1791992149461,
       "tag": "0006_user_players",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791992851084,
+      "tag": "0007_rank_history",
+      "breakpoints": true
     }
   ]
 }

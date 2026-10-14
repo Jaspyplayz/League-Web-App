@@ -80,6 +80,26 @@ export const rankedEntries = pgTable(
   (t) => [primaryKey({ columns: [t.puuid, t.queueType] })],
 ).enableRLS();
 
+// A dated copy of a ranked_entries row, kept each time a player's rank
+// changes, so the profile can draw an LP graph. Riot has no rank history of
+// its own. Rows are only added, never updated; see src/lib/rank-history.ts.
+export const rankHistory = pgTable(
+  "rank_history",
+  {
+    puuid: text("puuid")
+      .notNull()
+      .references(() => players.puuid, { onDelete: "cascade" }),
+    queueType: text("queue_type").notNull(),
+    tier: text("tier").notNull(),
+    rank: text("rank").notNull(),
+    leaguePoints: integer("league_points").notNull(),
+    wins: integer("wins").notNull(),
+    losses: integer("losses").notNull(),
+    recordedAt: timestamptz("recorded_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.puuid, t.queueType, t.recordedAt] })],
+).enableRLS();
+
 // One row per game, stored once and never refetched.
 export const matches = pgTable(
   "matches",

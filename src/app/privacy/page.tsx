@@ -27,7 +27,10 @@ export default function PrivacyPage() {
       </p>
       <ul>
         <li>Riot ID (game name and tag), region, profile icon and summoner level</li>
-        <li>Ranked tier, LP, wins and losses</li>
+        <li>
+          Ranked tier, LP, wins and losses, plus a dated copy each time they change, to draw the
+          LP graph on the player&apos;s profile
+        </li>
         <li>Match history, match details and minute-by-minute match timelines</li>
         <li>The analysis Turnpoint computes from those matches</li>
       </ul>

@@ -35,7 +35,8 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   sets them against one rank's games or one chosen player's,
                   and score.ts is the trained 0 to 100 game score (score-model.json)
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
-src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button
+src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
+                  each save also adds changed ranks to rank_history for the LP graph
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
 src/db/           Drizzle schema, connection, and cache freshness rules

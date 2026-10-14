@@ -1,10 +1,11 @@
 import "server-only";
 
 import * as Sentry from "@sentry/nextjs";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { tables } from "@/db";
 import { isFresh, secondsUntilUpdate, TTL_MS } from "@/db/freshness";
 import { database, readCache } from "@/lib/match-store";
+import { GRAPH_DAYS, ranksToRecord, type RankPoint } from "@/lib/rank-history";
 import type { Region } from "@/lib/regions";
 import { getMatchIds, getRankedEntries, getSummoner } from "@/lib/riot/api";
 import { RiotApiError, settle, type RiotErrorKind } from "@/lib/riot/client";
@@ -171,5 +172,68 @@ async function saveProfile(region: Region, account: Account, profile: Profile) {
   } catch (error) {
     // The page still has the fresh profile to show; it just isn't saved.
     Sentry.captureException(error);
+    return;
   }
+
+  // Kept out of the transaction above on purpose: if this fails (say the
+  // rank_history table hasn't been created yet), the profile is still saved
+  // and only the LP graph misses a point.
+  try {
+    // Keep a dated copy of each rank that changed. The latest few rows are
+    // enough to find each queue's last one.
+    const latest = await db
+      .select()
+      .from(tables.rankHistory)
+      .where(eq(tables.rankHistory.puuid, puuid))
+      .orderBy(desc(tables.rankHistory.recordedAt))
+      .limit(10);
+    const changed = ranksToRecord(latest, profile.ranked);
+    if (changed.length > 0) {
+      await db
+        .insert(tables.rankHistory)
+        .values(changed.map((e) => ({ puuid, ...pickRank(e), recordedAt: updatedAt })));
+    }
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+}
+
+// Only the columns rank_history stores; Riot's entries carry more fields.
+function pickRank(e: LeagueEntry) {
+  const { queueType, tier, rank, leaguePoints, wins, losses } = e;
+  return { queueType, tier, rank, leaguePoints, wins, losses };
+}
+
+// The saved rank history for the LP graph: the last GRAPH_DAYS days, plus the
+// last row before them so the line can start at the left edge. Empty without
+// a database. Costs no Riot calls.
+export async function loadRankHistory(puuid: string, now: Date): Promise<RankPoint[]> {
+  const start = new Date(now.getTime() - GRAPH_DAYS * 24 * 60 * 60 * 1000);
+  const rows = await readCache(async (db) => {
+    const columns = {
+      queueType: true,
+      tier: true,
+      rank: true,
+      leaguePoints: true,
+      wins: true,
+      losses: true,
+      recordedAt: true,
+    } as const;
+    const [recent, older] = await Promise.all([
+      db.query.rankHistory.findMany({
+        where: and(eq(tables.rankHistory.puuid, puuid), gte(tables.rankHistory.recordedAt, start)),
+        columns,
+      }),
+      // At most one row per queue is needed from before the window, but a
+      // few spare rows are cheaper than one query per queue.
+      db.query.rankHistory.findMany({
+        where: and(eq(tables.rankHistory.puuid, puuid), lt(tables.rankHistory.recordedAt, start)),
+        columns,
+        orderBy: desc(tables.rankHistory.recordedAt),
+        limit: 4,
+      }),
+    ]);
+    return [...older, ...recent];
+  });
+  return rows ?? [];
 }
