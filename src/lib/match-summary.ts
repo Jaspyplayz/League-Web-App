@@ -159,6 +159,18 @@ export function summarizeRecord(matches: MatchSummary[]): RecentRecord {
   };
 }
 
+// The five roles in map order, as positionName() spells them.
+export const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"] as const;
+
+// How many recent games were played in each role, in map order, for the role
+// bars. Remakes and modes without roles (ARAM, Arena) aren't counted.
+export function roleCounts(matches: MatchSummary[]): { role: string; games: number }[] {
+  return ROLES.map((role) => ({
+    role,
+    games: matches.filter((m) => !m.remake && m.position === role).length,
+  }));
+}
+
 export type ChampionStats = { championName: string; games: number; wins: number; kda: number };
 
 // Most-played champions in recent games, most games first.

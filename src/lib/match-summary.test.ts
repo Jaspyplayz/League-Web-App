@@ -6,6 +6,7 @@ import {
   formatTier,
   gameDurationSeconds,
   matchTeams,
+  roleCounts,
   summarizeMatch,
   summarizeRecord,
   timeAgo,
@@ -254,6 +255,22 @@ describe("matchTeams", () => {
       ],
       // No Riot ID (an old game or a bot): shown, but with nothing to link to.
       [{ championName: "Syndra", name: "Unknown", riotId: null, isMe: false }],
+    ]);
+  });
+});
+
+describe("roleCounts", () => {
+  const game = (position: string | null, remake = false) =>
+    ({ position, remake }) as MatchSummary;
+
+  it("counts games per role in map order, skipping remakes and games without a role", () => {
+    const games = [game("Jungle"), game("Jungle"), game("Mid"), game("Jungle", true), game(null)];
+    expect(roleCounts(games)).toEqual([
+      { role: "Top", games: 0 },
+      { role: "Jungle", games: 2 },
+      { role: "Mid", games: 1 },
+      { role: "Bot", games: 0 },
+      { role: "Support", games: 0 },
     ]);
   });
 });
