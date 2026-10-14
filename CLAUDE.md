@@ -35,6 +35,7 @@ src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back 
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/db/           Drizzle schema, connection, and cache freshness rules
+src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
 scripts/          Command-line jobs run with tsx (npm run benchmarks)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
@@ -61,6 +62,7 @@ Copy `.env.example` to `.env.local` (git-ignored). Variables, names only:
 - `RIOT_API_KEY`: dev keys expire every 24 hours; regenerate at developer.riotgames.com
 - `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`
 - `DATABASE_URL` (transaction pooler, port 6543), `DATABASE_URL_DIRECT` (session pooler, port 5432, migrations only)
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: sign-in; without them "Sign in" is hidden ([docs/sign-in.md](docs/sign-in.md))
 
 Production values live in Vercel's environment variables, which Jasper sets himself.
 
