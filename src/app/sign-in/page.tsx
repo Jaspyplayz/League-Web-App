@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { DiscordLogo, GoogleLogo } from "@/components/icons";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Panel } from "@/components/ui/panel";
 import { signIn } from "@/app/auth/actions";
@@ -12,6 +13,11 @@ export const metadata: Metadata = {
 };
 
 type SearchParams = Promise<{ next?: string; error?: string }>;
+
+const LOGOS: Record<Provider, typeof GoogleLogo> = {
+  google: GoogleLogo,
+  discord: DiscordLogo,
+};
 
 // Shown when a sign-in attempt bounces back here with ?error=.
 const ERRORS: Record<string, string> = {
@@ -65,20 +71,24 @@ async function SignInOptions({ searchParams }: { searchParams: SearchParams }) {
           {ERRORS[error] ?? ERRORS.start}
         </p>
       )}
-      {(Object.keys(PROVIDERS) as Provider[]).map((provider) => (
-        // Each button is its own small form, so it works before any
-        // JavaScript loads. The hidden fields tell signIn() what was picked.
-        <form key={provider} action={signIn}>
-          <input type="hidden" name="provider" value={provider} />
-          <input type="hidden" name="next" value={safeNextPath(next)} />
-          <button
-            type="submit"
-            className="w-full rounded-[10px] border border-line-strong px-5 py-3 font-semibold text-ink transition-colors hover:border-ahead hover:bg-page"
-          >
-            Continue with {PROVIDERS[provider]}
-          </button>
-        </form>
-      ))}
+      {/* Each button is its own small form, so it works before any JavaScript
+          loads. The hidden fields tell signIn() what was picked. */}
+      {(Object.keys(PROVIDERS) as Provider[]).map((provider) => {
+        const Logo = LOGOS[provider];
+        return (
+          <form key={provider} action={signIn}>
+            <input type="hidden" name="provider" value={provider} />
+            <input type="hidden" name="next" value={safeNextPath(next)} />
+            <button
+              type="submit"
+              className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line-strong px-5 py-3 font-semibold text-ink transition-colors hover:border-ahead hover:bg-page"
+            >
+              <Logo />
+              Continue with {PROVIDERS[provider]}
+            </button>
+          </form>
+        );
+      })}
     </Panel>
   );
 }
