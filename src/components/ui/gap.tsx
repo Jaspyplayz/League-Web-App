@@ -1,4 +1,4 @@
-import { formatGap } from "@/lib/analyzer/format";
+import { formatGap, type GapOptions } from "@/lib/analyzer/format";
 
 const TONE_CLASS = { better: "text-ahead", worse: "text-behind", even: "text-muted" };
 
@@ -7,16 +7,13 @@ const TONE_CLASS = { better: "text-ahead", worse: "text-behind", even: "text-mut
 export function Gap({
   you,
   them,
-  decimals,
-  lowerIsBetter,
   className = "",
-}: {
+  ...options
+}: GapOptions & {
   you: number;
   them: number;
-  decimals?: number;
-  lowerIsBetter?: boolean;
   className?: string;
 }) {
-  const { text, tone } = formatGap(you, them, { decimals, lowerIsBetter });
+  const { text, tone } = formatGap(you, them, options);
   return <span className={`font-mono ${TONE_CLASS[tone]} ${className}`}>{text}</span>;
 }

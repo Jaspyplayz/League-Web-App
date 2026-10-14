@@ -12,22 +12,34 @@ export function formatSigned(value: number): string {
 // someone else: 5.4 vs 6.3 CS/min -> "0.9 behind". Saying the gap saves the
 // reader from subtracting in their head. For stats where less is better
 // (deaths), the words switch to "more" and "fewer" so "0.1 more" isn't read
-// as good news.
+// as good news. For stats that are neither good nor bad (`neutral`), it's
+// "more" and "less" with no tone. `format` writes the size of the gap when a
+// plain number won't do, like a share as a percent.
 export type Gap = { text: string; tone: "better" | "worse" | "even" };
+
+export type GapOptions = {
+  decimals?: number;
+  lowerIsBetter?: boolean;
+  neutral?: boolean;
+  format?: (size: number) => string;
+};
 
 export function formatGap(
   you: number,
   them: number,
-  { decimals = 0, lowerIsBetter = false }: { decimals?: number; lowerIsBetter?: boolean } = {},
+  { decimals = 0, lowerIsBetter = false, neutral = false, format }: GapOptions = {},
 ): Gap {
   // Round first, so 5.41 vs 5.39 shown as "5.4" and "5.4" reads "Even".
   const scale = 10 ** decimals;
   const diff = Math.round((you - them) * scale) / scale;
   if (diff === 0) return { text: "Even", tone: "even" };
-  const size = Math.abs(diff).toLocaleString("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+  const size = format
+    ? format(Math.abs(diff))
+    : Math.abs(diff).toLocaleString("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+  if (neutral) return { text: `${size} ${diff > 0 ? "more" : "less"}`, tone: "even" };
   if (lowerIsBetter) {
     return diff > 0 ? { text: `${size} more`, tone: "worse" } : { text: `${size} fewer`, tone: "better" };
   }
