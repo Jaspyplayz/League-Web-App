@@ -1,0 +1,71 @@
+import "server-only";
+
+import * as Sentry from "@sentry/nextjs";
+import { eq } from "drizzle-orm";
+import { tables, type Db } from "@/db";
+import { database, readCache } from "@/lib/match-store";
+import { isRegion, type Region } from "@/lib/regions";
+
+// The player a signed-in account marked with "This is me", stored in the
+// user_players table (see src/db/schema.ts). Without a database the feature
+// just stays off: nothing is found and nothing is saved.
+
+export type MyPlayer = {
+  puuid: string;
+  region: Region;
+  gameName: string;
+  tagLine: string;
+};
+
+export async function readMyPlayer(userId: string): Promise<MyPlayer | null> {
+  const row = await readCache(async (db) => {
+    // Join players for the current name and region, which change on that
+    // player's next profile refresh if they rename themselves.
+    const [found] = await db
+      .select({
+        puuid: tables.players.puuid,
+        region: tables.players.region,
+        gameName: tables.players.gameName,
+        tagLine: tables.players.tagLine,
+      })
+      .from(tables.userPlayers)
+      .innerJoin(tables.players, eq(tables.userPlayers.puuid, tables.players.puuid))
+      .where(eq(tables.userPlayers.userId, userId))
+      .limit(1);
+    return found;
+  });
+  return row && isRegion(row.region) ? { ...row, region: row.region } : null;
+}
+
+// Returns false when it couldn't be saved, for example a PUUID Turnpoint has
+// never looked up (the players row must exist first).
+export async function saveMyPlayer(userId: string, puuid: string): Promise<boolean> {
+  return write((db) =>
+    db
+      .insert(tables.userPlayers)
+      .values({ userId, puuid })
+      // Picking a new player replaces the old one: an account has at most one.
+      .onConflictDoUpdate({
+        target: tables.userPlayers.userId,
+        set: { puuid, linkedAt: new Date() },
+      }),
+  );
+}
+
+export async function forgetMyPlayer(userId: string): Promise<boolean> {
+  return write((db) =>
+    db.delete(tables.userPlayers).where(eq(tables.userPlayers.userId, userId)),
+  );
+}
+
+async function write(run: (db: Db) => Promise<unknown>): Promise<boolean> {
+  const db = database();
+  if (!db) return false;
+  try {
+    await run(db);
+    return true;
+  } catch (error) {
+    Sentry.captureException(error);
+    return false;
+  }
+}

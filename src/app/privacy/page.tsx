@@ -61,6 +61,11 @@ export default function PrivacyPage() {
         </li>
       </ul>
       <p>
+        If you click This is me on a player&apos;s profile, Turnpoint saves which player you
+        picked next to your account, so the header can link to it. Only you see it. Click the
+        button again to remove it.
+      </p>
+      <p>
         While you&apos;re signed in, your browser keeps a sign-in cookie so you don&apos;t have
         to sign in on every page. Signing out removes it.
       </p>

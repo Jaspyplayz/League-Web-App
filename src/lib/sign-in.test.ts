@@ -38,27 +38,42 @@ describe("safeNextPath", () => {
 });
 
 describe("userFromClaims", () => {
+  const ID = "4f6c1d2e-8a3b-4c5d-9e7f-0a1b2c3d4e5f";
+
   it("uses the full name and provider from a Google sign-in", () => {
     expect(
       userFromClaims({
+        sub: ID,
         email: "jasper@example.com",
         user_metadata: { full_name: "Jasper", name: "Jasper L" },
         app_metadata: { provider: "google" },
       }),
-    ).toEqual({ name: "Jasper", provider: "google" });
+    ).toEqual({ id: ID, name: "Jasper", provider: "google" });
   });
 
   it("falls back to the Discord username, then the email", () => {
     expect(
-      userFromClaims({ user_metadata: { user_name: "jaspy" }, app_metadata: { provider: "discord" } }),
-    ).toEqual({ name: "jaspy", provider: "discord" });
-    expect(userFromClaims({ email: "a@b.com", user_metadata: { full_name: "  " } })).toEqual({
+      userFromClaims({
+        sub: ID,
+        user_metadata: { user_name: "jaspy" },
+        app_metadata: { provider: "discord" },
+      }),
+    ).toEqual({ id: ID, name: "jaspy", provider: "discord" });
+    expect(
+      userFromClaims({ sub: ID, email: "a@b.com", user_metadata: { full_name: "  " } }),
+    ).toEqual({
+      id: ID,
       name: "a@b.com",
       provider: null,
     });
   });
 
   it("still returns a name when the profile is empty", () => {
-    expect(userFromClaims({})).toEqual({ name: "Player", provider: null });
+    expect(userFromClaims({ sub: ID })).toEqual({ id: ID, name: "Player", provider: null });
+  });
+
+  it("treats a token without an account ID as signed out", () => {
+    expect(userFromClaims({ user_metadata: { full_name: "Jasper" } })).toBeNull();
+    expect(userFromClaims({ sub: "" })).toBeNull();
   });
 });

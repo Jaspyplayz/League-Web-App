@@ -15,10 +15,11 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `match_insights` | player × game, analyzer output | never; recomputed locally when `version` changes |
 | `benchmark_games` | Sampled player (Iron to Challenger) × game, summary only, with the player's tier | filled by `npm run benchmarks`; keeps each player's last 20, deletes games older than 60 days |
 | `score_games` | benchmark game, all ten players' end-of-game numbers (no names or PUUIDs) | never; filled by `npm run benchmarks`, read by `npm run train-score` ([docs/game-score.md](game-score.md)) |
+| `user_players` | signed-in account, the player it marked with "This is me" | never; Supabase deletes the row when the account is deleted |
 
 The schema lives in [`src/db/schema.ts`](../src/db/schema.ts), with a comment on every column that isn't obvious. The refresh rules live in [`src/db/freshness.ts`](../src/db/freshness.ts).
 
-Row level security is on for every table with no policies. The app connects to Postgres directly from the server, which isn't affected by RLS, while Supabase's public REST API can't read or write anything. Turnpoint has no user accounts, so nothing needs that API.
+Row level security is on for every table with no policies. The app connects to Postgres directly from the server, which isn't affected by RLS, while Supabase's public REST API can't read or write anything. Sign-in (see [sign-in.md](sign-in.md)) also goes through the server, so nothing needs that API.
 
 ## Setup
 
