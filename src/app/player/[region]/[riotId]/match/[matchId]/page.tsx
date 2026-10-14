@@ -83,6 +83,7 @@ async function Analysis({ params }: { params: Params }) {
   const header = <MatchHeader match={match} me={me} now={now} />;
   const scoreboard = (
     <Scoreboard
+      region={region}
       dd={dd}
       participants={match.info.participants}
       meId={me.participantId}
@@ -122,7 +123,7 @@ async function Analysis({ params }: { params: Params }) {
     <>
       {back}
       {header}
-      <AnalysisSections match={match} analysis={analysis} dd={dd} label={label} />
+      <AnalysisSections region={region} match={match} analysis={analysis} dd={dd} label={label} />
     </>
   );
 }

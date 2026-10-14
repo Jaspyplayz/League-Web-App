@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // same pull request.
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="October 13, 2026">
+    <LegalPage title="Privacy policy" updated="October 14, 2026">
       <p>
         Turnpoint is a free League of Legends stats site built by one student. This page
         explains what data it handles and why. The short version: there are no accounts, no
@@ -39,6 +39,14 @@ export default function PrivacyPage() {
         Finished matches never change, so they are kept. Ranks and match lists are refreshed
         from Riot after a short time. The data is stored in a Postgres database hosted by
         Supabase in the United States.
+      </p>
+
+      <h2>Stored in your browser</h2>
+      <p>
+        Turnpoint remembers the last few players you looked up, so you can click back to them
+        from the home page. That list is kept in your own browser&apos;s local storage: it
+        stays on your device and is never sent to Turnpoint. Remove a player with the ×
+        next to their name, or the whole list with the Clear button.
       </p>
 
       <h2>Technical data</h2>

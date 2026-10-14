@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
+import { RememberPlayer } from "@/components/recent-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
@@ -46,6 +47,8 @@ async function Player({ params }: { params: Params }) {
   const playerPath = `/player/${region}/${toSlug(account.value)}`;
   return (
     <>
+      {/* Uses the spelling Riot returns, so "faker-kr1" is saved as "Faker#KR1". */}
+      <RememberPlayer region={region} gameName={gameName} tagLine={tagLine} />
       <Suspense fallback={<HeaderPlaceholder gameName={gameName} tagLine={tagLine} />}>
         <ProfileHeader region={region} puuid={puuid} gameName={gameName} tagLine={tagLine} />
       </Suspense>

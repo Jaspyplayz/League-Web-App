@@ -1,15 +1,21 @@
+import Link from "next/link";
 import { ChampionIcon, ItemIcon } from "@/components/game-icons";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { championName, type DataDragon } from "@/lib/ddragon";
+import type { Region } from "@/lib/regions";
 import type { Participant } from "@/lib/riot/types";
+import { parseRiotId, toSlug } from "@/lib/riot-id";
 
-// Both teams' end-of-game numbers, blue side first.
+// Both teams' end-of-game numbers, blue side first. Each player's name links
+// to their own profile, so you can look up anyone you played with or against.
 export function Scoreboard({
+  region,
   dd,
   participants,
   meId,
   opponentId,
 }: {
+  region: Region;
   dd: DataDragon | null;
   participants: Participant[];
   meId: number;
@@ -69,6 +75,7 @@ export function Scoreboard({
                 {team.map((p) => (
                   <Row
                     key={p.participantId}
+                    region={region}
                     dd={dd}
                     p={p}
                     tag={
@@ -92,12 +99,14 @@ export function Scoreboard({
 }
 
 function Row({
+  region,
   dd,
   p,
   tag,
   damagePct,
   barColor,
 }: {
+  region: Region;
   dd: DataDragon | null;
   p: Participant;
   tag: "You" | "Opponent" | null;
@@ -106,26 +115,45 @@ function Row({
 }) {
   const items = [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6];
   const name = [p.riotIdGameName, p.riotIdTagline].filter(Boolean).join("#");
+  // Old games and some bots have no Riot ID, so there's no profile to link to.
+  const riotId = parseRiotId(name);
+
+  const who = (
+    <>
+      <ChampionIcon dd={dd} name={p.championName} size={36} className="rounded-[9px]" />
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">{championName(dd, p.championName)}</span>
+          {tag && (
+            <span
+              className={`rounded-full border px-2 font-mono text-[10px] uppercase tracking-[0.1em] ${tag === "You" ? "border-ahead-soft text-ahead-soft" : "border-behind text-behind"}`}
+            >
+              {tag}
+            </span>
+          )}
+        </div>
+        <div className="text-[13px] text-faint underline-offset-2 group-hover:text-ink group-hover:underline">
+          {name}
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <tr className={`border-t border-line ${tag === "You" ? "bg-ahead/10" : ""}`}>
       <th scope="row" className="px-5 py-2.5 text-left font-normal">
-        <div className="flex items-center gap-3">
-          <ChampionIcon dd={dd} name={p.championName} size={36} className="rounded-[9px]" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{championName(dd, p.championName)}</span>
-              {tag && (
-                <span
-                  className={`rounded-full border px-2 font-mono text-[10px] uppercase tracking-[0.1em] ${tag === "You" ? "border-ahead-soft text-ahead-soft" : "border-behind text-behind"}`}
-                >
-                  {tag}
-                </span>
-              )}
-            </div>
-            <div className="text-[13px] text-faint">{name}</div>
-          </div>
-        </div>
+        {riotId ? (
+          // The whole cell (icon, champion and name) is the link, so it's an
+          // easy target; the name underlines on hover to show it's clickable.
+          <Link
+            href={`/player/${region}/${toSlug(riotId)}`}
+            className="group flex items-center gap-3 rounded-lg"
+          >
+            {who}
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3">{who}</div>
+        )}
       </th>
       <td className="px-3 py-2.5 font-mono">
         {p.kills} / {p.deaths} / {p.assists}
