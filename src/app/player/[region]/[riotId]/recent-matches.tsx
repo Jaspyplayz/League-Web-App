@@ -6,6 +6,7 @@ import { findPlayer } from "@/lib/analyzer";
 import { getDataDragon } from "@/lib/ddragon";
 import { scoreGame } from "@/lib/game-score";
 import {
+  matchBadges,
   matchTeams,
   roleCounts,
   summarizeMatch,
@@ -104,6 +105,7 @@ export async function RecentMatches({ region, puuid, profile, queue, playerPath 
                 now={now}
                 score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
                 teams={{ region, players: matchTeams(match, puuid) }}
+                badges={matchBadges(match, puuid)}
                 details={
                   <MatchDetails
                     region={region}

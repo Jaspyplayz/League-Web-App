@@ -5,6 +5,7 @@ import {
   formatThousands,
   formatTier,
   gameDurationSeconds,
+  matchBadges,
   matchTeams,
   roleCounts,
   summarizeMatch,
@@ -272,5 +273,26 @@ describe("roleCounts", () => {
       { role: "Bot", games: 0 },
       { role: "Support", games: 0 },
     ]);
+  });
+});
+
+describe("matchBadges", () => {
+  const withMe = (overrides: Partial<Participant>) => ({
+    ...match,
+    info: { ...match.info, participants: [participant({ puuid: "me", ...overrides })] },
+  });
+
+  it("shows only the biggest multikill, plus first blood", () => {
+    expect(
+      matchBadges(withMe({ doubleKills: 3, tripleKills: 1, firstBloodKill: true }), "me"),
+    ).toEqual(["Triple kill", "First blood"]);
+    expect(matchBadges(withMe({ doubleKills: 2, pentaKills: 1, quadraKills: 1 }), "me")).toEqual([
+      "Pentakill",
+    ]);
+  });
+
+  it("has no badges for a quiet game or a player who isn't in it", () => {
+    expect(matchBadges(withMe({ doubleKills: 0 }), "me")).toEqual([]);
+    expect(matchBadges(withMe({ pentaKills: 1 }), "stranger")).toEqual([]);
   });
 });

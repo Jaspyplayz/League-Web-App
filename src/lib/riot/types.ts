@@ -76,6 +76,13 @@ export type Participant = {
   // Runes. Missing in some game modes, like Arena.
   perks?: Perks;
   gameEndedInEarlySurrender?: boolean;
+  // Multikills and first blood, for the badges on match rows. Optional so
+  // older test data still fits; Riot always sends them.
+  doubleKills?: number;
+  tripleKills?: number;
+  quadraKills?: number;
+  pentaKills?: number;
+  firstBloodKill?: boolean;
 };
 
 // A player's rune page. Every number is a rune id from Data Dragon's
