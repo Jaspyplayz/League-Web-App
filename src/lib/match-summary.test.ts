@@ -187,6 +187,7 @@ describe("formatting", () => {
 
   it("finds a queue's entry", () => {
     const solo = {
+      puuid: "p1",
       queueType: "RANKED_SOLO_5x5",
       tier: "GOLD",
       rank: "I",

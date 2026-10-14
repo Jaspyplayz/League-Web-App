@@ -3,11 +3,15 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
-import { PanelHeading } from "@/components/ui/panel-heading";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
 import { computeTrends } from "@/lib/analyzer/trends";
-import { loadBenchmarks } from "@/lib/benchmark-store";
-import { championsPlayed, readFilters, type InsightsFilters } from "@/lib/insights-filters";
+import { loadBenchmarks, loadBenchmarkTiers } from "@/lib/benchmark-store";
+import {
+  championsPlayed,
+  pickTier,
+  readFilters,
+  type InsightsFilters,
+} from "@/lib/insights-filters";
 import { championClass, championName, getDataDragon, type DataDragon } from "@/lib/ddragon";
 import { isRegion } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
@@ -16,18 +20,19 @@ import type { Match } from "@/lib/riot/types";
 import { fromSlug, toSlug } from "@/lib/riot-id";
 import { loadTrendGames } from "@/lib/trend-games";
 import { AnalysisProgress } from "./analysis-progress";
-import { BenchmarkComparison } from "./benchmark-comparison";
 import { loadChosenPlayer, readChoice } from "./chosen-player";
 import { CompareWithPlayer } from "./compare-with-player";
 import { InsightsFilterBar } from "./insights-filters";
+import { TierComparison } from "./tier-comparison";
 import { LaningChart } from "./laning-chart";
 import { CsPhases, EarlyDeaths, LeadsAndDeficits } from "./trend-sections";
 import { Weaknesses } from "./weaknesses";
 
 // The insights page: trends across a player's last 20, 50 or 100 games.
 // URL: /player/na/Name-TAG/insights, plus ?games=50&champion=Ahri to filter
-// (see src/lib/insights-filters.ts) and ?vs=Name%23TAG&vsRegion=kr when
-// comparing with another player.
+// and ?tier=diamond to pick the rank to compare with (see
+// src/lib/insights-filters.ts), and ?vs=Name%23TAG&vsRegion=kr when comparing
+// with another player.
 //
 // Every game needs its match and timeline, each one Riot call the first
 // time. A new player's 100 games would be 200 calls, twice the dev key's
@@ -86,10 +91,10 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
 
   const query = await searchParams;
   const filters = readFilters(query);
-  const [loaded, dd, benchmarks] = await Promise.all([
+  const [loaded, dd, tiers] = await Promise.all([
     settle(loadTrendGames(region, puuid, { count: filters.games, budget: TIMELINES_PER_VIEW })),
     getDataDragon().catch(() => null),
-    loadBenchmarks(),
+    loadBenchmarkTiers(),
   ]);
   if (!loaded.ok) {
     return (
@@ -149,16 +154,25 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       games: 0,
     });
   }
-  // Each form carries the other's choices along (see InsightsFilterBar).
-  const filterParams = {
+  // Null until `npm run benchmarks` has collected some games.
+  const tier = pickTier(query.tier, tiers.map((t) => t.tier));
+
+  // Every choice on the page, as URL parameters. Each form carries the others
+  // along in hidden inputs, so picking one doesn't reset the rest.
+  const current: Record<string, string> = {
     games: String(filters.games),
     ...(filters.champion && { champion: filters.champion }),
+    ...(typeof query.tier === "string" && tier && { tier: tier.toLowerCase() }),
+    ...(choice && { vs: choice.input, vsRegion: choice.region }),
   };
-  const choiceParams: Record<string, string> = choice
-    ? { vs: choice.input, vsRegion: choice.region }
-    : {};
+  const without = (...names: string[]) =>
+    Object.fromEntries(Object.entries(current).filter(([name]) => !names.includes(name)));
   const filterBar = (
-    <InsightsFilterBar filters={filters} champions={champions} keep={choiceParams} />
+    <InsightsFilterBar
+      filters={filters}
+      champions={champions}
+      keep={without("games", "champion")}
+    />
   );
 
   if (games.length < MIN_GAMES) {
@@ -175,8 +189,8 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const trends = computeTrends(games);
   const label = (name: string) => championName(dd, name);
   const classOf = (name: string) => championClass(dd, name);
-  // Null until `npm run benchmarks` has filled the table, or when none of
-  // your games has enough Challenger games to compare with.
+  // Null when none of your games has enough of that rank's games to compare.
+  const benchmarks = tier ? await loadBenchmarks(tier) : [];
   const comparison = compareWithBenchmarks(games, benchmarks, classOf);
   const playerComparison = theirs
     ? compareWithBenchmarks(games, theirs.games, classOf, MIN_PLAYER_GAMES)
@@ -198,17 +212,20 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
         <EarlyDeaths earlyDeaths={trends.earlyDeaths} games={games.length} />
         <CsPhases csPerMin={trends.csPerMin} />
       </div>
-      {comparison && (
-        <section aria-labelledby="benchmark-heading" className="flex flex-col gap-3.5">
-          <PanelHeading id="benchmark-heading">You vs Challenger</PanelHeading>
-          <BenchmarkComparison comparison={comparison} against={{ kind: "challenger" }} dd={dd} />
-        </section>
+      {tier && (
+        <TierComparison
+          tier={tier}
+          tiers={tiers}
+          comparison={comparison}
+          keep={without("tier")}
+          dd={dd}
+        />
       )}
       <CompareWithPlayer
         chosen={chosen}
         comparison={playerComparison}
-        clearHref={`${playerPath}/insights?${new URLSearchParams(filterParams)}`}
-        keep={filterParams}
+        clearHref={`${playerPath}/insights?${new URLSearchParams(without("vs", "vsRegion"))}`}
+        keep={without("vs", "vsRegion")}
         dd={dd}
       />
       <Footnote

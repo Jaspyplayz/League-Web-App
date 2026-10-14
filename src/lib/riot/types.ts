@@ -15,18 +15,26 @@ export type Summoner = {
 };
 
 export type LeagueEntry = {
+  puuid: string;
   queueType: string; // "RANKED_SOLO_5x5" or "RANKED_FLEX_SR"
   tier: string; // "GOLD"
   rank: string; // "II"
   leaguePoints: number;
   wins: number;
   losses: number;
+  inactive?: boolean; // hasn't played in a while
 };
 
 // league-v4's Challenger list for one queue. Entries carry the PUUID, so no
 // account lookup is needed to fetch their games.
 export type LeagueList = {
-  entries: { puuid: string; leaguePoints: number; wins: number; losses: number }[];
+  entries: {
+    puuid: string;
+    leaguePoints: number;
+    wins: number;
+    losses: number;
+    inactive?: boolean;
+  }[];
 };
 
 export type Participant = {

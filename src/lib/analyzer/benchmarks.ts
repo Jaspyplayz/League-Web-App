@@ -1,8 +1,6 @@
-// Benchmarks: the top solo queue players Insights compares you with. The
-// collector script (scripts/collect-benchmarks.ts) uses these to pick whose
-// games to download, and Insights uses them to find one-tricks.
-
-import type { LeagueList } from "@/lib/riot/types";
+// Benchmarks: the solo queue players of each rank that Insights compares you
+// with. The collector script (scripts/collect-benchmarks.ts) uses these to
+// pick whose games to download, and Insights uses them to find one-tricks.
 
 // A one-trick plays one champion in at least this share of their recent
 // ranked games...
@@ -13,12 +11,26 @@ export const ONE_TRICK_WINDOW = 20;
 // of 4 doesn't make someone a Lee Sin one-trick.
 export const MIN_ONE_TRICK_GAMES = 10;
 
-// The highest-LP players in a Challenger list.
-export function topPlayers(league: LeagueList, count: number): string[] {
-  return [...league.entries]
-    .sort((a, b) => b.leaguePoints - a.leaguePoints)
-    .slice(0, count)
-    .map((e) => e.puuid);
+type RankedPlayer = {
+  puuid: string;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  inactive?: boolean;
+};
+
+// `count` players spread evenly from the top to the bottom of a ladder or
+// division by LP, so the sample stands for the whole tier rather than just
+// its best players. Players with fewer than ONE_TRICK_WINDOW ranked games
+// this season, or who have stopped playing, are skipped: they don't have the
+// recent games to collect.
+export function samplePlayers(entries: RankedPlayer[], count: number): string[] {
+  const active = entries
+    .filter((e) => !e.inactive && e.wins + e.losses >= ONE_TRICK_WINDOW)
+    .sort((a, b) => b.leaguePoints - a.leaguePoints);
+  if (active.length <= count) return active.map((e) => e.puuid);
+  const step = active.length / count;
+  return Array.from({ length: count }, (_, i) => active[Math.floor(i * step)].puuid);
 }
 
 type PlayedGame = { puuid: string; championName: string; startedAt: number };
