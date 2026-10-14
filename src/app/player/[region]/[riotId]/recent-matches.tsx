@@ -1,9 +1,10 @@
 import { Suspense } from "react";
+import { FilterableMatchList } from "@/components/filterable-match-list";
 import { MatchDetails } from "@/components/match-details";
 import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { findPlayer } from "@/lib/analyzer";
-import { getDataDragon } from "@/lib/ddragon";
+import { championName, getDataDragon } from "@/lib/ddragon";
 import { scoreGame } from "@/lib/game-score";
 import {
   matchBadges,
@@ -96,28 +97,32 @@ export async function RecentMatches({ region, puuid, profile, queue, playerPath 
             </p>
           )
         ) : (
-          <ul className="flex flex-col gap-2">
-            {games.map(({ match, summary: m }) => (
-              <MatchRow
-                key={m.matchId}
-                match={m}
-                dd={dd}
-                now={now}
-                score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
-                teams={{ region, players: matchTeams(match, puuid) }}
-                badges={matchBadges(match, puuid)}
-                details={
-                  <MatchDetails
-                    region={region}
-                    dd={dd}
-                    match={match}
-                    puuid={puuid}
-                    analysisHref={`${playerPath}/match/${m.matchId}`}
-                  />
-                }
-              />
-            ))}
-          </ul>
+          <FilterableMatchList
+            games={games.map(({ match, summary: m }) => ({
+              // The name players know ("Wukong", not Riot's "MonkeyKing").
+              champion: championName(dd, m.championName),
+              row: (
+                <MatchRow
+                  key={m.matchId}
+                  match={m}
+                  dd={dd}
+                  now={now}
+                  score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
+                  teams={{ region, players: matchTeams(match, puuid) }}
+                  badges={matchBadges(match, puuid)}
+                  details={
+                    <MatchDetails
+                      region={region}
+                      dd={dd}
+                      match={match}
+                      puuid={puuid}
+                      analysisHref={`${playerPath}/match/${m.matchId}`}
+                    />
+                  }
+                />
+              ),
+            }))}
+          />
         )}
       </section>
     </div>
