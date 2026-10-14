@@ -71,6 +71,13 @@
       "when": 1791993546470,
       "tag": "0009_benchmark_more_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791995921205,
+      "tag": "0010_win_chance_games",
+      "breakpoints": true
     }
   ]
 }

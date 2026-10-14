@@ -1,0 +1,498 @@
+// Turnpoint's win chance: each team's chance of winning at every minute of a
+// finished game, like the win probability line on sports broadcasts.
+//
+// It's a small machine learning model (logistic regression) trained on saved
+// games. For every minute of every game, it sees how far ahead blue side was
+// (gold, XP, kills, towers, dragons, buffs...) and which side won in the end.
+// It learns one weight per stat, so a 2,000 gold lead at minute 12 can be
+// turned into "blue wins about 65% of games like this".
+//
+// It only ever runs on finished games. Riot's policy doesn't allow live-game
+// predictions, and Turnpoint never fetches live games anyway.
+//
+// Everything here is pure (games in, numbers out). scripts/train-win-chance.ts
+// runs the training and saves the result in win-chance-model.json. See
+// docs/win-chance.md for the formula with a worked example.
+
+import type { Match } from "@/lib/riot/types";
+import { isScorable, toScoreGame } from "./score";
+import type { TrimmedEvent, TrimmedFrame, TrimmedTimeline } from "./trim";
+
+// What we record about each team at each minute, in this order. Saved as
+// plain arrays (not objects) so thousands of games stay a few MB.
+export const TEAM_STATS = [
+  "gold", // total gold earned by the five players
+  "xp", // total XP of the five players
+  "kills", // champion kills
+  "towers", // enemy towers destroyed
+  "inhibitors", // enemy inhibitors down right now (they respawn after 5 minutes)
+  "dragons", // elemental dragons, not counting Elder
+  "elderBuff", // 1 while the team has the Elder Dragon buff
+  "baronBuff", // 1 while the team has the Baron buff
+  "grubs", // void grubs
+  "heralds", // Rift Heralds
+  "atakhans", // Atakhan
+] as const;
+export type TeamStat = (typeof TEAM_STATS)[number];
+export type TeamState = Record<TeamStat, number>;
+
+// One moment of a game: seconds since the start, then blue side's and red
+// side's numbers in TEAM_STATS order.
+export type WinChanceFrame = { t: number; blue: number[]; red: number[] };
+
+// The only parts of a game the model reads. The benchmark job saves these
+// (the win_chance_games table), with no names or PUUIDs in them.
+export type WinChanceGame = {
+  matchId: string;
+  patch: string; // "16.20"
+  blueWin: boolean;
+  frames: WinChanceFrame[];
+};
+
+// How long buffs last and how long an inhibitor stays down, in ms.
+const INHIBITOR_RESPAWN_MS = 5 * 60_000;
+const BARON_BUFF_MS = 3 * 60_000;
+const ELDER_BUFF_MS = 150_000;
+
+// The patch a game was played on: "16.20.712.3456" becomes "16.20".
+export function patchOf(gameVersion: string): string {
+  return gameVersion.split(".").slice(0, 2).join(".");
+}
+
+// Sorts patches oldest first ("16.9" before "16.10").
+export function comparePatches(a: string, b: string): number {
+  const [aMajor = 0, aMinor = 0] = a.split(".").map(Number);
+  const [bMajor = 0, bMinor = 0] = b.split(".").map(Number);
+  return aMajor - bMajor || aMinor - bMinor;
+}
+
+// Boils a finished game down to each team's numbers at each minute. Null for
+// games the model can't learn from: the same ones the game score skips
+// (ARAM, Arena, remakes, early surrenders and games under 10 minutes).
+export function toWinChanceGame(match: Match, timeline: TrimmedTimeline): WinChanceGame | null {
+  if (!isScorable(toScoreGame(match))) return null;
+  const { participants } = match.info;
+  const blueWin = participants.find((p) => p.teamId === 100)?.win;
+  if (blueWin === undefined) return null;
+
+  const teamOf = new Map(participants.map((p) => [p.participantId, p.teamId]));
+  const frames = timeline.frames.map((frame) => {
+    const blue = teamStateAt(frame, timeline.events, teamOf, 100);
+    const red = teamStateAt(frame, timeline.events, teamOf, 200);
+    return {
+      t: Math.round(frame.timestamp / 1000),
+      blue: TEAM_STATS.map((stat) => blue[stat]),
+      red: TEAM_STATS.map((stat) => red[stat]),
+    };
+  });
+  return { matchId: match.metadata.matchId, patch: patchOf(match.info.gameVersion), blueWin, frames };
+}
+
+// One team's numbers at one frame of the game. `teamOf` maps each
+// participantId to their team.
+export function teamStateAt(
+  frame: TrimmedFrame,
+  events: TrimmedEvent[],
+  teamOf: Map<number, number>,
+  teamId: number,
+): TeamState {
+  const at = frame.timestamp;
+  const ours = (participantId: number) => teamOf.get(participantId) === teamId;
+  const state: TeamState = {
+    gold: 0,
+    xp: 0,
+    kills: 0,
+    towers: 0,
+    inhibitors: 0,
+    dragons: 0,
+    elderBuff: 0,
+    baronBuff: 0,
+    grubs: 0,
+    heralds: 0,
+    atakhans: 0,
+  };
+  frame.players.forEach((p, i) => {
+    if (!ours(i + 1)) return;
+    state.gold += p.gold;
+    state.xp += p.xp;
+  });
+
+  for (const e of events) {
+    if (e.timestamp > at) continue;
+    const ago = at - e.timestamp;
+    switch (e.type) {
+      case "CHAMPION_KILL":
+        // Counted by who died, so executions (no champion killer) count too.
+        if (!ours(e.victimId) && teamOf.has(e.victimId)) state.kills++;
+        break;
+      case "BUILDING_KILL":
+        // teamId is the team that lost the building.
+        if (e.teamId === teamId) break;
+        if (e.buildingType === "TOWER_BUILDING") state.towers++;
+        if (e.buildingType === "INHIBITOR_BUILDING" && ago < INHIBITOR_RESPAWN_MS) state.inhibitors++;
+        break;
+      case "ELITE_MONSTER_KILL":
+        if (e.killerTeamId !== teamId) break;
+        if (e.monsterType === "DRAGON" && e.monsterSubType === "ELDER_DRAGON") {
+          if (ago < ELDER_BUFF_MS) state.elderBuff = 1;
+        } else if (e.monsterType === "DRAGON") {
+          state.dragons++;
+        } else if (e.monsterType === "BARON_NASHOR") {
+          if (ago < BARON_BUFF_MS) state.baronBuff = 1;
+        } else if (e.monsterType === "HORDE") {
+          state.grubs++;
+        } else if (e.monsterType === "RIFTHERALD") {
+          state.heralds++;
+        } else if (e.monsterType === "ATAKHAN") {
+          state.atakhans++;
+        }
+        break;
+    }
+  }
+  return state;
+}
+
+export function readTeam(values: number[]): TeamState {
+  return Object.fromEntries(TEAM_STATS.map((stat, i) => [stat, values[i] ?? 0])) as TeamState;
+}
+
+// What the model looks at: how far ahead blue side is, so 0 means even.
+// Red side's chance is always 100% minus blue's.
+//
+// `alwaysHelps` is the one thing we tell it up front: being further ahead
+// in gold or towers never makes you less likely to win. It learns how much
+// each lead is worth. "goldLate" is the gold lead again, scaled by how late
+// it is, so the model can learn that a 2,000 gold lead matters more at
+// minute 10 than at minute 35, when everyone has full builds.
+//
+// Changing this list means retraining: a saved model trained on a different
+// list is ignored (see winChanceCurve).
+export const WIN_CHANCE_FEATURES = [
+  {
+    key: "gold",
+    label: "gold lead, per 1,000",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => (b.gold - r.gold) / 1000,
+  },
+  {
+    key: "goldLate",
+    label: "gold lead per 1,000, times minutes / 30",
+    alwaysHelps: false,
+    value: (b: TeamState, r: TeamState, minutes: number) => ((b.gold - r.gold) / 1000) * (minutes / 30),
+  },
+  {
+    key: "xp",
+    label: "XP lead, per 1,000",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => (b.xp - r.xp) / 1000,
+  },
+  {
+    key: "kills",
+    label: "kill lead",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.kills - r.kills,
+  },
+  {
+    key: "towers",
+    label: "tower lead",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.towers - r.towers,
+  },
+  {
+    key: "inhibitors",
+    label: "inhibitors down lead",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.inhibitors - r.inhibitors,
+  },
+  {
+    key: "dragons",
+    label: "dragon lead",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.dragons - r.dragons,
+  },
+  {
+    key: "soul",
+    label: "dragon soul (1 if blue has it, -1 if red has it)",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => Number(b.dragons >= 4) - Number(r.dragons >= 4),
+  },
+  {
+    key: "elderBuff",
+    label: "Elder buff (1 blue, -1 red)",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.elderBuff - r.elderBuff,
+  },
+  {
+    key: "baronBuff",
+    label: "Baron buff (1 blue, -1 red)",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.baronBuff - r.baronBuff,
+  },
+  {
+    key: "grubs",
+    label: "void grub lead",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.grubs - r.grubs,
+  },
+  {
+    key: "heralds",
+    label: "Rift Herald lead",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.heralds - r.heralds,
+  },
+  {
+    key: "atakhans",
+    label: "Atakhan lead",
+    alwaysHelps: true,
+    value: (b: TeamState, r: TeamState) => b.atakhans - r.atakhans,
+  },
+] as const;
+
+export function winChanceFeatures(frame: WinChanceFrame): number[] {
+  const blue = readTeam(frame.blue);
+  const red = readTeam(frame.red);
+  return WIN_CHANCE_FEATURES.map((f) => f.value(blue, red, frame.t / 60));
+}
+
+// One minute of one game, ready for training.
+export type Example = {
+  matchId: string;
+  patch: string;
+  minute: number;
+  features: number[];
+  blueWin: boolean;
+};
+
+export function winChanceExamples(game: WinChanceGame): Example[] {
+  return game.frames
+    // The first frame is the loading screen: everything is 0, so it can't
+    // teach anything.
+    .filter((frame) => frame.t > 0)
+    .map((frame) => ({
+      matchId: game.matchId,
+      patch: game.patch,
+      minute: frame.t / 60,
+      features: winChanceFeatures(frame),
+      blueWin: game.blueWin,
+    }));
+}
+
+// How the model did on games it wasn't trained on (see crossValidate).
+export type Evaluation = {
+  examples: number;
+  // How many minutes it picked the eventual winner of (over 50% for them).
+  accuracy: number;
+  // Lower is better. Log loss punishes being confidently wrong; a coin flip
+  // (always 50%) scores 0.693. Brier score is the average squared miss; a
+  // coin flip scores 0.25.
+  logLoss: number;
+  brier: number;
+  // Accuracy at a few points in the game, next to the simplest possible
+  // rule ("the team with more gold wins") so we can see the model beats it.
+  byMinute: { minute: number; examples: number; accuracy: number; goldRule: number }[];
+  // When it says 60-70%, does that team win about 65% of the time?
+  calibration: { from: number; to: number; examples: number; predicted: number; actual: number }[];
+};
+
+export type WinChanceModel = {
+  trainedAt: string;
+  games: number;
+  // The patches the training games came from, oldest first.
+  patches: string[];
+  features: string[];
+  // One weight per feature, in WIN_CHANCE_FEATURES order. There's no bias
+  // term, so an even game is exactly 50%, and swapping the sides gives the
+  // mirror answer.
+  weights: number[];
+  evaluation: Evaluation;
+  // The same check on just the newest patch's games, to spot a patch that
+  // changed how much leads are worth. Null when it's the only patch.
+  newestPatch: (Evaluation & { patch: string; games: number }) | null;
+};
+
+// Blue side's chance of winning (0 to 1) at one moment.
+export function blueWinChance(weights: readonly number[], features: number[]): number {
+  return sigmoid(dot(weights, features));
+}
+
+// Blue side's chance of winning at every saved minute of a game. Null when the
+// saved model was trained on a different feature list.
+export function winChanceCurve(
+  game: WinChanceGame,
+  model: WinChanceModel,
+): { t: number; blue: number }[] | null {
+  if (model.features.join() !== featureKeys().join()) return null;
+  return game.frames.map((frame) => ({
+    t: frame.t,
+    blue: frame.t > 0 ? blueWinChance(model.weights, winChanceFeatures(frame)) : 0.5,
+  }));
+}
+
+// Training: learns the weights on every example, and checks them with
+// cross-validation first. `games` is how many games the examples came from.
+export function trainWinChanceModel(
+  examples: Example[],
+  games: number,
+  trainedAt: Date,
+): WinChanceModel {
+  const patches = [...new Set(examples.map((e) => e.patch))].sort(comparePatches);
+  const newest = patches.at(-1);
+  const predictions = crossValidate(examples);
+  const onNewest = predictions.filter((p) => p.example.patch === newest);
+
+  return {
+    trainedAt: trainedAt.toISOString(),
+    games,
+    patches,
+    features: featureKeys(),
+    weights: fitLogistic(examples),
+    evaluation: evaluate(predictions),
+    newestPatch:
+      newest && patches.length > 1
+        ? {
+            patch: newest,
+            games: new Set(onNewest.map((p) => p.example.matchId)).size,
+            ...evaluate(onNewest),
+          }
+        : null,
+  };
+}
+
+type Prediction = { example: Example; blue: number };
+
+// Predicts every example with weights that never saw its game. The games
+// are split into five groups, and each group is predicted by weights
+// trained on the other four. All the minutes of one game stay in the same
+// group: minute 20 and minute 21 of a game look alike and share a result,
+// so splitting them up would let the model peek at the answer.
+export function crossValidate(examples: Example[], folds = 5): Prediction[] {
+  const ids = [...new Set(examples.map((e) => e.matchId))];
+  const fold = new Map(ids.map((id, i) => [id, i % folds]));
+  const predictions: Prediction[] = [];
+  for (let k = 0; k < folds; k++) {
+    const test = examples.filter((e) => fold.get(e.matchId) === k);
+    if (test.length === 0) continue;
+    const weights = fitLogistic(examples.filter((e) => fold.get(e.matchId) !== k));
+    for (const example of test) {
+      predictions.push({ example, blue: blueWinChance(weights, example.features) });
+    }
+  }
+  return predictions;
+}
+
+export const CHECK_MINUTES = [10, 15, 20, 25, 30];
+
+export function evaluate(predictions: Prediction[]): Evaluation {
+  let logLoss = 0;
+  let brier = 0;
+  for (const { example, blue } of predictions) {
+    const won = example.blueWin ? 1 : 0;
+    // Clamped so one 100%-sure miss can't make the total infinite.
+    const p = Math.min(1 - 1e-6, Math.max(1e-6, blue));
+    logLoss -= won * Math.log(p) + (1 - won) * Math.log(1 - p);
+    brier += (blue - won) ** 2;
+  }
+  const n = Math.max(1, predictions.length);
+
+  const goldIndex = WIN_CHANCE_FEATURES.findIndex((f) => f.key === "gold");
+  const byMinute = CHECK_MINUTES.map((minute) => {
+    // Frames land a few ms after each minute, so match on the rounded minute.
+    const at = predictions.filter((p) => Math.round(p.example.minute) === minute);
+    return {
+      minute,
+      examples: at.length,
+      accuracy: accuracyOf(at, (p) => p.blue),
+      goldRule: accuracyOf(at, (p) => 0.5 + Math.sign(p.example.features[goldIndex]) / 4),
+    };
+  });
+
+  const calibration = Array.from({ length: 10 }, (_, i) => {
+    const from = i / 10;
+    const to = (i + 1) / 10;
+    // The last group includes exactly 100%.
+    const inGroup = predictions.filter((p) => p.blue >= from && (p.blue < to || i === 9));
+    return {
+      from,
+      to,
+      examples: inGroup.length,
+      predicted: round(average(inGroup.map((p) => p.blue)), 3),
+      actual: round(average(inGroup.map((p) => (p.example.blueWin ? 1 : 0))), 3),
+    };
+  });
+
+  return {
+    examples: predictions.length,
+    accuracy: accuracyOf(predictions, (p) => p.blue),
+    logLoss: round(logLoss / n, 4),
+    brier: round(brier / n, 4),
+    byMinute,
+    calibration,
+  };
+}
+
+// How often `chance` favoured the team that went on to win. Exactly 50% is
+// a coin flip, so it counts as half right.
+function accuracyOf(predictions: Prediction[], chance: (p: Prediction) => number): number {
+  if (predictions.length === 0) return 0;
+  const right = predictions.reduce((total, p) => {
+    const c = chance(p);
+    return total + (c === 0.5 ? 0.5 : Number(c > 0.5 === p.example.blueWin));
+  }, 0);
+  return round(right / predictions.length, 3);
+}
+
+// Logistic regression by gradient descent, as in the game score (score.ts):
+// start with every weight at 0 (50% for everything) and repeatedly nudge
+// them so the predicted chances get closer to the real results. A weight
+// that goes the wrong way for a feature that `alwaysHelps` is put back to 0.
+//
+// The features have very different sizes (a gold lead of 3 vs a Baron buff
+// of 1), so each is first divided by its typical size, which lets one
+// learning rate suit them all. The weights are turned back into plain units
+// at the end, so the saved model reads "per 1,000 gold" and "per tower".
+export function fitLogistic(
+  examples: Example[],
+  { steps = 1000, rate = 0.5, l2 = 0.001 } = {},
+): number[] {
+  const width = WIN_CHANCE_FEATURES.length;
+  const weights: number[] = new Array(width).fill(0);
+  const n = examples.length;
+  if (n === 0) return weights;
+
+  // Root mean square instead of standard deviation: subtracting the mean
+  // would add a bias term and break "even game = 50%".
+  const scale = WIN_CHANCE_FEATURES.map((_, i) => {
+    const size = Math.sqrt(average(examples.map((e) => e.features[i] ** 2)));
+    return size > 0 ? size : 1;
+  });
+  const rows = examples.map((e) => ({
+    x: e.features.map((v, i) => v / scale[i]),
+    y: e.blueWin ? 1 : 0,
+  }));
+
+  for (let step = 0; step < steps; step++) {
+    const grad: number[] = new Array(width).fill(0);
+    for (const { x, y } of rows) {
+      const error = sigmoid(dot(weights, x)) - y;
+      for (let i = 0; i < width; i++) grad[i] += error * x[i];
+    }
+    for (let i = 0; i < width; i++) {
+      const next = weights[i] - rate * (grad[i] / n + l2 * weights[i]);
+      weights[i] = WIN_CHANCE_FEATURES[i].alwaysHelps ? Math.max(0, next) : next;
+    }
+  }
+  return weights.map((w, i) => round(w / scale[i], 4));
+}
+
+export function sigmoid(x: number): number {
+  return 1 / (1 + Math.exp(-x));
+}
+
+function featureKeys(): string[] {
+  return WIN_CHANCE_FEATURES.map((f) => f.key);
+}
+
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+const average = (xs: number[]) => (xs.length ? sum(xs) / xs.length : 0);
+const dot = (a: readonly number[], b: number[]) => a.reduce((total, x, i) => total + x * b[i], 0);
+const round = (x: number, digits: number) => Math.round(x * 10 ** digits) / 10 ** digits;

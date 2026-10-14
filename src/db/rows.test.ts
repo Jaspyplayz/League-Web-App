@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { match, participants } from "../lib/analyzer/test-fixtures";
-import { BENCHMARK_STATS_VERSION, benchmarkRow, matchRow, participantRows } from "./rows";
+import { BENCHMARK_STATS_VERSION, benchmarkRow, matchRow, participantRows, winChanceRow } from "./rows";
 
 describe("matchRow", () => {
   it("copies the match details and keeps the whole payload", () => {
@@ -110,6 +110,18 @@ describe("benchmarkRow", () => {
       enemyJungleKills: 12,
       scuttles: 2,
       statsVersion: BENCHMARK_STATS_VERSION,
+    });
+  });
+});
+
+describe("winChanceRow", () => {
+  it("keeps the patch and start time next to the game, for filtering and clean-up", () => {
+    const game = { matchId: "NA1_1", patch: "16.20", blueWin: true, frames: [] };
+    expect(winChanceRow(game, match())).toEqual({
+      matchId: "NA1_1",
+      patch: "16.20",
+      gameStartAt: new Date(1_700_000_000_000),
+      game,
     });
   });
 });

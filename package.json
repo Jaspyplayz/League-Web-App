@@ -16,7 +16,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "benchmarks": "tsx --conditions=react-server scripts/collect-benchmarks.ts",
-    "train-score": "tsx --conditions=react-server scripts/train-score.ts"
+    "train-score": "tsx --conditions=react-server scripts/train-score.ts",
+    "train-win-chance": "tsx --conditions=react-server scripts/train-win-chance.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^11.7.0",
