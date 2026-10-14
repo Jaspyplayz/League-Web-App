@@ -64,6 +64,13 @@
       "when": 1791993182044,
       "tag": "0008_match_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791993546470,
+      "tag": "0009_benchmark_more_stats",
+      "breakpoints": true
     }
   ]
 }

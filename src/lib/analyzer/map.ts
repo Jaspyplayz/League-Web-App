@@ -62,12 +62,25 @@ const MID_LANE_CORE = 1100;
 export function describeSpot(position: MapPosition, myTeamId: number): string {
   const area = mapArea(position);
   const { x, y } = position;
-  const blueHalf = x + y < MAP_SIZE;
-  const mine = blueHalf === (myTeamId === 100);
+  const mine = !onEnemyHalf(position, myTeamId);
   if (area === "base") return mine ? "your base" : "enemy base";
-  const inMidCore = Math.abs(x - y) < MID_LANE_CORE;
-  if (area === "top" || area === "bot" || (area === "mid" && inMidCore)) return `${area} lane`;
+  if (inLane(position)) return `${area} lane`;
   const side = y > x ? "top side" : "bot side";
   if (Math.abs(x + y - MAP_SIZE) < RIVER_HALF_WIDTH) return `river (${side})`;
   return mine ? `your ${side} jungle` : `enemy ${side} jungle`;
+}
+
+// True when a spot is in one of the three lanes, counting only the lane itself
+// for mid (see MID_LANE_CORE), so a kill at the raptors isn't "in mid lane".
+export function inLane(position: MapPosition): boolean {
+  const area = mapArea(position);
+  if (area === "top" || area === "bot") return true;
+  return area === "mid" && Math.abs(position.x - position.y) < MID_LANE_CORE;
+}
+
+// True when a spot is on the other team's half of the map, past the river's
+// center line (the diagonal from the top lane corner to the bot lane corner).
+export function onEnemyHalf({ x, y }: MapPosition, myTeamId: number): boolean {
+  const blueHalf = x + y < MAP_SIZE;
+  return blueHalf !== (myTeamId === 100);
 }

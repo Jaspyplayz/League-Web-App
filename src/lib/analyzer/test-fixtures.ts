@@ -2,6 +2,7 @@
 // these contain just the fields the analyzer reads.
 
 import type { Match, Participant } from "@/lib/riot/types";
+import type { GameTrend } from "./trends";
 import type { PlayerFrame, TrimmedEvent, TrimmedFrame } from "./trim";
 
 const ROLES = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
@@ -118,3 +119,17 @@ export const SPOTS = {
   botLane: { x: 10000, y: 1200 },
   jungle: { x: 4000, y: 8000 },
 };
+
+// The GameTrend stats added after the first ones, all left out, for tests
+// that build game summaries by hand.
+export const NO_EXTRA_STATS = {
+  xpAt15: null,
+  earlyTakedowns: null,
+  visionPerMin: null,
+  strongerSide: null,
+  enemyHalf: null,
+  gankTakedowns: null,
+  objectiveShare: null,
+  enemyJungleKills: null,
+  scuttles: null,
+} satisfies Partial<GameTrend>;

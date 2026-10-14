@@ -254,6 +254,19 @@ export const benchmarkGames = pgTable(
     csPerMinEarly: real("cs_per_min_early").notNull(),
     csPerMinMid: real("cs_per_min_mid"),
     csPerMinLate: real("cs_per_min_late"),
+    // Added in stats version 2 (see BENCHMARK_STATS_VERSION in rows.ts), so
+    // older rows have nulls here until the script refills them. Null also
+    // means the stat doesn't apply to the role, as in GameTrend.
+    xpAt15: integer("xp_at_15"),
+    earlyTakedowns: integer("early_takedowns"),
+    visionPerMin: real("vision_per_min"),
+    strongerSide: real("stronger_side"),
+    enemyHalf: real("enemy_half"),
+    gankTakedowns: integer("gank_takedowns"),
+    objectiveShare: real("objective_share"),
+    enemyJungleKills: integer("enemy_jungle_kills"),
+    scuttles: integer("scuttles"),
+    statsVersion: integer("stats_version").notNull().default(1),
     collectedAt: timestamptz("collected_at").notNull().defaultNow(),
   },
   (t) => [

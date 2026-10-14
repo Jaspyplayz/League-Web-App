@@ -83,6 +83,12 @@ export type Participant = {
   quadraKills?: number;
   pentaKills?: number;
   firstBloodKill?: boolean;
+  // A few of Riot's per-game "challenges" numbers, for the jungle stats on
+  // Insights. Optional because Riot leaves them out of some games.
+  challenges?: {
+    enemyJungleMonsterKills?: number; // monsters killed in the enemy jungle
+    scuttleCrabKills?: number;
+  };
 };
 
 // A player's rune page. Every number is a rune id from Data Dragon's

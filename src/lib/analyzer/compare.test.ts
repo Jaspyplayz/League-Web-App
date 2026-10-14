@@ -6,6 +6,7 @@ import {
   type BenchmarkGame,
 } from "./compare";
 import type { GameTrend } from "./trends";
+import { NO_EXTRA_STATS } from "./test-fixtures";
 
 function game(overrides: Partial<GameTrend> = {}): GameTrend {
   return {
@@ -19,6 +20,7 @@ function game(overrides: Partial<GameTrend> = {}): GameTrend {
     goldAt15: 0,
     earlyDeaths: [],
     csPerMin: { early: 5, mid: 5, late: null },
+    ...NO_EXTRA_STATS,
     ...overrides,
   };
 }
@@ -36,6 +38,7 @@ function bench(puuid: string, count: number, overrides: Partial<BenchmarkGame> =
     goldAt15: 0,
     earlyDeaths: [],
     csPerMin: { early: 5, mid: 5, late: null },
+    ...NO_EXTRA_STATS,
     ...overrides,
   }));
 }
@@ -155,6 +158,18 @@ describe("compareWithBenchmarks", () => {
       classOf,
     )!;
     expect(result.stats.map((s) => s.key)).not.toContain("goldAt15");
+  });
+
+  it("needs enough benchmark games with a stat, not just enough games", () => {
+    // 20 Lee Sin games, but only some were collected after XP at 15 was added.
+    const withXp = (n: number) => [
+      ...bench("lee", n, { xpAt15: 300 }),
+      ...bench("lee", 20 - n),
+    ];
+    const keys = (n: number) =>
+      compareWithBenchmarks([game({ xpAt15: 100 })], withXp(n), classOf)!.stats.map((s) => s.key);
+    expect(keys(MIN_BENCHMARK_GAMES - 1)).not.toContain("xpAt15");
+    expect(keys(MIN_BENCHMARK_GAMES)).toContain("xpAt15");
   });
 
   it("can compare with one player's few games on a champion", () => {

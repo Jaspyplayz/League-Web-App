@@ -43,6 +43,11 @@ export function participantRows(match: Match): (typeof matchParticipants.$inferI
   }));
 }
 
+// Which stats a benchmark row has. Bump it when GameTrend gains a stat, and
+// `npm run benchmarks` refetches the games saved with an older version.
+// Version 2 added XP at 15, early takedowns, vision and the jungle stats.
+export const BENCHMARK_STATS_VERSION = 2;
+
 export function benchmarkRow(
   game: GameTrend,
   puuid: string,
@@ -65,5 +70,15 @@ export function benchmarkRow(
     csPerMinEarly: game.csPerMin.early,
     csPerMinMid: game.csPerMin.mid,
     csPerMinLate: game.csPerMin.late,
+    xpAt15: game.xpAt15,
+    earlyTakedowns: game.earlyTakedowns,
+    visionPerMin: game.visionPerMin,
+    strongerSide: game.strongerSide,
+    enemyHalf: game.enemyHalf,
+    gankTakedowns: game.gankTakedowns,
+    objectiveShare: game.objectiveShare,
+    enemyJungleKills: game.enemyJungleKills,
+    scuttles: game.scuttles,
+    statsVersion: BENCHMARK_STATS_VERSION,
   };
 }

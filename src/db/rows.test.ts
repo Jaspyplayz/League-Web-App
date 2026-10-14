@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { match, participants } from "../lib/analyzer/test-fixtures";
-import { benchmarkRow, matchRow, participantRows } from "./rows";
+import { BENCHMARK_STATS_VERSION, benchmarkRow, matchRow, participantRows } from "./rows";
 
 describe("matchRow", () => {
   it("copies the match details and keeps the whole payload", () => {
@@ -70,6 +70,15 @@ describe("benchmarkRow", () => {
         goldAt15: null,
         earlyDeaths: ["caught"],
         csPerMin: { early: 6.1, mid: 6.8, late: null },
+        xpAt15: 420,
+        earlyTakedowns: 5,
+        visionPerMin: 0.9,
+        strongerSide: 0.6,
+        enemyHalf: 0.25,
+        gankTakedowns: 3,
+        objectiveShare: 0.5,
+        enemyJungleKills: 12,
+        scuttles: 2,
       },
       "puuid-1",
       "kr",
@@ -91,6 +100,16 @@ describe("benchmarkRow", () => {
       csPerMinEarly: 6.1,
       csPerMinMid: 6.8,
       csPerMinLate: null,
+      xpAt15: 420,
+      earlyTakedowns: 5,
+      visionPerMin: 0.9,
+      strongerSide: 0.6,
+      enemyHalf: 0.25,
+      gankTakedowns: 3,
+      objectiveShare: 0.5,
+      enemyJungleKills: 12,
+      scuttles: 2,
+      statsVersion: BENCHMARK_STATS_VERSION,
     });
   });
 });

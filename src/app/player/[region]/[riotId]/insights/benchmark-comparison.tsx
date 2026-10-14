@@ -13,15 +13,34 @@ import { tierName, type Tier } from "@/lib/tiers";
 
 const card = "rounded-[14px] border border-line-strong bg-surface";
 
-// How each stat is labeled and shown. Leads are signed ("+250"); rates and
-// counts are plain numbers. For deaths, fewer is better.
-const STAT_ROWS: Record<StatKey, { label: string; format: (v: number) => string; lowerIsBetter?: boolean }> = {
+// How each stat is labeled and shown. Leads are signed ("+250"), shares are
+// percentages, and rates and counts are plain numbers. For deaths, fewer is
+// better. Time in the enemy half is neither good nor bad on its own (invading
+// at the wrong time gets you killed), so it isn't colored.
+type StatRowStyle = {
+  label: string;
+  format: (v: number) => string;
+  lowerIsBetter?: boolean;
+  neutral?: boolean;
+};
+const oneDecimal = (v: number) => v.toFixed(1);
+const percent = (v: number) => `${Math.round(v * 100)}%`;
+const STAT_ROWS: Record<StatKey, StatRowStyle> = {
   goldAt10: { label: "Gold lead at 10", format: formatSigned },
   goldAt15: { label: "Gold lead at 15", format: formatSigned },
   csAt10: { label: "CS lead at 10", format: formatSigned },
-  csPerMinEarly: { label: "CS/min, 0 to 10", format: (v) => v.toFixed(1) },
-  csPerMinMid: { label: "CS/min, 10 to 20", format: (v) => v.toFixed(1) },
-  earlyDeaths: { label: "Deaths before 14:00", format: (v) => v.toFixed(1), lowerIsBetter: true },
+  csPerMinEarly: { label: "CS/min, 0 to 10", format: oneDecimal },
+  csPerMinMid: { label: "CS/min, 10 to 20", format: oneDecimal },
+  earlyDeaths: { label: "Deaths before 14:00", format: oneDecimal, lowerIsBetter: true },
+  xpAt15: { label: "XP lead at 15", format: formatSigned },
+  earlyTakedowns: { label: "Kills + assists before 14:00", format: oneDecimal },
+  visionPerMin: { label: "Vision score per minute", format: (v) => v.toFixed(2) },
+  strongerSide: { label: "Minutes on the stronger side, 3 to 15", format: percent },
+  enemyHalf: { label: "Minutes in the enemy half, 3 to 15", format: percent, neutral: true },
+  gankTakedowns: { label: "Kills + assists in lanes before 14:00", format: oneDecimal },
+  objectiveShare: { label: "Dragons, grubs and Heralds your team took", format: percent },
+  enemyJungleKills: { label: "Enemy jungle monsters killed", format: oneDecimal },
+  scuttles: { label: "Scuttle crabs", format: oneDecimal },
 };
 
 // Who your games are compared with: players of one rank on KR, EUW and NA
@@ -83,15 +102,18 @@ export function BenchmarkComparison({
         {against.kind === "tier"
           ? `Leads are against each player's own lane opponent, so a ${them} player's lead is over another ${them} player.`
           : `${against.name}'s leads are against their own lane opponents, at their own rank.`}{" "}
-        Support games are left out of CS.
+        Support games are left out of CS. The map stats use jungle and support games, the other
+        jungle stats only jungle games. &ldquo;Stronger side&rdquo; means the side whose lane was
+        at least 500 gold better off than the other side&apos;s.
       </p>
     </div>
   );
 }
 
 function StatRow({ stat }: { stat: StatComparison }) {
-  const { label, format, lowerIsBetter } = STAT_ROWS[stat.key];
+  const { label, format, lowerIsBetter, neutral } = STAT_ROWS[stat.key];
   const better = lowerIsBetter ? stat.you <= stat.them : stat.you >= stat.them;
+  const tone = neutral ? "text-ink" : better ? "text-ahead" : "text-behind";
   return (
     <tr className="border-t border-line">
       <th scope="row" className="px-5 py-3 font-normal text-ink-soft">
@@ -100,7 +122,7 @@ function StatRow({ stat }: { stat: StatComparison }) {
           {plural(stat.games, "game")}
         </span>
       </th>
-      <td className={`px-5 py-3 text-right font-mono ${better ? "text-ahead" : "text-behind"}`}>
+      <td className={`px-5 py-3 text-right font-mono ${tone}`}>
         {format(stat.you)}
       </td>
       <td className="px-5 py-3 text-right font-mono text-muted">{format(stat.them)}</td>
