@@ -6,7 +6,7 @@ Images for the main [README](../../README.md).
 
 | File | What it shows | Where it goes in the README |
 |---|---|---|
-| `hero.png` | A match page: the Win chance panel with its biggest swings, and the lead chart below. Pick a game with a clear comeback or throw. | Top of the README |
+| `hero.png` | A match page, scrolled to the Win chance panel (below the lead chart, above Team gold) with its biggest swings beside it. Pick a game with a clear comeback or throw. | Top of the README |
 | `match-panel.png` | A profile with one match row expanded on its Overview tab, game scores and badges showing | Every game at a glance |
 | `team-analysis.png` | The same expanded row on the Team analysis tab | Every game at a glance |
 | `profile.png` | The top of a profile: rank emblem, LP graph, win-rate ring and the first few matches | Player profile |

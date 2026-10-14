@@ -7,7 +7,7 @@
 
 **Live site:** https://league-web-app.vercel.app
 
-![Match page: your team's win chance at every minute with its biggest swings, above the gold lead against the enemy in your role](docs/screenshots/hero.png)
+![Match page: your team's win chance at every minute, with the three biggest swings and what caused them](docs/screenshots/hero.png)
 
 ## Why Turnpoint
 
