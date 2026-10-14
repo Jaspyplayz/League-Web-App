@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameTrend } from "@/lib/analyzer/trends";
-import { championsPlayed, readFilters } from "./insights-filters";
+import { championsPlayed, pickTier, readFilters } from "./insights-filters";
 
 describe("readFilters", () => {
   it("reads the game window and champion", () => {
@@ -22,5 +22,20 @@ describe("championsPlayed", () => {
       { championName: "Ahri", games: 1 },
       { championName: "Elise", games: 1 },
     ]);
+  });
+});
+
+describe("pickTier", () => {
+  it("uses the rank in the URL when it has games", () => {
+    expect(pickTier("diamond", ["GOLD", "DIAMOND", "CHALLENGER"])).toBe("DIAMOND");
+  });
+
+  it("falls back to the highest rank with games", () => {
+    expect(pickTier(undefined, ["GOLD", "CHALLENGER"])).toBe("CHALLENGER");
+    expect(pickTier("iron", ["GOLD", "DIAMOND"])).toBe("DIAMOND");
+  });
+
+  it("is null before any benchmarks are collected", () => {
+    expect(pickTier("gold", [])).toBeNull();
   });
 });

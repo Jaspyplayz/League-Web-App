@@ -48,7 +48,7 @@ The analyzer is the core of the project. The full research and design is in [doc
 4. **Find turning points.** Slide a window over the gold curve, keep the biggest swings, and explain each one from the events inside that window (deaths, ganks, tower plates, objectives).
 5. **Roll it up.** Across your recent games, apply simple, tested rules like "behind at 10 minutes in most games" to surface recurring weaknesses.
 
-**Why compare to the opponent in your role?** Riot's API has no "average Gold-rank player" benchmark, and building one would mean crawling thousands of games. The enemy in your role is at roughly the same rank, on the same patch, in the same game. It's also how pro analysts talk about laning.
+**Why compare to the opponent in your role?** Riot's API has no ready-made "average Gold-rank player" numbers. The enemy in your role is at roughly the same rank, on the same patch, in the same game. It's also how pro analysts talk about laning. For a wider view, Insights also compares you with players sampled from any rank, Iron to Challenger, which a script collects through Riot's league endpoints (`npm run benchmarks`).
 
 ## Tech stack
 

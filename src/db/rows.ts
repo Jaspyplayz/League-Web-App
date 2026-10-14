@@ -6,6 +6,7 @@ import type { GameTrend } from "../lib/analyzer/trends";
 import { gameDurationSeconds } from "../lib/match-summary";
 import type { Region } from "../lib/regions";
 import type { Match } from "../lib/riot/types";
+import type { Tier } from "../lib/tiers";
 import type { benchmarkGames, matches, matchParticipants } from "./schema";
 
 export function matchRow(match: Match): typeof matches.$inferInsert {
@@ -46,11 +47,13 @@ export function benchmarkRow(
   game: GameTrend,
   puuid: string,
   region: Region,
+  tier: Tier,
 ): typeof benchmarkGames.$inferInsert {
   return {
     matchId: game.matchId,
     puuid,
     region,
+    tier,
     gameStartAt: new Date(game.startedAt),
     championName: game.championName,
     position: game.position,

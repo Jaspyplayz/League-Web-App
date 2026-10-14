@@ -21,12 +21,19 @@ export type LeagueEntry = {
   leaguePoints: number;
   wins: number;
   losses: number;
+  inactive?: boolean; // hasn't played in a while
 };
 
-// league-v4's Challenger list for one queue. Entries carry the PUUID, so no
+// league-v4's Master, Grandmaster or Challenger ladder for one queue. Entries carry the PUUID, so no
 // account lookup is needed to fetch their games.
 export type LeagueList = {
-  entries: { puuid: string; leaguePoints: number; wins: number; losses: number }[];
+  entries: {
+    puuid: string;
+    leaguePoints: number;
+    wins: number;
+    losses: number;
+    inactive?: boolean;
+  }[];
 };
 
 export type Participant = {

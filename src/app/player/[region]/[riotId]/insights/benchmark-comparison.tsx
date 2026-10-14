@@ -9,6 +9,7 @@ import type {
 import { formatSigned, plural } from "@/lib/analyzer/format";
 import { championClass, championName, type DataDragon } from "@/lib/ddragon";
 import { positionName } from "@/lib/match-summary";
+import { tierName, type Tier } from "@/lib/tiers";
 
 const card = "rounded-[14px] border border-line-strong bg-surface";
 
@@ -23,9 +24,9 @@ const STAT_ROWS: Record<StatKey, { label: string; format: (v: number) => string;
   earlyDeaths: { label: "Deaths before 14:00", format: (v) => v.toFixed(1), lowerIsBetter: true },
 };
 
-// Who your games are compared with: Challenger players on KR, EUW and NA, or
-// one player you picked (see compare-with-player.tsx).
-export type Against = { kind: "challenger" } | { kind: "player"; name: string; href: string };
+// Who your games are compared with: players of one rank on KR, EUW and NA
+// (see tier-comparison.tsx), or one player you picked (compare-with-player.tsx).
+export type Against = { kind: "tier"; tier: Tier } | { kind: "player"; name: string; href: string };
 
 // "You vs the top of solo queue": your averages next to theirs, matched
 // champion by champion (see src/lib/analyzer/compare.ts).
@@ -38,12 +39,12 @@ export function BenchmarkComparison({
   against: Against;
   dd: DataDragon | null;
 }) {
-  const them = against.kind === "challenger" ? "Challenger" : against.name;
+  const them = against.kind === "tier" ? tierName(against.tier) : against.name;
   return (
     <div className="flex flex-col gap-3.5">
       <p className="text-[15px] text-muted">
-        {against.kind === "challenger" ? (
-          "Each of your games is compared with Challenger players on KR, EUW and NA, using one-tricks on your champion when there are enough of their games."
+        {against.kind === "tier" ? (
+          `Each of your games is compared with ${them} players on KR, EUW and NA, using one-tricks on your champion when there are enough of their games.`
         ) : (
           <>
             Each of your games is compared with{" "}
@@ -79,8 +80,8 @@ export function BenchmarkComparison({
       </div>
       <ChampionList champions={comparison.champions} against={against} dd={dd} />
       <p className="text-[13px] text-faint">
-        {against.kind === "challenger"
-          ? "Leads are against each player's own lane opponent, so a Challenger player's lead is over another Challenger player."
+        {against.kind === "tier"
+          ? `Leads are against each player's own lane opponent, so a ${them} player's lead is over another ${them} player.`
           : `${against.name}'s leads are against their own lane opponents, at their own rank.`}{" "}
         Support games are left out of CS.
       </p>
@@ -151,7 +152,7 @@ function ChampionList({
   );
 }
 
-// "vs 3 Lee Sin one-tricks (45 games)", "vs Challenger Fighters in Jungle (80 games)",
+// "vs 3 Lee Sin one-tricks (45 games)", "vs Gold Fighters in Jungle (80 games)",
 // "vs Faker on Ahri (6 games)".
 function comparedWith(c: ChampionComparison, against: Against, dd: DataDragon | null): string {
   const name = championName(dd, c.championName);
@@ -173,16 +174,17 @@ function comparedWith(c: ChampionComparison, against: Against, dd: DataDragon | 
         return `Not compared: ${them} has too few recent ${role} games`;
     }
   }
+  const rank = tierName(against.tier);
   switch (c.level) {
     case "one-trick":
-      return `vs ${plural(c.sample.players, `${name} one-trick`)} ${games}`;
+      return `vs ${plural(c.sample.players, `${rank} ${name} one-trick`)} ${games}`;
     case "champion":
-      return `vs Challenger ${name} players ${games}`;
+      return `vs ${rank} ${name} players ${games}`;
     case "class":
-      return `vs Challenger ${champClass}s in ${role} ${games}`;
+      return `vs ${rank} ${champClass}s in ${role} ${games}`;
     case "role":
-      return `vs all Challenger ${role} players ${games}`;
+      return `vs all ${rank} ${role} players ${games}`;
     case null:
-      return "Not compared: too few Challenger games in this role yet";
+      return `Not compared: too few ${rank} games in this role yet`;
   }
 }

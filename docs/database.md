@@ -12,7 +12,7 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `match_participants` | player × game (the scoreboard) | never (filled from `matches.raw`) |
 | `match_timelines` | game, trimmed timeline | never, fetched only when the match is opened |
 | `match_insights` | player × game, analyzer output | never; recomputed locally when `version` changes |
-| `benchmark_games` | Challenger player × game, summary only | filled by `npm run benchmarks`; keeps each player's last 20, deletes games older than 60 days |
+| `benchmark_games` | Sampled player (Iron to Challenger) × game, summary only, with the player's tier | filled by `npm run benchmarks`; keeps each player's last 20, deletes games older than 60 days |
 
 The schema lives in [`src/db/schema.ts`](../src/db/schema.ts), with a comment on every column that isn't obvious. The refresh rules live in [`src/db/freshness.ts`](../src/db/freshness.ts).
 
@@ -98,14 +98,16 @@ Pages don't call Riot for cached data directly; they go through a thin layer tha
 
 ## Benchmark games
 
-`benchmark_games` holds the games Insights compares you with: recent ranked solo games from the top Challenger players on KR, EUW and NA. Nothing on the site writes to it. `npm run benchmarks` ([`scripts/collect-benchmarks.ts`](../scripts/collect-benchmarks.ts)) fills it, using the `RIOT_API_KEY` and `DATABASE_URL` in `.env.local`:
+`benchmark_games` holds the games Insights compares you with: recent ranked solo games from players sampled from every rank, Iron to Challenger, on KR, EUW and NA. Each row records the player's tier, and Insights' "You vs [rank]" menu shows one tier at a time. Nothing on the site writes to it. `npm run benchmarks` ([`scripts/collect-benchmarks.ts`](../scripts/collect-benchmarks.ts)) fills it, using the `RIOT_API_KEY` and `DATABASE_URL` in `.env.local`:
 
 ```sh
-npm run benchmarks                               # KR, EUW and NA, top 30 players each
-npm run benchmarks -- --regions kr --players 5   # a quick test
+npm run benchmarks                                          # every tier, KR, EUW and NA, 10 players per tier
+npm run benchmarks -- --tiers gold,diamond                  # just some tiers
+npm run benchmarks -- --regions na --tiers gold --players 2 # a quick test
 ```
 
-- Each row is the small per-game summary from `summarizeGame`, the same one Insights makes of your games. The match and timeline aren't stored. Each player keeps only their last 20 ranked games, so the table holds at most about 1,800 rows per run (3 servers × 30 players × 20 games), plus older players' games until they pass 60 days.
-- The script stays under 70 Riot calls per 2 minutes per server, leaving the live site part of the key's allowance. A first full run takes roughly half an hour. Later runs skip games already saved, and a stopped run loses nothing.
+- Players come from Riot's league endpoints. Iron to Diamond have four divisions, so a quarter of each tier's players come from page 1 of each division. Master, Grandmaster and Challenger are one ladder each. Within a ladder or division, players are spread from the top LP to the bottom (`samplePlayers` in `src/lib/analyzer/benchmarks.ts`), skipping anyone with fewer than 20 ranked games this season.
+- Each row is the small per-game summary from `summarizeGame`, the same one Insights makes of your games. The match and timeline aren't stored. Each player keeps only their last 20 ranked games, so a full run holds about 6,000 rows (3 servers × 10 tiers × 10 players × 20 games), plus older players' games until they pass 60 days.
+- The script stays under 70 Riot calls per 2 minutes per server, leaving the live site part of the key's allowance. A first full run takes about 2 hours (the three servers run side by side). Later runs skip games already saved, and a stopped run loses nothing, so it's fine to run a few tiers at a time with `--tiers`.
 - One-tricks aren't stored. They're worked out from the rows (`findOneTricks` in `src/lib/analyzer/benchmarks.ts`): someone with at least 60% of their last 20 games on one champion.
 - PUUIDs are tied to the Riot app that issued the key. When Turnpoint switches to a production key, empty this table (`delete from benchmark_games`) and run the script again.

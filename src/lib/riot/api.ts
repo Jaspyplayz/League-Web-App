@@ -2,6 +2,7 @@ import "server-only";
 
 import { accountRegional, REGIONS, type Region } from "@/lib/regions";
 import type { RiotId } from "@/lib/riot-id";
+import type { ApexTier, Division, Tier } from "@/lib/tiers";
 import { RiotApiError, riotGet } from "./client";
 import type { Account, LeagueEntry, LeagueList, Match, Summoner, Timeline } from "./types";
 
@@ -49,12 +50,26 @@ export function getMatchIds(region: Region, puuid: string, count: number, queue?
   );
 }
 
-// The Challenger tier of ranked solo/duo on one server: its top ~300 players
-// (200 on smaller servers).
-export function getChallengerLeague(region: Region) {
+// The whole Master, Grandmaster or Challenger ladder of ranked solo/duo on
+// one server. Challenger is the top ~300 players (200 on smaller servers).
+export function getApexLeague(region: Region, tier: ApexTier) {
   return riotGet<LeagueList>(
     REGIONS[region].platform,
-    "/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5",
+    `/lol/league/v4/${tier.toLowerCase()}leagues/by-queue/RANKED_SOLO_5x5`,
+  );
+}
+
+// One page (about 200 players) of a ranked solo/duo division below Master,
+// such as Gold II.
+export function getLeagueEntries(
+  region: Region,
+  tier: Exclude<Tier, ApexTier>,
+  division: Division,
+  page = 1,
+) {
+  return riotGet<(LeagueEntry & { puuid: string })[]>(
+    REGIONS[region].platform,
+    `/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`,
   );
 }
 

@@ -1,8 +1,10 @@
 import type { GameTrend } from "@/lib/analyzer/trends";
+import type { Tier } from "@/lib/tiers";
 
-// The filters at the top of Insights: how many recent games to look at, and
-// optionally just one champion. They live in the URL
-// (?games=50&champion=Ahri), so a filtered page can be shared or reloaded.
+// The filters on Insights: how many recent games to look at, optionally just
+// one champion, and which rank to compare with. They live in the URL
+// (?games=50&champion=Ahri&tier=diamond), so a filtered page can be shared or
+// reloaded.
 
 // Riot returns at most 100 match IDs per request, so 100 is the biggest
 // window one request can cover. A bigger one would also take many minutes to
@@ -30,4 +32,14 @@ export function championsPlayed(games: GameTrend[]): { championName: string; gam
   return [...counts]
     .map(([championName, played]) => ({ championName, games: played.length }))
     .sort((a, b) => b.games - a.games || a.championName.localeCompare(b.championName));
+}
+
+// The rank to compare with: the one asked for in the URL (?tier=diamond) if
+// it has benchmark games, otherwise the highest rank that does. Null when
+// `npm run benchmarks` hasn't collected anything yet. `available` is lowest
+// first, as loadBenchmarkTiers returns it.
+export function pickTier(requested: string | string[] | undefined, available: Tier[]): Tier | null {
+  const asked = typeof requested === "string" ? requested.toUpperCase() : "";
+  const match = available.find((t) => t === asked);
+  return match ?? available.at(-1) ?? null;
 }

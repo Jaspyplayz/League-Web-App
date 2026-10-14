@@ -181,10 +181,11 @@ export const matchInsights = pgTable(
   ],
 ).enableRLS();
 
-// Benchmark games: one row per game from a top solo queue player (Challenger
-// on KR, EUW or NA), collected by `npm run benchmarks`. Insights compares your
-// games with these. Only the small per-game summary from summarizeGame is
-// kept, not the match or timeline, so thousands of games stay a few MB.
+// Benchmark games: one row per game from a sampled solo queue player of some
+// rank (Iron to Challenger, on KR, EUW or NA), collected by
+// `npm run benchmarks`. Insights compares your games with these. Only the
+// small per-game summary from summarizeGame is kept, not the match or
+// timeline, so thousands of games stay a few MB.
 //
 // PUUIDs are tied to the Riot API key's app. If Turnpoint moves to a new key
 // (a production key), delete every row here and collect again.
@@ -195,6 +196,9 @@ export const benchmarkGames = pgTable(
     puuid: text("puuid").notNull(),
     // Our region key from src/lib/regions.ts: "kr", "euw" or "na".
     region: text("region").notNull(),
+    // The player's ranked tier when collected, as in src/lib/tiers.ts. Rows
+    // from before tiers were added were all Challenger.
+    tier: text("tier").notNull().default("CHALLENGER"),
     gameStartAt: timestamptz("game_start_at").notNull(),
     championName: text("champion_name").notNull(),
     // "TOP", "JUNGLE", "MIDDLE", "BOTTOM" or "UTILITY".
@@ -213,8 +217,8 @@ export const benchmarkGames = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.matchId, t.puuid] }),
-    // Insights looks benchmarks up by role, then champion.
-    index("benchmark_games_position_idx").on(t.position, t.championName),
+    // Insights loads one tier's games at a time.
+    index("benchmark_games_tier_idx").on(t.tier),
     index("benchmark_games_puuid_idx").on(t.puuid),
   ],
 ).enableRLS();

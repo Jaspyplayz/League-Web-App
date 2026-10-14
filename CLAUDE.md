@@ -30,7 +30,7 @@ src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (rate limits, retries) and one function per endpoint
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
                   trends.ts rolls games up into the Insights page, and compare.ts
-                  sets them against Challenger games or one chosen player's
+                  sets them against one rank's games or one chosen player's
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
@@ -50,7 +50,7 @@ docs/             Design and research docs
 | `npm test` | Vitest unit tests |
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
-| `npm run benchmarks` | Collect Challenger games for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
+| `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.**
 

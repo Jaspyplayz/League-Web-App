@@ -1,21 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { findOneTricks, oneTrickChampion, topPlayers } from "./benchmarks";
+import { findOneTricks, oneTrickChampion, samplePlayers } from "./benchmarks";
 
 // `count` games on `championName`, one a minute apart starting at `from`.
 function games(championName: string, count: number, from = 0) {
   return Array.from({ length: count }, (_, i) => ({ championName, startedAt: from + i * 60_000 }));
 }
 
-describe("topPlayers", () => {
-  it("picks the highest LP first", () => {
-    const league = {
-      entries: [
-        { puuid: "a", leaguePoints: 900, wins: 1, losses: 1 },
-        { puuid: "b", leaguePoints: 1500, wins: 1, losses: 1 },
-        { puuid: "c", leaguePoints: 1200, wins: 1, losses: 1 },
-      ],
-    };
-    expect(topPlayers(league, 2)).toEqual(["b", "c"]);
+describe("samplePlayers", () => {
+  const player = (puuid: string, leaguePoints: number, extra = {}) => ({
+    puuid,
+    leaguePoints,
+    wins: 15,
+    losses: 15,
+    ...extra,
+  });
+
+  it("spreads the picks from the top of the ladder to the bottom", () => {
+    const ladder = [100, 900, 500, 300, 700, 800, 200, 600].map((lp) => player(`p${lp}`, lp));
+    // Sorted by LP: 900, 800, 700, 600, 500, 300, 200, 100; every second one.
+    expect(samplePlayers(ladder, 4)).toEqual(["p900", "p700", "p500", "p200"]);
+  });
+
+  it("skips players without enough recent games", () => {
+    const ladder = [
+      player("new", 900, { wins: 5, losses: 4 }),
+      player("away", 800, { inactive: true }),
+      player("regular", 700),
+    ];
+    expect(samplePlayers(ladder, 3)).toEqual(["regular"]);
   });
 });
 

@@ -73,11 +73,13 @@ describe("benchmarkRow", () => {
       },
       "puuid-1",
       "kr",
+      "DIAMOND",
     );
     expect(row).toEqual({
       matchId: "KR_1",
       puuid: "puuid-1",
       region: "kr",
+      tier: "DIAMOND",
       gameStartAt: new Date(1_700_000_000_000),
       championName: "LeeSin",
       position: "JUNGLE",
