@@ -1,4 +1,5 @@
 import { ProfileIcon } from "@/components/game-icons";
+import { PinButton } from "@/components/saved-players";
 import { secondsUntilUpdate } from "@/db/freshness";
 import { getDataDragon } from "@/lib/ddragon";
 import { findQueue, formatTier, timeAgo, winRate } from "@/lib/match-summary";
@@ -28,10 +29,13 @@ export async function ProfileHeader({ region, puuid, gameName, tagLine, profile 
             name={gameName}
           />
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-semibold">
-              {gameName}
-              <span className="text-zinc-500">#{tagLine}</span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-semibold">
+                {gameName}
+                <span className="text-zinc-500">#{tagLine}</span>
+              </h1>
+              <PinButton region={region} gameName={gameName} tagLine={tagLine} />
+            </div>
             <p className="text-zinc-600 dark:text-zinc-400">
               {REGIONS[region].label}
               {profile.summonerLevel !== null && ` · Level ${profile.summonerLevel}`}

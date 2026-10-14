@@ -49,6 +49,10 @@ export default function PrivacyPage() {
         next to their name, or the whole list with the Clear button.
       </p>
       <p>
+        Players you pin with the star on their profile are saved the same way, so they stay on
+        the home page until you unpin them.
+      </p>
+      <p>
         If you pick a focus goal on the Insights tab, Turnpoint saves which weakness you
         picked, for which player, and when, in the same local storage. It also stays on your
         device. Remove it with the Stop focusing button.
