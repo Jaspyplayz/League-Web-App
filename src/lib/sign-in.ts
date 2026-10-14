@@ -29,20 +29,29 @@ export function safeNextPath(next: string | null | undefined): string {
   return url.origin === HOME ? `${url.pathname}${url.search}${url.hash}` : "/";
 }
 
-// The parts of a signed-in user the header shows. Google and Discord fill in
-// slightly different profile fields, so fall back from one to the next.
+// The parts of a signed-in user the site uses. Google and Discord fill in
+// slightly different profile fields, so the name falls back from one to the
+// next.
 export type SignedInUser = {
+  // Supabase's ID for the account (a UUID). It never changes, so rows the
+  // account owns, like its "This is me" player, are keyed by it.
+  id: string;
   name: string;
   provider: Provider | null;
 };
 
 type Claims = {
+  sub?: unknown;
   email?: unknown;
   user_metadata?: Record<string, unknown>;
   app_metadata?: Record<string, unknown>;
 };
 
-export function userFromClaims(claims: Claims): SignedInUser {
+// Null when the token has no account ID, which a real Supabase token always
+// has; treating that as signed out is safer than guessing.
+export function userFromClaims(claims: Claims): SignedInUser | null {
+  if (typeof claims.sub !== "string" || claims.sub === "") return null;
+
   const meta = claims.user_metadata ?? {};
   const name = [meta.full_name, meta.name, meta.user_name, claims.email].find(
     (value): value is string => typeof value === "string" && value.trim() !== "",
@@ -50,6 +59,7 @@ export function userFromClaims(claims: Claims): SignedInUser {
   const provider = String(claims.app_metadata?.provider ?? "");
 
   return {
+    id: claims.sub,
     name: name?.trim() ?? "Player",
     provider: isProvider(provider) ? provider : null,
   };

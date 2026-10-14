@@ -2,11 +2,15 @@
 
 Players can sign in with **Google** or **Discord**. Signing in with Riot comes later, once Riot approves a production key ([issue #40](https://github.com/Jaspyplayz/League-Web-App/issues/40)).
 
-Accounts are minimal for now: signing in shows your name in the header and nothing else depends on it yet. Focus goals and recent players still live in the browser.
+What an account does today:
+
+- **This is me**: a button next to a player's name marks that profile as yours, and the header gets a **My profile** link to it. It's saved in the `user_players` table, one player per account. It isn't checked with Riot, so anyone could pick any player, but only they see the result. Riot sign-in could verify it later.
+
+Focus goals and recent players still live in the browser.
 
 ## How it works
 
-Turnpoint uses [Supabase Auth](https://supabase.com/docs/guides/auth), which runs on the same Supabase project as the database. Users live in Supabase's own `auth.users` table, so there's no migration or Drizzle table for them.
+Turnpoint uses [Supabase Auth](https://supabase.com/docs/guides/auth), which runs on the same Supabase project as the database. Users live in Supabase's own `auth.users` table, so there's no migration or Drizzle table for them. Tables for things an account owns, like `user_players`, use the user's ID (`auth.users.id`, the token's `sub`) as a foreign key with `ON DELETE CASCADE`, so deleting an account in the Supabase dashboard deletes its data too.
 
 Signing in uses **OAuth**, the "Continue with Google" flow most sites use:
 

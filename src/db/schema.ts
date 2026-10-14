@@ -20,7 +20,9 @@ import {
   smallint,
   text,
   timestamp,
+  uuid,
 } from "drizzle-orm/pg-core";
+import { authUsers } from "drizzle-orm/supabase";
 
 const timestamptz = (name: string) =>
   timestamp(name, { withTimezone: true, mode: "date" });
@@ -252,4 +254,22 @@ export const scoreGames = pgTable("score_games", {
   // A ScoreGame: { matchId, durationS, players: ScorePlayer[] }.
   game: jsonb("game").notNull(),
   collectedAt: timestamptz("collected_at").notNull().defaultNow(),
+}).enableRLS();
+
+// Which player each signed-in account picked with "This is me" on a profile,
+// so the header can link back to it. At most one per account. It isn't
+// checked with Riot (anyone could pick any player), which is fine because
+// only that account ever sees it; Riot sign-in (issue #40) could verify it.
+export const userPlayers = pgTable("user_players", {
+  // The account in Supabase Auth's own auth.users table. Deleting the
+  // account deletes this row with it.
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => authUsers.id, { onDelete: "cascade" }),
+  // The player's name and region come from the players row, so the link
+  // follows them if they change their Riot ID.
+  puuid: text("puuid")
+    .notNull()
+    .references(() => players.puuid, { onDelete: "cascade" }),
+  linkedAt: timestamptz("linked_at").notNull().defaultNow(),
 }).enableRLS();
