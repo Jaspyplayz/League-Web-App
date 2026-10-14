@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RememberPlayer } from "@/components/recent-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { loadProfile } from "@/lib/profile-store";
 import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
@@ -28,8 +29,9 @@ export default function PlayerPage({ params }: { params: Params }) {
 }
 
 // Finds the account first, because every other request needs its PUUID. Then
-// the header and the match list load side by side, each in its own Suspense
-// boundary, so the header can show while the slower match list is loading.
+// the profile (rank and the latest match IDs), which comes from the saved
+// snapshot when there is one; see src/lib/profile-store.ts. The match list
+// loads in its own Suspense boundary, so the header shows while it's loading.
 async function Player({ params }: { params: Params }) {
   const { region, riotId } = await params;
   const id = fromSlug(riotId);
@@ -45,17 +47,36 @@ async function Player({ params }: { params: Params }) {
 
   const { puuid, gameName, tagLine } = account.value;
   const playerPath = `/player/${region}/${toSlug(account.value)}`;
+  const profile = await settle(loadProfile(region, account.value));
   return (
     <>
       {/* Uses the spelling Riot returns, so "faker-kr1" is saved as "Faker#KR1". */}
       <RememberPlayer region={region} gameName={gameName} tagLine={tagLine} />
-      <Suspense fallback={<HeaderPlaceholder gameName={gameName} tagLine={tagLine} />}>
-        <ProfileHeader region={region} puuid={puuid} gameName={gameName} tagLine={tagLine} />
-      </Suspense>
-      <ProfileTabs playerPath={playerPath} current="matches" />
-      <Suspense fallback={<p className="text-zinc-500">Loading recent matches…</p>}>
-        <RecentMatches region={region} puuid={puuid} playerPath={playerPath} />
-      </Suspense>
+      {profile.ok ? (
+        <>
+          <ProfileHeader
+            region={region}
+            puuid={puuid}
+            gameName={gameName}
+            tagLine={tagLine}
+            profile={profile.value}
+          />
+          <ProfileTabs playerPath={playerPath} current="matches" />
+          <Suspense fallback={<p className="text-zinc-500">Loading recent matches…</p>}>
+            <RecentMatches
+              region={region}
+              puuid={puuid}
+              matchIds={profile.value.matchIds}
+              playerPath={playerPath}
+            />
+          </Suspense>
+        </>
+      ) : (
+        <>
+          <PlayerName gameName={gameName} tagLine={tagLine} />
+          <RiotErrorNotice error={profile.error} />
+        </>
+      )}
     </>
   );
 }
@@ -72,7 +93,7 @@ function PlayerNotFound({ region, id }: { region: Region; id: RiotId }) {
   );
 }
 
-function HeaderPlaceholder({ gameName, tagLine }: { gameName: string; tagLine: string }) {
+function PlayerName({ gameName, tagLine }: { gameName: string; tagLine: string }) {
   return (
     <h1 className="text-3xl font-semibold">
       {gameName}

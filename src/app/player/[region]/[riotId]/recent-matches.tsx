@@ -8,27 +8,26 @@ import {
   topChampions,
   type MatchSummary,
 } from "@/lib/match-summary";
+import { loadMatches } from "@/lib/match-store";
 import type { Region } from "@/lib/regions";
-import { getRecentMatches } from "@/lib/riot/api";
-import { settle } from "@/lib/riot/client";
 
-// Each match is one API call, so this is the main cost of a page view:
-// 4 calls for the player + 1 per match. Raise it once matches are stored in
-// the database and repeat visits stop costing calls.
-const MATCH_COUNT = 10;
+// matchIds come from the player's saved profile, newest first. playerPath is
+// this player's page, e.g. "/player/na/Name-TAG"; each row links to its match
+// analysis under it.
+type Props = { region: Region; puuid: string; matchIds: string[]; playerPath: string };
 
-// playerPath is this player's page, e.g. "/player/na/Name-TAG". Each row
-// links to its match analysis under it.
-type Props = { region: Region; puuid: string; playerPath: string };
-
-export async function RecentMatches({ region, puuid, playerPath }: Props) {
+export async function RecentMatches({ region, puuid, matchIds, playerPath }: Props) {
   const [result, dd] = await Promise.all([
-    settle(getRecentMatches(region, puuid, MATCH_COUNT)),
+    // Stored matches come from the database; only new ones cost a Riot call.
+    loadMatches(region, matchIds, matchIds.length),
     getDataDragon().catch(() => null),
   ]);
-  if (!result.ok) return <RiotErrorNotice error={result.error} />;
+  // Show whatever loaded; the error only matters if nothing did.
+  if (result.matches.length === 0 && result.error) {
+    return <RiotErrorNotice error={result.error} />;
+  }
 
-  const matches = result.value
+  const matches = result.matches
     .map((match) => summarizeMatch(match, puuid))
     .filter((m): m is MatchSummary => m !== null);
 
