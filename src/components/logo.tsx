@@ -1,5 +1,5 @@
 // The Turnpoint mark: a line crossing from your side (blue dot) to your
-// opponent's (amber dot). Decorative, so screen readers skip it.
+// opponent's (red dot). Decorative, so screen readers skip it.
 export function LogoMark({ size = 30 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 30 30" aria-hidden="true">

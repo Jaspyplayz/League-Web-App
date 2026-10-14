@@ -11,7 +11,7 @@ import type { Participant } from "@/lib/riot/types";
 // champion up with the one they played against. The ring in the middle
 // splits the two teams' totals.
 //
-// The winning team is blue and the losing team amber. Your row has a solid
+// The winning team is blue and the losing team red. Your row has a solid
 // outline and your opponent's a dashed one, so you can find both either way.
 export function TeamAnalysis({
   dd,

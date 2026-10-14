@@ -8,7 +8,7 @@ import type { Participant } from "@/lib/riot/types";
 export type TeamStat = {
   key: string;
   label: string;
-  // Your team first. `won` decides the color: winners blue, losers amber.
+  // Your team first. `won` decides the color: winners blue, losers red.
   teams: {
     teamId: number;
     won: boolean;

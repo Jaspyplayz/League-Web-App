@@ -75,8 +75,8 @@ const ROLE_SHORT: Record<string, string> = {
   Support: "Sup",
 };
 
-// A ring that fills blue for wins and amber for losses, with the win rate in
-// the middle. Two SVG circles drawn on top of each other: the amber one is the
+// A ring that fills blue for wins and red for losses, with the win rate in
+// the middle. Two SVG circles drawn on top of each other: the red one is the
 // whole ring, and the blue one only draws the winning share of its outline
 // (that's what strokeDasharray does: "draw this much, then skip the rest").
 function WinRateRing({ wins, losses }: { wins: number; losses: number }) {

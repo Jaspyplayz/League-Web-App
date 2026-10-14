@@ -158,7 +158,7 @@ export function CsPhases({ csPerMin }: { csPerMin: Trends["csPerMin"] }) {
         <ul className="flex flex-wrap gap-3">
           {PHASES.map(({ key, label }) => {
             const value = csPerMin[key];
-            // Amber when you farm noticeably slower than in lane.
+            // Red when you farm noticeably slower than in lane.
             const dropped = value !== null && key !== "early" && value < early * CS_DROP;
             return (
               <li

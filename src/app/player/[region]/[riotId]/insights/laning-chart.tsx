@@ -14,7 +14,7 @@ const DENSE_GAMES = 30;
 
 // Gold difference at 10 minutes in each game, oldest on the left. Bars above
 // the line are games you were ahead in (blue), below are games you were
-// behind in (amber). Each bar links to that game's analysis.
+// behind in (red). Each bar links to that game's analysis.
 export function LaningChart({
   games,
   laning,

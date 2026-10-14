@@ -63,6 +63,7 @@ export function MatchDetails({
         participantId: p.participantId,
         teamId: p.teamId,
         ally: p.teamId === me?.teamId,
+        won: p.win,
         label: [championName(dd, p.championName), p.riotIdGameName].filter(Boolean).join(", "),
         icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="rounded-md" />,
       }))}
@@ -75,7 +76,7 @@ export function MatchDetails({
 // Both teams' end-of-game numbers. A smaller version of the scoreboard on the
 // match page, sized to fit next to the profile's sidebar. Your team comes
 // first and both are in role order, so you and your opponent are on the same
-// row of each table. The winning team is blue and the losing team amber, like
+// row of each table. The winning team is blue and the losing team red, like
 // op.gg's blue and red.
 function MatchOverview({
   region,

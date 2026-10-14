@@ -28,6 +28,10 @@ export function MatchHeader({ match, me, now }: { match: Match; me: Participant;
 
   const result = remake ? "Remake" : me.win ? "Victory" : "Defeat";
   const resultColor = remake ? "text-faint" : me.win ? "text-ahead" : "text-behind";
+  // The kill score follows the team rule: the winners' kills in blue, the
+  // losers' in red, and no color at all for a remake.
+  const winnersColor = remake ? "" : "text-ahead";
+  const losersColor = remake ? "" : "text-behind";
 
   return (
     <section
@@ -49,11 +53,11 @@ export function MatchHeader({ match, me, now }: { match: Match; me: Participant;
         <span className="font-mono text-xs font-normal uppercase tracking-[0.12em] text-faint">
           Kills
         </span>
-        <span className="text-ahead">{kills(me.teamId)}</span>
+        <span className={me.win ? winnersColor : losersColor}>{kills(me.teamId)}</span>
         <span className="text-placeholder" aria-label="to">
           –
         </span>
-        <span>{kills(enemyTeamId)}</span>
+        <span className={me.win ? losersColor : winnersColor}>{kills(enemyTeamId)}</span>
       </p>
     </section>
   );

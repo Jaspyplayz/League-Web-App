@@ -38,7 +38,7 @@ export function MatchRow({
   const result = m.remake ? "Remake" : m.win ? "Win" : "Loss";
   const resultColor = m.remake ? "text-faint" : m.win ? "text-ahead" : "text-behind";
   // A colored edge on the left shows the result at a glance, like op.gg's
-  // blue and red rows: blue for a win, amber for a loss.
+  // blue and red rows: blue for a win, red for a loss.
   const edge = m.remake ? "border-l-line-strong" : m.win ? "border-l-ahead" : "border-l-behind";
   const box = `rounded-[14px] border border-l-4 border-line-strong ${edge} bg-surface px-[18px] py-3.5`;
 

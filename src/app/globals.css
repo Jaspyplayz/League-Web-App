@@ -7,11 +7,12 @@
  *
  * Meaning of the two accents, used everywhere data is shown:
  *   ahead  (blue)  = you, your team, ahead, win
- *   behind (amber) = your opponent, behind, loss
- * Blue/amber instead of green/red so color-blind players can tell them apart.
+ *   behind (red)   = your opponent, behind, loss
+ * Blue and red rather than green and red: red-green color blindness turns
+ * red and green into the same brown, but blue stays clearly apart from red.
  *
  * Views of both teams (scoreboards, Team analysis) color by result instead:
- * the winning team is blue and the losing team amber, like op.gg. Your own
+ * the winning team is blue and the losing team red, like op.gg. Your own
  * row gets an outline so you can find it either way.
  */
 @theme {
@@ -29,7 +30,7 @@
   --color-ahead: #5a8cff;
   --color-ahead-soft: #8fb0ff;
   --color-ahead-bright: #b9ceff;
-  --color-behind: #f0a030;
+  --color-behind: #f4615a;
 
   /*
    * Text sizes beyond Tailwind's defaults, so the site sticks to a few:

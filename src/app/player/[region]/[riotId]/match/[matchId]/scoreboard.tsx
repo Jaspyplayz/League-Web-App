@@ -12,7 +12,7 @@ import { participantRiotId, toSlug } from "@/lib/riot-id";
 
 // Both teams' end-of-game numbers: your team first, both in role order, so
 // you and your opponent are on the same row of each table. Like the match
-// panel, the winning team is blue and the losing team amber, and you and
+// panel, the winning team is blue and the losing team red, and you and
 // your opponent are outlined. Each player's name links to their own profile,
 // so you can look up anyone you played with or against.
 export function Scoreboard({
