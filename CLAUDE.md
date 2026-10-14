@@ -34,6 +34,7 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
+src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
 src/db/           Drizzle schema, connection, and cache freshness rules
 scripts/          Command-line jobs run with tsx (npm run benchmarks)
 drizzle/          Generated SQL migrations (never edit by hand)

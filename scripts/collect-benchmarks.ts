@@ -134,7 +134,9 @@ async function collectPlayer(
   tier: Tier,
   puuid: string,
 ) {
-  const ids = await call(() => getMatchIds(region, puuid, ONE_TRICK_WINDOW, RANKED_SOLO_QUEUE));
+  const ids = await call(() =>
+    getMatchIds(region, puuid, ONE_TRICK_WINDOW, { queue: RANKED_SOLO_QUEUE }),
+  );
   const saved = await savedMatchIds(db, puuid, ids);
   const missing = ids.filter((id) => !saved.has(id));
 

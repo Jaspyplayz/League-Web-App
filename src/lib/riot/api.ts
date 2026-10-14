@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { MatchIdFilter } from "@/lib/queue-filters";
 import { accountRegional, REGIONS, type Region } from "@/lib/regions";
 import type { RiotId } from "@/lib/riot-id";
 import type { ApexTier, Division, Tier } from "@/lib/tiers";
@@ -39,14 +40,25 @@ export function getRankedEntries(region: Region, puuid: string) {
   );
 }
 
-// Ranked solo/duo is queue 420. Leave `queue` out to get every game mode.
+// Ranked solo/duo is queue 420.
 export const RANKED_SOLO_QUEUE = 420;
 
-export function getMatchIds(region: Region, puuid: string, count: number, queue?: number) {
-  const onlyQueue = queue === undefined ? "" : `&queue=${queue}`;
+// A player's match IDs, newest first, at most 100 per request. With no
+// filter it's every game mode. `startTime` (seconds since 1970) leaves out
+// older games, and `start` skips that many.
+export function getMatchIds(
+  region: Region,
+  puuid: string,
+  count: number,
+  filter: MatchIdFilter & { startTime?: number; start?: number } = {},
+) {
+  const query = new URLSearchParams({ start: String(filter.start ?? 0), count: String(count) });
+  if (filter.queue !== undefined) query.set("queue", String(filter.queue));
+  if (filter.type) query.set("type", filter.type);
+  if (filter.startTime !== undefined) query.set("startTime", String(filter.startTime));
   return riotGet<string[]>(
     REGIONS[region].regional,
-    `/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=${count}${onlyQueue}`,
+    `/lol/match/v5/matches/by-puuid/${puuid}/ids?${query}`,
   );
 }
 
