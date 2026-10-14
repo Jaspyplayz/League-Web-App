@@ -37,7 +37,7 @@ export function FilterableMatchList({
       {shown.length > 0 ? (
         <ul className="flex flex-col gap-2">{shown.map((g) => g.row)}</ul>
       ) : (
-        <p className="text-zinc-600 dark:text-zinc-400">No games on &ldquo;{query}&rdquo; here.</p>
+        <p className="text-muted">No games on &ldquo;{query}&rdquo; here.</p>
       )}
     </div>
   );

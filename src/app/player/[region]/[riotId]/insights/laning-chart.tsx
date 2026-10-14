@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatSigned } from "@/lib/analyzer/format";
 import type { GameTrend, Trends } from "@/lib/analyzer/trends";
+import { panelClass } from "@/components/ui/panel";
 
 // Bars never get taller than this many gold, so one stomp doesn't flatten
 // the rest, and never shorter, so +40 doesn't look like a lead of thousands.
@@ -33,7 +34,7 @@ export function LaningChart({
   return (
     <section aria-labelledby="laning-heading" className="flex flex-col gap-3.5">
       <PanelHeading id="laning-heading">Early game: gold at 10 minutes</PanelHeading>
-      <div className="flex flex-col gap-5 rounded-2xl border border-line-strong bg-surface p-[22px]">
+      <div className={`${panelClass} flex flex-col gap-5 p-[22px]`}>
         <dl className="flex flex-wrap gap-x-10 gap-y-3">
           <Stat
             label="Ahead at 10"

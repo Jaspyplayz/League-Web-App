@@ -75,7 +75,7 @@ Production values live in Vercel's environment variables, which Jasper sets hims
 
 ## Design
 
-Dark "scouting report" style. Tokens live in `src/app/globals.css`: **blue = you / ahead / win, amber = opponent / behind / loss** (chosen over green/red for color-blind players). Reuse the tokens (`bg-surface`, `text-muted`, `text-ahead`...) instead of raw colors. Views of both teams (scoreboards, Team analysis) color the winning team blue and the losing team amber, with your row outlined. Where two numbers sit side by side, write the gap in words with `ui/gap.tsx` ("614 behind"). Cards use `ui/panel.tsx`; text sizes stick to Tailwind's plus `text-label`, `text-note` and `text-body`. Approved mockups: https://claude.ai/artifact/2yuQ2qLhDpjqX5SMLubpDr (only viewable from Jasper's account).
+Dark "scouting report" style. Tokens live in `src/app/globals.css`: **blue = you / ahead / win, amber = opponent / behind / loss** (chosen over green/red for color-blind players). Reuse the tokens (`bg-surface`, `text-muted`, `text-ahead`...) instead of raw colors. Views of both teams (scoreboards, Team analysis) color the winning team blue and the losing team amber, with your row outlined. Where two numbers sit side by side, write the gap in words with `ui/gap.tsx` ("614 behind"). Cards use `ui/panel.tsx` (`Panel`, or `panelClass` for a list or paragraph); text sizes stick to Tailwind's plus `text-label`, `text-note` and `text-body`. Approved mockups: https://claude.ai/artifact/2yuQ2qLhDpjqX5SMLubpDr (only viewable from Jasper's account).
 
 ## Code rules
 

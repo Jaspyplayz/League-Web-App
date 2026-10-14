@@ -2,8 +2,8 @@ import { PanelHeading } from "@/components/ui/panel-heading";
 import { DEATH_LABEL_TEXT } from "@/lib/analyzer/deaths";
 import { plural } from "@/lib/analyzer/format";
 import { CS_DROP, type Trends, type WinRecord } from "@/lib/analyzer/trends";
+import { panelClass } from "@/components/ui/panel";
 
-const card = "rounded-[14px] border border-line-strong bg-surface";
 
 // Win rate when ahead vs when behind. "You win 70% when ahead but only 20%
 // when behind" tells a player whether their problem is laning or closing out
@@ -18,7 +18,7 @@ export function LeadsAndDeficits({ conversion }: { conversion: Trends["conversio
         {conversion.map(({ minute, ahead, behind }) => {
           const difference = aheadDifference(minute, ahead, behind);
           return (
-            <li key={minute} className={`flex flex-col gap-3 px-5 py-4 ${card}`}>
+            <li key={minute} className={`flex flex-col gap-3 px-5 py-4 ${panelClass}`}>
               <h3 className="font-mono text-label uppercase tracking-[0.12em] text-faint">
                 At {minute} minutes
               </h3>
@@ -104,7 +104,7 @@ export function EarlyDeaths({
       className="flex min-w-0 flex-[1_1_340px] flex-col gap-3.5"
     >
       <PanelHeading id="early-deaths-heading">Early deaths</PanelHeading>
-      <div className={`flex flex-col gap-4 p-5 ${card}`}>
+      <div className={`flex flex-col gap-4 p-5 ${panelClass}`}>
         <p className="text-[15px] text-muted">
           {total === 0
             ? `You didn't die before 14:00 in any of these ${games} games.`
@@ -150,7 +150,7 @@ export function CsPhases({ csPerMin }: { csPerMin: Trends["csPerMin"] }) {
     >
       <PanelHeading id="cs-phases-heading">CS per minute</PanelHeading>
       {early === null ? (
-        <p className={`px-5 py-4 text-[15px] text-muted ${card}`}>
+        <p className={`px-5 py-4 text-[15px] text-muted ${panelClass}`}>
           These were all support games, where farming isn&apos;t the job, so there&apos;s no CS
           trend to show.
         </p>
@@ -163,7 +163,7 @@ export function CsPhases({ csPerMin }: { csPerMin: Trends["csPerMin"] }) {
             return (
               <li
                 key={key}
-                className={`flex min-w-0 flex-[1_1_120px] flex-col gap-1 px-5 py-[18px] ${card}`}
+                className={`flex min-w-0 flex-[1_1_120px] flex-col gap-1 px-5 py-[18px] ${panelClass}`}
               >
                 <span className="text-sm text-muted">{label}</span>
                 <span className={`font-mono text-2xl font-medium ${dropped ? "text-behind" : ""}`}>

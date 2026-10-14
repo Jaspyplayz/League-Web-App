@@ -5,6 +5,7 @@ import { playedPosition } from "@/lib/analyzer/matchup";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import { formatDuration, gameDurationSeconds, queueName, timeAgo } from "@/lib/match-summary";
 import type { Match, Participant } from "@/lib/riot/types";
+import { panelClass } from "@/components/ui/panel";
 
 const POSITION_NAMES: Record<string, string> = {
   TOP: "Top",
@@ -75,7 +76,7 @@ export function Matchup({
   return (
     <section
       aria-label="Matchup"
-      className="flex flex-wrap items-center gap-x-8 gap-y-5 rounded-[18px] border border-line-strong bg-surface p-6"
+      className={`${panelClass} flex flex-wrap items-center gap-x-8 gap-y-5 p-6`}
     >
       <PlayerSide dd={dd} player={me} side="you" />
       <Verdict at15={at15} finalGoldDiff={finalGoldDiff} hasOpponent={opponent !== null} />

@@ -11,8 +11,8 @@ import { formatSigned, plural, type GapOptions } from "@/lib/analyzer/format";
 import { championClass, championName, type DataDragon } from "@/lib/ddragon";
 import { positionName } from "@/lib/match-summary";
 import { tierName, type Tier } from "@/lib/tiers";
+import { panelClass } from "@/components/ui/panel";
 
-const card = "rounded-[14px] border border-line-strong bg-surface";
 
 // How each stat is labeled and shown. Leads are signed ("+250"), shares are
 // percentages, and rates and counts are plain numbers. `gap` says how the Gap
@@ -100,7 +100,7 @@ export function BenchmarkComparison({
           </>
         )}
       </p>
-      <div className={`overflow-x-auto ${card}`}>
+      <div className={`overflow-x-auto ${panelClass}`}>
         <table className="w-full text-left text-sm">
           <thead className="font-mono text-xs uppercase tracking-[0.08em] text-faint">
             <tr>
@@ -174,7 +174,7 @@ function ChampionList({
   dd: DataDragon | null;
 }) {
   return (
-    <ul className={`flex flex-col divide-y divide-line ${card}`}>
+    <ul className={`flex flex-col divide-y divide-line ${panelClass}`}>
       {champions.map((c) => {
         const gold = c.stats.find((s) => s.key === "goldAt10");
         return (

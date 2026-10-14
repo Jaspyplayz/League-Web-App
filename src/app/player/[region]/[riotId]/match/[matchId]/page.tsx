@@ -15,6 +15,7 @@ import { AnalysisSections } from "./analysis-sections";
 import { MatchHeader } from "./match-header";
 import { MatchNotes } from "./match-notes";
 import { Scoreboard } from "./scoreboard";
+import { panelClass } from "@/components/ui/panel";
 
 // The match analysis page: one game, from one player's point of view.
 // URL: /player/na/Name-TAG/match/NA1_1234567890
@@ -90,7 +91,7 @@ async function Analysis({ params }: { params: Params }) {
       <>
         {back}
         {header}
-        <p className="rounded-[14px] border border-line-strong bg-surface px-5 py-4 text-muted">
+        <p className={`${panelClass} px-5 py-4 text-muted`}>
           This game ended before 15 minutes, which is too short to analyze. Here&apos;s the
           scoreboard.
         </p>

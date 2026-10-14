@@ -6,6 +6,7 @@ import { isRegion, REGIONS } from "@/lib/regions";
 import { parseRiotId } from "@/lib/riot-id";
 import { ArrowRightIcon } from "./icons";
 import { noteSearch } from "./saved-players";
+import { panelClass } from "@/components/ui/panel";
 
 const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
 
@@ -23,7 +24,7 @@ export function SearchForm() {
 
   return (
     <form action={action} onSubmit={rememberSearch} role="search" aria-label="Player lookup" className="flex max-w-[600px] flex-col gap-2">
-      <div className="flex flex-wrap gap-2 rounded-[14px] border border-line-strong bg-surface p-2 focus-within:border-ahead">
+      <div className={`${panelClass} flex flex-wrap gap-2 p-2 focus-within:border-ahead`}>
         <div className="flex min-w-0 flex-[1_1_260px] flex-col px-3 py-1.5 max-sm:basis-full">
           <label htmlFor="riotId" className={fieldLabel}>
             Riot ID

@@ -31,7 +31,7 @@ export function RiotErrorNotice({ error }: { error: RiotApiError }) {
       className="flex flex-col gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-5"
     >
       <p className="font-semibold">{title}</p>
-      <p className="text-zinc-600 dark:text-zinc-400">{body(error)}</p>
+      <p className="text-muted">{body(error)}</p>
     </div>
   );
 }

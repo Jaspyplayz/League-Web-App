@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { panelClass } from "@/components/ui/panel";
 
 // How long to wait before asking the server for the next batch of games.
 const NEXT_BATCH_MS = 1_000;
@@ -49,7 +50,7 @@ export function AnalysisProgress({
   return (
     <div
       role="status"
-      className="flex flex-col gap-3 rounded-[14px] border border-line-strong bg-surface px-5 py-4"
+      className={`${panelClass} flex flex-col gap-3 px-5 py-4`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-semibold">

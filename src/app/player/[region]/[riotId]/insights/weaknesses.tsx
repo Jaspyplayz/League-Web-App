@@ -1,5 +1,6 @@
 import type { Weakness } from "@/lib/analyzer/trends";
 import { FocusButton } from "./focus";
+import { panelClass } from "@/components/ui/panel";
 
 // The "recurring weakness" card from the mockup: up to three patterns that
 // show up in most of your recent games, worst first. Each one can be picked
@@ -18,7 +19,7 @@ export function Weaknesses({
     return (
       <section
         aria-labelledby="weaknesses-heading"
-        className="flex flex-col gap-2.5 rounded-2xl border border-line-strong bg-surface p-[22px]"
+        className={`${panelClass} flex flex-col gap-2.5 p-[22px]`}
       >
         <h2
           id="weaknesses-heading"
