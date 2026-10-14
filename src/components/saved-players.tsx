@@ -5,9 +5,12 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import {
   addRecentPlayer,
   hasPlayer,
+  isPendingSearch,
   MAX_PINNED_PLAYERS,
   MAX_RECENT_PLAYERS,
+  parsePendingSearch,
   parseSavedPlayers,
+  PENDING_SEARCH_KEY,
   PINNED_PLAYERS_KEY,
   RECENT_PLAYERS_KEY,
   removePlayer,
@@ -78,10 +81,36 @@ function useSavedPlayers(key: ListKey): SavedPlayer[] {
   return useMemo(() => parseSavedPlayers(saved, MAX[key]), [saved, key]);
 }
 
-// Renders nothing; adds the player whose page is open to the recent list.
-export function RememberPlayer({ region, gameName, tagLine }: SavedPlayer) {
+// The search box calls this when you search, before the page changes. See
+// PENDING_SEARCH_KEY in src/lib/saved-players.ts for why it's saved for later
+// instead of going straight into Recent.
+export function noteSearch(player: SavedPlayer) {
+  try {
+    sessionStorage.setItem(PENDING_SEARCH_KEY, JSON.stringify({ ...player, at: Date.now() }));
+  } catch {
+    // Without storage the search just won't show under Recent.
+  }
+}
+
+// Renders nothing. If you got to this profile by searching for it, adds the
+// player to Recent; if you clicked through from somewhere else, does nothing.
+export function RememberSearchedPlayer({ region, gameName, tagLine }: SavedPlayer) {
   useEffect(() => {
-    update(RECENT_PLAYERS_KEY, (list) => addRecentPlayer(list, { region, gameName, tagLine }));
+    const player = { region, gameName, tagLine };
+    let pending = null;
+    try {
+      pending = parsePendingSearch(sessionStorage.getItem(PENDING_SEARCH_KEY));
+    } catch {
+      return;
+    }
+    if (!isPendingSearch(pending, player, Date.now())) return;
+    try {
+      // Used up: reloading the page or coming back later doesn't count again.
+      sessionStorage.removeItem(PENDING_SEARCH_KEY);
+    } catch {
+      // Nothing else to do.
+    }
+    update(RECENT_PLAYERS_KEY, (list) => addRecentPlayer(list, player));
   }, [region, gameName, tagLine]);
   return null;
 }
@@ -122,8 +151,8 @@ export function PinButton(player: SavedPlayer) {
 const chip =
   "flex items-center rounded-full border border-line-strong font-mono text-ink-soft transition-colors hover:border-ahead";
 
-// Two rows under the search box: players you pinned, then the ones you looked
-// at last. A pinned player isn't repeated under Recent. Each row is hidden
+// Two rows under the search box: players you pinned, then the ones you
+// searched for last. A pinned player isn't repeated under Recent. Each row is hidden
 // while it's empty.
 export function SavedPlayers() {
   const pinned = useSavedPlayers(PINNED_PLAYERS_KEY);

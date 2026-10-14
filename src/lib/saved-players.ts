@@ -2,8 +2,8 @@ import { isRegion, type Region } from "./regions";
 
 // Two short lists of players, kept in your own browser (localStorage), so they
 // need no account and never reach our server:
-// - recent: the players you looked at lately, newest first. Added
-//   automatically each time you open a profile.
+// - recent: the players you searched for lately, newest first. Only searches
+//   count: clicking through to someone from a match doesn't add them.
 // - pinned: players you starred on their profile, so they stay at hand until
 //   you unpin them.
 // These helpers are plain functions on the saved text, so they can be tested
@@ -42,6 +42,38 @@ function isSavedPlayer(value: unknown): value is SavedPlayer {
     typeof gameName === "string" &&
     typeof tagLine === "string"
   );
+}
+
+// A search you just made, waiting for its profile page to open. The search
+// box saves it, and the profile adds the player to Recent only if it matches,
+// using the spelling Riot sends back. It's kept in sessionStorage (this tab
+// only) and expires after a minute, so a search for a player who doesn't
+// exist can't add them later when you reach them some other way.
+export const PENDING_SEARCH_KEY = "turnpoint:pending-search";
+export const PENDING_SEARCH_MS = 60_000;
+
+export type PendingSearch = SavedPlayer & { at: number };
+
+export function parsePendingSearch(saved: string | null): PendingSearch | null {
+  if (!saved) return null;
+  let data: unknown;
+  try {
+    data = JSON.parse(saved);
+  } catch {
+    return null;
+  }
+  if (!isSavedPlayer(data)) return null;
+  const { at } = data as { at?: unknown };
+  return typeof at === "number" ? { ...data, at } : null;
+}
+
+// Did the player whose profile just opened come from that search?
+export function isPendingSearch(
+  pending: PendingSearch | null,
+  player: SavedPlayer,
+  now: number,
+): boolean {
+  return pending !== null && samePlayer(pending, player) && now - pending.at <= PENDING_SEARCH_MS;
 }
 
 // Puts `player` at the front. If they're already in the list, the old entry is

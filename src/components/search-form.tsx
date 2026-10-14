@@ -2,16 +2,27 @@
 
 import { useActionState } from "react";
 import { searchPlayer } from "@/app/actions";
-import { REGIONS } from "@/lib/regions";
+import { isRegion, REGIONS } from "@/lib/regions";
+import { parseRiotId } from "@/lib/riot-id";
 import { ArrowRightIcon } from "./icons";
+import { noteSearch } from "./saved-players";
 
 const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
 
 export function SearchForm() {
   const [state, action, pending] = useActionState(searchPlayer, { error: null });
 
+  // Runs in the browser just before the form is sent, so the profile page can
+  // tell this player came from a search and add them to Recent.
+  function rememberSearch(event: React.FormEvent<HTMLFormElement>) {
+    const form = new FormData(event.currentTarget);
+    const region = String(form.get("region") ?? "");
+    const riotId = parseRiotId(String(form.get("riotId") ?? ""));
+    if (isRegion(region) && riotId) noteSearch({ region, ...riotId });
+  }
+
   return (
-    <form action={action} role="search" aria-label="Player lookup" className="flex max-w-[600px] flex-col gap-2">
+    <form action={action} onSubmit={rememberSearch} role="search" aria-label="Player lookup" className="flex max-w-[600px] flex-col gap-2">
       <div className="flex flex-wrap gap-2 rounded-[14px] border border-line-strong bg-surface p-2 focus-within:border-ahead">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col px-3 py-1.5 max-sm:basis-full">
           <label htmlFor="riotId" className={fieldLabel}>
