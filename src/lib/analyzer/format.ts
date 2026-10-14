@@ -8,6 +8,32 @@ export function formatSigned(value: number): string {
   return sign + Math.abs(rounded).toLocaleString("en-US");
 }
 
+// How far apart two numbers are, in words, for tables that put "you" next to
+// someone else: 5.4 vs 6.3 CS/min -> "0.9 behind". Saying the gap saves the
+// reader from subtracting in their head. For stats where less is better
+// (deaths), the words switch to "more" and "fewer" so "0.1 more" isn't read
+// as good news.
+export type Gap = { text: string; tone: "better" | "worse" | "even" };
+
+export function formatGap(
+  you: number,
+  them: number,
+  { decimals = 0, lowerIsBetter = false }: { decimals?: number; lowerIsBetter?: boolean } = {},
+): Gap {
+  // Round first, so 5.41 vs 5.39 shown as "5.4" and "5.4" reads "Even".
+  const scale = 10 ** decimals;
+  const diff = Math.round((you - them) * scale) / scale;
+  if (diff === 0) return { text: "Even", tone: "even" };
+  const size = Math.abs(diff).toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  if (lowerIsBetter) {
+    return diff > 0 ? { text: `${size} more`, tone: "worse" } : { text: `${size} fewer`, tone: "better" };
+  }
+  return diff > 0 ? { text: `${size} ahead`, tone: "better" } : { text: `${size} behind`, tone: "worse" };
+}
+
 // Game clock from milliseconds: 490000 -> "8:10".
 export function formatClock(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);

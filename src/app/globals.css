@@ -9,6 +9,10 @@
  *   ahead  (blue)  = you, your team, ahead, win
  *   behind (amber) = your opponent, behind, loss
  * Blue/amber instead of green/red so color-blind players can tell them apart.
+ *
+ * Views of both teams (scoreboards, Team analysis) color by result instead:
+ * the winning team is blue and the losing team amber, like op.gg. Your own
+ * row gets an outline so you can find it either way.
  */
 @theme {
   --color-page: #0b0e13;
@@ -26,6 +30,16 @@
   --color-ahead-soft: #8fb0ff;
   --color-ahead-bright: #b9ceff;
   --color-behind: #f0a030;
+
+  /*
+   * Text sizes beyond Tailwind's defaults, so the site sticks to a few:
+   * text-label (11px, the small uppercase mono labels), text-note (13px,
+   * captions and footnotes) and text-body (15px, sentences on a page).
+   * Headings use PanelHeading and SectionHeading.
+   */
+  --text-label: 11px;
+  --text-note: 13px;
+  --text-body: 15px;
 
   --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
   --font-sans: var(--font-plex-sans), system-ui, sans-serif;
