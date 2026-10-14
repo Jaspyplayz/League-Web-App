@@ -3,11 +3,12 @@
 // Pure, so it can be tested without a database.
 
 import type { GameTrend } from "../lib/analyzer/trends";
+import type { WinChanceGame } from "../lib/analyzer/win-chance";
 import { gameDurationSeconds } from "../lib/match-summary";
 import type { Region } from "../lib/regions";
 import type { Match } from "../lib/riot/types";
 import type { Tier } from "../lib/tiers";
-import type { benchmarkGames, matches, matchParticipants } from "./schema";
+import type { benchmarkGames, matches, matchParticipants, winChanceGames } from "./schema";
 
 export function matchRow(match: Match): typeof matches.$inferInsert {
   const { info } = match;
@@ -46,7 +47,9 @@ export function participantRows(match: Match): (typeof matchParticipants.$inferI
 // Which stats a benchmark row has. Bump it when GameTrend gains a stat, and
 // `npm run benchmarks` refetches the games saved with an older version.
 // Version 2 added XP at 15, early takedowns, vision and the jungle stats.
-export const BENCHMARK_STATS_VERSION = 2;
+// Version 3 also saves each game's minute-by-minute team numbers for the win
+// chance model (win_chance_games), so older games get fetched once more.
+export const BENCHMARK_STATS_VERSION = 3;
 
 export function benchmarkRow(
   game: GameTrend,
@@ -80,5 +83,14 @@ export function benchmarkRow(
     enemyJungleKills: game.enemyJungleKills,
     scuttles: game.scuttles,
     statsVersion: BENCHMARK_STATS_VERSION,
+  };
+}
+
+export function winChanceRow(game: WinChanceGame, match: Match): typeof winChanceGames.$inferInsert {
+  return {
+    matchId: game.matchId,
+    patch: game.patch,
+    gameStartAt: new Date(match.info.gameStartTimestamp),
+    game,
   };
 }

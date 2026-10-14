@@ -2,7 +2,9 @@
 // from every rank, Iron to Challenger, on KR, EUW and NA. Each game is boiled
 // down by summarizeGame (the same summary Insights makes of your games) and
 // saved to benchmark_games with the player's tier. Every player's end-of-game
-// numbers go to score_games, as training data for the game score.
+// numbers go to score_games, as training data for the game score, and each
+// team's numbers at every minute go to win_chance_games, as training data
+// for the win chance model.
 //
 //   npm run benchmarks                                every tier, 3 servers, 10 players per tier
 //   npm run benchmarks -- --tiers gold,diamond        just those tiers
@@ -22,14 +24,15 @@
 
 import { parseArgs } from "node:util";
 import { loadEnvConfig } from "@next/env";
-import { and, eq, gte, inArray, lt, notInArray } from "drizzle-orm";
+import { and, count, eq, gte, inArray, lt, notInArray } from "drizzle-orm";
 import { getDb, tables, type Db } from "@/db";
-import { BENCHMARK_STATS_VERSION, benchmarkRow } from "@/db/rows";
+import { BENCHMARK_STATS_VERSION, benchmarkRow, winChanceRow } from "@/db/rows";
 import { findOneTricks, ONE_TRICK_WINDOW, samplePlayers } from "@/lib/analyzer/benchmarks";
 import { plural } from "@/lib/analyzer/format";
 import { toScoreGame } from "@/lib/analyzer/score";
 import { isTrendGame, summarizeGame } from "@/lib/analyzer/trends";
 import { trimTimeline } from "@/lib/analyzer/trim";
+import { toWinChanceGame } from "@/lib/analyzer/win-chance";
 import { createPacer } from "@/lib/pace";
 import { isRegion, type Region } from "@/lib/regions";
 import {
@@ -156,6 +159,12 @@ async function collectPlayer(
         .values({ matchId, game: toScoreGame(match) })
         .onConflictDoNothing();
       const timeline = trimTimeline(await call(() => getTimeline(region, matchId)));
+      // And both teams' minute-by-minute numbers train the win chance
+      // model (npm run train-win-chance).
+      const chance = toWinChanceGame(match, timeline);
+      if (chance) {
+        await db.insert(tables.winChanceGames).values(winChanceRow(chance, match)).onConflictDoNothing();
+      }
       const game = summarizeGame(match, timeline, puuid);
       if (!game) continue;
       // An older row for the same game gets the new stats.
@@ -237,6 +246,9 @@ async function deleteOldGames(db: Db) {
     .where(lt(tables.benchmarkGames.gameStartAt, cutoff))
     .returning({ matchId: tables.benchmarkGames.matchId });
   if (deleted.length > 0) console.log(`Deleted ${deleted.length} games older than ${MAX_AGE_DAYS} days`);
+  // Old patches would teach the win chance model about a game that's
+  // changed since, so its training games go too.
+  await db.delete(tables.winChanceGames).where(lt(tables.winChanceGames.gameStartAt, cutoff));
 }
 
 // What's in the table now, so you can see the run worked.
@@ -265,6 +277,8 @@ async function printSummary(db: Db) {
         `${plural(theirOneTricks.length, "one-trick")}${champions}`,
     );
   }
+  const [chance] = await db.select({ games: count() }).from(tables.winChanceGames);
+  console.log(`win_chance_games holds ${plural(chance.games, "game")} for npm run train-win-chance.`);
 }
 
 main().catch((error: unknown) => {

@@ -289,6 +289,26 @@ export const scoreGames = pgTable("score_games", {
   collectedAt: timestamptz("collected_at").notNull().defaultNow(),
 }).enableRLS();
 
+// Training data for the win chance model (src/lib/analyzer/win-chance.ts):
+// each team's gold, XP, kills, towers, dragons and buffs at every minute of
+// each benchmark game, and which side won. No names or PUUIDs. About 3 KB a
+// game. `npm run benchmarks` fills it, deleting games older than 60 days,
+// and `npm run train-win-chance` reads it, along with the games opened on
+// the site (matches and match_timelines).
+export const winChanceGames = pgTable(
+  "win_chance_games",
+  {
+    matchId: text("match_id").primaryKey(),
+    // "16.20", so training can stick to recent patches.
+    patch: text("patch").notNull(),
+    gameStartAt: timestamptz("game_start_at").notNull(),
+    // A WinChanceGame: { matchId, patch, blueWin, frames }.
+    game: jsonb("game").notNull(),
+    collectedAt: timestamptz("collected_at").notNull().defaultNow(),
+  },
+  (t) => [index("win_chance_games_start_idx").on(t.gameStartAt)],
+).enableRLS();
+
 // Which player each signed-in account picked with "This is me" on a profile,
 // so the header can link back to it. At most one per account. It isn't
 // checked with Riot (anyone could pick any player), which is fine because

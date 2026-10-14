@@ -15,6 +15,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Analyzer research: [docs/match-analyzer.md](docs/match-analyzer.md)
 - Database tables and setup: [docs/database.md](docs/database.md)
 - Game score (the trained 0 to 100 rating): [docs/game-score.md](docs/game-score.md)
+- Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
@@ -33,7 +34,8 @@ src/lib/riot/     Server-only Riot client (rate limits, retries) and one functio
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
                   trends.ts rolls games up into the Insights page, compare.ts
                   sets them against one rank's games or one chosen player's,
-                  and score.ts is the trained 0 to 100 game score (score-model.json)
+                  score.ts is the trained 0 to 100 game score (score-model.json)
+                  and win-chance.ts each team's chance to win at every minute
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
@@ -41,7 +43,7 @@ src/lib/trend-games.ts  A player's recent games summarized for Insights, a few t
 src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
-scripts/          Command-line jobs run with tsx (npm run benchmarks, npm run train-score)
+scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
 .claude/          Claude Code settings; hooks/ runs lint and typecheck before Claude commits
@@ -59,6 +61,7 @@ docs/             Design and research docs
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
 | `npm run train-score` | Retrain the game score on saved games and update `score-model.json` ([docs/game-score.md](docs/game-score.md)) |
+| `npm run train-win-chance` | Train the win chance model on saved games and write `win-chance-model.json` ([docs/win-chance.md](docs/win-chance.md)) |
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass.
 
