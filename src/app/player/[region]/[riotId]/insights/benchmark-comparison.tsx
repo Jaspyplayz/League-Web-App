@@ -6,7 +6,8 @@ import type {
   StatComparison,
   StatKey,
 } from "@/lib/analyzer/compare";
-import { formatSigned, plural } from "@/lib/analyzer/format";
+import { Gap } from "@/components/ui/gap";
+import { formatSigned, plural, type GapOptions } from "@/lib/analyzer/format";
 import { championClass, championName, type DataDragon } from "@/lib/ddragon";
 import { positionName } from "@/lib/match-summary";
 import { tierName, type Tier } from "@/lib/tiers";
@@ -14,33 +15,57 @@ import { tierName, type Tier } from "@/lib/tiers";
 const card = "rounded-[14px] border border-line-strong bg-surface";
 
 // How each stat is labeled and shown. Leads are signed ("+250"), shares are
-// percentages, and rates and counts are plain numbers. For deaths, fewer is
-// better. Time in the enemy half is neither good nor bad on its own (invading
-// at the wrong time gets you killed), so it isn't colored.
+// percentages, and rates and counts are plain numbers. `gap` says how the Gap
+// column writes the difference: with the same decimals as the numbers, and
+// "more"/"fewer" for deaths, where fewer is better. Time in the enemy half is
+// neither good nor bad on its own (invading at the wrong time gets you
+// killed), so it isn't colored.
 type StatRowStyle = {
   label: string;
   format: (v: number) => string;
-  lowerIsBetter?: boolean;
-  neutral?: boolean;
+  gap: GapOptions;
 };
 const oneDecimal = (v: number) => v.toFixed(1);
 const percent = (v: number) => `${Math.round(v * 100)}%`;
+const LEAD = { decimals: 0 };
+const ONE_DECIMAL = { decimals: 1 };
+const SHARE = { decimals: 2, format: percent };
 const STAT_ROWS: Record<StatKey, StatRowStyle> = {
-  goldAt10: { label: "Gold lead at 10", format: formatSigned },
-  goldAt15: { label: "Gold lead at 15", format: formatSigned },
-  csAt10: { label: "CS lead at 10", format: formatSigned },
-  csPerMinEarly: { label: "CS/min, 0 to 10", format: oneDecimal },
-  csPerMinMid: { label: "CS/min, 10 to 20", format: oneDecimal },
-  earlyDeaths: { label: "Deaths before 14:00", format: oneDecimal, lowerIsBetter: true },
-  xpAt15: { label: "XP lead at 15", format: formatSigned },
-  earlyTakedowns: { label: "Kills + assists before 14:00", format: oneDecimal },
-  visionPerMin: { label: "Vision score per minute", format: (v) => v.toFixed(2) },
-  strongerSide: { label: "Minutes on the stronger side, 3 to 15", format: percent },
-  enemyHalf: { label: "Minutes in the enemy half, 3 to 15", format: percent, neutral: true },
-  gankTakedowns: { label: "Kills + assists in lanes before 14:00", format: oneDecimal },
-  objectiveShare: { label: "Dragons, grubs and Heralds your team took", format: percent },
-  enemyJungleKills: { label: "Enemy jungle monsters killed", format: oneDecimal },
-  scuttles: { label: "Scuttle crabs", format: oneDecimal },
+  goldAt10: { label: "Gold lead at 10", format: formatSigned, gap: LEAD },
+  goldAt15: { label: "Gold lead at 15", format: formatSigned, gap: LEAD },
+  csAt10: { label: "CS lead at 10", format: formatSigned, gap: LEAD },
+  csPerMinEarly: { label: "CS/min, 0 to 10", format: oneDecimal, gap: ONE_DECIMAL },
+  csPerMinMid: { label: "CS/min, 10 to 20", format: oneDecimal, gap: ONE_DECIMAL },
+  earlyDeaths: {
+    label: "Deaths before 14:00",
+    format: oneDecimal,
+    gap: { decimals: 1, lowerIsBetter: true },
+  },
+  xpAt15: { label: "XP lead at 15", format: formatSigned, gap: LEAD },
+  earlyTakedowns: { label: "Kills + assists before 14:00", format: oneDecimal, gap: ONE_DECIMAL },
+  visionPerMin: {
+    label: "Vision score per minute",
+    format: (v) => v.toFixed(2),
+    gap: { decimals: 2 },
+  },
+  strongerSide: { label: "Minutes on the stronger side, 3 to 15", format: percent, gap: SHARE },
+  enemyHalf: {
+    label: "Minutes in the enemy half, 3 to 15",
+    format: percent,
+    gap: { ...SHARE, neutral: true },
+  },
+  gankTakedowns: {
+    label: "Kills + assists in lanes before 14:00",
+    format: oneDecimal,
+    gap: ONE_DECIMAL,
+  },
+  objectiveShare: {
+    label: "Dragons, grubs and Heralds your team took",
+    format: percent,
+    gap: SHARE,
+  },
+  enemyJungleKills: { label: "Enemy jungle monsters killed", format: oneDecimal, gap: ONE_DECIMAL },
+  scuttles: { label: "Scuttle crabs", format: oneDecimal, gap: ONE_DECIMAL },
 };
 
 // Who your games are compared with: players of one rank on KR, EUW and NA
@@ -79,14 +104,17 @@ export function BenchmarkComparison({
         <table className="w-full text-left text-sm">
           <thead className="font-mono text-xs uppercase tracking-[0.08em] text-faint">
             <tr>
-              <th scope="col" className="px-5 py-3 font-medium">
+              <th scope="col" className="px-3 py-3 sm:px-5 font-medium">
                 Per game
               </th>
-              <th scope="col" className="px-5 py-3 text-right font-medium">
+              <th scope="col" className="px-3 py-3 sm:px-5 text-right font-medium">
                 You
               </th>
-              <th scope="col" className="px-5 py-3 text-right font-medium">
+              <th scope="col" className="px-3 py-3 sm:px-5 text-right font-medium">
                 {them}
+              </th>
+              <th scope="col" className="px-3 py-3 sm:px-5 text-right font-medium">
+                Gap
               </th>
             </tr>
           </thead>
@@ -111,21 +139,25 @@ export function BenchmarkComparison({
 }
 
 function StatRow({ stat }: { stat: StatComparison }) {
-  const { label, format, lowerIsBetter, neutral } = STAT_ROWS[stat.key];
-  const better = lowerIsBetter ? stat.you <= stat.them : stat.you >= stat.them;
-  const tone = neutral ? "text-ink" : better ? "text-ahead" : "text-behind";
+  const { label, format, gap } = STAT_ROWS[stat.key];
+  const better = gap.lowerIsBetter ? stat.you <= stat.them : stat.you >= stat.them;
+  const tone = gap.neutral ? "text-ink" : better ? "text-ahead" : "text-behind";
   return (
     <tr className="border-t border-line">
-      <th scope="row" className="px-5 py-3 font-normal text-ink-soft">
+      <th scope="row" className="px-3 py-3 sm:px-5 font-normal text-ink-soft">
         {label}
         <span className="block font-mono text-xs text-faint sm:ml-2 sm:inline">
           {plural(stat.games, "game")}
         </span>
       </th>
-      <td className={`px-5 py-3 text-right font-mono ${tone}`}>
+      <td className={`px-3 py-3 sm:px-5 text-right font-mono ${tone}`}>
         {format(stat.you)}
       </td>
-      <td className="px-5 py-3 text-right font-mono text-muted">{format(stat.them)}</td>
+      <td className="px-3 py-3 sm:px-5 text-right font-mono text-ink-soft">{format(stat.them)}</td>
+      {/* The gap in words, so nobody has to subtract in their head. */}
+      <td className="whitespace-nowrap px-3 py-3 sm:px-5 text-right">
+        <Gap you={stat.you} them={stat.them} {...gap} />
+      </td>
     </tr>
   );
 }
@@ -163,8 +195,9 @@ function ChampionList({
             </div>
             {gold && (
               // Below the name on phones, on the right on wider screens.
-              <span className="basis-full whitespace-nowrap pl-11 font-mono text-xs text-faint sm:basis-auto sm:pl-0">
-                Gold at 10: {formatSigned(gold.you)} vs {formatSigned(gold.them)}
+              <span className="basis-full whitespace-nowrap pl-11 font-mono text-sm text-ink-soft sm:basis-auto sm:pl-0">
+                <span className="text-note text-faint">Gold at 10</span> {formatSigned(gold.you)} vs{" "}
+                {formatSigned(gold.them)} · <Gap you={gold.you} them={gold.them} />
               </span>
             )}
           </li>

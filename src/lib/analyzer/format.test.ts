@@ -40,6 +40,25 @@ describe("formatGap", () => {
   });
 });
 
+describe("formatGap for shares and neutral stats", () => {
+  const percent = (v: number) => `${Math.round(v * 100)}%`;
+
+  it("writes the gap with the format it is given", () => {
+    expect(formatGap(0.45, 0.57, { decimals: 2, format: percent })).toEqual({
+      text: "12% behind",
+      tone: "worse",
+    });
+  });
+
+  it("says more or less without judging neutral stats", () => {
+    expect(formatGap(0.6, 0.4, { decimals: 2, format: percent, neutral: true })).toEqual({
+      text: "20% more",
+      tone: "even",
+    });
+    expect(formatGap(2, 3, { neutral: true })).toEqual({ text: "1 less", tone: "even" });
+  });
+});
+
 describe("formatClock", () => {
   it("shows minutes and seconds", () => {
     expect(formatClock(490_000)).toBe("8:10");

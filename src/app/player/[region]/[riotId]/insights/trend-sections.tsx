@@ -7,26 +7,36 @@ const card = "rounded-[14px] border border-line-strong bg-surface";
 
 // Win rate when ahead vs when behind. "You win 70% when ahead but only 20%
 // when behind" tells a player whether their problem is laning or closing out
-// games.
+// games. One card per minute, so the two numbers you compare (ahead and
+// behind at the same minute) sit side by side, with the difference spelled
+// out underneath.
 export function LeadsAndDeficits({ conversion }: { conversion: Trends["conversion"] }) {
   return (
     <section aria-labelledby="conversion-heading" className="flex flex-col gap-3.5">
       <PanelHeading id="conversion-heading">Win rate when ahead or behind</PanelHeading>
-      <ul className="flex flex-wrap gap-3">
-        {conversion.flatMap(({ minute, ahead, behind }) => [
-          <WinRateTile
-            key={`ahead-${minute}`}
-            title={`Ahead at ${minute}`}
-            record={ahead}
-            tone="ahead"
-          />,
-          <WinRateTile
-            key={`behind-${minute}`}
-            title={`Behind at ${minute}`}
-            record={behind}
-            tone="behind"
-          />,
-        ])}
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {conversion.map(({ minute, ahead, behind }) => {
+          const difference = aheadDifference(minute, ahead, behind);
+          return (
+            <li key={minute} className={`flex flex-col gap-3 px-5 py-4 ${card}`}>
+              <h3 className="font-mono text-label uppercase tracking-[0.12em] text-faint">
+                At {minute} minutes
+              </h3>
+              <div className="grid grid-cols-2">
+                <WinRate title="Ahead" record={ahead} tone="ahead" />
+                <WinRate
+                  title="Behind"
+                  record={behind}
+                  tone="behind"
+                  className="border-l border-line pl-5"
+                />
+              </div>
+              {difference && (
+                <p className="border-t border-line pt-2.5 text-note text-muted">{difference}</p>
+              )}
+            </li>
+          );
+        })}
       </ul>
       <p className="text-[13px] text-faint">
         Ahead or behind means in gold against the enemy in your role.
@@ -35,23 +45,25 @@ export function LeadsAndDeficits({ conversion }: { conversion: Trends["conversio
   );
 }
 
-function WinRateTile({
+function WinRate({
   title,
   record,
   tone,
+  className = "",
 }: {
   title: string;
   record: WinRecord;
   tone: "ahead" | "behind";
+  className?: string;
 }) {
   const color = tone === "ahead" ? "text-ahead" : "text-behind";
   return (
-    <li className={`flex min-w-0 flex-[1_1_150px] flex-col gap-1 px-5 py-[18px] ${card}`}>
+    <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
       <span className={`text-sm ${color}`}>{title}</span>
       {record.games > 0 ? (
         <>
           <span className="font-mono text-2xl font-medium">
-            {Math.round((record.wins / record.games) * 100)}% won
+            {winRate(record)}% won
           </span>
           <span className="font-mono text-xs text-faint">
             {record.wins} of {plural(record.games, "game")}
@@ -60,8 +72,20 @@ function WinRateTile({
       ) : (
         <span className="text-sm text-faint">No games</span>
       )}
-    </li>
+    </div>
   );
+}
+
+const winRate = (r: WinRecord) => Math.round((r.wins / r.games) * 100);
+
+// "Being ahead at 10 adds 45 points to your win rate." Null when one side has
+// no games, since there's nothing to compare.
+function aheadDifference(minute: number, ahead: WinRecord, behind: WinRecord): string | null {
+  if (ahead.games === 0 || behind.games === 0) return null;
+  const points = winRate(ahead) - winRate(behind);
+  if (points > 0) return `Being ahead at ${minute} adds ${points} points to your win rate.`;
+  if (points < 0) return `You won ${-points} points more often when behind at ${minute}.`;
+  return `You won just as often ahead or behind at ${minute}.`;
 }
 
 // Deaths before 14:00, split by kind. "Most of your early deaths are ganks" is
