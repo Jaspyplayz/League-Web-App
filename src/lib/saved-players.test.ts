@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   addRecentPlayer,
   hasPlayer,
+  isPendingSearch,
   MAX_PINNED_PLAYERS,
   MAX_RECENT_PLAYERS,
+  parsePendingSearch,
   parseSavedPlayers,
+  PENDING_SEARCH_MS,
   removePlayer,
   togglePinnedPlayer,
   type SavedPlayer,
@@ -93,5 +96,38 @@ describe("togglePinnedPlayer", () => {
     expect(togglePinnedPlayer(full, caps)).toBe(full);
     // Unpinning still works when full.
     expect(togglePinnedPlayer(full, full[0])).toHaveLength(MAX_PINNED_PLAYERS - 1);
+  });
+});
+
+describe("parsePendingSearch", () => {
+  it("reads back a saved search", () => {
+    expect(parsePendingSearch(JSON.stringify({ ...faker, at: 5 }))).toEqual({ ...faker, at: 5 });
+  });
+
+  it.each([null, "", "not json", JSON.stringify(faker), JSON.stringify({ ...faker, at: "5" })])(
+    "gives null for %j",
+    (saved) => {
+      expect(parsePendingSearch(saved)).toBeNull();
+    },
+  );
+});
+
+describe("isPendingSearch", () => {
+  const searched = { region: "kr" as const, gameName: "hide on bush", tagLine: "kr1", at: 1000 };
+
+  it("matches the searched player, whatever the capitals", () => {
+    expect(isPendingSearch(searched, faker, 2000)).toBe(true);
+  });
+
+  it("doesn't match a different player, such as one clicked in a match", () => {
+    expect(isPendingSearch(searched, caps, 2000)).toBe(false);
+  });
+
+  it("doesn't match once the search is over a minute old", () => {
+    expect(isPendingSearch(searched, faker, 1000 + PENDING_SEARCH_MS + 1)).toBe(false);
+  });
+
+  it("doesn't match when there was no search", () => {
+    expect(isPendingSearch(null, faker, 2000)).toBe(false);
   });
 });

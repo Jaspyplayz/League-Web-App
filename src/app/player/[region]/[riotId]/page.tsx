@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
-import { RememberPlayer } from "@/components/saved-players";
+import { RememberSearchedPlayer } from "@/components/saved-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { loadProfile } from "@/lib/profile-store";
 import { readQueueFilter } from "@/lib/queue-filters";
@@ -60,8 +60,8 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
   const profile = await settle(loadProfile(region, account.value));
   return (
     <>
-      {/* Uses the spelling Riot returns, so "faker-kr1" is saved as "Faker#KR1". */}
-      <RememberPlayer region={region} gameName={gameName} tagLine={tagLine} />
+      {/* Uses the spelling Riot returns, so a search for "faker#kr1" is saved as "Faker#KR1". */}
+      <RememberSearchedPlayer region={region} gameName={gameName} tagLine={tagLine} />
       {profile.ok ? (
         <>
           <ProfileHeader
