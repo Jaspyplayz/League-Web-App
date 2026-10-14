@@ -15,6 +15,13 @@
       "when": 1791908493973,
       "tag": "0001_benchmark_games",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791985554224,
+      "tag": "0002_profile_match_ids",
+      "breakpoints": true
     }
   ]
 }

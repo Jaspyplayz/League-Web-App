@@ -9,31 +9,29 @@ import {
   topChampions,
   type MatchSummary,
 } from "@/lib/match-summary";
+import { loadMatches } from "@/lib/match-store";
 import type { Region } from "@/lib/regions";
-import { getRecentMatches } from "@/lib/riot/api";
 import type { Match } from "@/lib/riot/types";
-import { settle } from "@/lib/riot/client";
 
-// Each match is one API call, so this is the main cost of a page view:
-// 4 calls for the player + 1 per match. Raise it once matches are stored in
-// the database and repeat visits stop costing calls.
-const MATCH_COUNT = 10;
+// matchIds come from the player's saved profile, newest first. playerPath is
+// this player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with
+// both teams' scoreboard and a link to the match analysis under that path.
+type Props = { region: Region; puuid: string; matchIds: string[]; playerPath: string };
 
-// playerPath is this player's page, e.g. "/player/na/Name-TAG". Each row
-// opens a panel with both teams' scoreboard and a link to the match analysis
-// under that path.
-type Props = { region: Region; puuid: string; playerPath: string };
-
-export async function RecentMatches({ region, puuid, playerPath }: Props) {
+export async function RecentMatches({ region, puuid, matchIds, playerPath }: Props) {
   const [result, dd] = await Promise.all([
-    settle(getRecentMatches(region, puuid, MATCH_COUNT)),
+    // Stored matches come from the database; only new ones cost a Riot call.
+    loadMatches(region, matchIds, matchIds.length),
     getDataDragon().catch(() => null),
   ]);
-  if (!result.ok) return <RiotErrorNotice error={result.error} />;
+  // Show whatever loaded; the error only matters if nothing did.
+  if (result.matches.length === 0 && result.error) {
+    return <RiotErrorNotice error={result.error} />;
+  }
 
   // Keep each full match next to its summary: the row shows the summary, and
   // the panel under it needs every player's numbers.
-  const games = result.value
+  const games = result.matches
     .map((match) => ({ match, summary: summarizeMatch(match, puuid) }))
     .filter((g): g is { match: Match; summary: MatchSummary } => g.summary !== null);
   const matches = games.map((g) => g.summary);

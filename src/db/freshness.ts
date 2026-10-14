@@ -2,12 +2,12 @@
 // again. Matches and timelines aren't here: they never change, so they
 // never expire.
 export const TTL_MS = {
-  // account-v1 + summoner-v4: Riot ID, icon, level.
+  // A player's profile (icon, level, rank and latest match IDs) is a saved
+  // snapshot, like op.gg's. A visit after this long fetches a new one.
   profile: 24 * 60 * 60 * 1000,
-  // league-v4: tier, LP, wins and losses.
-  ranked: 15 * 60 * 1000,
-  // Minimum gap between two "Update" clicks for the same player.
-  matchIdsCooldown: 2 * 60 * 1000,
+  // Minimum gap between two "Update" clicks for the same player, so nobody
+  // can spend the Riot rate limit by clicking over and over.
+  updateCooldown: 2 * 60 * 1000,
 } as const;
 
 // True if data fetched at `fetchedAt` is still within `ttlMs`.
@@ -19,4 +19,15 @@ export function isFresh(
 ): boolean {
   if (!fetchedAt) return false;
   return now.getTime() - fetchedAt.getTime() < ttlMs;
+}
+
+// Whole seconds until a profile fetched at `fetchedAt` can be updated again;
+// 0 means it can be updated now. Rounded up, so "1" still means "wait".
+export function secondsUntilUpdate(
+  fetchedAt: Date | null | undefined,
+  now: Date = new Date(),
+): number {
+  if (!fetchedAt) return 0;
+  const readyAt = fetchedAt.getTime() + TTL_MS.updateCooldown;
+  return Math.max(0, Math.ceil((readyAt - now.getTime()) / 1000));
 }
