@@ -42,8 +42,9 @@ export default function PlayerPage({
 // loads in its own Suspense boundary, so the header shows while it's loading.
 async function Player({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { region, riotId } = await params;
+  const search = await searchParams;
   // ?queue=solo picks a game-mode tab above the match list.
-  const queue = readQueueFilter((await searchParams).queue);
+  const queue = readQueueFilter(search.queue);
   const id = fromSlug(riotId);
   if (!isRegion(region) || !id) notFound();
 
@@ -78,6 +79,7 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
               puuid={puuid}
               profile={profile.value}
               queue={queue}
+              beforeParam={search.before}
               playerPath={playerPath}
             />
           </Suspense>

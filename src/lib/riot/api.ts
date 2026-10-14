@@ -44,18 +44,19 @@ export function getRankedEntries(region: Region, puuid: string) {
 export const RANKED_SOLO_QUEUE = 420;
 
 // A player's match IDs, newest first, at most 100 per request. With no
-// filter it's every game mode. `startTime` (seconds since 1970) leaves out
-// older games, and `start` skips that many.
+// filter it's every game mode. `startTime` and `endTime` (seconds since 1970)
+// leave out games older or newer than that, and `start` skips that many.
 export function getMatchIds(
   region: Region,
   puuid: string,
   count: number,
-  filter: MatchIdFilter & { startTime?: number; start?: number } = {},
+  filter: MatchIdFilter & { startTime?: number; endTime?: number; start?: number } = {},
 ) {
   const query = new URLSearchParams({ start: String(filter.start ?? 0), count: String(count) });
   if (filter.queue !== undefined) query.set("queue", String(filter.queue));
   if (filter.type) query.set("type", filter.type);
   if (filter.startTime !== undefined) query.set("startTime", String(filter.startTime));
+  if (filter.endTime !== undefined) query.set("endTime", String(filter.endTime));
   return riotGet<string[]>(
     REGIONS[region].regional,
     `/lol/match/v5/matches/by-puuid/${puuid}/ids?${query}`,

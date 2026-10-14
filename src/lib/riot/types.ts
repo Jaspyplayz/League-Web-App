@@ -105,7 +105,9 @@ export type Match = {
     platformId: string; // "NA1"
     gameVersion: string; // "16.20.712.3456"
     queueId: number;
-    gameStartTimestamp: number; // ms since 1970
+    // When the game was made, a little before it started. Both in ms since 1970.
+    gameCreation?: number;
+    gameStartTimestamp: number;
     gameEndTimestamp?: number;
     // Seconds for games played since late 2021 (when gameEndTimestamp
     // exists), milliseconds for older ones.
