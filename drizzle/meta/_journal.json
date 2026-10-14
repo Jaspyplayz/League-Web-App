@@ -57,6 +57,13 @@
       "when": 1791992851084,
       "tag": "0007_rank_history",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791993182044,
+      "tag": "0008_match_notes",
+      "breakpoints": true
     }
   ]
 }
