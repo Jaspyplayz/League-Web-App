@@ -6,11 +6,15 @@
 // Like the rest of the analyzer, everything is measured against the enemy in
 // the same role in the same game, so it works for every role, jungle included.
 
+import { gameDurationSeconds } from "@/lib/match-summary";
 import type { Match } from "@/lib/riot/types";
-import { findDeaths, type DeathLabel } from "./deaths";
+import { EARLY_DEATH_MS, findDeaths, type DeathLabel } from "./deaths";
 import { findPlayer, isAnalyzable } from "./index";
+import { inLane } from "./map";
 import { findOpponent, playedPosition, playerAt, snapshotAt } from "./matchup";
-import type { TrimmedFrame, TrimmedTimeline } from "./trim";
+import { findObjectives } from "./objectives";
+import { enemyHalfShare, strongerSideShare } from "./roaming";
+import type { ChampionKill, TrimmedEvent, TrimmedFrame, TrimmedTimeline } from "./trim";
 
 // One game, reduced to what the trends need.
 export type GameTrend = {
@@ -29,6 +33,28 @@ export type GameTrend = {
   // Your own CS per minute in each phase of the game. Null when the game
   // didn't last long enough to have that phase.
   csPerMin: { early: number; mid: number | null; late: number | null };
+
+  // The stats below are null when they don't apply to the role, and in
+  // benchmark games collected before they were added (see compare.ts).
+
+  // Your XP minus your opponent's at 15 minutes.
+  xpAt15: number | null;
+  // Kills plus assists before 14:00.
+  earlyTakedowns: number | null;
+  visionPerMin: number | null;
+  // Junglers and supports only (see roaming.ts), as a share from 0 to 1:
+  // minutes on the side of the map whose lane was clearly stronger, and
+  // minutes past the halfway line, both from 3:00 to 15:00.
+  strongerSide: number | null;
+  enemyHalf: number | null;
+  // Junglers only. Kills plus assists in a lane before 14:00.
+  gankTakedowns: number | null;
+  // Junglers only. The share of dragons, void grub groups and Rift Heralds
+  // your team took, from 0 to 1.
+  objectiveShare: number | null;
+  // Junglers only, from Riot's own per-game counts.
+  enemyJungleKills: number | null;
+  scuttles: number | null;
 };
 
 // A game counts for trends when it's long enough to analyze and the player
@@ -55,19 +81,53 @@ export function summarizeGame(
   const at10 = snapshotAt(frames, meId, opponent.participantId, 10);
   const at15 = snapshotAt(frames, meId, opponent.participantId, 15);
   const deaths = findDeaths(events, { me, opponent, participants });
+  const position = playedPosition(me);
+  const jungle = position === "JUNGLE";
+  // Junglers and supports move around the map; laners mostly stay in lane.
+  const roams = jungle || position === "UTILITY";
+  const earlyTakedowns = takedowns(events, meId).filter((k) => k.timestamp < EARLY_DEATH_MS);
 
   return {
     matchId: match.metadata.matchId,
     startedAt: match.info.gameStartTimestamp,
     win: me.win,
     championName: me.championName,
-    position: playedPosition(me),
+    position,
     goldAt10: at10 ? at10.you.gold - at10.opponent.gold : null,
     csAt10: at10 ? at10.you.cs - at10.opponent.cs : null,
     goldAt15: at15 ? at15.you.gold - at15.opponent.gold : null,
     earlyDeaths: deaths.filter((d) => d.early).map((d) => d.label),
     csPerMin: csByPhase(frames, meId),
+    xpAt15: at15 ? at15.you.xp - at15.opponent.xp : null,
+    earlyTakedowns: earlyTakedowns.length,
+    visionPerMin: me.visionScore / (gameDurationSeconds(match.info) / 60),
+    strongerSide: roams ? strongerSideShare(frames, participants, me) : null,
+    enemyHalf: roams ? enemyHalfShare(frames, me) : null,
+    gankTakedowns: jungle
+      ? earlyTakedowns.filter((k) => k.position && inLane(k.position)).length
+      : null,
+    objectiveShare: jungle ? objectiveShare(events, me.teamId) : null,
+    enemyJungleKills: jungle ? (me.challenges?.enemyJungleMonsterKills ?? null) : null,
+    scuttles: jungle ? (me.challenges?.scuttleCrabKills ?? null) : null,
   };
+}
+
+// The champion kills you got or assisted in.
+function takedowns(events: TrimmedEvent[], meId: number): ChampionKill[] {
+  return events.filter(
+    (e): e is ChampionKill =>
+      e.type === "CHAMPION_KILL" &&
+      (e.killerId === meId || e.assistingParticipantIds.includes(meId)),
+  );
+}
+
+// Of the dragons, void grub groups and Rift Heralds anyone took, the share
+// your team got. Null when nobody took any.
+function objectiveShare(events: TrimmedEvent[], myTeamId: number): number | null {
+  const taken = findObjectives(events, myTeamId).filter(
+    (o) => o.kind === "dragon" || o.kind === "grubs" || o.kind === "herald",
+  );
+  return taken.length ? taken.filter((o) => o.ours).length / taken.length : null;
 }
 
 // The late phase only counts once there are at least this many minutes of it,

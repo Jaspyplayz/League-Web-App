@@ -16,13 +16,15 @@
 // so 10 players in each of the 10 tiers take around 2 hours. The three
 // servers run side by side, because Riot counts each server's limit
 // separately. Later runs skip games already saved, so they're much quicker,
-// and stopping a run halfway loses nothing.
+// and stopping a run halfway loses nothing. Games saved before the latest
+// stats were added (BENCHMARK_STATS_VERSION in src/db/rows.ts) are fetched
+// again and updated, so the run after a new stat costs as much as a first run.
 
 import { parseArgs } from "node:util";
 import { loadEnvConfig } from "@next/env";
-import { and, eq, inArray, lt, notInArray } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, notInArray } from "drizzle-orm";
 import { getDb, tables, type Db } from "@/db";
-import { benchmarkRow } from "@/db/rows";
+import { BENCHMARK_STATS_VERSION, benchmarkRow } from "@/db/rows";
 import { findOneTricks, ONE_TRICK_WINDOW, samplePlayers } from "@/lib/analyzer/benchmarks";
 import { plural } from "@/lib/analyzer/format";
 import { toScoreGame } from "@/lib/analyzer/score";
@@ -104,7 +106,7 @@ async function collectRegion(db: Db, region: Region) {
     log(`${tierName(tier)}: collecting games from ${plural(players.length, "player")}`);
     for (const [i, puuid] of players.entries()) {
       const { added, saved } = await collectPlayer(db, call, log, region, tier, puuid);
-      log(`${tierName(tier)} ${i + 1}/${players.length}: ${added} new games (${saved} already saved)`);
+      log(`${tierName(tier)} ${i + 1}/${players.length}: ${added} games saved (${saved} already up to date)`);
     }
   }
 }
@@ -156,10 +158,15 @@ async function collectPlayer(
       const timeline = trimTimeline(await call(() => getTimeline(region, matchId)));
       const game = summarizeGame(match, timeline, puuid);
       if (!game) continue;
+      // An older row for the same game gets the new stats.
+      const row = benchmarkRow(game, puuid, region, tier);
       const inserted = await db
         .insert(tables.benchmarkGames)
-        .values(benchmarkRow(game, puuid, region, tier))
-        .onConflictDoNothing()
+        .values(row)
+        .onConflictDoUpdate({
+          target: [tables.benchmarkGames.matchId, tables.benchmarkGames.puuid],
+          set: row,
+        })
         .returning({ matchId: tables.benchmarkGames.matchId });
       added += inserted.length;
     } catch (error) {
@@ -205,13 +212,21 @@ function pacedCaller(log: (message: string) => void) {
   };
 }
 
+// The games already saved with every current stat. Older rows don't count,
+// so they're fetched again.
 async function savedMatchIds(db: Db, puuid: string, ids: string[]): Promise<Set<string>> {
   if (ids.length === 0) return new Set();
   const t = tables.benchmarkGames;
   const rows = await db
     .select({ matchId: t.matchId })
     .from(t)
-    .where(and(eq(t.puuid, puuid), inArray(t.matchId, ids)));
+    .where(
+      and(
+        eq(t.puuid, puuid),
+        inArray(t.matchId, ids),
+        gte(t.statsVersion, BENCHMARK_STATS_VERSION),
+      ),
+    );
   return new Set(rows.map((r) => r.matchId));
 }
 

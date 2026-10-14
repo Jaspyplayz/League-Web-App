@@ -55,6 +55,15 @@ async function readBenchmarks(tier: Tier): Promise<BenchmarkGame[]> {
     goldAt15: r.goldAt15,
     earlyDeaths: r.earlyDeaths as DeathLabel[],
     csPerMin: { early: r.csPerMinEarly, mid: r.csPerMinMid, late: r.csPerMinLate },
+    xpAt15: r.xpAt15,
+    earlyTakedowns: r.earlyTakedowns,
+    visionPerMin: r.visionPerMin,
+    strongerSide: r.strongerSide,
+    enemyHalf: r.enemyHalf,
+    gankTakedowns: r.gankTakedowns,
+    objectiveShare: r.objectiveShare,
+    enemyJungleKills: r.enemyJungleKills,
+    scuttles: r.scuttles,
   }));
 }
 

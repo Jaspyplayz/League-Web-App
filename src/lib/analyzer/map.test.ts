@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeSpot, laneOf, mapArea } from "./map";
+import { describeSpot, inLane, laneOf, mapArea, onEnemyHalf } from "./map";
 
 describe("mapArea", () => {
   it.each([
@@ -57,5 +57,22 @@ describe("describeSpot", () => {
   it("names bases from your point of view", () => {
     expect(describeSpot({ x: 1000, y: 1000 }, BLUE)).toBe("your base");
     expect(describeSpot({ x: 1000, y: 1000 }, RED)).toBe("enemy base");
+  });
+});
+
+describe("inLane", () => {
+  it("counts the lanes, but not the raptors next to mid", () => {
+    expect(inLane({ x: 1500, y: 9000 })).toBe(true);
+    expect(inLane({ x: 7400, y: 7300 })).toBe(true);
+    expect(inLane({ x: 7000, y: 5400 })).toBe(false);
+    expect(inLane({ x: 4000, y: 8000 })).toBe(false);
+  });
+});
+
+describe("onEnemyHalf", () => {
+  it("splits the map at the river's center line", () => {
+    expect(onEnemyHalf({ x: 11000, y: 7000 }, 100)).toBe(true);
+    expect(onEnemyHalf({ x: 11000, y: 7000 }, 200)).toBe(false);
+    expect(onEnemyHalf({ x: 4000, y: 8000 }, 100)).toBe(false);
   });
 });

@@ -86,10 +86,10 @@ export function jungleReplay(
   };
 }
 
-type Roster = { ours: number[]; theirs: number[] };
+export type Roster = { ours: number[]; theirs: number[] };
 
 // Which participantIds play each lane, on each team.
-function laneRosters(participants: Participant[], myTeamId: number): Record<Lane, Roster> {
+export function laneRosters(participants: Participant[], myTeamId: number): Record<Lane, Roster> {
   const rosters: Record<Lane, Roster> = {
     top: { ours: [], theirs: [] },
     mid: { ours: [], theirs: [] },

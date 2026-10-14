@@ -31,7 +31,16 @@ export type StatKey =
   | "csAt10"
   | "csPerMinEarly"
   | "csPerMinMid"
-  | "earlyDeaths";
+  | "earlyDeaths"
+  | "xpAt15"
+  | "earlyTakedowns"
+  | "visionPerMin"
+  | "strongerSide"
+  | "enemyHalf"
+  | "gankTakedowns"
+  | "objectiveShare"
+  | "enemyJungleKills"
+  | "scuttles";
 
 type Stat = {
   key: StatKey;
@@ -47,6 +56,17 @@ export const STATS: Stat[] = [
   { key: "csPerMinEarly", pick: (g) => g.csPerMin.early, farming: true },
   { key: "csPerMinMid", pick: (g) => g.csPerMin.mid, farming: true },
   { key: "earlyDeaths", pick: (g) => g.earlyDeaths.length, farming: false },
+  { key: "xpAt15", pick: (g) => g.xpAt15, farming: false },
+  { key: "earlyTakedowns", pick: (g) => g.earlyTakedowns, farming: false },
+  { key: "visionPerMin", pick: (g) => g.visionPerMin, farming: false },
+  // The rest are null outside jungle (and support, for the first two), so
+  // they only show up for those roles.
+  { key: "strongerSide", pick: (g) => g.strongerSide, farming: false },
+  { key: "enemyHalf", pick: (g) => g.enemyHalf, farming: false },
+  { key: "gankTakedowns", pick: (g) => g.gankTakedowns, farming: false },
+  { key: "objectiveShare", pick: (g) => g.objectiveShare, farming: false },
+  { key: "enemyJungleKills", pick: (g) => g.enemyJungleKills, farming: false },
+  { key: "scuttles", pick: (g) => g.scuttles, farming: false },
 ];
 
 // Your average and the benchmark's, over the games where both exist.
@@ -110,12 +130,12 @@ export function compareWithBenchmarks(
           games: pool?.games.length ?? 0,
           players: new Set(pool?.games.map((g) => g.puuid)).size,
         },
-        stats: pool ? compareStats(theirs.map((game) => ({ game, pool }))) : [],
+        stats: pool ? compareStats(theirs.map((game) => ({ game, pool })), minGames) : [],
       };
     })
     .sort((a, b) => b.games - a.games);
 
-  return { stats: compareStats(matched), champions, compared: matched.length };
+  return { stats: compareStats(matched, minGames), champions, compared: matched.length };
 }
 
 function findPool(
@@ -142,14 +162,20 @@ function findPool(
 }
 
 // For each stat: your average across the games, and the average of each
-// game's benchmark group, over the games where both have a value.
-function compareStats(matched: { game: GameTrend; pool: Pool }[]): StatComparison[] {
+// game's benchmark group, over the games where both have a value. Benchmark
+// games collected before a stat was added don't have it, so a group needs
+// `minGames` games with the stat itself, not just `minGames` games.
+function compareStats(
+  matched: { game: GameTrend; pool: Pool }[],
+  minGames: number,
+): StatComparison[] {
   return STATS.flatMap(({ key, pick, farming }) => {
     const pairs = matched.flatMap(({ game, pool }) => {
       if (farming && game.position === "UTILITY") return [];
       const you = pick(game);
-      const them = average(pool.games.map(pick).filter((v): v is number => v !== null));
-      return you === null || them === null ? [] : [{ you, them }];
+      const theirs = pool.games.map(pick).filter((v): v is number => v !== null);
+      if (you === null || theirs.length < minGames) return [];
+      return [{ you, them: average(theirs)! }];
     });
     if (pairs.length === 0) return [];
     return [

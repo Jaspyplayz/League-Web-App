@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { frames, kill, match, participants, SPOTS } from "./test-fixtures";
+import { clock, frames, kill, match, NO_EXTRA_STATS, participants, SPOTS } from "./test-fixtures";
+import type { TrimmedEvent } from "./trim";
 import {
   checkWeaknesses,
   computeTrends,
@@ -24,6 +25,7 @@ function game(overrides: Partial<GameTrend> = {}, i = 0): GameTrend {
     goldAt15: 200,
     earlyDeaths: [],
     csPerMin: { early: 8, mid: 8, late: 8 },
+    ...NO_EXTRA_STATS,
     ...overrides,
   };
 }
@@ -62,10 +64,78 @@ describe("summarizeGame", () => {
     expect(summary.csPerMin).toEqual({ early: 8, mid: 8, late: 4 });
   });
 
+  it("adds XP at 15, early takedowns and vision for every role", () => {
+    expect(summary.xpAt15).toBe(0);
+    expect(summary.earlyTakedowns).toBe(0);
+    expect(summary.visionPerMin).toBe(0);
+  });
+
+  it("leaves the jungle stats out for laners", () => {
+    expect(summary).toMatchObject({
+      strongerSide: null,
+      enemyHalf: null,
+      gankTakedowns: null,
+      objectiveShare: null,
+      enemyJungleKills: null,
+      scuttles: null,
+    });
+  });
+
   it("skips remakes and games without an opponent in your role", () => {
     expect(summarizeGame(match(participants(), 300), timeline, "player-3")).toBeNull();
     const aram = participants().map((p) => ({ ...p, teamPosition: "", individualPosition: "" }));
     expect(isTrendGame(match(aram), "player-3")).toBe(false);
+  });
+});
+
+describe("summarizeGame for a jungler", () => {
+  // Vi (blue jungle, participant 2) against Lee Sin (7).
+  const players = participants().map((p) =>
+    p.participantId === 2
+      ? { ...p, visionScore: 45, challenges: { enemyJungleMonsterKills: 8, scuttleCrabKills: 3 } }
+      : p,
+  );
+  const monster = (at: string, killerTeamId: number, monsterType: string): TrimmedEvent => ({
+    type: "ELITE_MONSTER_KILL",
+    timestamp: clock(at),
+    killerTeamId,
+    monsterType,
+    monsterSubType: monsterType === "DRAGON" ? "FIRE_DRAGON" : null,
+    killerId: killerTeamId === 100 ? 2 : 7,
+    assistingParticipantIds: [],
+  });
+  const timeline = {
+    frames: frames(30, (minute, id) => ({ xp: minute * (id === 2 ? 500 : 450) })),
+    events: [
+      kill("4:30", 2, 6, [1], SPOTS.topLane), // a gank top
+      kill("6:00", 1, 7, [2], SPOTS.jungle), // a fight in the jungle
+      kill("9:00", 3, 8, [], SPOTS.midLane), // mid kills without you
+      kill("20:00", 2, 9, [], SPOTS.botLane), // after 14:00
+      monster("8:00", 100, "DRAGON"),
+      monster("14:00", 100, "RIFTHERALD"),
+      monster("15:00", 200, "DRAGON"),
+      monster("25:00", 200, "BARON_NASHOR"), // not counted
+    ],
+  };
+  const summary = summarizeGame(match(players), timeline, "player-2")!;
+
+  it("counts takedowns before 14:00, and the ones in a lane as ganks", () => {
+    expect(summary.earlyTakedowns).toBe(2);
+    expect(summary.gankTakedowns).toBe(1);
+  });
+
+  it("works out XP at 15 and vision per minute", () => {
+    expect(summary.xpAt15).toBe(750);
+    expect(summary.visionPerMin).toBe(1.5);
+  });
+
+  it("shares out dragons, grubs and Heralds", () => {
+    expect(summary.objectiveShare).toBeCloseTo(2 / 3);
+  });
+
+  it("reads enemy jungle monsters and scuttles from Riot's challenges", () => {
+    expect(summary.enemyJungleKills).toBe(8);
+    expect(summary.scuttles).toBe(3);
   });
 });
 
