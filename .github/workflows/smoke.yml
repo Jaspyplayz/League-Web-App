@@ -1,0 +1,30 @@
+name: Smoke test
+
+# Vercel tells GitHub when a preview finishes deploying (a "deployment
+# status"). This runs the Playwright test in e2e/ against that preview, so a
+# page that only breaks on the real site shows up on the PR.
+# Guide: https://vercel.com/guides/how-can-i-run-end-to-end-tests-after-my-vercel-preview-deployment
+on: deployment_status
+
+jobs:
+  smoke:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          BASE_URL: ${{ github.event.deployment_status.environment_url }}
+          # Only needed if Vercel's preview protection is on (see docs/SETUP.md).
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
