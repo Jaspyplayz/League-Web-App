@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/panel";
 import { SectionHeading } from "@/components/ui/section-heading";
 import type { DiffPoint } from "@/lib/diff-chart";
 import { toSlug } from "@/lib/riot-id";
+import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 
 // A well-known public Riot ID (Faker), so visitors can try a lookup in one click.
 const EXAMPLE_PLAYER = { region: "kr", gameName: "Hide on bush", tagLine: "KR1" };
@@ -61,6 +62,13 @@ export default function Home() {
               className="rounded-full border border-line-strong px-3.5 py-2 font-mono text-ink-soft transition-colors hover:border-ahead hover:text-ink"
             >
               {EXAMPLE_PLAYER.gameName}#{EXAMPLE_PLAYER.tagLine}
+            </Link>
+            <span>or</span>
+            <Link
+              href={SAMPLE_MATCH_HREF}
+              className="rounded-full border border-line-strong px-3.5 py-2 text-ink-soft transition-colors hover:border-ahead hover:text-ink"
+            >
+              See a sample analysis
             </Link>
           </div>
           <SavedPlayers />

@@ -1,4 +1,6 @@
+import Link from "next/link";
 import type { RiotApiError } from "@/lib/riot/client";
+import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 
 // Turns a failed Riot call into a message a visitor can act on.
 const MESSAGES: Record<RiotApiError["kind"], { title: string; body: (e: RiotApiError) => string }> =
@@ -32,6 +34,18 @@ export function RiotErrorNotice({ error }: { error: RiotApiError }) {
     >
       <p className="font-semibold">{title}</p>
       <p className="text-muted">{body(error)}</p>
+      {/* The sample game is served from the database, so it still works
+          while Riot can't be reached. "not-found" is about this one player,
+          so a sample wouldn't help there. */}
+      {error.kind !== "not-found" && (
+        <p className="text-muted">
+          Meanwhile, you can{" "}
+          <Link href={SAMPLE_MATCH_HREF} className="text-ink underline hover:text-ahead">
+            see a sample analysis
+          </Link>
+          .
+        </p>
+      )}
     </div>
   );
 }
