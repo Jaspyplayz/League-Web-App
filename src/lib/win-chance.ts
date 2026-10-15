@@ -1,3 +1,4 @@
+import { listNames } from "@/lib/analyzer/format";
 import type { TrimmedTimeline } from "@/lib/analyzer/trim";
 import {
   biggestSwings,
@@ -32,4 +33,23 @@ export function matchWinChance(
   const chances = teamWinChance(game, WIN_CHANCE_MODEL, teamId);
   if (!chances) return null;
   return { chances, swings: biggestSwings(game, chances, teamId), model: WIN_CHANCE_MODEL };
+}
+
+// A swing in words, leading with the side it went toward: "Your team took
+// Baron and 2 kills", then what the other side got, if anything. Used by the
+// Biggest swings list and the shareable match card.
+export function describeSwing(s: WinChanceSwing): { title: string; detail: string | null } {
+  const good = s.to > s.from;
+  const [first, second] = good
+    ? [took("Your team", s.ours), took("The enemy team", s.theirs)]
+    : [took("The enemy team", s.theirs), took("Your team", s.ours)];
+  return {
+    title: first ?? second ?? "Gold and XP shifted",
+    detail: first && second ? second : null,
+  };
+}
+
+// "Your team took Baron and 2 kills", or null when they took nothing.
+function took(who: string, things: string[]): string | null {
+  return things.length > 0 ? `${who} took ${listNames(things)}` : null;
 }

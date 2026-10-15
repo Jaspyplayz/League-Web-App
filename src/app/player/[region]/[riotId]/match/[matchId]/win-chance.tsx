@@ -1,10 +1,10 @@
 import { DiffChart, type TurningPointMarker } from "@/components/diff-chart";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
-import { formatClock, listNames } from "@/lib/analyzer/format";
+import { formatClock } from "@/lib/analyzer/format";
 import type { WinChanceSwing } from "@/lib/analyzer/win-chance";
 import type { DiffPoint } from "@/lib/diff-chart";
-import type { MatchWinChance } from "@/lib/win-chance";
+import { describeSwing, type MatchWinChance } from "@/lib/win-chance";
 import { LegendSwatch } from "./legend-swatch";
 
 // Your team's chance of winning at every minute, from Turnpoint's trained
@@ -78,14 +78,8 @@ export function WinChance({ chances, swings, model }: MatchWinChance) {
 }
 
 function Swing({ swing: s, number }: { swing: WinChanceSwing; number: number }) {
-  const good = s.to > s.from;
-  const color = good ? "text-ahead-soft border-ahead" : "text-behind border-behind";
-  // Lead with the side the swing went toward.
-  const [first, second] = good
-    ? [took("Your team", s.ours), took("The enemy team", s.theirs)]
-    : [took("The enemy team", s.theirs), took("Your team", s.ours)];
-  const title = first ?? second ?? "Gold and XP shifted";
-  const detail = first && second ? second : null;
+  const color = s.to > s.from ? "text-ahead-soft border-ahead" : "text-behind border-behind";
+  const { title, detail } = describeSwing(s);
 
   return (
     <li className={`${panelClass} flex items-start gap-3.5 px-4 py-3.5`}>
@@ -109,11 +103,6 @@ function Swing({ swing: s, number }: { swing: WinChanceSwing; number: number }) 
       </div>
     </li>
   );
-}
-
-// "Your team took Baron and 2 kills", or null when they took nothing.
-function took(who: string, things: string[]): string | null {
-  return things.length > 0 ? `${who} took ${listNames(things)}` : null;
 }
 
 function percent(chance: number): string {
