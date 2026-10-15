@@ -573,3 +573,37 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const average = (xs: number[]) => (xs.length ? sum(xs) / xs.length : 0);
 const dot = (a: readonly number[], b: number[]) => a.reduce((total, x, i) => total + x * b[i], 0);
 const round = (x: number, digits: number) => Math.round(x * 10 ** digits) / 10 ** digits;
+
+// The "try it yourself" calculator on the How it works page: your team's
+// chance from a few leads you pick, using the same features and weights as
+// the match page. Each lead is yours minus the enemy's, so 0 is even.
+export type WhatIf = {
+  minute: number;
+  goldLead: number;
+  xpLead: number;
+  dragonLead: number;
+  inhibitorLead: number;
+  // 1 while your team has Baron, -1 while the enemy does.
+  baron: -1 | 0 | 1;
+};
+
+export function whatIfChance(model: WinChanceModel, w: WhatIf): number {
+  const zero = readTeam([]);
+  // Your team plays blue: a lead goes on your side, a deficit on theirs.
+  const you: TeamState = {
+    ...zero,
+    gold: w.goldLead,
+    xp: w.xpLead,
+    dragons: Math.max(0, w.dragonLead),
+    inhibitors: Math.max(0, w.inhibitorLead),
+    baronBuff: Math.max(0, w.baron),
+  };
+  const them: TeamState = {
+    ...zero,
+    dragons: Math.max(0, -w.dragonLead),
+    inhibitors: Math.max(0, -w.inhibitorLead),
+    baronBuff: Math.max(0, -w.baron),
+  };
+  const features = WIN_CHANCE_FEATURES.map((f) => f.value(you, them, w.minute));
+  return blueWinChance(model.weights, features);
+}

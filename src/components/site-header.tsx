@@ -23,7 +23,7 @@ export function SiteHeader() {
           </span>
         </Link>
         <div className="flex flex-wrap items-center gap-1">
-          <Link href="/#how" className={navLink}>
+          <Link href="/how-it-works" className={navLink}>
             How it works
           </Link>
           <a href={REPO_URL} className={navLink}>
