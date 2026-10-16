@@ -167,6 +167,15 @@ describe("studyRows", () => {
     expect(at(7).nextPlay).toBeNull();
   });
 
+  it("can look further ahead for the next play, and notes the time since the last kill", () => {
+    const later = studyRows(game, 120_000).minutes;
+    const row = (m: number) => later.find((r) => r.minute === m)!;
+    expect(row(13).nextPlay).toBe(1); // the 14:30 kill, more than a minute later
+    expect(row(12).nextPlay).toBeNull(); // 12:20 had no jungler in it
+    expect(at(5).sinceKillS).toBe(Infinity);
+    expect(at(6).sinceKillS).toBe(30);
+  });
+
   it("lists epic monsters with the calls before them", () => {
     expect(objectives).toHaveLength(1);
     expect(objectives[0]).toMatchObject({ kind: "dragon", blueTook: false, spawnsAt: clock("5:00") });

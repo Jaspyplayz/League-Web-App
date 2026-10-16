@@ -55,7 +55,7 @@ function main() {
   const games = loadGames().filter((g) => !tiers || tiers.includes(g.tier));
   if (games.length === 0) throw new Error(`No games in ${STUDY_FOLDER}. Run npm run tempo-games first.`);
 
-  const all = games.map(studyRows);
+  const all = games.map((g) => studyRows(g));
   const minutes = all.flatMap((r) => r.minutes);
   const objectives = all.flatMap((r) => r.objectives);
   const duels = all.flatMap((r) => r.duels);
@@ -93,6 +93,7 @@ function main() {
   duelsSection(duels);
   shapeSection(all.map((r) => r.minutes));
   tiersSection(labeled, objectives);
+  robustnessSection(games, labeled);
   bootstrapSection(labeled, objectives, definitions, check);
 
   const report = lines.join("\n") + "\n";
@@ -390,17 +391,9 @@ function callOf(d: Definition, r: StudyRow): TempoTone {
 // on that lead alone, with both junglers alive.
 function tunedDefinitions(labeled: StudyRow[]): Definition[] {
   const train = labeled.filter((r) => isTuning(r.matchId));
-  const round = (x: number, step = 50) => Math.round(x / step) * step;
-  const goldPer = (keys: StudyFeature[]) => {
-    const w = fitLogistic(asRows(train, keys));
-    // asRows gives gold in thousands, so w[1] is per 1,000 gold of keys[0].
-    return keys.map((_, i) => round((1000 * w[i + 1]) / w[1]));
-  };
-  const thresholdFor = (lead: (r: StudyRow) => number, unit: number, alive = (r: StudyRow) => r.f.alive) => {
-    const bothAlive = train.filter((r) => alive(r) === 0);
-    const [, b] = fitLogistic(bothAlive.map((r) => ({ x: [lead(r) / unit], won: r.nextPlay === 1 })));
-    return b > 0 ? (unit * Math.log(0.55 / 0.45)) / b : Infinity;
-  };
+  const goldPer = (keys: StudyFeature[]) => goldWeights(train, keys);
+  const thresholdFor = (lead: (r: StudyRow) => number, unit: number, alive?: (r: StudyRow) => number) =>
+    leadFor55(train, lead, unit, alive);
   const gold = (x: number) => Math.round(x).toLocaleString("en-US");
   const definition = (
     name: string,
@@ -408,7 +401,7 @@ function tunedDefinitions(labeled: StudyRow[]): Definition[] {
     lead: (r: StudyRow) => number,
     alive?: (r: StudyRow) => number,
   ): Definition => {
-    const threshold = round(thresholdFor(lead, 1000, alive));
+    const threshold = round50(thresholdFor(lead, 1000, alive));
     return { name, weights, alive, lead, threshold, thresholdText: gold(threshold) };
   };
 
@@ -455,6 +448,32 @@ function tunedDefinitions(labeled: StudyRow[]): Definition[] {
       thresholdText: gold(TEMPO_LEAD),
     },
   ];
+}
+
+function round50(x: number): number {
+  return Math.round(x / 50) * 50;
+}
+
+// A logistic regression of the next play on `keys`, with each weight turned
+// into gold: how much gold of the first key has the same effect. Rounded to
+// 50 gold.
+function goldWeights(rows: StudyRow[], keys: StudyFeature[]): number[] {
+  const w = fitLogistic(asRows(rows, keys));
+  // asRows gives gold in thousands, so w[1] is per 1,000 gold of keys[0].
+  return keys.map((_, i) => round50((1000 * w[i + 1]) / w[1]));
+}
+
+// The lead at which the side ahead won 55% of next plays, from a fit of the
+// next play on that lead alone, over the moments with both junglers alive.
+function leadFor55(
+  rows: StudyRow[],
+  lead: (r: StudyRow) => number,
+  unit: number,
+  alive = (r: StudyRow) => r.f.alive,
+): number {
+  const bothAlive = rows.filter((r) => alive(r) === 0);
+  const [, b] = fitLogistic(bothAlive.map((r) => ({ x: [lead(r) / unit], won: r.nextPlay === 1 })));
+  return b > 0 ? (unit * Math.log(0.55 / 0.45)) / b : Infinity;
 }
 
 function evaluate(d: Definition, check: CheckHalf) {
@@ -516,6 +535,50 @@ function tuningSection(labeled: StudyRow[], definitions: Definition[], check: Ch
       return `${pct(c.right)} of ${pct(c.share)}`;
     });
     say(`| ${d.name} | ${cells.join(" | ")} |`);
+  }
+
+  say();
+  say(`Do the weights hold across ranks? The items, levels and players alive weights fitted again on each rank group's games (all of them, both halves):`);
+  say();
+  say(`| Ranks | Games | Gold per level | Gold per player alive | Lead for 55% |`);
+  say(`|---|---|---|---|---|`);
+  for (const [label, tiers] of TIER_GROUPS) {
+    const rows = labeled.filter((r) => tiers.includes(r.tier));
+    if (new Set(rows.map((r) => r.matchId)).size < 30) continue;
+    const [, level, , player] = goldWeights(rows, ["itemGold", "level", "alive", "numbers"]);
+    const threshold = leadFor55(rows, (r) => r.f.itemGold + level * r.f.level + player * r.f.numbers, 1000);
+    say(
+      `| ${label} | ${new Set(rows.map((r) => r.matchId)).size} | ${level.toLocaleString("en-US")} | ${player.toLocaleString("en-US")} | ${round50(threshold).toLocaleString("en-US")} |`,
+    );
+  }
+}
+
+// Do the results hang on choices the study made? The same call checked
+// with a shorter and a longer window for "the next play", and without the
+// minutes in the middle of a fight, where whoever has more players standing
+// usually wins the next kill.
+function robustnessSection(games: StudyGame[], labeled: StudyRow[]) {
+  const withWindow = (ms: number) =>
+    games.flatMap((g) => studyRows(g, ms).minutes).filter((r) => r.nextPlay !== null);
+  const variants: [string, StudyRow[]][] = [
+    ["Next play within 30 s", withWindow(30_000)],
+    ["Within 60 s (the main measure)", labeled],
+    ["Within 2 min", withWindow(120_000)],
+    ["Within 60 s, no kill in the 20 s before the mark", labeled.filter((r) => r.sinceKillS > 20)],
+    ["Within 60 s, no kill in the 60 s before the mark", labeled.filter((r) => r.sinceKillS > 60)],
+  ];
+  say();
+  say(`## Robustness`);
+  say();
+  say(`The current settings' call against other ways of measuring the next play.`);
+  say();
+  say(`| Measure | Moments | Call right | AUC lead | AUC junglers' gold | AUC team gold |`);
+  say(`|---|---|---|---|---|---|`);
+  for (const [label, rows] of variants) {
+    const c = callAccuracy(rows.map((r) => ({ tone: r.tone, won: r.nextPlay === 1 })));
+    say(
+      `| ${label} | ${rows.length} | ${pct(c.right)} of ${pct(c.share)} | ${aucOf(rows, "lead").toFixed(3)} | ${aucOf(rows, "gold").toFixed(3)} | ${aucOf(rows, "teamGold").toFixed(3)} |`,
+    );
   }
 }
 

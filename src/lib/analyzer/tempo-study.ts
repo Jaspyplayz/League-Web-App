@@ -143,6 +143,10 @@ export type StudyRow = {
   // Did blue's side win the next jungler fight or epic monster within a
   // minute of this mark? Null when nothing happened.
   nextPlay: 0 | 1 | null;
+  // Seconds since the last champion kill anywhere on the map, to tell
+  // minutes in the middle of a fight from quiet ones. Infinity before the
+  // first kill.
+  sinceKillS: number;
 };
 
 // An epic monster taken, with the tempo call just before and a minute before.
@@ -173,7 +177,9 @@ export const NEXT_PLAY_MS = 60_000;
 // Minute 1 is still the walk to the first camp, so the study starts at 2.
 const FIRST_MINUTE = 2;
 
-export function studyRows(game: StudyGame): StudyRows {
+// `nextPlayMs` is how long after a mark something counts as the next play;
+// the study also tries other windows to check the results don't hang on it.
+export function studyRows(game: StudyGame, nextPlayMs = NEXT_PLAY_MS): StudyRows {
   const blue = game.participants.find((p) => p.teamId === 100 && p.position === "JUNGLE")!;
   const red = game.participants.find((p) => p.teamId === 200 && p.position === "JUNGLE")!;
   const { timeline } = game;
@@ -201,6 +207,7 @@ export function studyRows(game: StudyGame): StudyRows {
   const upOn = (i: number, teamId: number) =>
     game.participants.filter((p) => p.teamId === teamId && up(i, p.participantId)).length;
   const plays = playsOf(events, game.participants, [blue.participantId, red.participantId]);
+  const kills = events.filter((e): e is ChampionKill => e.type === "CHAMPION_KILL");
 
   const rows: StudyRow[] = [];
   for (const [index, m] of exact.minutes.entries()) {
@@ -209,7 +216,8 @@ export function studyRows(game: StudyGame): StudyRows {
     if (minute < FIRST_MINUTE) continue;
     const est = estimated.minutes[index];
     const sinceShop = (lastShop: number | null) => (m.timestamp - (lastShop ?? 0)) / 60_000;
-    const next = plays.find((p) => p.timestamp > m.timestamp && p.timestamp <= m.timestamp + NEXT_PLAY_MS);
+    const next = plays.find((p) => p.timestamp > m.timestamp && p.timestamp <= m.timestamp + nextPlayMs);
+    const lastKill = kills.findLast((k) => k.timestamp <= m.timestamp);
     rows.push({
       matchId: game.matchId,
       tier: game.tier,
@@ -239,6 +247,7 @@ export function studyRows(game: StudyGame): StudyRows {
       tone: m.tone,
       toneEst: est.tone,
       nextPlay: next ? (next.blueWon ? 1 : 0) : null,
+      sinceKillS: lastKill ? (m.timestamp - lastKill.timestamp) / 1000 : Infinity,
     });
   }
 
