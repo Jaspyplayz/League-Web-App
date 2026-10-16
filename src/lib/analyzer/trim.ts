@@ -10,11 +10,18 @@
 import type { MapPosition, Timeline, TimelineEvent } from "@/lib/riot/types";
 
 // Version 2 added item purchases and skill level-ups, for the Build tab.
+// unspentGold came later without a new version: it's optional, and the tempo
+// timeline estimates it for timelines saved before it existed, so there's no
+// need to fetch them all again.
 export const TRIM_VERSION = 2;
 
 // One player at one moment of the game.
 export type PlayerFrame = {
   gold: number; // total gold earned so far, spent or not
+  // Gold in their pocket, not spent yet (Riot's currentGold). gold minus this
+  // is what they've spent on items. Missing in timelines saved before the
+  // tempo timeline was added.
+  unspentGold?: number;
   xp: number;
   level: number;
   cs: number; // minions + jungle monsters
@@ -117,6 +124,7 @@ export function trimTimeline(timeline: Timeline): TrimmedTimeline {
       const p = frame.participantFrames[String(id)];
       players.push({
         gold: p?.totalGold ?? 0,
+        ...(typeof p?.currentGold === "number" ? { unspentGold: p.currentGold } : {}),
         xp: p?.xp ?? 0,
         level: p?.level ?? 1,
         cs: (p?.minionsKilled ?? 0) + (p?.jungleMinionsKilled ?? 0),
