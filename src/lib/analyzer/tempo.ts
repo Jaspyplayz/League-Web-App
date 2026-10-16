@@ -34,8 +34,10 @@ import type { ChampionKill, EliteMonsterKill, TrimmedFrame, TrimmedTimeline } fr
 
 // How much one level and one extra player alive are worth, in gold, and how
 // big the combined lead has to be to count as up tempo. Set from the study in
-// docs/tempo.md.
-export const LEVEL_GOLD = 1500;
+// docs/tempo.md: in 1,923 games, a level and a player alive each did about as
+// much as 2,000 gold of items, so being a level or a player up is enough on
+// its own.
+export const LEVEL_GOLD = 2000;
 export const PLAYER_GOLD = 2000;
 export const TEMPO_LEAD = 2000;
 
@@ -401,9 +403,10 @@ function monsterKind(m: EliteMonsterKill): ObjectiveKind | null {
 
 // --- Epic monster timers ---
 
-// Spawn and respawn times on Summoner's Rift, in ms. They match every saved
-// game from patch 16.13 on (docs/tempo.md); Riot changes them now and then,
-// so they're worth checking when a season starts.
+// Spawn and respawn times on Summoner's Rift, in ms. None of the 13,738 epic
+// monsters in the study's games (patches 16.1 to 16.20, docs/tempo.md) was
+// taken before them. Riot changes them now and then, so they're worth
+// checking when a season starts.
 export const DRAGON_SPAWN_MS = 5 * 60_000;
 export const DRAGON_RESPAWN_MS = 5 * 60_000;
 // Once a team has four dragons (the soul), Elder Dragon takes their place.
