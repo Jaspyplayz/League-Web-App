@@ -12,6 +12,9 @@ import type { RecapFacts } from "@/lib/analyzer/recap-facts";
 // saved (src/lib/recap-store.ts), so a game is only ever written once.
 export const RECAP_MODEL = "claude-haiku-5-5";
 
+// `detail` holds the points, one per line, each as "12:00<tab>what happened"
+// (see src/lib/recap-points.ts). Recaps saved before the points existed are a
+// single paragraph, which shows as one point with no time.
 export type Recap = { headline: string; detail: string };
 
 // Without the key, the site hides the "Write recap" button.
@@ -34,16 +37,27 @@ Rules:
 - Plain words a casual player understands. Write times as game clock times like 14:20.
 
 Output:
-- headline: one sentence of at most 14 words.
-- detail: 3 to 5 short sentences, as one paragraph.`;
+- points: 3 to 6 points in game order. Each has a time and a text.
+  - time: the game clock time it happened, like "12:00". For something that spans part of the game, a range like "3:00–14:00". For something about the whole game, like farm or vision, "Overall". Put "Overall" points last.
+  - text: one short sentence of at most 18 words about one thing, with at most two numbers. Don't repeat the time in it. Example: "Your team took two towers and a kill, and your win chance rose from 66% to 84%."
+- headline: one sentence of at most 12 words that sums up the points. It may only repeat something already said in the points, never a new fact.`;
 
 const SCHEMA = {
   type: "object",
   properties: {
+    points: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { time: { type: "string" }, text: { type: "string" } },
+        required: ["time", "text"],
+        additionalProperties: false,
+      },
+    },
     headline: { type: "string" },
-    detail: { type: "string" },
   },
-  required: ["headline", "detail"],
+  // Points come first so the model writes them before summing them up.
+  required: ["points", "headline"],
   additionalProperties: false,
 };
 
@@ -68,10 +82,18 @@ function parseRecap(text: string): Recap | null {
   try {
     const value: unknown = JSON.parse(text);
     if (typeof value !== "object" || value === null) return null;
-    const { headline, detail } = value as Record<string, unknown>;
-    if (typeof headline !== "string" || typeof detail !== "string") return null;
-    if (!headline.trim() || !detail.trim()) return null;
-    return { headline: headline.trim(), detail: detail.trim() };
+    const { headline, points } = value as Record<string, unknown>;
+    if (typeof headline !== "string" || !headline.trim() || !Array.isArray(points)) return null;
+    // One line per point, so a point can't contain line breaks or tabs of its own.
+    const clean = (value: unknown) =>
+      typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+    const lines = points
+      .map((p) => (typeof p === "object" && p !== null ? (p as Record<string, unknown>) : {}))
+      .map((p) => ({ time: clean(p.time), text: clean(p.text) }))
+      .filter((p) => p.text !== "")
+      .map((p) => `${p.time}\t${p.text}`);
+    if (lines.length === 0) return null;
+    return { headline: headline.trim(), detail: lines.join("\n") };
   } catch {
     return null;
   }
