@@ -78,6 +78,13 @@
       "when": 1791995921205,
       "tag": "0010_win_chance_games",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792174873509,
+      "tag": "0011_day_notes",
+      "breakpoints": true
     }
   ]
 }

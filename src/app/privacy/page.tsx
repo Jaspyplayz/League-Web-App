@@ -74,6 +74,11 @@ export default function PrivacyPage() {
         them. Clear a note and save it to delete it.
       </p>
       <p>
+        The same goes for notes you write on a day in your Log tab: Turnpoint saves the note
+        and the date with your account, and only you see them. Clear a note and save it to
+        delete it.
+      </p>
+      <p>
         While you&apos;re signed in, your browser keeps a sign-in cookie so you don&apos;t have
         to sign in on every page. Signing out removes it.
       </p>
@@ -97,6 +102,9 @@ export default function PrivacyPage() {
       <p>
         The theme you pick on the Settings page (dark, light or system) is saved in the same
         local storage, so the site looks the way you chose on your next visit.
+      </p>
+      <p>
+        Whether you picked Short or Detailed day cards on the Log tab is saved there too.
       </p>
 
       <h2>Technical data</h2>
