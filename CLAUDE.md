@@ -27,7 +27,8 @@ Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Driz
 ```
 src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   .../match/[matchId]/ under it is the match analysis page
-                  and .../insights/ the trends across the last 20 to 100 games;
+                  and .../insights/ the trends across the last 20 to 100 games,
+                  .../log/ the Log tab (one card per day, src/lib/daily-log.ts);
                   settings/ holds preferences saved in the browser (theme)
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them

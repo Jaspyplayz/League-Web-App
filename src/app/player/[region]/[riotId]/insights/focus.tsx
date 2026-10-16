@@ -50,7 +50,7 @@ function save(player: string, focus: Focus | null) {
 
 // The player's focus, or null. The server has no saved focus, so it renders
 // none, and the browser fills it in right after the page loads.
-function useFocus(player: string): Focus | null {
+export function useFocus(player: string): Focus | null {
   const saved = useSyncExternalStore(subscribe, readSaved, () => null);
   return useMemo(() => parseFocuses(saved)[player] ?? null, [saved, player]);
 }

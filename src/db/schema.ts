@@ -345,3 +345,24 @@ export const matchNotes = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.matchId] })],
 ).enableRLS();
+
+// A private note a signed-in player keeps on a day of their Log tab ("tilted
+// after game 4, stopped"). One note per account per day, only ever shown to
+// that account, on the profile it marked with "This is me".
+export const dayNotes = pgTable(
+  "day_notes",
+  {
+    // Deleting the account in Supabase Auth deletes its notes.
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    // "2026-10-16", the day in the player's own timezone (see
+    // src/lib/daily-log.ts). Text, because a date column would be read back
+    // in the server's timezone.
+    day: text("day").notNull(),
+    // Up to MAX_NOTE_LENGTH characters (src/lib/match-note.ts).
+    text: text("text").notNull(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.day] })],
+).enableRLS();
