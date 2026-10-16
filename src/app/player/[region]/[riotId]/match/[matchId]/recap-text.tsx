@@ -1,15 +1,21 @@
-// The saved or just-written recap: the headline, its points as a list (one
-// per line of `detail`, see src/lib/recap.ts), and a note that AI wrote it.
+import { recapPoints } from "@/lib/recap-points";
+
+// The saved or just-written recap: the headline, then its points in game
+// order with the time in its own column, and a note that AI wrote it.
 export function RecapText({ headline, detail }: { headline: string; detail: string }) {
-  const points = detail.split("\n").filter((line) => line.trim() !== "");
+  const points = recapPoints(detail);
   return (
     <>
       <p className="text-body font-semibold text-ink">{headline}</p>
-      <ul className="flex flex-col gap-2 text-ink-soft">
+      <ul className="flex flex-col divide-y divide-line">
         {points.map((point, i) => (
-          <li key={i} className="flex gap-3">
-            <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-ahead" aria-hidden="true" />
-            <span>{point}</span>
+          <li key={i} className="flex gap-4 py-2">
+            {point.time && (
+              <span className="w-24 shrink-0 font-mono text-sm leading-6 text-ahead-soft tabular-nums">
+                {point.time}
+              </span>
+            )}
+            <span className="text-ink-soft">{point.text}</span>
           </li>
         ))}
       </ul>
