@@ -30,6 +30,9 @@ export function SiteHeader() {
             <GitHubIcon />
             GitHub
           </a>
+          <Link href="/settings" className={navLink}>
+            Settings
+          </Link>
           {/* Who's signed in depends on the visitor's cookies, so it streams in
               after the rest of the header, which stays prerendered. */}
           <Suspense>

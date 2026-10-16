@@ -18,6 +18,7 @@
 @theme {
   --color-page: #0b0e13;
   --color-surface: #12161d;
+  --color-surface-hover: #171c24;
   --color-line: #1e2430;
   --color-line-strong: #262c37;
 
@@ -48,11 +49,44 @@
 }
 
 /*
- * The site is dark only. The root layout puts class="dark" on <html>, so any
- * dark: utilities (like the ones on the player page) always apply instead of
- * following the visitor's OS setting.
+ * Light mode. The colors above are the dark theme and the default; picking
+ * Light on the Settings page puts data-theme="light" on <html> (see
+ * src/lib/theme.ts), and these replace them. Every utility reads the colors
+ * through var(--color-...), so pages and charts switch without changes.
+ *
+ * Same meanings as dark: blue = you / ahead / win, red = opponent / behind /
+ * loss. The blues and red are darker here so text in them stays readable on
+ * white: at least 4.5:1 contrast on the page and cards, the WCAG AA bar.
  */
-@custom-variant dark (&:where(.dark, .dark *));
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-page: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-surface-hover: #eef1f5;
+  --color-line: #e2e6ec;
+  --color-line-strong: #d3d9e2;
+
+  --color-ink: #141922;
+  --color-ink-soft: #323b49;
+  --color-muted: #4f5a69;
+  --color-faint: #5f6a7b;
+  --color-placeholder: #8a93a1;
+
+  /* In dark mode "soft" and "bright" are lighter blues for text on black;
+     on white they go darker instead, so links and highlights still stand out. */
+  --color-ahead: #2c62db;
+  --color-ahead-soft: #1f55cc;
+  --color-ahead-bright: #163f9e;
+  --color-behind: #cf352e;
+}
+
+/*
+ * dark: and light: utilities follow the theme picked in Settings, not the
+ * visitor's OS setting (System handles that in src/lib/theme.ts).
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
 
 :root {
   color-scheme: dark;

@@ -54,3 +54,15 @@ test("open the sample analysis", async ({ page }) => {
   );
   await expect(page.getByText("Biggest swings")).toBeVisible();
 });
+
+// The theme is applied by a script in <head>, so check it survives a reload:
+// if that script broke, the page would come back dark.
+test("switch to light mode in Settings", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("radio", { name: /^Light/ }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("radio", { name: /^Light/ })).toBeChecked();
+});

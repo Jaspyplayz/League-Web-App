@@ -33,7 +33,7 @@ export function ExpandableRow({
           if (event.target instanceof Element && event.target.closest("a")) return;
           setOpen((wasOpen) => !wasOpen);
         }}
-        className={`${rowClassName} flex cursor-pointer items-center gap-3 transition-colors hover:bg-[#171c24] ${open ? "rounded-b-none" : ""}`}
+        className={`${rowClassName} flex cursor-pointer items-center gap-3 transition-colors hover:bg-surface-hover ${open ? "rounded-b-none" : ""}`}
       >
         {row}
         <button

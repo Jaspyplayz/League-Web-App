@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // same pull request.
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="October 14, 2026">
+    <LegalPage title="Privacy policy" updated="October 16, 2026">
       <p>
         Turnpoint is a free League of Legends stats site built by one student. This page
         explains what data it handles and why. The short version: accounts are optional, and
@@ -93,6 +93,10 @@ export default function PrivacyPage() {
         If you pick a focus goal on the Insights tab, Turnpoint saves which weakness you
         picked, for which player, and when, in the same local storage. It also stays on your
         device. Remove it with the Stop focusing button.
+      </p>
+      <p>
+        The theme you pick on the Settings page (dark, light or system) is saved in the same
+        local storage, so the site looks the way you chose on your next visit.
       </p>
 
       <h2>Technical data</h2>
