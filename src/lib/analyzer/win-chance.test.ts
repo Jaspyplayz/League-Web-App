@@ -8,6 +8,7 @@ import {
   crossValidate,
   evaluate,
   fitLogistic,
+  modelForTier,
   patchOf,
   readTeam,
   TEAM_STATS,
@@ -156,7 +157,7 @@ describe("winChanceFeatures", () => {
 
 // Made-up games where blue's gold lead wanders up and down, and the team
 // ahead at the end usually (not always) wins.
-function fakeGames(count: number, patch = "16.20"): WinChanceGame[] {
+function fakeGames(count: number, patch = "16.20", tier?: string): WinChanceGame[] {
   let seed = 7;
   const random = () => {
     seed = (seed * 16807) % 2147483647;
@@ -171,7 +172,8 @@ function fakeGames(count: number, patch = "16.20"): WinChanceGame[] {
       return { t: minute * 60, blue, red };
     });
     const blueWin = lead + (random() - 0.5) * 2000 > 0;
-    return { matchId: `${patch}_${g}`, patch, blueWin, frames: gameFrames };
+    const matchId = tier ? `${patch}_${tier}_${g}` : `${patch}_${g}`;
+    return { matchId, patch, blueWin, frames: gameFrames, tier };
   });
 }
 
@@ -255,6 +257,39 @@ describe("trainWinChanceModel and winChanceCurve", () => {
 
   it("ignores a model trained on a different feature list", () => {
     expect(winChanceCurve(games[0], { ...model, features: ["gold"] })).toBeNull();
+  });
+});
+
+describe("per-rank models", () => {
+  const games = [...fakeGames(30, "16.20", "GOLD"), ...fakeGames(30, "16.20", "MASTER"), ...fakeGames(10)];
+  const model = trainWinChanceModel(games.flatMap(winChanceExamples), games.length, new Date(0), {
+    minRankGames: 20,
+  });
+
+  it("trains each tier and group with enough games, and skips the rest", () => {
+    expect(model.rank).toBe("All ranks");
+    expect(model.ranks.map((r) => [r.key, r.games])).toEqual([
+      ["GOLD", 30],
+      ["MASTER", 30],
+      ["EMERALD+", 30],
+      ["MASTER+", 30],
+    ]);
+  });
+
+  it("checks the all-ranks model on the same games as each rank's own", () => {
+    for (const rank of model.ranks) {
+      expect(rank.allRanks.examples).toBe(rank.evaluation.examples);
+    }
+  });
+
+  it("picks the tier's own model, else the narrowest group, else all ranks", () => {
+    const pick = (tier: string | null) => modelForTier(model, tier);
+    expect(pick("GOLD")).toMatchObject({ rank: "Gold", games: 30 });
+    expect(pick("GOLD").weights).toEqual(model.ranks[0].weights);
+    expect(pick("GRANDMASTER").rank).toBe("Master+");
+    expect(pick("DIAMOND").rank).toBe("Emerald+");
+    expect(pick("IRON")).toBe(model);
+    expect(pick(null)).toBe(model);
   });
 });
 

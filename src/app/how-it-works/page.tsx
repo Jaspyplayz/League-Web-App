@@ -8,7 +8,7 @@ import { WIN_CHANCE_FEATURES } from "@/lib/analyzer/win-chance";
 import { SCORE_MODEL } from "@/lib/game-score";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { WIN_CHANCE_MODEL } from "@/lib/win-chance";
-import { WhatIfCalculator } from "./what-if-calculator";
+import { WhatIfCalculator, type RankWeights } from "./what-if-calculator";
 
 export const metadata: Metadata = {
   title: "How it works",
@@ -27,6 +27,11 @@ export default function HowItWorksPage() {
   }))
     .filter((w) => Math.abs(w.weight) >= 0.05)
     .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
+  // Only the weights go to the browser, not each rank's test results.
+  const ranks: RankWeights[] = [
+    { label: winChance.rank, weights: winChance.weights },
+    ...winChance.ranks.map((r) => ({ label: r.label, weights: r.weights })),
+  ];
 
   return (
     <main className="mx-auto flex w-full max-w-[860px] flex-col gap-12 px-6 pb-[88px] pt-14">
@@ -118,7 +123,14 @@ export default function HowItWorksPage() {
         </p>
 
         <h3 className="pt-2 text-lg font-semibold text-ink">Try it yourself</h3>
-        <WhatIfCalculator model={winChance} />
+        {ranks.length > 1 && (
+          <p>
+            Each rank also has a model of its own ({winChance.ranks.map((r) => r.label).join(", ")}),
+            trained only on games at that rank, and the match page uses the one for the
+            player&apos;s rank. Pick a rank to see how much the same lead is worth there.
+          </p>
+        )}
+        <WhatIfCalculator ranks={ranks} />
 
         <h3 className="pt-2 text-lg font-semibold text-ink">How good is it?</h3>
         <p>

@@ -94,6 +94,23 @@ async function fetchProfile(region: Region, account: Account): Promise<Profile> 
   return profile;
 }
 
+// The player's saved solo queue tier ("GOLD"), so the match page can use
+// the win chance model for their rank. It's their rank now, not when the
+// game was played, which is close enough for recent games. Null when
+// they're unranked in solo queue or haven't been looked up. No Riot calls.
+export async function savedSoloTier(puuid: string): Promise<string | null> {
+  const entry = await readCache((db) =>
+    db.query.rankedEntries.findFirst({
+      where: and(
+        eq(tables.rankedEntries.puuid, puuid),
+        eq(tables.rankedEntries.queueType, "RANKED_SOLO_5x5"),
+      ),
+      columns: { tier: true },
+    }),
+  );
+  return entry?.tier ?? null;
+}
+
 async function readProfile(region: Region, puuid: string): Promise<Profile | undefined> {
   return readCache(async (db) => {
     const player = await db.query.players.findFirst({

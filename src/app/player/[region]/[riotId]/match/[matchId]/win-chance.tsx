@@ -2,7 +2,7 @@ import { DiffChart, type TurningPointMarker } from "@/components/diff-chart";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatClock } from "@/lib/analyzer/format";
-import type { WinChanceSwing } from "@/lib/analyzer/win-chance";
+import { ALL_RANKS, type WinChanceSwing } from "@/lib/analyzer/win-chance";
 import type { DiffPoint } from "@/lib/diff-chart";
 import { describeSwing, type MatchWinChance } from "@/lib/win-chance";
 import { LegendSwatch } from "./legend-swatch";
@@ -48,8 +48,9 @@ export function WinChance({ chances, swings, model }: MatchWinChance) {
           </div>
         </div>
         <p className="text-note text-faint">
-          From a model trained on {model.games.toLocaleString("en-US")} ranked games: how often
-          teams in the same spot (gold, XP, kills, towers, dragons, buffs) went on to win.
+          From a model trained on {model.games.toLocaleString("en-US")} ranked{" "}
+          {model.rank === ALL_RANKS ? "games" : `${model.rank} games, this player's rank`}: how
+          often teams in the same spot (gold, XP, kills, towers, dragons, buffs) went on to win.
           {at20 && at20.examples > 0
             ? ` At 20 minutes it picks the winner ${percent(at20.accuracy)} of the time in games it hasn't seen.`
             : ""}

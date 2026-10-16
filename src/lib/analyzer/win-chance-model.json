@@ -1,5 +1,6 @@
 {
   "trainedAt": "2026-10-14T19:10:32.615Z",
+  "rank": "All ranks",
   "games": 4185,
   "patches": [
     "16.16",
@@ -259,5 +260,6 @@
         "actual": 0.965
       }
     ]
-  }
+  },
+  "ranks": []
 }
