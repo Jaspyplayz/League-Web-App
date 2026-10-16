@@ -2,7 +2,7 @@
 
 The tempo timeline shows, minute by minute, which jungler had the tempo: the time advantage that lets one jungler make the next play (invade, gank, start an objective) while the other has to farm, back or give way. It's on the match page of any game where you played jungle, below the gank log, marked **Beta**.
 
-It's an experiment. Riot doesn't record tempo, so the timeline estimates it from what Riot does record. This page explains how the estimate is made, and how well it held up against real games.
+It's an experiment. Riot doesn't record tempo, so the timeline estimates it from what Riot does record. This page explains how the estimate is made, and how well it held up in 1,923 real games.
 
 The code is in [`src/lib/analyzer/tempo.ts`](../src/lib/analyzer/tempo.ts) and the panel is `match/[matchId]/tempo.tsx`. The study that set its numbers is [`src/lib/analyzer/tempo-study.ts`](../src/lib/analyzer/tempo-study.ts), run by [`scripts/study-tempo.ts`](../scripts/study-tempo.ts) on games that [`scripts/collect-tempo-games.ts`](../scripts/collect-tempo-games.ts) downloads.
 
@@ -22,14 +22,14 @@ Once a minute, Riot records every player's gold, level and position, and it logs
 Then it adds up one lead:
 
 ```
-lead = items lead + 1,500 × levels ahead + 2,000 × extra players alive on your team
+lead = items lead + 2,000 × levels ahead + 2,000 × extra players alive on your team
 ```
 
 - If only one jungler is alive, they're up tempo, whatever the lead. A dead jungler can't make a play.
 - Otherwise, a lead of 2,000 or more puts that side up tempo.
 - Anything smaller is even.
 
-The three numbers are `LEVEL_GOLD`, `PLAYER_GOLD` and `TEMPO_LEAD` in `tempo.ts`. The study below is where they came from.
+So a level up, a player up or 2,000 more gold spent on items each count the same, and any one of them is enough on its own. The three numbers are `LEVEL_GOLD`, `PLAYER_GOLD` and `TEMPO_LEAD` in `tempo.ts`, and the study below is where they came from.
 
 ### A worked example
 
@@ -42,24 +42,24 @@ A real minute: Qiyana against Shaco at 16:00.
 | Players alive | 5 | 4 | 2,000 ahead |
 | **All together** | | | **2,832 ahead: Qiyana up tempo** |
 
-At 9:00 in the same game, Qiyana had spent 934 more on items, at the same level with everyone alive. That's even: in the study, a lead that size won about 52% of next plays, too close to a coin flip to call.
+At 9:00 in the same game, Qiyana had spent 934 more on items, at the same level with everyone alive. That's even: in the study, a side ahead by 500 to 2,000 won only 52% to 54% of next plays, too close to a coin flip to call.
 
 The panel shows these lines for whichever minute you pick, so the total can always be checked by hand.
 
 ### Games saved before unspent gold was kept
 
-Turnpoint started keeping unspent gold in saved timelines with this feature. For a game saved before that, item gold is estimated instead: the gold the jungler had earned by their last shop visit, as if they spent all of it there. Riot logs each purchase with its exact time but only records gold once a minute, so the gold at the moment of the visit is read off a straight line between the snapshots either side. In the study, the estimate was 81 gold off at the median and gave the same call as the exact numbers at 93% of minute marks. The panel says when a game uses it.
+Turnpoint started keeping unspent gold in saved timelines with this feature. For a game saved before that, item gold is estimated instead: the gold the jungler had earned by their last shop visit, as if they spent all of it there. Riot logs each purchase with its exact time but only records gold once a minute, so the gold at the moment of the visit is read off a straight line between the snapshots either side. In the study, the estimate was 90 gold off at the median and gave the same call as the exact numbers at 96.8% of minute marks. The panel says when a game uses it.
 
 ## What the panel shows
 
 - **The strip**: one block per minute, blue when you were up tempo, red when the enemy jungler was, gray when it was even. Above it are the epic monsters each team took; below it, when each jungler shopped (●) or died (×).
 - **The picked minute**: the numbers behind the call, any epic monster that was up or about to spawn, and what each jungler did until the next minute mark: kills, deaths, epic monsters, shop visits, CS, and where they were at the next mark.
 
-Epic monster spawn times come from the game's timers (`DRAGON_SPAWN_MS` and the rest). In the study, no epic monster was ever taken before its timer said it was up.
+Epic monster spawn times come from the game's timers (`DRAGON_SPAWN_MS` and the rest). None of the 13,738 epic monsters in the study was taken before its timer said it was up.
 
 ## The study
 
-The three numbers were set from real games, then checked on games that played no part in setting them.
+The three numbers were set on half of the study's games, then checked on the other half, which played no part in setting them.
 
 ### What counts as being right
 
@@ -68,7 +68,7 @@ A call is only useful if it matches what happened next. So for each minute mark,
 Then it asks whether the jungler called up tempo won the next play. Two numbers answer that, always together:
 
 - **Call right**: of the minutes that got a call (not even), how often the side called up tempo won. 50% is a coin flip.
-- **Coverage**: the share of minutes that got a call. Calling only the surest minutes would score high on the first and low on this one. Tables write the two as "66% of 58%".
+- **Coverage**: the share of minutes that got a call. Calling only the surest minutes would score high on the first and low on this one. Tables write the two as "65% of 60%".
 
 A third number compares ways of measuring a lead without picking a threshold:
 
@@ -76,38 +76,112 @@ A third number compares ways of measuring a lead without picking a threshold:
 
 ### The games
 
-<!-- Filled in from the final report. -->
+1,923 ranked solo/duo games from the Oceania server, downloaded on 2026-10-16 with `npm run tempo-games`:
+
+| Ranks | Games |
+|---|---|
+| Challenger, Grandmaster, Master | 328, 255, 344 (40 players each, up to 10 games each) |
+| Diamond, Emerald | 140, 149 (15 players each) |
+| Platinum, Gold | 145, 140 |
+| Silver, Bronze, Iron | 144, 136, 142 |
+
+That's 53,489 minute marks, 38,920 of them followed by a play within a minute. Most games are from patches 16.19 and 16.20; players in lower ranks play less often, so their last ten games go back as far as patch 16.1. Every minute is counted once, from blue's side, so both junglers are in it.
+
+Oceania, because Riot counts each server group's rate limit separately. The benchmark collector was using NA, EUW and KR at the same time, so downloading from Oceania didn't slow it down or the live site.
 
 ### Setting the numbers
 
-The games are split in two by match ID. On the tuning half:
+The games are split in two by match ID: 951 to tune the numbers and 972 to check them. On the tuning half:
 
-1. **Weights.** A logistic regression (the same kind as the [game score](game-score.md)) learns how much each input helps predict the next play: items lead, levels lead, being the only jungler alive, and players alive. Dividing each weight by the items weight turns it into gold. One level did as much as about 1,500 gold of items, and one extra player alive as much as about 2,000.
-2. **Threshold.** A lead counts once the side ahead won 55% of next plays at that size of lead. Below it, the side ahead was barely more likely to win than the side behind, so the minute is called even.
+1. **Weights.** A logistic regression (the same kind as the [game score](game-score.md)) learns how much each input helps predict the next play: items lead, levels lead, being the only jungler alive, and players alive. Dividing each weight by the items weight turns it into gold. One level did as much as about 2,050 gold of items, and one extra player alive as much as about 2,100.
+2. **Threshold.** A lead counts once the side ahead won 55% of next plays at that size of lead. Below it, the side ahead was barely more likely to win than the side behind, so the minute is called even. With those weights, that came out at about 2,200.
 
-The weights are rounded to make them easy to read and check. Then every number is measured on the check half.
+All three are rounded to 2,000, so that a level, a player or 2,000 gold of items each count the same and any one is enough. Rounding the threshold down from 2,200 makes a call at more minutes (63% instead of 60% of them) and is right a little less often (64.6% instead of 65.0%), well within the uncertainty (below).
+
+The same fit on each group of ranks:
+
+| Ranks | Games | Gold per level | Gold per player alive | Lead for 55% |
+|---|---|---|---|---|
+| Master and up | 927 | 1,750 | 1,850 | 2,000 |
+| Emerald, Diamond | 289 | 1,850 | 2,300 | 2,200 |
+| Gold, Platinum | 285 | 1,950 | 2,300 | 2,650 |
+| Iron, Bronze, Silver | 422 | 3,150 | 2,350 | 2,650 |
+
+A player alive is worth about the same at every rank. A level counts for more in Iron to Silver, and every group below Master needs a slightly bigger lead before the side ahead wins 55%. One set of numbers keeps the timeline simple to read, and it's about as often right at every rank (below).
 
 ### Results
 
-<!-- Filled in from the final report. -->
+On the 972 check games, against the first guess the timeline started with and the other ways of making the call the study tried, each tuned on the other half the same way:
+
+| Call | Lead | Up tempo from | Next play | AUC | Epic monsters, called 1+ min before | One jungler killing the other | Even minutes |
+|---|---|---|---|---|---|---|---|
+| **Final** | items + 2,000 a level + 2,000 a player | 2,000 | 64.6% of 63.2% | 0.644 | 61.7% of 63.2% | 61.3% of 61.4% | 38.4% |
+| First guess | items + 300 a level | 500 | 61.5% of 74.4% | 0.632 | 59.0% of 76.0% | 58.5% of 73.7% | 28.4% |
+| Without players alive | items + 2,400 a level | 2,250 | 64.0% of 60.6% | 0.638 | 62.1% of 60.3% | 60.4% of 58.5% | 41.0% |
+| Total gold instead of items | gold + 2,400 a level + 2,350 a player | 2,600 | 64.8% of 61.0% | 0.643 | 62.2% of 62.4% | 61.4% of 58.8% | 41.0% |
+| Who's alive from health snapshots | items + 2,200 a level + 2,250 a player | 2,350 | 64.7% of 59.3% | 0.639 | 62.0% of 60.3% | 61.9% of 57.5% | 43.0% |
+| Lead as a share of the junglers' gold | the tuned lead ÷ their average gold | 46% | 64.7% of 54.5% | 0.638 | 61.5% of 54.9% | 61.6% of 49.0% | 44.7% |
+
+In words:
+
+- When the timeline makes a call, the side it calls up tempo wins the next play 64.6% of the time, on games that played no part in setting it. It makes a call at 63% of minutes; the rest are even.
+- The first guess called more minutes but was right less often. Counting levels for far more (2,000 instead of 300) and adding players alive made the biggest difference.
+- Calls get more common and more often right as the game goes on: right 60.7% of the time at 44% of minutes 2 to 14, 66.0% at 75% of minutes 15 to 24, and 66.5% at 82% of minutes from 25 on. Early leads are small, and a small lead barely changes who wins the next play.
+- It holds at every rank, across all the games: right 64.2% of the time in Master and up, 65.4% in Emerald and Diamond, 62.4% in Gold and Platinum, and 64.3% in Iron, Bronze and Silver.
+- The tempo lead, which only looks at the two junglers and who's alive, predicts the next play as well as the whole team's gold lead (AUC 0.625 against 0.627, all games), and clearly better than the junglers' gold alone (0.596).
+- Across all the games, when an epic monster was taken, the side called up tempo a minute or more before took it 61.4% of the time (Baron 64.7%, dragons 61.6%, Rift Herald 61.1%, void grubs only 55.3%). When one jungler killed the other, the one called up tempo at the minute before was the killer 60.6% of the time.
+
+### Checking the checks
+
+The next play is one way of measuring "right", and it has choices in it, so the final call was measured a few other ways too (all games):
+
+| Measure | Moments | Call right | AUC of the lead | AUC of team gold |
+|---|---|---|---|---|
+| Next play within 30 seconds | 25,698 | 65.2% of 62.9% | 0.631 | 0.631 |
+| Within a minute (the main measure) | 38,920 | 64.1% of 62.3% | 0.625 | 0.627 |
+| Within 2 minutes | 49,630 | 62.7% of 61.2% | 0.617 | 0.624 |
+| Within a minute, no kill in the 20 seconds before | 22,036 | 62.7% of 53.9% | 0.608 | 0.620 |
+| Within a minute, no kill in the minute before | 7,594 | 61.0% of 49.0% | 0.592 | 0.595 |
+
+The call is still right 61.0% of the time in quiet minutes, with no kill in the minute before, so it isn't only picking the winner of a fight that's already happening. It's a little less sure further ahead, as you'd expect: a lot changes in two minutes.
 
 ### What didn't help
 
-<!-- Filled in from the final report. -->
+- **Shop timing.** This was the surprise. When both junglers had earned about the same gold (within 250), the one who had spent more of it on items won no more next plays than the other: 47% to 53% across the whole range, with no trend. In this data the next play went to whoever had earned more, whether or not they'd been back to spend it. Either a minute is too short to see it, or once-a-minute snapshots are too coarse. The call still uses gold spent on items, which matches how junglers think about tempo and did as well as total gold, and the strip shows every shop visit so you can see the timing yourself.
+- **Camps and time since shopping.** Monsters killed in the last two minutes and time since the last shop visit added nothing measurable (log loss 0.6520 with and without them).
+- **Health.** Health at the minute mark helps a little at the extremes: with gold about even, the side at much lower health won 39% of next plays and the side at much higher health 60%. Turnpoint doesn't save health, and a snapshot of health says little about a fight a minute later, so it's left out.
+- **Who's alive from health snapshots.** Riot's snapshots say who's at 0 health, so the study tried that instead of the death timer. It was slightly worse (AUC 0.639, against 0.644 for the same call with death timers), so the death timer stays.
+- **A lead as a share of gold**, so that 1,000 counts for more at 10 minutes than at 30: no better (AUC 0.638), and it called fewer minutes.
+- **Team gold.** Adding the two teams' total gold to the timeline's inputs predicts the next play better still (AUC 0.656 against 0.640 without it). It's left out because the timeline is about the junglers' situation, not a forecast of who wins the next fight.
 
 ### Death timers
 
-<!-- Filled in from the final report. -->
+Riot's snapshots include health, which made it possible to check the death timer formula. For 96,292 deaths followed by a minute mark within twice their timer, the formula and the snapshot agreed 89.8% of the time. Where they didn't, the player was usually back sooner than the formula said: 8,757 times, with a median of 19 seconds still on the formula's timer. The other way round, 1,101 players were still at 0 health after the formula had them back, by a median of 1.5 seconds.
+
+Making every timer longer or shorter doesn't help (the best scale is 1.00), and revives explain little: Guardian Angel, Zilean, Akshan, Sion, Zac or Anivia were in the game for 6.7% of the early returns, against 4.9% of all deaths. The study couldn't find the cause. Using the snapshots instead made the call slightly worse (above), so the formula stays.
 
 ### How sure
 
-<!-- Filled in from the final report. -->
+95% ranges from redrawing the games 200 times:
+
+| Number | Value | 95% range |
+|---|---|---|
+| Call right, all games | 64.1% | 63.6% to 64.8% |
+| Call right, check games only | 64.6% | 64.0% to 65.2% |
+| AUC gain over the first guess, check games only | 0.011 | 0.008 to 0.016 |
+| AUC of the tempo lead, all games | 0.625 | 0.618 to 0.632 |
+| The same, minus the junglers' gold alone | 0.029 | 0.025 to 0.030 |
+| The same, minus team gold | −0.002 | −0.006 to 0.004 |
+| Epic monsters, call right 1+ minute before | 61.4% | 60.3% to 63.0% |
+
+So the gains over the first guess and over the junglers' gold are real, and the tempo lead and team gold are a tie.
 
 ## Limits
 
 - Riot records gold, levels and positions once a minute. Anything between two snapshots is unknown, and a lot can change in a minute.
 - Riot records nothing about waves, vision, cooldowns or summoner spells, so the call can't include them.
-- About 1 in 10 deaths ends sooner than the death timer says, some from revives like Guardian Angel or Zilean's ultimate, so a player can be counted dead for a few seconds after they're back.
+- About 1 in 10 deaths ends sooner than the death timer says, and the study couldn't find out why, so a player can be counted dead for a while after they're back.
+- All the study's games are from Oceania. Other servers play the same game, but weren't checked.
 - A study game's rank is the rank of the player whose match history it came from. The other nine players are usually close to it.
 - Leads are small in the first minutes, so early minutes are usually even.
 
@@ -122,6 +196,6 @@ npm run study-tempo -- --tiers gold,platinum                # only some ranks
 
 On Windows PowerShell, use `npm.cmd` when passing options after `--`.
 
-The downloader keeps under 70 Riot calls every 2 minutes, and it uses the Oceania server by default because Riot counts each server group's limit separately: the benchmark collector uses NA, EUW and KR, so the two can run at the same time without slowing each other or the live site. The games stay on your computer in `.cache/tempo-study`, one JSON file each, without names or PUUIDs. Git ignores the folder and nothing goes in the database.
+The downloader keeps under 70 Riot calls every 2 minutes. It uses the Oceania server by default because the benchmark collector uses NA, EUW and KR, so the two can run at the same time. The games stay on your computer in `.cache/tempo-study`, one JSON file each, without names or PUUIDs. Git ignores the folder and nothing goes in the database. Downloading all ten tiers took about two hours.
 
 When a report suggests different numbers, for example after a big patch, change `LEVEL_GOLD`, `PLAYER_GOLD` and `TEMPO_LEAD` in `tempo.ts`, and update the results here.
