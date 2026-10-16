@@ -127,8 +127,12 @@ export type StudyFeature = (typeof STUDY_FEATURES)[number];
 export type StudyRow = {
   matchId: string;
   tier: string;
+  region: string;
   minute: number;
   f: Record<StudyFeature, number>;
+  // The two junglers' average total gold, for testing a lead measured as a
+  // share of what they have rather than in plain gold.
+  size: number;
   // The tempo timeline's call from blue's side, with exact and estimated item gold.
   tone: TempoTone;
   toneEst: TempoTone;
@@ -201,6 +205,7 @@ export function studyRows(game: StudyGame): StudyRows {
     rows.push({
       matchId: game.matchId,
       tier: game.tier,
+      region: game.region,
       minute,
       f: {
         gold: m.you.gold - m.them.gold,
@@ -218,6 +223,7 @@ export function studyRows(game: StudyGame): StudyRows {
         lead: m.lead,
         leadEst: est.lead,
       },
+      size: (m.you.gold + m.them.gold) / 2,
       tone: m.tone,
       toneEst: est.tone,
       nextPlay: next ? (next.blueWon ? 1 : 0) : null,
@@ -290,6 +296,48 @@ export function aliveCheck(game: StudyGame): {
     }
   }
   return counts;
+}
+
+// One death, for checking the death timer formula against Riot's health
+// snapshots: at the first minute mark after the death, was the player still
+// at 0 health? If the formula is right, they were exactly when the timer
+// hadn't run out yet (gapS < timerS).
+export type RespawnRow = {
+  minute: number; // when they died, in game minutes
+  level: number;
+  timerS: number; // the formula's death timer, in seconds
+  gapS: number; // seconds from the death to the next minute mark
+  deadAtMark: boolean; // health 0 at that mark
+};
+
+export function respawnRows(game: StudyGame): RespawnRow[] {
+  const { frames } = game.timeline;
+  if (!game.extra.some((frame) => frame.some((p) => p.healthMax > 0))) return [];
+  const deaths = deathSpans(game.timeline);
+  const rows: RespawnRow[] = [];
+  for (const d of deaths) {
+    // The first snapshot after the death, leaving out the end of the game.
+    const i = frames.findIndex((f) => f.timestamp > d.diedAt);
+    if (i === -1 || i >= frames.length - 1) continue;
+    const mark = frames[i].timestamp;
+    // Dying again before the mark would make the snapshot about that death.
+    const again = deaths.some(
+      (o) => o.participantId === d.participantId && o.diedAt > d.diedAt && o.diedAt <= mark,
+    );
+    const timerS = (d.respawnAt - d.diedAt) / 1000;
+    const gapS = (mark - d.diedAt) / 1000;
+    // Long back by the mark: says nothing about the timer.
+    if (again || gapS > 2 * timerS) continue;
+    const frame = frames.findLast((f) => f.timestamp <= d.diedAt) ?? frames[0];
+    rows.push({
+      minute: d.diedAt / 60_000,
+      level: frame.players[d.participantId - 1].level,
+      timerS,
+      gapS,
+      deadAtMark: (game.extra[i]?.[d.participantId - 1]?.health ?? 1) <= 0,
+    });
+  }
+  return rows;
 }
 
 // For each jungler at each minute mark: the exact item gold minus the

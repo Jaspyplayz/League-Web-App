@@ -24,9 +24,13 @@ import {
   estimateErrors,
   fitLogistic,
   hash,
+  respawnRows,
   STUDY_FEATURES,
   STUDY_FOLDER,
   studyRows,
+  type DuelRow,
+  type ObjectiveRow,
+  type RespawnRow,
   type StudyFeature,
   type StudyGame,
   type StudyRow,
@@ -69,18 +73,27 @@ function main() {
   say(`- Minute marks followed by a jungler fight or epic monster within a minute: ${labeled.length} (${pct(labeled.length / minutes.length)}). Blue side won ${pct(mean(labeled.map((r) => r.nextPlay!)))} of them.`);
   say(`- Epic monsters taken: ${countBy(objectives, (o) => o.kind)}`);
   say(`- Kills where one jungler died with the other taking part: ${duels.length}`);
+  say(`- Only one jungler alive at ${pct(minutes.filter((r) => r.f.alive !== 0).length / minutes.length)} of minute marks.`);
+
+  const definitions = tunedDefinitions(labeled);
+  const check = {
+    labeled: labeled.filter((r) => !isTuning(r.matchId)),
+    objectives: objectives.filter((o) => !isTuning(o.matchId)),
+    duels: duels.filter((d) => !isTuning(d.matchId)),
+    games: all.map((r) => r.minutes).filter((rows) => rows.length && !isTuning(rows[0].matchId)),
+  };
 
   timersSection(objectives);
   aliveSection(games);
   estimateSection(games, minutes);
   nextPlaySection(labeled);
   modelsSection(labeled);
-  tuningSection(labeled);
+  tuningSection(labeled, definitions, check);
   objectivesSection(objectives);
   duelsSection(duels);
   shapeSection(all.map((r) => r.minutes));
   tiersSection(labeled, objectives);
-  bootstrapSection(labeled, objectives);
+  bootstrapSection(labeled, objectives, definitions, check);
 
   const report = lines.join("\n") + "\n";
   console.log(report);
@@ -102,7 +115,7 @@ function loadGames(): StudyGame[] {
 
 // Are the spawn timers right? A monster taken before the window it was put
 // in opened would mean a timer is too late.
-function timersSection(objectives: ReturnType<typeof studyRows>["objectives"]) {
+function timersSection(objectives: ObjectiveRow[]) {
   say();
   say(`## Spawn timers`);
   say();
@@ -133,6 +146,52 @@ function aliveSection(games: StudyGame[]) {
   say(`|---|---|---|`);
   say(`| Dead by the timer | ${total.bothDead} | ${total.timerOnly} |`);
   say(`| Alive by the timer | ${total.healthOnly} | ${total.bothAlive} |`);
+  respawnFit(games.flatMap(respawnRows));
+}
+
+// Is the formula's death timer too long or too short? Each death with a
+// minute mark soon after it is a yes/no test: still at 0 health at the mark
+// means the real timer was longer than the gap. The best scale is the
+// multiple of the formula's timer that agrees with the most of them.
+function respawnFit(rows: RespawnRow[]) {
+  if (rows.length === 0) return;
+  say();
+  say(`Each death followed by a minute mark within twice its timer (${rows.length} deaths): was the player still at 0 health at the mark? A best scale of 0.90 would mean the real timers were about 90% of the formula's.`);
+  say();
+  say(`| Deaths | Count | Formula agrees | Best scale | Agrees with it |`);
+  say(`|---|---|---|---|---|`);
+  const groups: [string, (r: RespawnRow) => boolean][] = [
+    ["All", () => true],
+    ["Before 15:00", (r) => r.minute < 15],
+    ["15:00 to 30:00", (r) => r.minute >= 15 && r.minute < 30],
+    ["30:00 on", (r) => r.minute >= 30],
+    ["Levels 1-6", (r) => r.level <= 6],
+    ["Levels 7-11", (r) => r.level >= 7 && r.level <= 11],
+    ["Levels 12-18", (r) => r.level >= 12],
+  ];
+  for (const [label, keep] of groups) {
+    const group = rows.filter(keep);
+    if (group.length === 0) continue;
+    const agrees = (scale: number) =>
+      mean(group.map((r) => Number(r.timerS * scale > r.gapS === r.deadAtMark)));
+    let best = 1;
+    let bestAgrees = agrees(1);
+    for (let step = 50; step <= 150; step++) {
+      const scale = step / 100;
+      const a = agrees(scale);
+      // Ties go to the scale nearest 1.
+      if (a > bestAgrees + 1e-12 || (a > bestAgrees - 1e-12 && Math.abs(scale - 1) < Math.abs(best - 1))) {
+        best = scale;
+        bestAgrees = a;
+      }
+    }
+    say(`| ${label} | ${group.length} | ${pct(agrees(1))} | ${best.toFixed(2)} | ${pct(bestAgrees)} |`);
+  }
+  const sorted = (xs: number[]) => xs.sort((a, b) => a - b);
+  const back = sorted(rows.filter((r) => r.timerS > r.gapS && !r.deadAtMark).map((r) => r.timerS - r.gapS));
+  const stillDead = sorted(rows.filter((r) => r.timerS <= r.gapS && r.deadAtMark).map((r) => r.gapS - r.timerS));
+  say();
+  say(`Back before the formula said: ${back.length}, with a median of ${back.length ? quantile(back, 0.5).toFixed(1) : "-"} s left on the formula's timer (90% within ${back.length ? quantile(back, 0.9).toFixed(1) : "-"} s). Still dead after it said: ${stillDead.length}, median ${stillDead.length ? quantile(stillDead, 0.5).toFixed(1) : "-"} s over (90% within ${stillDead.length ? quantile(stillDead, 0.9).toFixed(1) : "-"} s).`);
 }
 
 function estimateSection(games: StudyGame[], minutes: StudyRow[]) {
@@ -264,44 +323,160 @@ function modelsSection(labeled: StudyRow[]) {
   say(`Weights with everything: ${all.map((k, i) => `${k} ${wa[i + 1].toPrecision(3)}`).join(", ")} (constant ${wa[0].toFixed(3)}).`);
 }
 
-// Which level weight and threshold work best, on half the games, checked on
-// the other half.
-function tuningSection(labeled: StudyRow[]) {
-  const train = labeled.filter((r) => hash(r.matchId) % 2 === 0);
-  const test = labeled.filter((r) => hash(r.matchId) % 2 === 1);
-  const score = (r: StudyRow, levelGold: number) =>
-    r.f.alive * 1e6 + r.f.itemGold + levelGold * r.f.level;
+// A way of making the call, for comparing settings: the lead from blue's
+// side and how big it has to be. Being the only jungler alive comes first
+// in all of them, as in tempo.ts.
+type Definition = {
+  name: string;
+  weights: string;
+  lead: (r: StudyRow) => number;
+  threshold: number;
+  thresholdText: string;
+};
+
+type CheckHalf = {
+  labeled: StudyRow[];
+  objectives: ObjectiveRow[];
+  duels: DuelRow[];
+  games: StudyRow[][];
+};
+
+// Half the games tune the settings and the other half checks them, split by
+// match ID so a game is always on the same side.
+function isTuning(matchId: string): boolean {
+  return hash(matchId) % 2 === 0;
+}
+
+function callOf(d: Definition, r: StudyRow): TempoTone {
+  if (r.f.alive !== 0) return r.f.alive > 0 ? "ahead" : "behind";
+  return toneOf(d.lead(r), d.threshold);
+}
+
+// The settings to compare, worked out on the tuning half only. Weights: a
+// logistic regression of the next play on the inputs, turned into gold (a
+// level is worth as much gold as has the same effect). Threshold: the lead
+// at which the side ahead won 55% of next plays, from a fit of the next play
+// on that lead alone, with both junglers alive.
+function tunedDefinitions(labeled: StudyRow[]): Definition[] {
+  const train = labeled.filter((r) => isTuning(r.matchId));
+  const round = (x: number, step = 50) => Math.round(x / step) * step;
+  const goldPer = (keys: StudyFeature[]) => {
+    const w = fitLogistic(asRows(train, keys));
+    // asRows gives gold in thousands, so w[1] is per 1,000 gold of keys[0].
+    return keys.map((_, i) => round((1000 * w[i + 1]) / w[1]));
+  };
+  const thresholdFor = (lead: (r: StudyRow) => number, unit: number) => {
+    const bothAlive = train.filter((r) => r.f.alive === 0);
+    const [, b] = fitLogistic(bothAlive.map((r) => ({ x: [lead(r) / unit], won: r.nextPlay === 1 })));
+    return b > 0 ? (unit * Math.log(0.55 / 0.45)) / b : Infinity;
+  };
+  const gold = (x: number) => Math.round(x).toLocaleString("en-US");
+  const definition = (name: string, weights: string, lead: (r: StudyRow) => number): Definition => {
+    const threshold = round(thresholdFor(lead, 1000));
+    return { name, weights, lead, threshold, thresholdText: gold(threshold) };
+  };
+
+  const [, levelA] = goldPer(["itemGold", "level", "alive"]);
+  const [, levelB, , playerB] = goldPer(["itemGold", "level", "alive", "numbers"]);
+  const [, levelC, , playerC] = goldPer(["gold", "level", "alive", "numbers"]);
+  const leadB = (r: StudyRow) => r.f.itemGold + levelB * r.f.level + playerB * r.f.numbers;
+  const share = Math.round(thresholdFor((r) => leadB(r) / Math.max(1, r.size), 1) * 100) / 100;
+
+  return [
+    {
+      name: "First guess",
+      weights: "items + 300 a level",
+      lead: (r) => r.f.itemGold + 300 * r.f.level,
+      threshold: 500,
+      thresholdText: "500",
+    },
+    definition("Items, levels", `items + ${gold(levelA)} a level`, (r) => r.f.itemGold + levelA * r.f.level),
+    definition("Items, levels, players alive", `items + ${gold(levelB)} a level + ${gold(playerB)} a player`, leadB),
+    definition(
+      "Total gold, levels, players alive",
+      `gold + ${gold(levelC)} a level + ${gold(playerC)} a player`,
+      (r) => r.f.gold + levelC * r.f.level + playerC * r.f.numbers,
+    ),
+    {
+      name: "Items, levels, players alive, as a share",
+      weights: "the lead above ÷ the junglers' average gold",
+      lead: (r) => leadB(r) / Math.max(1, r.size),
+      threshold: share,
+      thresholdText: pct(share),
+    },
+    {
+      name: "Current settings (tempo.ts)",
+      weights: `items + ${gold(LEVEL_GOLD)} a level`,
+      lead: (r) => r.f.lead,
+      threshold: TEMPO_LEAD,
+      thresholdText: gold(TEMPO_LEAD),
+    },
+  ];
+}
+
+function evaluate(d: Definition, check: CheckHalf) {
+  const next = callAccuracy(check.labeled.map((r) => ({ tone: callOf(d, r), won: r.nextPlay === 1 })));
+  const leadAuc = auc(check.labeled.map((r) => ({ score: r.f.alive * 1e9 + d.lead(r), won: r.nextPlay === 1 })));
+  const monsters = callAccuracy(
+    check.objectives.flatMap((o) => (o.minuteBefore ? [{ tone: callOf(d, o.minuteBefore), won: o.blueTook }] : [])),
+  );
+  const kills = callAccuracy(check.duels.flatMap((x) => (x.before ? [{ tone: callOf(d, x.before), won: x.blueWon }] : [])));
+  const rows = check.games.flat();
+  const even = rows.filter((r) => callOf(d, r) === "even").length / Math.max(1, rows.length);
+  const flips = mean(check.games.map((g) => g.slice(1).filter((r, i) => callOf(d, r) !== callOf(d, g[i])).length));
+  return { next, leadAuc, monsters, kills, even, flips };
+}
+
+function tuningSection(labeled: StudyRow[], definitions: Definition[], check: CheckHalf) {
+  const train = labeled.filter((r) => isTuning(r.matchId));
+  const score = (r: StudyRow, levelGold: number) => r.f.alive * 1e9 + r.f.itemGold + levelGold * r.f.level;
   say();
   say(`## Tuning`);
   say();
-  say(`Level weight: AUC of items + weight × levels (being the only one alive first), on half the games (tuning) and the other half (check).`);
+  say(`Games are split in two by match ID: ${new Set(train.map((r) => r.matchId)).size} tune the settings and ${new Set(check.labeled.map((r) => r.matchId)).size} check them.`);
+  say();
+  say(`Level weight: AUC of items + weight × levels (being the only one alive first) for the next play.`);
   say();
   say(`| Gold per level | Tuning half | Check half |`);
   say(`|---|---|---|`);
-  for (const levelGold of [0, 100, 200, 300, 400, 500, 600, 800, 1000]) {
+  for (const levelGold of [0, 200, 400, 600, 800, 1000, 1200, 1500, 2000, 3000]) {
     const a = (rows: StudyRow[]) => auc(rows.map((r) => ({ score: score(r, levelGold), won: r.nextPlay === 1 })));
-    say(`| ${levelGold} | ${a(train).toFixed(4)} | ${a(test).toFixed(4)} |`);
+    say(`| ${levelGold} | ${a(train).toFixed(4)} | ${a(check.labeled).toFixed(4)} |`);
   }
+
   say();
-  say(`Threshold, with LEVEL_GOLD ${LEVEL_GOLD}: how often the side called up tempo won the next play, and the share of moments called, on the check half.`);
+  say(`Each way of making the call, with weights and threshold worked out on the tuning half (a logistic regression turned into gold, and the lead at which the side ahead won 55% of next plays), checked on the other half. "Right" is how often the side called up tempo won, "of" the share of moments that got a call.`);
   say();
-  say(`| Threshold | Tuning half | Check half |`);
-  say(`|---|---|---|`);
-  for (const threshold of [0, 250, 500, 750, 1000, 1500, 2000]) {
-    const call = (rows: StudyRow[]) => {
-      const c = callAccuracy(
-        rows.map((r) => ({
-          tone: r.f.alive !== 0 ? (r.f.alive > 0 ? "ahead" : "behind") : toneOf(r.f.lead, threshold),
-          won: r.nextPlay === 1,
-        })),
-      );
+  say(`| Call | Lead | Counts from | Next play | AUC | Epic monsters (1+ min before) | Jungler kills | Even minutes | Changes a game |`);
+  say(`|---|---|---|---|---|---|---|---|---|`);
+  for (const d of definitions) {
+    const e = evaluate(d, check);
+    const rightOf = (c: { right: number; share: number }) => `${pct(c.right)} of ${pct(c.share)}`;
+    say(
+      `| ${d.name} | ${d.weights} | ${d.thresholdText} | ${rightOf(e.next)} | ${e.leadAuc.toFixed(3)} | ${rightOf(e.monsters)} | ${rightOf(e.kills)} | ${pct(e.even)} | ${e.flips.toFixed(1)} |`,
+    );
+  }
+
+  say();
+  say(`The same calls on the check half by game phase (next play):`);
+  say();
+  const phases: [string, (r: StudyRow) => boolean][] = [
+    ["2-14", (r) => r.minute < 15],
+    ["15-24", (r) => r.minute >= 15 && r.minute < 25],
+    ["25+", (r) => r.minute >= 25],
+  ];
+  say(`| Call | ${phases.map(([p]) => p).join(" | ")} |`);
+  say(`|---|${phases.map(() => "---").join("|")}|`);
+  for (const d of definitions) {
+    const cells = phases.map(([, keep]) => {
+      const c = callAccuracy(check.labeled.filter(keep).map((r) => ({ tone: callOf(d, r), won: r.nextPlay === 1 })));
       return `${pct(c.right)} of ${pct(c.share)}`;
-    };
-    say(`| ${threshold} | ${call(train)} | ${call(test)} |`);
+    });
+    say(`| ${d.name} | ${cells.join(" | ")} |`);
   }
 }
 
-function objectivesSection(objectives: ReturnType<typeof studyRows>["objectives"]) {
+function objectivesSection(objectives: ObjectiveRow[]) {
   say();
   say(`## Epic monsters`);
   say();
@@ -327,7 +502,7 @@ function objectivesSection(objectives: ReturnType<typeof studyRows>["objectives"
   }
 }
 
-function duelsSection(duels: ReturnType<typeof studyRows>["duels"]) {
+function duelsSection(duels: DuelRow[]) {
   const withRow = duels.filter((d) => d.before);
   say();
   say(`## Jungler against jungler`);
@@ -349,20 +524,29 @@ function shapeSection(games: StudyRow[][]) {
   say(`Blue up tempo ${share("ahead")} of minutes, red ${share("behind")}, even ${share("even")}. The call changes ${mean(flips).toFixed(1)} times a game on average (median ${quantile([...flips].sort((a, b) => a - b), 0.5)}).`);
 }
 
-function tiersSection(labeled: StudyRow[], objectives: ReturnType<typeof studyRows>["objectives"]) {
+function tiersSection(labeled: StudyRow[], objectives: ObjectiveRow[]) {
+  const regions = [...new Set(labeled.map((r) => r.region))].sort();
+  const regionOf = new Map(labeled.map((r) => [r.matchId, r.region]));
+  const groups: [string, (x: { tier: string; matchId: string }) => boolean][] = [
+    ...TIER_GROUPS.map(([label, tiers]): [string, (x: { tier: string }) => boolean] => [label, (x) => tiers.includes(x.tier)]),
+    ...regions.map((region): [string, (x: { matchId: string }) => boolean] => [
+      `Server: ${region}`,
+      (x) => regionOf.get(x.matchId) === region,
+    ]),
+  ];
   say();
-  say(`## By rank`);
+  say(`## By rank and server`);
   say();
-  say(`| Ranks | Games | Next play: call right | AUC lead | AUC junglers' gold | Epic monsters: call right (1+ min before) |`);
+  say(`| Games | Count | Next play: call right | AUC lead | AUC junglers' gold | Epic monsters: call right (1+ min before) |`);
   say(`|---|---|---|---|---|---|`);
-  for (const [label, tiers] of TIER_GROUPS) {
-    const rows = labeled.filter((r) => tiers.includes(r.tier));
+  for (const [label, keep] of groups) {
+    const rows = labeled.filter(keep);
     if (rows.length === 0) continue;
     const c = callAccuracy(rows.map((r) => ({ tone: r.tone, won: r.nextPlay === 1 })));
-    const obj = objectives.filter((o) => tiers.includes(o.tier) && o.minuteBefore);
+    const obj = objectives.filter((o) => keep(o) && o.minuteBefore);
     const co = callAccuracy(obj.map((o) => ({ tone: o.minuteBefore!.tone, won: o.blueTook })));
     say(
-      `| ${label} | ${new Set(rows.map((r) => r.matchId)).size} | ${pct(c.right)} of ${pct(c.share)} | ${auc(rows.map((r) => ({ score: r.f.lead, won: r.nextPlay === 1 }))).toFixed(3)} | ${auc(rows.map((r) => ({ score: r.f.gold, won: r.nextPlay === 1 }))).toFixed(3)} | ${pct(co.right)} of ${pct(co.share)} |`,
+      `| ${label} | ${new Set(rows.map((r) => r.matchId)).size} | ${pct(c.right)} of ${pct(c.share)} | ${aucOf(rows, "lead").toFixed(3)} | ${aucOf(rows, "gold").toFixed(3)} | ${pct(co.right)} of ${pct(co.share)} |`,
     );
   }
 }
@@ -372,33 +556,35 @@ function tiersSection(labeled: StudyRow[], objectives: ReturnType<typeof studyRo
 // draw; the middle 95% of the results is the range shown. Whole games are
 // drawn, not single minutes, because minutes of the same game aren't
 // independent.
-function bootstrapSection(labeled: StudyRow[], objectives: ReturnType<typeof studyRows>["objectives"]) {
-  const byGame = Map.groupBy(labeled, (r) => r.matchId);
-  const objectivesByGame = Map.groupBy(objectives, (o) => o.matchId);
-  const ids = [...byGame.keys()];
-  let seed = 7;
-  const random = () => {
-    seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
-    return seed / 2_147_483_648;
-  };
-  const measures: [string, (rows: StudyRow[], objs: typeof objectives) => number][] = [
-    ["Next play: call right", (rows) => callAccuracy(rows.map((r) => ({ tone: r.tone, won: r.nextPlay === 1 }))).right],
-    ["Next play: AUC of the tempo lead", (rows) => aucOf(rows, "lead")],
-    ["Next play: AUC of the lead minus AUC of junglers' gold", (rows) => aucOf(rows, "lead") - aucOf(rows, "gold")],
-    ["Next play: AUC of the lead minus AUC of team gold", (rows) => aucOf(rows, "lead") - aucOf(rows, "teamGold")],
+type Sample = { labeled: StudyRow[]; objectives: ObjectiveRow[] };
+
+function bootstrapSection(
+  labeled: StudyRow[],
+  objectives: ObjectiveRow[],
+  definitions: Definition[],
+  check: CheckHalf,
+) {
+  const rightOn = (d: Definition | null, rows: StudyRow[]) =>
+    callAccuracy(rows.map((r) => ({ tone: d ? callOf(d, r) : r.tone, won: r.nextPlay === 1 }))).right;
+  const leadAuc = (d: Definition, rows: StudyRow[]) =>
+    auc(rows.map((r) => ({ score: r.f.alive * 1e9 + d.lead(r), won: r.nextPlay === 1 })));
+  const [firstGuess, ...rest] = definitions;
+  const measures: [string, (s: Sample) => number][] = [
+    ["Next play: call right", (s) => rightOn(null, s.labeled)],
+    ["Next play: AUC of the tempo lead", (s) => aucOf(s.labeled, "lead")],
+    ["Next play: AUC of the lead minus AUC of junglers' gold", (s) => aucOf(s.labeled, "lead") - aucOf(s.labeled, "gold")],
+    ["Next play: AUC of the lead minus AUC of team gold", (s) => aucOf(s.labeled, "lead") - aucOf(s.labeled, "teamGold")],
     [
       "Epic monsters: call right, 1+ min before",
-      (_, objs) =>
-        callAccuracy(objs.flatMap((o) => (o.minuteBefore ? [{ tone: o.minuteBefore.tone, won: o.blueTook }] : []))).right,
+      (s) =>
+        callAccuracy(s.objectives.flatMap((o) => (o.minuteBefore ? [{ tone: o.minuteBefore.tone, won: o.blueTook }] : []))).right,
     ],
   ];
-  const draws = measures.map(() => [] as number[]);
-  for (let draw = 0; draw < 200; draw++) {
-    const picked = Array.from({ length: ids.length }, () => ids[Math.floor(random() * ids.length)]);
-    const rows = picked.flatMap((id) => byGame.get(id) ?? []);
-    const objs = picked.flatMap((id) => objectivesByGame.get(id) ?? []);
-    measures.forEach(([, measure], i) => draws[i].push(measure(rows, objs)));
-  }
+  const checkMeasures: [string, (s: Sample) => number][] = rest.flatMap((d): [string, (s: Sample) => number][] => [
+    [`${d.name}: call right`, (s) => rightOn(d, s.labeled)],
+    [`${d.name}: AUC minus first guess's`, (s) => leadAuc(d, s.labeled) - leadAuc(firstGuess, s.labeled)],
+  ]);
+
   say();
   say(`## How sure`);
   say();
@@ -406,10 +592,36 @@ function bootstrapSection(labeled: StudyRow[], objectives: ReturnType<typeof stu
   say();
   say(`| Number | Value | 95% range |`);
   say(`|---|---|---|`);
-  measures.forEach(([label, measure], i) => {
+  for (const line of bootstrap({ labeled, objectives }, measures)) say(line);
+  say();
+  say(`On the check half only, for the settings tuned on the other half:`);
+  say();
+  say(`| Number | Value | 95% range |`);
+  say(`|---|---|---|`);
+  for (const line of bootstrap({ labeled: check.labeled, objectives: check.objectives }, checkMeasures)) say(line);
+}
+
+function bootstrap(sample: Sample, measures: [string, (s: Sample) => number][]): string[] {
+  const byGame = Map.groupBy(sample.labeled, (r) => r.matchId);
+  const objectivesByGame = Map.groupBy(sample.objectives, (o) => o.matchId);
+  const ids = [...byGame.keys()];
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+    return seed / 2_147_483_648;
+  };
+  const draws = measures.map(() => [] as number[]);
+  for (let draw = 0; draw < 200; draw++) {
+    const picked = Array.from({ length: ids.length }, () => ids[Math.floor(random() * ids.length)]);
+    const drawn: Sample = {
+      labeled: picked.flatMap((id) => byGame.get(id) ?? []),
+      objectives: picked.flatMap((id) => objectivesByGame.get(id) ?? []),
+    };
+    measures.forEach(([, measure], i) => draws[i].push(measure(drawn)));
+  }
+  return measures.map(([label, measure], i) => {
     const sorted = draws[i].sort((a, b) => a - b);
-    const value = measure(labeled, objectives);
-    say(`| ${label} | ${value.toFixed(3)} | ${quantile(sorted, 0.025).toFixed(3)} to ${quantile(sorted, 0.975).toFixed(3)} |`);
+    return `| ${label} | ${measure(sample).toFixed(3)} | ${quantile(sorted, 0.025).toFixed(3)} to ${quantile(sorted, 0.975).toFixed(3)} |`;
   });
 }
 

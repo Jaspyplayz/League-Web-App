@@ -11,6 +11,7 @@ import {
   hash,
   playsOf,
   predict,
+  respawnRows,
   studyRows,
   toStudyGame,
   type StudyGame,
@@ -182,6 +183,24 @@ describe("aliveCheck", () => {
     expect(c.timerOnly).toBe(0);
     expect(c.healthOnly).toBe(1);
     expect(c.bothAlive).toBe(20 * 10 - 2);
+  });
+});
+
+describe("respawnRows", () => {
+  it("lists deaths with whether the next snapshot still showed 0 health", () => {
+    const game = studyGame([kill("4:50", 7, 2), kill("7:40", 8, 3), kill("9:05", 8, 4)]);
+    // Blue's jungler (level 3, a 12 second timer) still shows 0 health at 5:00.
+    game.extra[5][1].health = 0;
+    expect(respawnRows(game)).toEqual([
+      { minute: clock("4:50") / 60_000, level: 3, timerS: 12, gapS: 10, deadAtMark: true },
+      { minute: clock("7:40") / 60_000, level: 4, timerS: 12, gapS: 20, deadAtMark: false },
+      // The 9:05 death is left out: 55 seconds later is long after the timer ran out.
+    ]);
+  });
+
+  it("skips a death followed by another before the snapshot", () => {
+    const game = studyGame([kill("4:10", 7, 2), kill("4:40", 7, 2)]);
+    expect(respawnRows(game).map((r) => r.minute)).toEqual([clock("4:40") / 60_000]);
   });
 });
 
