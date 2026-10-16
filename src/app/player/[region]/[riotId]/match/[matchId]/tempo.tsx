@@ -93,12 +93,13 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
     pick(Math.min(last, Math.max(0, to)), true);
   };
 
-  // The strip's columns: a label, then one per minute.
+  // The strip's columns: a label, then one per minute, in every row.
   const columns = { gridTemplateColumns: `4.5rem repeat(${minutes.length}, minmax(0, 1fr))` };
   const minuteColumns = {
     gridColumn: "2 / -1",
     gridTemplateColumns: `repeat(${minutes.length}, minmax(0, 1fr))`,
   };
+  const minuteRow = "grid gap-x-0.5";
 
   return (
     <section aria-labelledby="tempo-heading" className={`${panelClass} flex flex-col gap-[18px] p-6`}>
@@ -131,7 +132,7 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
           {/* The marks repeat what the details below say in words, so screen
               readers skip them. */}
           <RowLabel>Monsters</RowLabel>
-          <div aria-hidden="true" className="grid" style={minuteColumns}>
+          <div aria-hidden="true" className={minuteRow} style={minuteColumns}>
             {minutes.map((m) => (
               <MonsterMarks
                 key={m.timestamp}
@@ -147,7 +148,7 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
             role="radiogroup"
             aria-label={`Tempo by minute. You were up tempo for ${count("ahead")} minutes, ${them} for ${count("behind")}, and it was even for ${count("even")}.`}
             onKeyDown={onKeyDown}
-            className="grid"
+            className={minuteRow}
             style={minuteColumns}
           >
             {minutes.map((m, i) => (
@@ -163,7 +164,7 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
                 tabIndex={i === index ? 0 : -1}
                 title={formatClock(m.timestamp)}
                 onClick={() => pick(i)}
-                className={`h-9 first:rounded-l-md last:rounded-r-md ${TONE_FILL[m.tone]} ${
+                className={`h-9 rounded-[3px] ${TONE_FILL[m.tone]} ${
                   i === index
                     ? "relative z-10 outline-2 outline-offset-1 outline-ink"
                     : "hover:opacity-80"
@@ -173,20 +174,20 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
           </div>
 
           <RowLabel>{you}</RowLabel>
-          <div aria-hidden="true" className="grid" style={minuteColumns}>
+          <div aria-hidden="true" className={minuteRow} style={minuteColumns}>
             {minutes.map((m) => (
               <JunglerMarks key={m.timestamp} activities={m.next.you} tone="ahead" />
             ))}
           </div>
           <RowLabel>{them}</RowLabel>
-          <div aria-hidden="true" className="grid" style={minuteColumns}>
+          <div aria-hidden="true" className={minuteRow} style={minuteColumns}>
             {minutes.map((m) => (
               <JunglerMarks key={m.timestamp} activities={m.next.them} tone="behind" />
             ))}
           </div>
 
           <span />
-          <div aria-hidden="true" className="grid" style={minuteColumns}>
+          <div aria-hidden="true" className={minuteRow} style={minuteColumns}>
             {minutes.map((m) => {
               const whole = Math.round(m.timestamp / 60_000);
               return (
@@ -325,7 +326,9 @@ function MonsterMarks({
 function JunglerMarks({ activities, tone }: { activities: Activity[]; tone: "ahead" | "behind" }) {
   const color = tone === "ahead" ? "text-ahead-soft" : "text-behind";
   return (
-    <span className={`flex h-6 items-center justify-center gap-px text-label leading-none ${color}`}>
+    <span
+      className={`flex h-6 items-center justify-center gap-px text-[13px] font-semibold leading-none ${color}`}
+    >
       {activities.map((a) =>
         a.type === "shop" ? (
           <span key={`shop-${a.timestamp}`} title={`Shopped at ${formatClock(a.timestamp)}`}>
