@@ -8,6 +8,21 @@ import { expect, test } from "@playwright/test";
 // shows this message instead of a profile, and that's not a broken PR.
 const EXPIRED_KEY = "The site's Riot API key isn't working";
 
+// A preview's first visit starts a cold server and reads the game from the
+// database, which can take longer than Playwright's default 5 seconds.
+const FIRST_LOAD = { timeout: 30_000 };
+
+// When a test fails, print what the page actually showed, so the CI log
+// explains the failure without downloading the trace.
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const text = await page
+    .locator("body")
+    .innerText()
+    .catch(() => "(page unreadable)");
+  console.log(`Page at ${page.url()} showed:\n${text.slice(0, 1500)}`);
+});
+
 test("search a player and see their profile", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
@@ -33,6 +48,9 @@ test("open the sample analysis", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "See a sample analysis" }).click();
   await expect(page).toHaveURL(/\/match\/KR_/);
-  await expect(page.getByRole("region", { name: "Match summary" })).toContainText("Victory");
+  await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
+    "Victory",
+    FIRST_LOAD,
+  );
   await expect(page.getByText("Biggest swings")).toBeVisible();
 });
