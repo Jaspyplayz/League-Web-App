@@ -83,6 +83,16 @@ export default function PrivacyPage() {
         to sign in on every page. Signing out removes it.
       </p>
 
+      <h2>AI recaps</h2>
+      <p>
+        If you click Write recap on a match page, Turnpoint sends that game&apos;s stats (such as
+        champions, kills, gold gaps and objective timings, worked out from Riot&apos;s match
+        data) to Anthropic, which runs the Claude AI model, and saves the recap it writes. No
+        account details, Riot IDs or notes are sent. Anyone looking at that game sees the saved
+        recap. Turnpoint also notes which account asked for each recap, only to limit how many
+        one account can request a day.
+      </p>
+
       <h2>Stored in your browser</h2>
       <p>
         Turnpoint remembers the last few players you searched for, so you can click back to

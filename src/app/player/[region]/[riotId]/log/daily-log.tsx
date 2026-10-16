@@ -361,8 +361,8 @@ function FocusLine({ goal, results }: { goal: string; results: (boolean | null)[
 }
 
 // The day's games, oldest at the bottom, each linking to its analysis. Folded
-// away on Short cards. Each game is its own row with room for a second line
-// under it, for a one-line recap of the game once those exist.
+// away on Short cards. A game with an AI recap shows its one-line headline
+// under the row.
 function GameList({
   games,
   open,
@@ -402,6 +402,7 @@ function GameList({
               Analyze
             </Link>
           </div>
+          {g.recap && <p className="pl-5 pt-0.5 text-note text-muted">{g.recap}</p>}
         </li>
       ))}
     </ul>

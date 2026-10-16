@@ -35,6 +35,7 @@ function game(startedAt: number, extra: Partial<LogGame> = {}): LogGame {
     visionPerMin: 1,
     score: 60,
     goldAt15: null,
+    recap: null,
     shows: null,
     ...extra,
   };

@@ -14,6 +14,7 @@ import { scoreGame } from "@/lib/game-score";
 import { summarizeMatch } from "@/lib/match-summary";
 import { loadMatches, loadTimelines } from "@/lib/match-store";
 import { readMyPlayer } from "@/lib/my-player";
+import { readRecapHeadlines } from "@/lib/recap-store";
 import { loadRankHistory } from "@/lib/profile-store";
 import { isRegion } from "@/lib/regions";
 import { getAccount, getMatchIds } from "@/lib/riot/api";
@@ -100,11 +101,15 @@ async function Log({ params }: { params: Params }) {
 
   const loaded = await loadMatches(region, ids.value, MATCHES_PER_VIEW);
   const trendMatches = loaded.matches.filter((m) => isTrendGame(m, puuid));
-  const [{ timelines }, dd, history, notes] = await Promise.all([
+  const [{ timelines }, dd, history, notes, recaps] = await Promise.all([
     loadTimelines(region, trendMatches, TIMELINES_PER_VIEW),
     getDataDragon().catch(() => null),
     loadRankHistory(puuid, new Date(now)),
     loadNotes(puuid, dayKey(now - (LOG_DAYS + 2) * DAY_S * 1000)),
+    readRecapHeadlines(
+      puuid,
+      loaded.matches.map((m) => m.metadata.matchId),
+    ),
   ]);
 
   const games: LogGame[] = loaded.matches.flatMap((match) => {
@@ -130,6 +135,7 @@ async function Log({ params }: { params: Params }) {
         score: scoreGame(match).get(me.participantId)?.score ?? null,
         goldAt15: trend?.goldAt15 ?? null,
         shows: trend ? checkWeaknesses(trend) : null,
+        recap: recaps.get(summary.matchId) ?? null,
       },
     ];
   });

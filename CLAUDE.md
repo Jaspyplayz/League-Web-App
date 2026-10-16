@@ -16,11 +16,12 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Database tables and setup: [docs/database.md](docs/database.md)
 - Game score (the trained 0 to 100 rating): [docs/game-score.md](docs/game-score.md)
 - Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
+- AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
 
-Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Drizzle ORM, Riot Games API, Sentry, Vitest, GitHub Actions, Vercel. Node 22, pinned in `.nvmrc` and `package.json` `engines`.
+Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Drizzle ORM, Riot Games API, Claude API (Haiku, for recaps), Sentry, Vitest, GitHub Actions, Vercel. Node 22, pinned in `.nvmrc` and `package.json` `engines`.
 
 ## Layout
 
@@ -43,6 +44,7 @@ src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and 
                   each save also adds changed ranks to rank_history for the LP graph
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
+src/lib/recap.ts  The only Claude API call (AI match recaps); recap-store.ts saves them
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
 scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance)
@@ -76,6 +78,7 @@ Copy `.env.example` to `.env.local` (git-ignored). Variables, names only:
 - `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`
 - `DATABASE_URL` (transaction pooler, port 6543), `DATABASE_URL_DIRECT` (session pooler, port 5432, migrations only)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: sign-in; without them "Sign in" is hidden ([docs/sign-in.md](docs/sign-in.md))
+- `ANTHROPIC_API_KEY`: AI match recaps; without it "Write recap" is hidden ([docs/match-recap.md](docs/match-recap.md))
 
 Production values live in Vercel's environment variables, which Jasper sets himself.
 
