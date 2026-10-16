@@ -6,6 +6,7 @@ import { OBJECTIVE_NAMES, type Objective, type ObjectiveKind } from "@/lib/analy
 import { buildDiffChart, DEFAULT_BOX, type DiffPoint } from "@/lib/diff-chart";
 import { LegendSwatch } from "./legend-swatch";
 import { panelClass } from "@/components/ui/panel";
+import { SwipeHint } from "@/components/ui/swipe-hint";
 
 // Your team's gold minus the enemy team's, with the objectives each team
 // took lined up underneath. Shows whether the game was won or lost as a team,
@@ -31,6 +32,7 @@ export function TeamGold({ points, objectives }: { points: DiffPoint[]; objectiv
           {objectives.length > 0 && <ObjectiveStrip points={points} objectives={objectives} />}
         </div>
       </div>
+      <SwipeHint />
     </section>
   );
 }
