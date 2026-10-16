@@ -125,6 +125,9 @@ export default function Home() {
             </li>
           ))}
         </ol>
+        <Link href="/how-it-works" className="text-body text-ahead-soft hover:text-ahead-bright">
+          How the win chance and game score models work →
+        </Link>
       </section>
     </main>
   );

@@ -19,9 +19,12 @@ import {
   winChanceExamples,
   winChanceFeatures,
   whatHappened,
+  whatIfChance,
   type TeamState,
   type WinChanceGame,
+  type WinChanceModel,
 } from "./win-chance";
+import trainedModel from "./win-chance-model.json";
 
 const featureIndex = (key: string) => WIN_CHANCE_FEATURES.findIndex((f) => f.key === key);
 
@@ -310,5 +313,27 @@ describe("biggestSwings", () => {
   it("reads the game from red side's point of view", () => {
     const red = chances.map((c) => ({ ...c, chance: 1 - c.chance }));
     expect(biggestSwings(game, red, 200)[1]).toMatchObject({ ours: ["Baron"], theirs: [] });
+  });
+});
+
+describe("whatIfChance", () => {
+  const model = trainedModel as WinChanceModel;
+  const even = { minute: 20, goldLead: 0, xpLead: 0, dragonLead: 0, inhibitorLead: 0, baron: 0 } as const;
+
+  it("says 50% for an even game", () => {
+    expect(whatIfChance(model, even)).toBe(0.5);
+  });
+
+  it("adds up the weighted leads like the worked example in docs/win-chance.md", () => {
+    const w = { ...even, goldLead: 2302, xpLead: 1432, dragonLead: -1 };
+    const [gold, goldLate, xp, , , , dragons] = model.weights;
+    const score = gold * 2.302 + goldLate * 2.302 * (20 / 30) + xp * 1.432 - dragons;
+    expect(whatIfChance(model, w)).toBeCloseTo(1 / (1 + Math.exp(-score)), 10);
+  });
+
+  it("gives the mirror answer when the leads flip", () => {
+    const ahead = { ...even, goldLead: 3000, dragonLead: 2, baron: 1 } as const;
+    const behind = { ...even, goldLead: -3000, dragonLead: -2, baron: -1 } as const;
+    expect(whatIfChance(model, ahead) + whatIfChance(model, behind)).toBeCloseTo(1, 10);
   });
 });
