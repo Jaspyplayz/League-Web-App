@@ -1,0 +1,56 @@
+import { expect, test } from "@playwright/test";
+
+// One happy path through the real site: search a player, see their profile,
+// open the sample analysis. It runs against each PR's Vercel preview, so it
+// catches a page that crashes in production but passes the unit tests.
+
+// The development Riot key expires every 24 hours. When it has, the site
+// shows this message instead of a profile, and that's not a broken PR.
+const EXPIRED_KEY = "The site's Riot API key isn't working";
+
+// A preview's first visit starts a cold server and reads the game from the
+// database, which can take longer than Playwright's default 5 seconds.
+const FIRST_LOAD = { timeout: 30_000 };
+
+// When a test fails, print what the page actually showed, so the CI log
+// explains the failure without downloading the trace.
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const text = await page
+    .locator("body")
+    .innerText()
+    .catch(() => "(page unreadable)");
+  console.log(`Page at ${page.url()} showed:\n${text.slice(0, 1500)}`);
+});
+
+test("search a player and see their profile", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+
+  await page.getByLabel("Riot ID").fill("Hide on bush#KR1");
+  await page.getByLabel("Region").selectOption("kr");
+  await page.getByRole("button", { name: "Analyze" }).click();
+  await expect(page).toHaveURL(/\/player\/kr\/Hide%20on%20bush-KR1/);
+
+  // Wait for either the profile or the expired-key notice, whichever comes.
+  const profile = page.getByRole("region", { name: "Player summary" });
+  const expired = page.getByText(EXPIRED_KEY);
+  await expect(profile.or(expired)).toBeVisible();
+  test.skip(await expired.isVisible(), "Skipped: the Riot development key has expired.");
+
+  await expect(profile.getByText("Ranked Solo/Duo")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible();
+});
+
+// The sample game is served from the database, so unlike the search above it
+// must work even when the Riot key has expired.
+test("open the sample analysis", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await expect(page).toHaveURL(/\/match\/KR_/);
+  await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
+    "Victory",
+    FIRST_LOAD,
+  );
+  await expect(page.getByText("Biggest swings")).toBeVisible();
+});

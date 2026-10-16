@@ -156,3 +156,7 @@ next-env.d.ts
 
 # Claude Code personal settings (notifications, status line)
 .claude/settings.local.json
+
+# Playwright
+/test-results/
+/playwright-report/

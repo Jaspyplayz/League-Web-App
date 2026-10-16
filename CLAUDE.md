@@ -57,6 +57,7 @@ docs/             Design and research docs
 | `npm run lint` | ESLint |
 | `npm run typecheck` | Next.js type generation + `tsc` |
 | `npm test` | Vitest unit tests |
+| `npm run test:e2e` | Playwright smoke test (`e2e/`); runs on each Vercel preview ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test)) |
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |

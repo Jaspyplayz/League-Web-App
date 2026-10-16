@@ -1,0 +1,47 @@
+name: Smoke test
+
+# Vercel tells GitHub when a preview finishes deploying (a "deployment
+# status"). This runs the Playwright test in e2e/ against that preview, so a
+# page that only breaks on the real site shows up on the PR.
+# Guide: https://vercel.com/guides/how-can-i-run-end-to-end-tests-after-my-vercel-preview-deployment
+on: deployment_status
+
+jobs:
+  smoke:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # Vercel's preview protection answers with a login page (401) unless
+      # the request carries the bypass secret. Say so plainly instead of
+      # letting every test time out on "Log in to Vercel".
+      - name: Check the preview is reachable
+        env:
+          BASE_URL: ${{ github.event.deployment_status.environment_url }}
+          BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          headers=()
+          if [ -n "$BYPASS" ]; then headers=(-H "x-vercel-protection-bypass: $BYPASS"); fi
+          # Vercel's login wall answers 401 or 403, or 302 to a vercel.com login page.
+          read -r status redirect < <(curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" "${headers[@]}" "$BASE_URL")
+          echo "Preview answered $status $redirect"
+          if [ "$status" = "401" ] || [ "$status" = "403" ] || [[ "$redirect" == *vercel.com* ]]; then
+            echo "::error::The preview asks for a Vercel login. Add the VERCEL_AUTOMATION_BYPASS_SECRET repository secret (see docs/SETUP.md, 'The browser smoke test')."
+            exit 1
+          fi
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          BASE_URL: ${{ github.event.deployment_status.environment_url }}
+          # Only needed if Vercel's preview protection is on (see docs/SETUP.md).
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/

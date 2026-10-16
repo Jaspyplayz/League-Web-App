@@ -88,6 +88,19 @@ npm test
 npm run build
 ```
 
+## The browser smoke test
+
+After Vercel deploys a pull request's preview, GitHub runs `e2e/smoke.spec.ts` against it (workflow `.github/workflows/smoke.yml`): it searches Hide on bush#KR1 and opens the sample analysis. When the Riot key has expired, the search half is skipped, not failed. To run it yourself against a preview:
+
+```bash
+npx playwright install chromium
+BASE_URL=https://your-preview.vercel.app npm run test:e2e
+```
+
+If Vercel's preview protection is on (Vercel project → Settings → Deployment Protection), the test needs a way in: create a "Protection Bypass for Automation" secret there and save it in GitHub (repository → Settings → Secrets and variables → Actions) as `VERCEL_AUTOMATION_BYPASS_SECRET`.
+
+The sample analysis is read from the database, so `DATABASE_URL` in Vercel (Settings → Environment Variables) must be set for **Preview** as well as Production. Without it the preview tries Riot instead and the test fails once the key expires. After changing a variable, push a commit or redeploy the preview so it picks up the change.
+
 ## Optional: collect rank benchmarks
 
 The "You vs [rank]" comparisons on Insights need sample games from other players. `npm run benchmarks` collects them into the database using your `RIOT_API_KEY` and `DATABASE_URL`. A full run takes about 2 hours, so start small:
