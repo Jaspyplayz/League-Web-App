@@ -32,7 +32,7 @@ export function RecapButton({ region, matchId, puuid }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-muted">
-        Get a few sentences on what decided this game, written by AI from the stats on this page.
+        Get a few short points on what decided this game, written by AI from the stats on this page.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <button

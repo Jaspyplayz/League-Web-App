@@ -12,6 +12,8 @@ import type { RecapFacts } from "@/lib/analyzer/recap-facts";
 // saved (src/lib/recap-store.ts), so a game is only ever written once.
 export const RECAP_MODEL = "claude-haiku-5-5";
 
+// `detail` holds the bullet points, one per line. Recaps saved before the
+// points existed are a single paragraph, which shows as one point.
 export type Recap = { headline: string; detail: string };
 
 // Without the key, the site hides the "Write recap" button.
@@ -34,16 +36,17 @@ Rules:
 - Plain words a casual player understands. Write times as game clock times like 14:20.
 
 Output:
-- headline: one sentence of at most 14 words.
-- detail: 3 to 5 short sentences, as one paragraph.`;
+- points: 3 to 5 bullet points, most important first. Each point is one short sentence of at most 20 words about one thing, with at most two numbers. Start with the game time when there is one, like "12:00: Your team took two towers and a kill, and your win chance rose from 66% to 84%."
+- headline: one sentence of at most 12 words that sums up the points. It may only repeat something already said in the points, never a new fact.`;
 
 const SCHEMA = {
   type: "object",
   properties: {
+    points: { type: "array", items: { type: "string" } },
     headline: { type: "string" },
-    detail: { type: "string" },
   },
-  required: ["headline", "detail"],
+  // Points come first so the model writes them before summing them up.
+  required: ["points", "headline"],
   additionalProperties: false,
 };
 
@@ -68,10 +71,15 @@ function parseRecap(text: string): Recap | null {
   try {
     const value: unknown = JSON.parse(text);
     if (typeof value !== "object" || value === null) return null;
-    const { headline, detail } = value as Record<string, unknown>;
-    if (typeof headline !== "string" || typeof detail !== "string") return null;
-    if (!headline.trim() || !detail.trim()) return null;
-    return { headline: headline.trim(), detail: detail.trim() };
+    const { headline, points } = value as Record<string, unknown>;
+    if (typeof headline !== "string" || !headline.trim() || !Array.isArray(points)) return null;
+    // One line per point, so a point can't contain line breaks of its own.
+    const lines = points
+      .filter((p): p is string => typeof p === "string")
+      .map((p) => p.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    if (lines.length === 0) return null;
+    return { headline: headline.trim(), detail: lines.join("\n") };
   } catch {
     return null;
   }
