@@ -26,9 +26,10 @@ jobs:
         run: |
           headers=()
           if [ -n "$BYPASS" ]; then headers=(-H "x-vercel-protection-bypass: $BYPASS"); fi
-          status=$(curl -s -o /dev/null -w "%{http_code}" "${headers[@]}" "$BASE_URL")
-          echo "Preview answered $status"
-          if [ "$status" = "401" ] || [ "$status" = "403" ]; then
+          # Vercel's login wall answers 401 or 403, or 302 to a vercel.com login page.
+          read -r status redirect < <(curl -s -o /dev/null -w "%{http_code} %{redirect_url}" "${headers[@]}" "$BASE_URL")
+          echo "Preview answered $status $redirect"
+          if [ "$status" = "401" ] || [ "$status" = "403" ] || [[ "$redirect" == *vercel.com* ]]; then
             echo "::error::The preview asks for a Vercel login. Add the VERCEL_AUTOMATION_BYPASS_SECRET repository secret (see docs/SETUP.md, 'The browser smoke test')."
             exit 1
           fi
