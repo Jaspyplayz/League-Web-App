@@ -192,6 +192,28 @@ function respawnFit(rows: RespawnRow[]) {
   const stillDead = sorted(rows.filter((r) => r.timerS <= r.gapS && r.deadAtMark).map((r) => r.gapS - r.timerS));
   say();
   say(`Back before the formula said: ${back.length}, with a median of ${back.length ? quantile(back, 0.5).toFixed(1) : "-"} s left on the formula's timer (90% within ${back.length ? quantile(back, 0.9).toFixed(1) : "-"} s). Still dead after it said: ${stillDead.length}, median ${stillDead.length ? quantile(stillDead, 0.5).toFixed(1) : "-"} s over (90% within ${stillDead.length ? quantile(stillDead, 0.9).toFixed(1) : "-"} s).`);
+
+  // Early returns that big look like revives rather than a timer that's a
+  // little off. A revive is possible when the player had bought Guardian
+  // Angel, had Zilean or Akshan on their team, or was Sion, Zac or Anivia.
+  const early = rows.filter((r) => r.timerS > r.gapS && !r.deadAtMark);
+  const reviveShare = (group: RespawnRow[]) =>
+    group.length ? pct(group.filter((r) => r.revive).length / group.length) : "-";
+  say();
+  say(`A revive was possible (Guardian Angel bought, Zilean or Akshan on the team, or Sion, Zac or Anivia) for ${reviveShare(early)} of the early returns, against ${reviveShare(rows)} of all these deaths.`);
+  say();
+  say(`| Mark came after the death | Deaths | Back early | Revive possible, of those back early |`);
+  say(`|---|---|---|---|`);
+  for (const [label, from, to] of [
+    ["under 5 s", 0, 5],
+    ["5 to 15 s", 5, 15],
+    ["15 to 30 s", 15, 30],
+    ["30 s or more", 30, Infinity],
+  ] as const) {
+    const group = rows.filter((r) => r.gapS >= from && r.gapS < to && r.timerS > r.gapS);
+    const groupEarly = group.filter((r) => !r.deadAtMark);
+    say(`| ${label} | ${group.length} | ${group.length ? pct(groupEarly.length / group.length) : "-"} | ${reviveShare(groupEarly)} |`);
+  }
 }
 
 function estimateSection(games: StudyGame[], minutes: StudyRow[]) {
@@ -301,6 +323,7 @@ function modelsSection(labeled: StudyRow[]) {
     ["Items, levels, alive (the timeline's inputs)", ["itemGold", "level", "alive"]],
     ["Gold, unspent gold, levels, alive", ["gold", "unspent", "level", "alive"]],
     ["Items, levels, alive, players alive", ["itemGold", "level", "alive", "numbers"]],
+    ["The same, alive from health snapshots", ["itemGold", "level", "aliveHp", "numbersHp"]],
     ["Team gold, items, levels, alive, players alive", ["teamGold", "itemGold", "level", "alive", "numbers"]],
     ["... plus health", ["teamGold", "itemGold", "level", "alive", "numbers", "hp"]],
     ["... plus recent camps and time since shopping", ["teamGold", "itemGold", "level", "alive", "numbers", "hp", "jungleCs2", "sinceShop"]],
@@ -329,6 +352,9 @@ function modelsSection(labeled: StudyRow[]) {
 type Definition = {
   name: string;
   weights: string;
+  // 1 if only blue's jungler is alive, -1 if only red's. From the death
+  // timer formula, unless the definition reads Riot's health snapshots.
+  alive?: (r: StudyRow) => number;
   lead: (r: StudyRow) => number;
   threshold: number;
   thresholdText: string;
@@ -347,8 +373,13 @@ function isTuning(matchId: string): boolean {
   return hash(matchId) % 2 === 0;
 }
 
+function aliveOf(d: Definition, r: StudyRow): number {
+  return d.alive ? d.alive(r) : r.f.alive;
+}
+
 function callOf(d: Definition, r: StudyRow): TempoTone {
-  if (r.f.alive !== 0) return r.f.alive > 0 ? "ahead" : "behind";
+  const alive = aliveOf(d, r);
+  if (alive !== 0) return alive > 0 ? "ahead" : "behind";
   return toneOf(d.lead(r), d.threshold);
 }
 
@@ -365,20 +396,26 @@ function tunedDefinitions(labeled: StudyRow[]): Definition[] {
     // asRows gives gold in thousands, so w[1] is per 1,000 gold of keys[0].
     return keys.map((_, i) => round((1000 * w[i + 1]) / w[1]));
   };
-  const thresholdFor = (lead: (r: StudyRow) => number, unit: number) => {
-    const bothAlive = train.filter((r) => r.f.alive === 0);
+  const thresholdFor = (lead: (r: StudyRow) => number, unit: number, alive = (r: StudyRow) => r.f.alive) => {
+    const bothAlive = train.filter((r) => alive(r) === 0);
     const [, b] = fitLogistic(bothAlive.map((r) => ({ x: [lead(r) / unit], won: r.nextPlay === 1 })));
     return b > 0 ? (unit * Math.log(0.55 / 0.45)) / b : Infinity;
   };
   const gold = (x: number) => Math.round(x).toLocaleString("en-US");
-  const definition = (name: string, weights: string, lead: (r: StudyRow) => number): Definition => {
-    const threshold = round(thresholdFor(lead, 1000));
-    return { name, weights, lead, threshold, thresholdText: gold(threshold) };
+  const definition = (
+    name: string,
+    weights: string,
+    lead: (r: StudyRow) => number,
+    alive?: (r: StudyRow) => number,
+  ): Definition => {
+    const threshold = round(thresholdFor(lead, 1000, alive));
+    return { name, weights, alive, lead, threshold, thresholdText: gold(threshold) };
   };
 
   const [, levelA] = goldPer(["itemGold", "level", "alive"]);
   const [, levelB, , playerB] = goldPer(["itemGold", "level", "alive", "numbers"]);
   const [, levelC, , playerC] = goldPer(["gold", "level", "alive", "numbers"]);
+  const [, levelH, , playerH] = goldPer(["itemGold", "level", "aliveHp", "numbersHp"]);
   const leadB = (r: StudyRow) => r.f.itemGold + levelB * r.f.level + playerB * r.f.numbers;
   const share = Math.round(thresholdFor((r) => leadB(r) / Math.max(1, r.size), 1) * 100) / 100;
 
@@ -396,6 +433,12 @@ function tunedDefinitions(labeled: StudyRow[]): Definition[] {
       "Total gold, levels, players alive",
       `gold + ${gold(levelC)} a level + ${gold(playerC)} a player`,
       (r) => r.f.gold + levelC * r.f.level + playerC * r.f.numbers,
+    ),
+    definition(
+      "Items, levels, players alive, alive from health snapshots",
+      `items + ${gold(levelH)} a level + ${gold(playerH)} a player`,
+      (r) => r.f.itemGold + levelH * r.f.level + playerH * r.f.numbersHp,
+      (r) => r.f.aliveHp,
     ),
     {
       name: "Items, levels, players alive, as a share",
@@ -416,7 +459,7 @@ function tunedDefinitions(labeled: StudyRow[]): Definition[] {
 
 function evaluate(d: Definition, check: CheckHalf) {
   const next = callAccuracy(check.labeled.map((r) => ({ tone: callOf(d, r), won: r.nextPlay === 1 })));
-  const leadAuc = auc(check.labeled.map((r) => ({ score: r.f.alive * 1e9 + d.lead(r), won: r.nextPlay === 1 })));
+  const leadAuc = auc(check.labeled.map((r) => ({ score: aliveOf(d, r) * 1e9 + d.lead(r), won: r.nextPlay === 1 })));
   const monsters = callAccuracy(
     check.objectives.flatMap((o) => (o.minuteBefore ? [{ tone: callOf(d, o.minuteBefore), won: o.blueTook }] : [])),
   );
@@ -567,7 +610,7 @@ function bootstrapSection(
   const rightOn = (d: Definition | null, rows: StudyRow[]) =>
     callAccuracy(rows.map((r) => ({ tone: d ? callOf(d, r) : r.tone, won: r.nextPlay === 1 }))).right;
   const leadAuc = (d: Definition, rows: StudyRow[]) =>
-    auc(rows.map((r) => ({ score: r.f.alive * 1e9 + d.lead(r), won: r.nextPlay === 1 })));
+    auc(rows.map((r) => ({ score: aliveOf(d, r) * 1e9 + d.lead(r), won: r.nextPlay === 1 })));
   const [firstGuess, ...rest] = definitions;
   const measures: [string, (s: Sample) => number][] = [
     ["Next play: call right", (s) => rightOn(null, s.labeled)],

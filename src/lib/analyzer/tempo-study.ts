@@ -115,6 +115,10 @@ export const STUDY_FEATURES = [
   "xp",
   "alive", // 1 if only blue's jungler is alive, -1 if only red's
   "numbers", // players alive on blue minus on red
+  // The same two from Riot's health snapshots (health above 0) instead of
+  // kill times and the death timer formula. The site doesn't keep health.
+  "aliveHp",
+  "numbersHp",
   "teamGold", // the two teams' total gold
   "hp", // junglers' health as a share of their maximum (0 to 1)
   "jungleCs2", // monsters killed by the junglers in the last 2 minutes
@@ -192,6 +196,10 @@ export function studyRows(game: StudyGame): StudyRows {
   };
   const jungleCs2 = (i: number, id: number) =>
     (extra(i, id)?.jungleCs ?? 0) - (extra(Math.max(0, i - 2), id)?.jungleCs ?? 0);
+  const hasHealth = game.extra.some((frame) => frame.some((p) => p.healthMax > 0));
+  const up = (i: number, id: number) => (extra(i, id)?.health ?? 0) > 0;
+  const upOn = (i: number, teamId: number) =>
+    game.participants.filter((p) => p.teamId === teamId && up(i, p.participantId)).length;
   const plays = playsOf(events, game.participants, [blue.participantId, red.participantId]);
 
   const rows: StudyRow[] = [];
@@ -216,6 +224,10 @@ export function studyRows(game: StudyGame): StudyRows {
         xp: frames[i].players[blue.participantId - 1].xp - frames[i].players[red.participantId - 1].xp,
         alive: Number(m.you.alive) - Number(m.them.alive),
         numbers: m.alive.ours - m.alive.theirs,
+        aliveHp: hasHealth
+          ? Number(up(i, blue.participantId)) - Number(up(i, red.participantId))
+          : Number(m.you.alive) - Number(m.them.alive),
+        numbersHp: hasHealth ? upOn(i, 100) - upOn(i, 200) : m.alive.ours - m.alive.theirs,
         teamGold: teamGold(i, 100) - teamGold(i, 200),
         hp: healthShare(i, blue.participantId) - healthShare(i, red.participantId),
         jungleCs2: jungleCs2(i, blue.participantId) - jungleCs2(i, red.participantId),
@@ -308,7 +320,15 @@ export type RespawnRow = {
   timerS: number; // the formula's death timer, in seconds
   gapS: number; // seconds from the death to the next minute mark
   deadAtMark: boolean; // health 0 at that mark
+  // Something could have brought them back early: they'd bought Guardian
+  // Angel, Zilean or Akshan was on their team, or they were Sion, Zac or
+  // Anivia, whose passives keep them going after a kill.
+  revive: boolean;
 };
+
+const GUARDIAN_ANGEL = 3026;
+const REVIVING_TEAMMATES = new Set(["Zilean", "Akshan"]);
+const OWN_REVIVES = new Set(["Sion", "Zac", "Anivia"]);
 
 export function respawnRows(game: StudyGame): RespawnRow[] {
   const { frames } = game.timeline;
@@ -329,12 +349,26 @@ export function respawnRows(game: StudyGame): RespawnRow[] {
     // Long back by the mark: says nothing about the timer.
     if (again || gapS > 2 * timerS) continue;
     const frame = frames.findLast((f) => f.timestamp <= d.diedAt) ?? frames[0];
+    const victim = game.participants.find((p) => p.participantId === d.participantId);
+    const boughtAngel = game.timeline.events.some(
+      (e) =>
+        e.type === "ITEM_PURCHASED" &&
+        e.participantId === d.participantId &&
+        e.itemId === GUARDIAN_ANGEL &&
+        e.timestamp < d.diedAt,
+    );
     rows.push({
       minute: d.diedAt / 60_000,
       level: frame.players[d.participantId - 1].level,
       timerS,
       gapS,
       deadAtMark: (game.extra[i]?.[d.participantId - 1]?.health ?? 1) <= 0,
+      revive:
+        boughtAngel ||
+        OWN_REVIVES.has(victim?.championName ?? "") ||
+        game.participants.some(
+          (p) => p.teamId === victim?.teamId && REVIVING_TEAMMATES.has(p.championName),
+        ),
     });
   }
   return rows;

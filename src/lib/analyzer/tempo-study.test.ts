@@ -137,6 +137,18 @@ describe("studyRows", () => {
   const { minutes, objectives, duels } = studyRows(game);
   const at = (m: number) => minutes.find((r) => r.minute === m)!;
 
+  it("reads who was alive from the health snapshots too", () => {
+    const game = studyGame([kill("4:50", 7, 2)]);
+    // At 5:00 the timer says blue's jungler is dead (back at 5:02); the
+    // snapshot says they're up, and one of red's laners is at 0.
+    game.extra[5][7].health = 0;
+    const row = studyRows(game).minutes.find((r) => r.minute === 5)!;
+    expect(row.f.alive).toBe(-1);
+    expect(row.f.aliveHp).toBe(0);
+    expect(row.f.numbers).toBe(-1);
+    expect(row.f.numbersHp).toBe(1);
+  });
+
   it("starts at minute 2 and takes blue's jungler minus red's", () => {
     expect(minutes[0].minute).toBe(2);
     expect(at(4).f.gold).toBe(200);
@@ -192,10 +204,22 @@ describe("respawnRows", () => {
     // Blue's jungler (level 3, a 12 second timer) still shows 0 health at 5:00.
     game.extra[5][1].health = 0;
     expect(respawnRows(game)).toEqual([
-      { minute: clock("4:50") / 60_000, level: 3, timerS: 12, gapS: 10, deadAtMark: true },
-      { minute: clock("7:40") / 60_000, level: 4, timerS: 12, gapS: 20, deadAtMark: false },
+      { minute: clock("4:50") / 60_000, level: 3, timerS: 12, gapS: 10, deadAtMark: true, revive: false },
+      { minute: clock("7:40") / 60_000, level: 4, timerS: 12, gapS: 20, deadAtMark: false, revive: false },
       // The 9:05 death is left out: 55 seconds later is long after the timer ran out.
     ]);
+  });
+
+  it("notes when a revive was possible", () => {
+    const game = studyGame([
+      { type: "ITEM_PURCHASED", timestamp: clock("3:00"), participantId: 2, itemId: 3026 },
+      kill("4:50", 7, 2),
+      kill("7:40", 2, 7),
+    ]);
+    // Guardian Angel for blue's jungler; nothing for red's.
+    expect(respawnRows(game).map((r) => r.revive)).toEqual([true, false]);
+    game.participants[9].championName = "Zilean";
+    expect(respawnRows(game).map((r) => r.revive)).toEqual([true, true]);
   });
 
   it("skips a death followed by another before the snapshot", () => {
