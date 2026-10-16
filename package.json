@@ -21,6 +21,7 @@
     "train-win-chance": "tsx --conditions=react-server scripts/train-win-chance.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@sentry/nextjs": "^11.7.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.3",

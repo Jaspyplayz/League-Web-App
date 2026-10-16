@@ -38,6 +38,9 @@ export type LogGame = {
   // Whether the game showed each focus-goal weakness; null until the
   // timeline is in, or when the game has no role matchup.
   shows: Record<WeaknessId, boolean | null> | null;
+  // The one-line AI recap of the game, once someone has written one on its
+  // match page (see src/lib/recap.ts).
+  recap: string | null;
 };
 
 // One saved copy of the player's solo/duo rank (see src/lib/rank-history.ts):
