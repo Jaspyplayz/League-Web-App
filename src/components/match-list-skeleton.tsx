@@ -1,6 +1,6 @@
 import { Panel } from "@/components/ui/panel";
 
-// Grey rows shown while ... so the page doesn't ...
+// Grey rows shown while the recent matches load, so the page doesn't jump from a line of text to a full list.
 export function MatchListSkeleton() {
   return (
     <div className="flex flex-col gap-3 animate-pulse">
