@@ -22,6 +22,7 @@ import {
 } from "./matchup";
 import { findObjectives, type Objective } from "./objectives";
 import { pathingVsLanes, type Pathing } from "./pathing";
+import { tempoTimeline, type TempoTimeline } from "./tempo";
 import type { TrimmedTimeline } from "./trim";
 import { findTurningPoints, type TurningPoint } from "./turning-points";
 
@@ -53,6 +54,9 @@ export type MatchAnalysis = {
   // Both junglers' lane fights and visits before 14:00. Null unless you
   // played jungle.
   ganks: GankLog | null;
+  // Which jungler had the tempo each minute (beta). Null unless you played
+  // jungle.
+  tempo: TempoTimeline | null;
 };
 
 export function isAnalyzable(match: Match): boolean {
@@ -144,5 +148,6 @@ export function analyzeMatch(
           participants,
         )
       : null,
+    tempo: replay ? tempoTimeline(timeline, participants, replay.meId, replay.enemyJunglerId) : null,
   };
 }

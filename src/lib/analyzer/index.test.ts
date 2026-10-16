@@ -35,6 +35,15 @@ describe("analyzeMatch", () => {
     expect(analysis.teamGold[20].diff).toBe(-2000);
   });
 
+  it("adds the tempo timeline for junglers only", () => {
+    expect(analysis.tempo).toBeNull();
+    const jungle = analyzeMatch(game, timeline, "player-2")!;
+    expect(jungle.tempo?.meId).toBe(2);
+    expect(jungle.tempo?.enemyId).toBe(7);
+    // Minutes 1 to 19: frame 0 is the start and frame 20 the end.
+    expect(jungle.tempo?.minutes).toHaveLength(19);
+  });
+
   it("returns null for a player who isn't in the match", () => {
     expect(analyzeMatch(game, timeline, "nobody")).toBeNull();
   });

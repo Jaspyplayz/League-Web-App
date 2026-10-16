@@ -6,6 +6,7 @@ function participantFrame(id: number): TimelineParticipantFrame {
   return {
     participantId: id,
     totalGold: 500 + id,
+    currentGold: 20 * id,
     xp: 100 * id,
     level: 2,
     minionsKilled: 10,
@@ -94,6 +95,7 @@ describe("trimTimeline", () => {
     expect(trimmed.frames[1].players).toHaveLength(10);
     expect(trimmed.frames[1].players[2]).toEqual({
       gold: 503,
+      unspentGold: 60,
       xp: 300,
       level: 2,
       cs: 14,
