@@ -13,6 +13,7 @@ import { METRICS, type Metric } from "@/lib/analyzer/matchup";
 import type { DiffPoint } from "@/lib/diff-chart";
 import { LegendSwatch } from "./legend-swatch";
 import { panelClass } from "@/components/ui/panel";
+import { SwipeHint } from "@/components/ui/swipe-hint";
 
 const METRIC_NAMES: Record<Metric, string> = {
   gold: "Gold",
@@ -73,6 +74,7 @@ export function LeadChart({ series, markers, opponentName }: Props) {
           />
         </div>
       </div>
+      <SwipeHint />
     </section>
   );
 }
