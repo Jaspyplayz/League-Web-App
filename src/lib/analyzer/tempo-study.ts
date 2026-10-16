@@ -123,7 +123,7 @@ export const STUDY_FEATURES = [
   "hp", // junglers' health as a share of their maximum (0 to 1)
   "jungleCs2", // monsters killed by the junglers in the last 2 minutes
   "sinceShop", // minutes since the jungler last shopped
-  "lead", // the tempo timeline's lead (items + levels)
+  "lead", // the tempo timeline's lead (items, levels, players alive)
   "leadEst", // the same with estimated item gold
 ] as const;
 export type StudyFeature = (typeof STUDY_FEATURES)[number];

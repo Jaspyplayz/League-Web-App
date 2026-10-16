@@ -19,6 +19,7 @@ import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
 import {
   describeTempo,
   LEVEL_GOLD,
+  PLAYER_GOLD,
   TEMPO_LEAD,
   type Activity,
   type ObjectiveWindow,
@@ -113,10 +114,11 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
         <p className="text-sm text-muted">
           An experiment: which jungler had the time advantage each minute, so could make the next
           play while the other had to farm, back or give way. A jungler counts as up tempo when
-          they&apos;re the only one alive, or when the gold they&apos;ve spent on items, plus{" "}
-          {LEVEL_GOLD.toLocaleString("en-US")} for each level they&apos;re ahead, puts them at least{" "}
-          {TEMPO_LEAD.toLocaleString("en-US")} ahead. It shows the situation, not whether anyone
-          made the right call.
+          they&apos;re the only one alive, or when their lead adds up to at least{" "}
+          {TEMPO_LEAD.toLocaleString("en-US")} gold: the gold they&apos;ve spent on items, plus{" "}
+          {LEVEL_GOLD.toLocaleString("en-US")} for each level ahead and{" "}
+          {PLAYER_GOLD.toLocaleString("en-US")} for each extra player alive on their team. It shows
+          the situation, not whether anyone made the right call.
         </p>
       </div>
 

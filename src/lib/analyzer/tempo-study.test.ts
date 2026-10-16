@@ -156,7 +156,8 @@ describe("studyRows", () => {
     expect(at(4).f.itemGold).toBe(2250 - 500);
     expect(at(4).f.hp).toBeCloseTo(0.45);
     expect(at(4).f.jungleCs2).toBe(2);
-    expect(at(4).tone).toBe("ahead");
+    // By 10:00 blue's jungler has spent 4,450 more on items.
+    expect(at(10).tone).toBe("ahead");
   });
 
   it("labels each minute with who won the next jungler fight or epic monster within a minute", () => {

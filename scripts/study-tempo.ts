@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { formatGap, plural } from "@/lib/analyzer/format";
-import { LEVEL_GOLD, TEMPO_LEAD, type TempoTone } from "@/lib/analyzer/tempo";
+import { LEVEL_GOLD, PLAYER_GOLD, TEMPO_LEAD, type TempoTone } from "@/lib/analyzer/tempo";
 import {
   aliveCheck,
   auc,
@@ -63,7 +63,7 @@ function main() {
 
   say(`# Tempo study`);
   say();
-  say(`Settings: LEVEL_GOLD ${LEVEL_GOLD}, TEMPO_LEAD ${TEMPO_LEAD}.`);
+  say(`Settings: LEVEL_GOLD ${LEVEL_GOLD}, PLAYER_GOLD ${PLAYER_GOLD}, TEMPO_LEAD ${TEMPO_LEAD}.`);
   say();
   say(`## Data`);
   say();
@@ -282,7 +282,7 @@ function nextPlaySection(labeled: StudyRow[]) {
   }
 
   say();
-  say(`By the size of the lead (items + levels), both junglers alive:`);
+  say(`By the size of the timeline's lead, both junglers alive:`);
   say();
   binTable(
     labeled.filter((r) => r.f.alive === 0),
@@ -442,7 +442,7 @@ function tunedDefinitions(labeled: StudyRow[]): Definition[] {
     },
     {
       name: "Current settings (tempo.ts)",
-      weights: `items + ${gold(LEVEL_GOLD)} a level`,
+      weights: `items + ${gold(LEVEL_GOLD)} a level + ${gold(PLAYER_GOLD)} a player`,
       lead: (r) => r.f.lead,
       threshold: TEMPO_LEAD,
       thresholdText: gold(TEMPO_LEAD),

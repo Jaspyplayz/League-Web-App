@@ -9,6 +9,7 @@ import {
   itemGoldAt,
   LEVEL_GOLD,
   objectiveWindows,
+  PLAYER_GOLD,
   respawnSeconds,
   shopVisits,
   TEMPO_LEAD,
@@ -170,38 +171,46 @@ describe("itemGoldAt", () => {
 
 describe("tempoTone", () => {
   const jungler = (itemGold: number, level = 6, alive = true) => ({ itemGold, level, alive });
+  const allAlive = { ours: 5, theirs: 5 };
 
   it("calls it even inside the threshold", () => {
-    expect(tempoTone(jungler(2000), jungler(2000 - TEMPO_LEAD + 1))).toEqual({
+    expect(tempoTone(jungler(3000), jungler(3000 - TEMPO_LEAD + 1), allAlive)).toEqual({
       tone: "even",
       lead: TEMPO_LEAD - 1,
     });
   });
 
   it("calls the side ahead by the threshold or more up tempo", () => {
-    expect(tempoTone(jungler(2000 + TEMPO_LEAD), jungler(2000)).tone).toBe("ahead");
-    expect(tempoTone(jungler(2000), jungler(2000 + TEMPO_LEAD)).tone).toBe("behind");
+    expect(tempoTone(jungler(3000 + TEMPO_LEAD), jungler(3000), allAlive).tone).toBe("ahead");
+    expect(tempoTone(jungler(3000), jungler(3000 + TEMPO_LEAD), allAlive).tone).toBe("behind");
   });
 
   it("counts each level as LEVEL_GOLD", () => {
-    expect(tempoTone(jungler(2000, 8), jungler(2000, 6)).lead).toBe(2 * LEVEL_GOLD);
-    expect(tempoTone(jungler(2000, 6), jungler(2000 + LEVEL_GOLD, 7)).lead).toBe(-2 * LEVEL_GOLD);
+    expect(tempoTone(jungler(2000, 8), jungler(2000, 6), allAlive).lead).toBe(2 * LEVEL_GOLD);
+    expect(tempoTone(jungler(2000, 6), jungler(2000 + LEVEL_GOLD, 7), allAlive).lead).toBe(
+      -2 * LEVEL_GOLD,
+    );
+  });
+
+  it("counts each extra player alive as PLAYER_GOLD", () => {
+    expect(tempoTone(jungler(2000), jungler(2000), { ours: 5, theirs: 3 }).lead).toBe(2 * PLAYER_GOLD);
+    expect(tempoTone(jungler(2000), jungler(2000), { ours: 4, theirs: 5 }).lead).toBe(-PLAYER_GOLD);
   });
 
   it("puts whoever is alive up tempo whatever the lead", () => {
-    expect(tempoTone(jungler(0, 1), jungler(5000, 18, false)).tone).toBe("ahead");
-    expect(tempoTone(jungler(5000, 18, false), jungler(0, 1)).tone).toBe("behind");
-    expect(tempoTone(jungler(5000, 18, false), jungler(0, 1, false)).tone).toBe("ahead");
+    expect(tempoTone(jungler(0, 1), jungler(5000, 18, false), allAlive).tone).toBe("ahead");
+    expect(tempoTone(jungler(5000, 18, false), jungler(0, 1), allAlive).tone).toBe("behind");
+    expect(tempoTone(jungler(5000, 18, false), jungler(0, 1, false), allAlive).tone).toBe("ahead");
   });
 });
 
 describe("tempoTimeline", () => {
-  // Both junglers earn 400 gold a minute. You shop at 6:40 with what you
-  // have; Lee Sin doesn't shop until 9:20. Lee Sin dies at 10:50.
+  // You earn 400 gold a minute and Lee Sin 600. You shop at 6:40 with what
+  // you have; Lee Sin doesn't shop until 9:20. Lee Sin dies at 10:50.
   const timeline = game(
     12,
     (minute, id) => ({
-      gold: 500 + minute * 400,
+      gold: 500 + minute * (id === ENEMY ? 600 : 400),
       unspentGold:
         id === ME
           ? minute <= 6
@@ -209,8 +218,8 @@ describe("tempoTimeline", () => {
             : (minute - 7) * 400 + 100
           : id === ENEMY
             ? minute <= 9
-              ? minute * 400
-              : (minute - 10) * 400 + 50
+              ? minute * 600
+              : (minute - 10) * 600 + 50
             : 0,
       level: Math.min(18, 1 + minute),
       cs: minute * 5,
@@ -256,7 +265,8 @@ describe("tempoTimeline", () => {
   });
 
   it("swings back when the other jungler shops", () => {
-    expect(at(10).them.itemGold).toBe(4450);
+    expect(at(10).them.itemGold).toBe(6450);
+    expect(at(10).lead).toBe(3200 - 6450);
     expect(at(10).tone).toBe("behind");
   });
 
@@ -485,7 +495,8 @@ describe("describeTempo", () => {
     return {
       timestamp: clock("8:00"),
       tone: "ahead",
-      lead: TEMPO_LEAD + 100,
+      // 1,050 more spent on items and a level up.
+      lead: 1050 + LEVEL_GOLD,
       you: jungler,
       them: { ...jungler, participantId: ENEMY, level: 6, itemGold: 1300, unspentGold: 1240, lastShop: clock("3:41") },
       alive: { ours: 5, theirs: 5 },
@@ -499,8 +510,8 @@ describe("describeTempo", () => {
       title: "You were up tempo",
       reasons: [
         "You'd spent 2,350 gold on items, Lee Sin 1,300 gold: 1,050 gold ahead.",
-        "You were level 7, Lee Sin level 6.",
-        `Items and levels together: ${gold(TEMPO_LEAD + 100)} ahead (up tempo from ${gold(TEMPO_LEAD)}).`,
+        `You were level 7, Lee Sin level 6: counts as ${gold(LEVEL_GOLD)} ahead.`,
+        `All together: ${gold(1050 + LEVEL_GOLD)} ahead (up tempo from ${gold(TEMPO_LEAD)}).`,
         `Lee Sin was holding 1,240 gold not spent yet, last shopped at 3:41.`,
       ],
     });
@@ -515,7 +526,11 @@ describe("describeTempo", () => {
     const { title, reasons } = describeTempo(m, { them: "Lee Sin" });
     expect(title).toBe("Lee Sin was up tempo");
     expect(reasons[0]).toBe("You were dead until 8:21.");
-    expect(reasons.at(-1)).toBe("Players alive: 4 on your team, 5 on theirs.");
+    expect(reasons).toContain(
+      `Players alive: 4 on your team, 5 on theirs: counts as ${gold(PLAYER_GOLD)} behind.`,
+    );
+    // Being the only one alive decided it, so there's no total.
+    expect(reasons.some((r) => r.startsWith("All together"))).toBe(false);
   });
 
   it("says when items are level and leaves out small amounts of unspent gold", () => {
@@ -528,7 +543,7 @@ describe("describeTempo", () => {
       title: "Even tempo",
       reasons: [
         "You'd both spent 2,350 gold on items.",
-        `Items and levels together: even, short of the ${gold(TEMPO_LEAD)} that counts as up tempo.`,
+        `All together: even, short of the ${gold(TEMPO_LEAD)} that counts as up tempo.`,
       ],
     });
   });
@@ -538,7 +553,7 @@ describe("describeTempo", () => {
       them: "Lee Sin",
     });
     expect(reasons).toContain(
-      `Items and levels together: ${gold(TEMPO_LEAD - 50)} behind, short of the ${gold(TEMPO_LEAD)} that counts as up tempo.`,
+      `All together: ${gold(TEMPO_LEAD - 50)} behind, short of the ${gold(TEMPO_LEAD)} that counts as up tempo.`,
     );
   });
 });

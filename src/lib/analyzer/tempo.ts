@@ -15,10 +15,12 @@
 // - Alive: a dead jungler has no tempo until they respawn. Riot records the
 //   moment of each death; the respawn time comes from the game's death timer
 //   formula.
+// - Players alive: each extra player alive on your team counts as PLAYER_GOLD
+//   gold, since a team a player down can't contest the next play as well.
 //
-// The jungler whose items plus levels are worth at least TEMPO_LEAD more is
-// "up tempo". docs/tempo.md explains how these numbers were checked against
-// real games.
+// The jungler whose items, levels and players alive add up to at least
+// TEMPO_LEAD more is "up tempo". docs/tempo.md explains how these numbers were
+// worked out from real games, and how well they held up.
 //
 // Like the jungle map and the gank log, it lays out the situation and never
 // grades a decision. Whether to fight, farm or back depends on things Riot
@@ -30,10 +32,12 @@ import { formatClock, formatGap } from "./format";
 import type { ObjectiveKind } from "./objectives";
 import type { ChampionKill, EliteMonsterKill, TrimmedFrame, TrimmedTimeline } from "./trim";
 
-// How much one level is worth, in gold, and how big the combined lead has to
-// be to count as up tempo. Set from the study in docs/tempo.md.
-export const LEVEL_GOLD = 300;
-export const TEMPO_LEAD = 500;
+// How much one level and one extra player alive are worth, in gold, and how
+// big the combined lead has to be to count as up tempo. Set from the study in
+// docs/tempo.md.
+export const LEVEL_GOLD = 1500;
+export const PLAYER_GOLD = 2000;
+export const TEMPO_LEAD = 2000;
 
 // Purchases this close together are one shop visit.
 const SAME_VISIT_MS = 30_000;
@@ -82,8 +86,8 @@ export type Activity =
 export type TempoMinute = {
   timestamp: number;
   tone: TempoTone;
-  // Your item gold lead plus LEVEL_GOLD per level of lead. Negative when the
-  // enemy jungler is ahead.
+  // Your item gold lead, plus LEVEL_GOLD per level and PLAYER_GOLD per extra
+  // player alive. Negative when the enemy jungler is ahead.
   lead: number;
   you: JunglerState;
   them: JunglerState;
@@ -165,9 +169,10 @@ export function tempoTimeline(
     const until = frames[i + 1].timestamp;
     const you = state(i, meId);
     const them = state(i, enemyId);
-    const { tone, lead } = tempoTone(you, them);
     const aliveOn = (team: number) =>
       players.filter((p) => p.teamId === team && !deathAt(deaths, p.participantId, t)).length;
+    const alive = { ours: aliveOn(myTeam), theirs: aliveOn(teamOf.get(enemyId)!) };
+    const { tone, lead } = tempoTone(you, them, alive);
     const activities = (id: number) =>
       activitiesBetween(id, t, until, {
         visits: visits.get(id)!,
@@ -181,7 +186,7 @@ export function tempoTimeline(
       lead,
       you,
       them,
-      alive: { ours: aliveOn(myTeam), theirs: aliveOn(teamOf.get(enemyId)!) },
+      alive,
       next: { until, you: activities(meId), them: activities(enemyId) },
     });
   }
@@ -197,13 +202,19 @@ export function tempoTimeline(
   };
 }
 
-// Who was up tempo, and by how much: item gold lead plus LEVEL_GOLD per level.
-// Being alive beats any lead, since a dead jungler can't make a play.
+// Who was up tempo, and by how much: item gold lead, plus LEVEL_GOLD per level
+// and PLAYER_GOLD per extra player alive. Being the only jungler alive beats
+// any lead, since a dead jungler can't make a play.
 export function tempoTone(
   you: Pick<JunglerState, "alive" | "itemGold" | "level">,
   them: Pick<JunglerState, "alive" | "itemGold" | "level">,
+  alive: TempoMinute["alive"],
 ): { tone: TempoTone; lead: number } {
-  const lead = you.itemGold - them.itemGold + LEVEL_GOLD * (you.level - them.level);
+  const lead =
+    you.itemGold -
+    them.itemGold +
+    LEVEL_GOLD * (you.level - them.level) +
+    PLAYER_GOLD * (alive.ours - alive.theirs);
   if (you.alive !== them.alive) return { tone: you.alive ? "ahead" : "behind", lead };
   if (lead >= TEMPO_LEAD) return { tone: "ahead", lead };
   if (lead <= -TEMPO_LEAD) return { tone: "behind", lead };
@@ -505,8 +516,19 @@ export function describeTempo(
       ? `You'd both spent ${gold(m.you.itemGold)} on items.`
       : `You'd spent ${gold(m.you.itemGold)} on items, ${names.them} ${gold(m.them.itemGold)}: ${items.text}.`,
   );
+  // Levels and players alive, with the gold each counts as, so the total
+  // below adds up.
   if (m.you.level !== m.them.level) {
-    reasons.push(`You were level ${m.you.level}, ${names.them} level ${m.them.level}.`);
+    const levels = formatGap(LEVEL_GOLD * m.you.level, LEVEL_GOLD * m.them.level, { format: gold });
+    reasons.push(
+      `You were level ${m.you.level}, ${names.them} level ${m.them.level}: counts as ${levels.text}.`,
+    );
+  }
+  if (m.alive.ours !== m.alive.theirs) {
+    const players = formatGap(PLAYER_GOLD * m.alive.ours, PLAYER_GOLD * m.alive.theirs, { format: gold });
+    reasons.push(
+      `Players alive: ${m.alive.ours} on your team, ${m.alive.theirs} on theirs: counts as ${players.text}.`,
+    );
   }
   // The number the call is made on, unless being the only one alive decided it.
   if (m.you.alive && m.them.alive) {
@@ -514,8 +536,8 @@ export function describeTempo(
     const bar = gold(TEMPO_LEAD);
     reasons.push(
       m.tone === "even"
-        ? `Items and levels together: ${together.tone === "even" ? "even" : together.text}, short of the ${bar} that counts as up tempo.`
-        : `Items and levels together: ${together.text} (up tempo from ${bar}).`,
+        ? `All together: ${together.tone === "even" ? "even" : together.text}, short of the ${bar} that counts as up tempo.`
+        : `All together: ${together.text} (up tempo from ${bar}).`,
     );
   }
   for (const [who, j] of [
@@ -526,9 +548,6 @@ export function describeTempo(
       const since = j.lastShop === null ? "" : `, last shopped at ${formatClock(j.lastShop)}`;
       reasons.push(`${who} holding ${gold(j.unspentGold)} not spent yet${since}.`);
     }
-  }
-  if (m.alive.ours !== m.alive.theirs) {
-    reasons.push(`Players alive: ${m.alive.ours} on your team, ${m.alive.theirs} on theirs.`);
   }
   return { title, reasons };
 }
