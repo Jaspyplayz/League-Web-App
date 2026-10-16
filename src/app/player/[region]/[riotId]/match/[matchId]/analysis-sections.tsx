@@ -1,4 +1,5 @@
 import type { TurningPointMarker } from "@/components/diff-chart";
+import { REPO_URL } from "@/components/site-header";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
 import { championIconUrl, type DataDragon } from "@/lib/ddragon";
@@ -14,6 +15,7 @@ import { PathingGrid } from "./pathing";
 import { Scoreboard } from "./scoreboard";
 import { SnapshotTiles } from "./snapshot-tiles";
 import { TeamGold } from "./team-gold";
+import { Tempo } from "./tempo";
 import { TurningPoints } from "./turning-points";
 import { WinChance } from "./win-chance";
 
@@ -21,7 +23,7 @@ import { WinChance } from "./win-chance";
 // matchup, @10 and @15 stats, the lead chart with turning points, your team's
 // win chance, team gold with objectives, deaths, and the scoreboard. In the
 // same order as the mockup, plus the win chance and, for junglers, the
-// jungle map, early pathing and early ganks.
+// jungle map, early pathing, early ganks and the tempo timeline (beta).
 export function AnalysisSections({
   region,
   match,
@@ -83,6 +85,14 @@ export function AnalysisSections({
       {a.pathing && <PathingGrid pathing={a.pathing} />}
       {a.ganks && a.opponent && (
         <Ganks ganks={a.ganks} enemyJungler={label(a.opponent.championName)} />
+      )}
+      {a.tempo && (
+        <Tempo
+          tempo={a.tempo}
+          names={Object.fromEntries(participants.map((p) => [p.participantId, label(p.championName)]))}
+          myTeamId={a.me.teamId}
+          docsHref={`${REPO_URL}/blob/main/docs/tempo.md`}
+        />
       )}
 
       {winChance && <WinChance {...winChance} />}

@@ -485,7 +485,7 @@ describe("describeTempo", () => {
     return {
       timestamp: clock("8:00"),
       tone: "ahead",
-      lead: 1350,
+      lead: TEMPO_LEAD + 100,
       you: jungler,
       them: { ...jungler, participantId: ENEMY, level: 6, itemGold: 1300, unspentGold: 1240, lastShop: clock("3:41") },
       alive: { ours: 5, theirs: 5 },
@@ -500,6 +500,7 @@ describe("describeTempo", () => {
       reasons: [
         "You'd spent 2,350 gold on items, Lee Sin 1,300 gold: 1,050 gold ahead.",
         "You were level 7, Lee Sin level 6.",
+        `Items and levels together: ${gold(TEMPO_LEAD + 100)} ahead (up tempo from ${gold(TEMPO_LEAD)}).`,
         `Lee Sin was holding 1,240 gold not spent yet, last shopped at 3:41.`,
       ],
     });
@@ -520,11 +521,29 @@ describe("describeTempo", () => {
   it("says when items are level and leaves out small amounts of unspent gold", () => {
     const m = minute({
       tone: "even",
+      lead: 0,
       them: { ...minute().you, participantId: ENEMY, unspentGold: HOLDING_GOLD - 1 },
     });
     expect(describeTempo(m, { them: "Lee Sin" })).toEqual({
       title: "Even tempo",
-      reasons: ["You'd both spent 2,350 gold on items."],
+      reasons: [
+        "You'd both spent 2,350 gold on items.",
+        `Items and levels together: even, short of the ${gold(TEMPO_LEAD)} that counts as up tempo.`,
+      ],
     });
   });
+
+  it("gives the lead short of the bar as a number", () => {
+    const { reasons } = describeTempo(minute({ tone: "even", lead: -(TEMPO_LEAD - 50) }), {
+      them: "Lee Sin",
+    });
+    expect(reasons).toContain(
+      `Items and levels together: ${gold(TEMPO_LEAD - 50)} behind, short of the ${gold(TEMPO_LEAD)} that counts as up tempo.`,
+    );
+  });
 });
+
+// 2350 -> "2,350 gold", as describeTempo writes it.
+function gold(amount: number): string {
+  return `${amount.toLocaleString("en-US")} gold`;
+}

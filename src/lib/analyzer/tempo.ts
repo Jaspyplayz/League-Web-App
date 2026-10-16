@@ -508,6 +508,16 @@ export function describeTempo(
   if (m.you.level !== m.them.level) {
     reasons.push(`You were level ${m.you.level}, ${names.them} level ${m.them.level}.`);
   }
+  // The number the call is made on, unless being the only one alive decided it.
+  if (m.you.alive && m.them.alive) {
+    const together = formatGap(m.lead, 0, { format: gold });
+    const bar = gold(TEMPO_LEAD);
+    reasons.push(
+      m.tone === "even"
+        ? `Items and levels together: ${together.tone === "even" ? "even" : together.text}, short of the ${bar} that counts as up tempo.`
+        : `Items and levels together: ${together.text} (up tempo from ${bar}).`,
+    );
+  }
   for (const [who, j] of [
     ["You were", m.you],
     [`${names.them} was`, m.them],
