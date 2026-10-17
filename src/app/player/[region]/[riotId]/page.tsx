@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RememberSearchedPlayer } from "@/components/saved-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { MatchListSkeleton } from "@/components/match-list-skeleton";
 import { loadProfile } from "@/lib/profile-store";
 import { readQueueFilter } from "@/lib/queue-filters";
 import { isRegion, REGIONS, type Region } from "@/lib/regions";
@@ -73,7 +74,7 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
             profile={profile.value}
           />
           <ProfileTabs playerPath={playerPath} current="matches" />
-          <Suspense fallback={<p className="text-faint">Loading recent matches…</p>}>
+          <Suspense fallback={<MatchListSkeleton />}>
             <RecentMatches
               region={region}
               puuid={puuid}

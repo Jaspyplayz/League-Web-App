@@ -345,3 +345,51 @@ export const matchNotes = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.matchId] })],
 ).enableRLS();
+
+// A private note a signed-in player keeps on a day of their Log tab ("tilted
+// after game 4, stopped"). One note per account per day, only ever shown to
+// that account, on the profile it marked with "This is me".
+export const dayNotes = pgTable(
+  "day_notes",
+  {
+    // Deleting the account in Supabase Auth deletes its notes.
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    // "2026-10-16", the day in the player's own timezone (see
+    // src/lib/daily-log.ts). Text, because a date column would be read back
+    // in the server's timezone.
+    day: text("day").notNull(),
+    // Up to MAX_NOTE_LENGTH characters (src/lib/match-note.ts).
+    text: text("text").notNull(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.day] })],
+).enableRLS();
+
+// A short AI-written recap of one game from one player's side (see
+// src/lib/recap.ts). Finished games never change, so each recap is written
+// once and kept. Recaps only use public game stats, so anyone looking at that
+// player's game sees it; only signed-in accounts can ask for a new one.
+export const matchRecaps = pgTable(
+  "match_recaps",
+  {
+    matchId: text("match_id")
+      .notNull()
+      .references(() => matches.matchId, { onDelete: "cascade" }),
+    puuid: text("puuid").notNull(),
+    // One line for the Log tab, then a few sentences for the match page.
+    headline: text("headline").notNull(),
+    detail: text("detail").notNull(),
+    // Which Claude model wrote it, in case recaps are ever rewritten.
+    model: text("model").notNull(),
+    // The account that asked for it, to cap recaps per account per day.
+    // Deleting the account keeps the recap but forgets who asked.
+    createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "set null" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.matchId, t.puuid] }),
+    index("match_recaps_created_by_idx").on(t.createdBy, t.createdAt),
+  ],
+).enableRLS();

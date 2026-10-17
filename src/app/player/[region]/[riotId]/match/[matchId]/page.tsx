@@ -16,6 +16,7 @@ import { matchWinChance } from "@/lib/win-chance";
 import { AnalysisSections } from "./analysis-sections";
 import { MatchHeader } from "./match-header";
 import { MatchNotes } from "./match-notes";
+import { MatchRecap } from "./match-recap";
 import { Scoreboard } from "./scoreboard";
 import { panelClass } from "@/components/ui/panel";
 
@@ -134,6 +135,7 @@ async function Analysis({ params }: { params: Params }) {
         dd={dd}
         label={label}
       />
+      <MatchRecap region={region} matchId={matchId} puuid={me.puuid} />
       {notes}
     </>
   );

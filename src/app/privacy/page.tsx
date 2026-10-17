@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // same pull request.
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="October 14, 2026">
+    <LegalPage title="Privacy policy" updated="October 16, 2026">
       <p>
         Turnpoint is a free League of Legends stats site built by one student. This page
         explains what data it handles and why. The short version: accounts are optional, and
@@ -74,8 +74,23 @@ export default function PrivacyPage() {
         them. Clear a note and save it to delete it.
       </p>
       <p>
+        The same goes for notes you write on a day in your Log tab: Turnpoint saves the note
+        and the date with your account, and only you see them. Clear a note and save it to
+        delete it.
+      </p>
+      <p>
         While you&apos;re signed in, your browser keeps a sign-in cookie so you don&apos;t have
         to sign in on every page. Signing out removes it.
+      </p>
+
+      <h2>AI recaps</h2>
+      <p>
+        If you click Write recap on a match page, Turnpoint sends that game&apos;s stats (such as
+        champions, kills, gold gaps and objective timings, worked out from Riot&apos;s match
+        data) to Anthropic, which runs the Claude AI model, and saves the recap it writes. No
+        account details, Riot IDs or notes are sent. Anyone looking at that game sees the saved
+        recap. Turnpoint also notes which account asked for each recap, only to limit how many
+        one account can request a day.
       </p>
 
       <h2>Stored in your browser</h2>
@@ -93,6 +108,13 @@ export default function PrivacyPage() {
         If you pick a focus goal on the Insights tab, Turnpoint saves which weakness you
         picked, for which player, and when, in the same local storage. It also stays on your
         device. Remove it with the Stop focusing button.
+      </p>
+      <p>
+        The theme you pick on the Settings page (dark, light or system) is saved in the same
+        local storage, so the site looks the way you chose on your next visit.
+      </p>
+      <p>
+        Whether you picked Short or Detailed day cards on the Log tab is saved there too.
       </p>
 
       <h2>Technical data</h2>

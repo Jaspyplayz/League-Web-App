@@ -125,6 +125,7 @@ export type MapPosition = { x: number; y: number };
 export type TimelineParticipantFrame = {
   participantId: number;
   totalGold: number;
+  currentGold?: number; // gold not spent yet
   xp: number;
   level: number;
   minionsKilled: number;

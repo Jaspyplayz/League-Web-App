@@ -18,9 +18,12 @@
     "db:studio": "drizzle-kit studio",
     "benchmarks": "tsx --conditions=react-server scripts/collect-benchmarks.ts",
     "train-score": "tsx --conditions=react-server scripts/train-score.ts",
-    "train-win-chance": "tsx --conditions=react-server scripts/train-win-chance.ts"
+    "train-win-chance": "tsx --conditions=react-server scripts/train-win-chance.ts",
+    "tempo-games": "tsx --conditions=react-server scripts/collect-tempo-games.ts",
+    "study-tempo": "tsx --conditions=react-server scripts/study-tempo.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@sentry/nextjs": "^11.7.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.3",

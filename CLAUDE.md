@@ -16,34 +16,40 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Database tables and setup: [docs/database.md](docs/database.md)
 - Game score (the trained 0 to 100 rating): [docs/game-score.md](docs/game-score.md)
 - Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
+- AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
+- Tempo timeline (beta: which jungler had the time advantage each minute, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
 
-Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Drizzle ORM, Riot Games API, Sentry, Vitest, GitHub Actions, Vercel. Node 22, pinned in `.nvmrc` and `package.json` `engines`.
+Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Drizzle ORM, Riot Games API, Claude API (Haiku, for recaps), Sentry, Vitest, GitHub Actions, Vercel. Node 22, pinned in `.nvmrc` and `package.json` `engines`.
 
 ## Layout
 
 ```
 src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   .../match/[matchId]/ under it is the match analysis page
-                  and .../insights/ the trends across the last 20 to 100 games
+                  and .../insights/ the trends across the last 20 to 100 games,
+                  .../log/ the Log tab (one card per day, src/lib/daily-log.ts);
+                  settings/ holds preferences saved in the browser (theme)
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (rate limits, retries) and one function per endpoint
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
                   trends.ts rolls games up into the Insights page, compare.ts
                   sets them against one rank's games or one chosen player's,
-                  score.ts is the trained 0 to 100 game score (score-model.json)
-                  and win-chance.ts each team's chance to win at every minute
+                  score.ts is the trained 0 to 100 game score (score-model.json),
+                  win-chance.ts each team's chance to win at every minute
+                  and tempo.ts the jungle tempo timeline (tempo-study.ts checks it)
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
+src/lib/recap.ts  The only Claude API call (AI match recaps); recap-store.ts saves them
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
-scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance)
+scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, tempo study)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
 .claude/          Claude Code settings; hooks/ runs lint and typecheck before Claude commits
@@ -63,6 +69,7 @@ docs/             Design and research docs
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
 | `npm run train-score` | Retrain the game score on saved games and update `score-model.json` ([docs/game-score.md](docs/game-score.md)) |
 | `npm run train-win-chance` | Train the win chance model on saved games and write `win-chance-model.json` ([docs/win-chance.md](docs/win-chance.md)) |
+| `npm run tempo-games` / `study-tempo` | Download games for the tempo study into the git-ignored `.cache/tempo-study`, then print its report ([docs/tempo.md](docs/tempo.md)) |
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass.
 
@@ -74,12 +81,13 @@ Copy `.env.example` to `.env.local` (git-ignored). Variables, names only:
 - `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`
 - `DATABASE_URL` (transaction pooler, port 6543), `DATABASE_URL_DIRECT` (session pooler, port 5432, migrations only)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: sign-in; without them "Sign in" is hidden ([docs/sign-in.md](docs/sign-in.md))
+- `ANTHROPIC_API_KEY`: AI match recaps; without it "Write recap" is hidden ([docs/match-recap.md](docs/match-recap.md))
 
 Production values live in Vercel's environment variables, which Jasper sets himself.
 
 ## Design
 
-Dark "scouting report" style. Tokens live in `src/app/globals.css`: **blue = you / ahead / win, red = opponent / behind / loss** (blue and red, never green and red, so color-blind players can tell them apart). Reuse the tokens (`bg-surface`, `text-muted`, `text-ahead`...) instead of raw colors. Views of both teams (scoreboards, Team analysis) color the winning team blue and the losing team red, with your row outlined; that includes the kill score and the build and runes picker. Where two numbers sit side by side, write the gap in words with `ui/gap.tsx` ("614 behind"). Cards use `ui/panel.tsx` (`Panel`, or `panelClass` for a list or paragraph); text sizes stick to Tailwind's plus `text-label`, `text-note` and `text-body`. Approved mockups: https://claude.ai/artifact/2yuQ2qLhDpjqX5SMLubpDr (only viewable from Jasper's account).
+Dark "scouting report" style, with a light theme picked on `/settings` (saved in localStorage, applied before paint by `src/lib/theme.ts`). Tokens live in `src/app/globals.css`, once for dark and once under `data-theme="light"`, so any new color needs both: **blue = you / ahead / win, red = opponent / behind / loss** (blue and red, never green and red, so color-blind players can tell them apart). Reuse the tokens (`bg-surface`, `text-muted`, `text-ahead`...) instead of raw colors. Views of both teams (scoreboards, Team analysis) color the winning team blue and the losing team red, with your row outlined; that includes the kill score and the build and runes picker. Where two numbers sit side by side, write the gap in words with `ui/gap.tsx` ("614 behind"). Cards use `ui/panel.tsx` (`Panel`, or `panelClass` for a list or paragraph); text sizes stick to Tailwind's plus `text-label`, `text-note` and `text-body`. Approved mockups: https://claude.ai/artifact/2yuQ2qLhDpjqX5SMLubpDr (only viewable from Jasper's account).
 
 ## Code rules
 

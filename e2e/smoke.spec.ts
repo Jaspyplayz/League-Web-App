@@ -54,3 +54,28 @@ test("open the sample analysis", async ({ page }) => {
   );
   await expect(page.getByText("Biggest swings")).toBeVisible();
 });
+
+// The theme is applied by a script in <head>, so check it survives a reload:
+// if that script broke, the page would come back dark.
+test("switch to light mode in Settings", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("radio", { name: /^Light/ }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("radio", { name: /^Light/ })).toBeChecked();
+});
+
+// A typo in a link should land on our own 404 page with a search box, not a
+// blank dead end. Neither address needs Riot, so this works with an expired key.
+test("show the not-found page for a bad link", async ({ page }) => {
+  const response = await page.goto("/this-page-does-not-exist");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("We couldn't find that page");
+  await expect(page.getByLabel("Riot ID")).toBeVisible();
+
+  // An unknown region calls notFound() from the player page.
+  await page.goto("/player/xx/Hide%20on%20bush-KR1");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("We couldn't find that page");
+});

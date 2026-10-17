@@ -9,6 +9,7 @@ import type { DiffPoint } from "@/lib/diff-chart";
 import { gameDurationSeconds } from "../match-summary";
 import type { Match, Participant } from "@/lib/riot/types";
 import { findDeaths, type Death } from "./deaths";
+import { gankLog, type GankLog } from "./ganks";
 import { jungleReplay, type JungleReplay } from "./jungle-replay";
 import {
   diffSeries,
@@ -21,6 +22,7 @@ import {
 } from "./matchup";
 import { findObjectives, type Objective } from "./objectives";
 import { pathingVsLanes, type Pathing } from "./pathing";
+import { tempoTimeline, type TempoTimeline } from "./tempo";
 import type { TrimmedTimeline } from "./trim";
 import { findTurningPoints, type TurningPoint } from "./turning-points";
 
@@ -49,6 +51,12 @@ export type MatchAnalysis = {
   // Which lane you played near each early minute, and how it was doing. Null
   // unless you played jungle.
   pathing: Pathing | null;
+  // Both junglers' lane fights and visits before 14:00. Null unless you
+  // played jungle.
+  ganks: GankLog | null;
+  // Which jungler had the tempo each minute (beta). Null unless you played
+  // jungle.
+  tempo: TempoTimeline | null;
 };
 
 export function isAnalyzable(match: Match): boolean {
@@ -133,5 +141,13 @@ export function analyzeMatch(
     objectives: findObjectives(events, me.teamId),
     jungleReplay: replay,
     pathing: replay ? pathingVsLanes(replay) : null,
+    ganks: replay
+      ? gankLog(
+          replay,
+          events.filter((e) => e.type === "CHAMPION_KILL"),
+          participants,
+        )
+      : null,
+    tempo: replay ? tempoTimeline(timeline, participants, replay.meId, replay.enemyJunglerId) : null,
   };
 }

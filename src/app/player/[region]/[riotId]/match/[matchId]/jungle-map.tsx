@@ -387,7 +387,7 @@ function LaneLead({ lane, lead }: { lane: Lane; lead: number | null }) {
   );
 }
 
-function StepButton({
+export function StepButton({
   label,
   disabled = false,
   onClick,
