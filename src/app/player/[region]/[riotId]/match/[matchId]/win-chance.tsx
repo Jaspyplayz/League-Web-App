@@ -1,5 +1,6 @@
 import { DiffChart, type TurningPointMarker } from "@/components/diff-chart";
 import { panelClass } from "@/components/ui/panel";
+import { SwipeHint } from "@/components/ui/swipe-hint";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatClock } from "@/lib/analyzer/format";
 import type { WinChanceSwing } from "@/lib/analyzer/win-chance";
@@ -47,6 +48,7 @@ export function WinChance({ chances, swings, model }: MatchWinChance) {
             />
           </div>
         </div>
+        <SwipeHint />
         <p className="text-note text-faint">
           From a model trained on {model.games.toLocaleString("en-US")} ranked games: how often
           teams in the same spot (gold, XP, kills, towers, dragons, buffs) went on to win.

@@ -195,7 +195,7 @@ function ChampionList({
             </div>
             {gold && (
               // Below the name on phones, on the right on wider screens.
-              <span className="basis-full whitespace-nowrap pl-11 font-mono text-sm text-ink-soft sm:basis-auto sm:pl-0">
+              <span className="basis-full pl-11 font-mono text-sm text-ink-soft sm:basis-auto sm:whitespace-nowrap sm:pl-0">
                 <span className="text-note text-faint">Gold at 10</span> {formatSigned(gold.you)} vs{" "}
                 {formatSigned(gold.them)} · <Gap you={gold.you} them={gold.them} />
               </span>

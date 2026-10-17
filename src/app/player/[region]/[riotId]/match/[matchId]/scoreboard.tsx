@@ -137,7 +137,7 @@ function Row({
             </span>
           )}
         </div>
-        <div className="text-[13px] text-faint underline-offset-2 group-hover:text-ink group-hover:underline">
+        <div className="text-[13px] text-faint wrap-anywhere underline-offset-2 group-hover:text-ink group-hover:underline">
           {name}
         </div>
       </div>
