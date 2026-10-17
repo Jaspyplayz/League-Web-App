@@ -43,6 +43,7 @@ const timeline: Timeline = {
           },
           { type: "ITEM_PURCHASED", timestamp: 50_000, participantId: 2, itemId: 1055 },
           { type: "ITEM_SOLD", timestamp: 51_000, participantId: 2, itemId: 1055 },
+          { type: "ITEM_DESTROYED", timestamp: 51_500, participantId: 6, itemId: 2003 },
           {
             type: "SKILL_LEVEL_UP",
             timestamp: 52_000,
@@ -115,6 +116,8 @@ describe("trimTimeline", () => {
         position: { x: 7000, y: 7100 },
       },
       { type: "ITEM_PURCHASED", timestamp: 50_000, participantId: 2, itemId: 1055 },
+      { type: "ITEM_SOLD", timestamp: 51_000, participantId: 2, itemId: 1055 },
+      { type: "ITEM_DESTROYED", timestamp: 51_500, participantId: 6, itemId: 2003 },
       { type: "SKILL_LEVEL_UP", timestamp: 52_000, participantId: 4, skillSlot: 1 },
       {
         type: "ELITE_MONSTER_KILL",

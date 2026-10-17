@@ -63,7 +63,9 @@ export function findObjectives(events: TrimmedEvent[], myTeamId: number): Object
   return objectives;
 }
 
-function monsterKind(type: string, subType: string | null): ObjectiveKind | null {
+// The kind of epic monster an ELITE_MONSTER_KILL was, from Riot's names.
+// Null for ones that aren't objectives.
+export function monsterKind(type: string, subType: string | null): ObjectiveKind | null {
   switch (type) {
     case "DRAGON":
       return subType === "ELDER_DRAGON" ? "elder" : "dragon";

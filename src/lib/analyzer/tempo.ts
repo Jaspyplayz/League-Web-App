@@ -33,7 +33,7 @@
 
 import type { MapPosition } from "@/lib/riot/types";
 import { formatClock, formatGap } from "./format";
-import type { ObjectiveKind } from "./objectives";
+import { monsterKind, type ObjectiveKind } from "./objectives";
 import type { ChampionKill, EliteMonsterKill, TrimmedFrame, TrimmedTimeline } from "./trim";
 
 // How much one level and one extra player alive are worth, in gold, and how
@@ -480,29 +480,12 @@ function activitiesOf(
     }
   }
   for (const m of data.monsters) {
-    const kind = monsterKind(m);
+    const kind = monsterKind(m.monsterType, m.monsterSubType);
     if (kind && (m.killerId === id || m.assistingParticipantIds.includes(id))) {
       activities.push({ type: "objective", timestamp: m.timestamp, kind, killed: m.killerId === id });
     }
   }
   return activities.sort((a, b) => a.timestamp - b.timestamp);
-}
-
-function monsterKind(m: EliteMonsterKill): ObjectiveKind | null {
-  switch (m.monsterType) {
-    case "DRAGON":
-      return m.monsterSubType === "ELDER_DRAGON" ? "elder" : "dragon";
-    case "BARON_NASHOR":
-      return "baron";
-    case "RIFTHERALD":
-      return "herald";
-    case "HORDE":
-      return "grubs";
-    case "ATAKHAN":
-      return "atakhan";
-    default:
-      return null;
-  }
 }
 
 // --- Epic monster timers ---
