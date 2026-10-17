@@ -282,14 +282,34 @@ describe("per-rank models", () => {
     }
   });
 
+  // As if every rank's own model had clearly beaten the all-ranks model.
+  const better = {
+    ...model,
+    ranks: model.ranks.map((r) => ({
+      ...r,
+      evaluation: { ...r.evaluation, logLoss: r.allRanks.logLoss - 0.01 },
+    })),
+  };
+
   it("picks the tier's own model, else the narrowest group, else all ranks", () => {
-    const pick = (tier: string | null) => modelForTier(model, tier);
+    const pick = (tier: string | null) => modelForTier(better, tier);
     expect(pick("GOLD")).toMatchObject({ rank: "Gold", games: 30 });
     expect(pick("GOLD").weights).toEqual(model.ranks[0].weights);
     expect(pick("GRANDMASTER").rank).toBe("Master+");
     expect(pick("DIAMOND").rank).toBe("Emerald+");
-    expect(pick("IRON")).toBe(model);
-    expect(pick(null)).toBe(model);
+    expect(pick("IRON")).toBe(better);
+    expect(pick(null)).toBe(better);
+  });
+
+  it("sticks with all ranks when a rank's own model isn't clearly better", () => {
+    const close = {
+      ...model,
+      ranks: model.ranks.map((r) => ({
+        ...r,
+        evaluation: { ...r.evaluation, logLoss: r.allRanks.logLoss - 0.001 },
+      })),
+    };
+    expect(modelForTier(close, "GOLD")).toBe(close);
   });
 });
 

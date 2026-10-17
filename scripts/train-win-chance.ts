@@ -21,7 +21,9 @@ import { plural } from "@/lib/analyzer/format";
 import type { TrimmedTimeline } from "@/lib/analyzer/trim";
 import {
   comparePatches,
+  MIN_RANK_GAIN,
   MIN_RANK_GAMES,
+  rankModelHelps,
   toWinChanceGame,
   trainWinChanceModel,
   WIN_CHANCE_FEATURES,
@@ -107,7 +109,7 @@ function printRanks(model: WinChanceModel, games: WinChanceGame[]) {
   const ranked = games.filter((g) => g.tier).length;
   console.log(`\n${plural(ranked, "game")} of ${games.length} have a rank (games opened on the site don't).`);
   console.log("By rank (own model vs the all-ranks model, on games it didn't see):");
-  console.log("  rank          games   log loss       at 20:00     3k gold up at 20:00");
+  console.log("  rank          games   log loss       at 20:00     3k gold up at 20:00          used");
   for (const rank of WIN_CHANCE_RANKS) {
     const trained = model.ranks.find((r) => r.key === rank.key);
     if (!trained) {
@@ -121,10 +123,13 @@ function printRanks(model: WinChanceModel, games: WinChanceGame[]) {
         `${own.logLoss.toFixed(3)} vs ${all.logLoss.toFixed(3)}   ` +
         `${percent(at20(own)).padStart(4)} vs ${percent(at20(all)).padStart(4)}   ` +
         `${percent(whatIfChance(withRank(model, trained), lead)).padStart(4)} ` +
-        `(all ranks ${percent(whatIfChance(model, lead))})`,
+        `(all ranks ${percent(whatIfChance(model, lead))})   ` +
+        (rankModelHelps(trained) ? "yes" : "no, all ranks is as good"),
     );
   }
-  console.log("  (lower log loss is better)");
+  console.log(
+    `  (lower log loss is better; a rank's own model is used when it's at least ${MIN_RANK_GAIN} lower)`,
+  );
 }
 
 function printEvaluation(title: string, e: Evaluation) {

@@ -1,7 +1,7 @@
 {
-  "trainedAt": "2026-10-14T19:10:32.615Z",
+  "trainedAt": "2026-10-17T22:36:10.809Z",
   "rank": "All ranks",
-  "games": 4185,
+  "games": 18178,
   "patches": [
     "16.16",
     "16.17",
@@ -25,241 +25,3122 @@
     "atakhans"
   ],
   "weights": [
-    0.406,
-    -0.2124,
-    0.092,
-    0.0018,
+    0.3969,
+    -0.2057,
+    0.0941,
+    0.002,
     0,
-    0.3792,
-    0.2522,
-    0.0197,
-    0.2159,
-    0.1276,
-    0.0073,
-    0.0886,
+    0.3728,
+    0.2588,
+    0.0374,
+    0.2463,
+    0.0413,
+    0.0257,
+    0.0405,
     0
   ],
   "evaluation": {
-    "examples": 119943,
-    "accuracy": 0.731,
-    "logLoss": 0.513,
-    "brier": 0.1731,
+    "examples": 521336,
+    "accuracy": 0.73,
+    "logLoss": 0.5128,
+    "brier": 0.1733,
     "byMinute": [
       {
         "minute": 10,
-        "examples": 4185,
-        "accuracy": 0.696,
-        "goldRule": 0.7
+        "examples": 18178,
+        "accuracy": 0.703,
+        "goldRule": 0.696
       },
       {
         "minute": 15,
-        "examples": 4340,
-        "accuracy": 0.774,
-        "goldRule": 0.767
+        "examples": 18923,
+        "accuracy": 0.772,
+        "goldRule": 0.764
       },
       {
         "minute": 20,
-        "examples": 3779,
-        "accuracy": 0.801,
-        "goldRule": 0.782
+        "examples": 16370,
+        "accuracy": 0.796,
+        "goldRule": 0.784
       },
       {
         "minute": 25,
-        "examples": 3155,
-        "accuracy": 0.826,
-        "goldRule": 0.815
+        "examples": 13537,
+        "accuracy": 0.821,
+        "goldRule": 0.808
       },
       {
         "minute": 30,
-        "examples": 1839,
-        "accuracy": 0.824,
-        "goldRule": 0.806
+        "examples": 7896,
+        "accuracy": 0.819,
+        "goldRule": 0.802
       }
     ],
     "calibration": [
       {
         "from": 0,
         "to": 0.1,
-        "examples": 12674,
-        "predicted": 0.043,
+        "examples": 55097,
+        "predicted": 0.044,
+        "actual": 0.047
+      },
+      {
+        "from": 0.1,
+        "to": 0.2,
+        "examples": 38237,
+        "predicted": 0.149,
+        "actual": 0.153
+      },
+      {
+        "from": 0.2,
+        "to": 0.3,
+        "examples": 38722,
+        "predicted": 0.251,
+        "actual": 0.236
+      },
+      {
+        "from": 0.3,
+        "to": 0.4,
+        "examples": 49674,
+        "predicted": 0.353,
+        "actual": 0.331
+      },
+      {
+        "from": 0.4,
+        "to": 0.5,
+        "examples": 82502,
+        "predicted": 0.457,
+        "actual": 0.442
+      },
+      {
+        "from": 0.5,
+        "to": 0.6,
+        "examples": 85288,
+        "predicted": 0.541,
+        "actual": 0.55
+      },
+      {
+        "from": 0.6,
+        "to": 0.7,
+        "examples": 48070,
+        "predicted": 0.647,
+        "actual": 0.67
+      },
+      {
+        "from": 0.7,
+        "to": 0.8,
+        "examples": 36852,
+        "predicted": 0.749,
+        "actual": 0.765
+      },
+      {
+        "from": 0.8,
+        "to": 0.9,
+        "examples": 35709,
+        "predicted": 0.851,
+        "actual": 0.851
+      },
+      {
+        "from": 0.9,
+        "to": 1,
+        "examples": 51185,
+        "predicted": 0.955,
+        "actual": 0.956
+      }
+    ]
+  },
+  "newestPatch": {
+    "patch": "16.20",
+    "games": 9282,
+    "examples": 261549,
+    "accuracy": 0.726,
+    "logLoss": 0.5175,
+    "brier": 0.1752,
+    "byMinute": [
+      {
+        "minute": 10,
+        "examples": 9282,
+        "accuracy": 0.698,
+        "goldRule": 0.692
+      },
+      {
+        "minute": 15,
+        "examples": 9718,
+        "accuracy": 0.772,
+        "goldRule": 0.766
+      },
+      {
+        "minute": 20,
+        "examples": 8266,
+        "accuracy": 0.792,
+        "goldRule": 0.782
+      },
+      {
+        "minute": 25,
+        "examples": 6685,
+        "accuracy": 0.818,
+        "goldRule": 0.803
+      },
+      {
+        "minute": 30,
+        "examples": 3736,
+        "accuracy": 0.817,
+        "goldRule": 0.795
+      }
+    ],
+    "calibration": [
+      {
+        "from": 0,
+        "to": 0.1,
+        "examples": 27219,
+        "predicted": 0.044,
         "actual": 0.051
       },
       {
         "from": 0.1,
         "to": 0.2,
-        "examples": 8692,
-        "predicted": 0.15,
-        "actual": 0.152
+        "examples": 18883,
+        "predicted": 0.149,
+        "actual": 0.161
       },
       {
         "from": 0.2,
         "to": 0.3,
-        "examples": 8615,
+        "examples": 19463,
         "predicted": 0.251,
-        "actual": 0.231
+        "actual": 0.24
       },
       {
         "from": 0.3,
         "to": 0.4,
-        "examples": 11151,
+        "examples": 24804,
         "predicted": 0.353,
-        "actual": 0.319
+        "actual": 0.333
       },
       {
         "from": 0.4,
         "to": 0.5,
-        "examples": 18808,
-        "predicted": 0.457,
-        "actual": 0.446
+        "examples": 41636,
+        "predicted": 0.458,
+        "actual": 0.443
       },
       {
         "from": 0.5,
         "to": 0.6,
-        "examples": 19699,
+        "examples": 43142,
         "predicted": 0.541,
-        "actual": 0.558
+        "actual": 0.548
       },
       {
         "from": 0.6,
         "to": 0.7,
-        "examples": 11398,
+        "examples": 24446,
         "predicted": 0.647,
-        "actual": 0.664
+        "actual": 0.667
       },
       {
         "from": 0.7,
         "to": 0.8,
-        "examples": 8752,
+        "examples": 18394,
         "predicted": 0.748,
-        "actual": 0.768
+        "actual": 0.766
       },
       {
         "from": 0.8,
         "to": 0.9,
-        "examples": 8235,
+        "examples": 17769,
         "predicted": 0.851,
         "actual": 0.847
       },
       {
         "from": 0.9,
         "to": 1,
-        "examples": 11919,
+        "examples": 25793,
         "predicted": 0.956,
-        "actual": 0.958
+        "actual": 0.955
       }
     ]
   },
-  "newestPatch": {
-    "patch": "16.20",
-    "games": 1765,
-    "examples": 49640,
-    "accuracy": 0.73,
-    "logLoss": 0.5137,
-    "brier": 0.174,
-    "byMinute": [
-      {
-        "minute": 10,
-        "examples": 1765,
-        "accuracy": 0.7,
-        "goldRule": 0.697
+  "ranks": [
+    {
+      "key": "IRON",
+      "label": "Iron",
+      "games": 1356,
+      "weights": [
+        0.5341,
+        -0.3333,
+        0.0677,
+        0,
+        0.0073,
+        0.444,
+        0.3273,
+        0,
+        0.4498,
+        0.1793,
+        0.047,
+        0.1991,
+        0
+      ],
+      "evaluation": {
+        "examples": 40624,
+        "accuracy": 0.755,
+        "logLoss": 0.4871,
+        "brier": 0.1625,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1356,
+            "accuracy": 0.741,
+            "goldRule": 0.723
+          },
+          {
+            "minute": 15,
+            "examples": 1395,
+            "accuracy": 0.789,
+            "goldRule": 0.79
+          },
+          {
+            "minute": 20,
+            "examples": 1219,
+            "accuracy": 0.813,
+            "goldRule": 0.802
+          },
+          {
+            "minute": 25,
+            "examples": 1011,
+            "accuracy": 0.817,
+            "goldRule": 0.797
+          },
+          {
+            "minute": 30,
+            "examples": 687,
+            "accuracy": 0.805,
+            "goldRule": 0.782
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 5050,
+            "predicted": 0.042,
+            "actual": 0.038
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 3219,
+            "predicted": 0.149,
+            "actual": 0.14
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 3132,
+            "predicted": 0.251,
+            "actual": 0.21
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 3826,
+            "predicted": 0.352,
+            "actual": 0.299
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 5497,
+            "predicted": 0.456,
+            "actual": 0.413
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 5584,
+            "predicted": 0.541,
+            "actual": 0.542
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 3594,
+            "predicted": 0.648,
+            "actual": 0.651
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 2901,
+            "predicted": 0.749,
+            "actual": 0.759
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3053,
+            "predicted": 0.852,
+            "actual": 0.845
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 4768,
+            "predicted": 0.957,
+            "actual": 0.944
+          }
+        ]
       },
-      {
-        "minute": 15,
-        "examples": 1845,
-        "accuracy": 0.776,
-        "goldRule": 0.777
-      },
-      {
-        "minute": 20,
-        "examples": 1565,
-        "accuracy": 0.802,
-        "goldRule": 0.785
-      },
-      {
-        "minute": 25,
-        "examples": 1292,
-        "accuracy": 0.827,
-        "goldRule": 0.815
-      },
-      {
-        "minute": 30,
-        "examples": 714,
-        "accuracy": 0.825,
-        "goldRule": 0.801
+      "allRanks": {
+        "examples": 40624,
+        "accuracy": 0.753,
+        "logLoss": 0.4904,
+        "brier": 0.1637,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1356,
+            "accuracy": 0.749,
+            "goldRule": 0.723
+          },
+          {
+            "minute": 15,
+            "examples": 1395,
+            "accuracy": 0.795,
+            "goldRule": 0.79
+          },
+          {
+            "minute": 20,
+            "examples": 1219,
+            "accuracy": 0.814,
+            "goldRule": 0.802
+          },
+          {
+            "minute": 25,
+            "examples": 1011,
+            "accuracy": 0.808,
+            "goldRule": 0.797
+          },
+          {
+            "minute": 30,
+            "examples": 687,
+            "accuracy": 0.798,
+            "goldRule": 0.782
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 4338,
+            "predicted": 0.045,
+            "actual": 0.034
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 3103,
+            "predicted": 0.149,
+            "actual": 0.114
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 3126,
+            "predicted": 0.25,
+            "actual": 0.2
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 3953,
+            "predicted": 0.353,
+            "actual": 0.267
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 6212,
+            "predicted": 0.456,
+            "actual": 0.414
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 6301,
+            "predicted": 0.541,
+            "actual": 0.546
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 3635,
+            "predicted": 0.647,
+            "actual": 0.669
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 2945,
+            "predicted": 0.749,
+            "actual": 0.793
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 2964,
+            "predicted": 0.851,
+            "actual": 0.861
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 4047,
+            "predicted": 0.954,
+            "actual": 0.952
+          }
+        ]
       }
-    ],
-    "calibration": [
-      {
-        "from": 0,
-        "to": 0.1,
-        "examples": 5084,
-        "predicted": 0.043,
-        "actual": 0.048
+    },
+    {
+      "key": "BRONZE",
+      "label": "Bronze",
+      "games": 1133,
+      "weights": [
+        0.4405,
+        -0.2096,
+        0.0257,
+        0.0012,
+        0,
+        0.419,
+        0.2204,
+        0,
+        0.0249,
+        0.4511,
+        0.0491,
+        0,
+        0
+      ],
+      "evaluation": {
+        "examples": 35145,
+        "accuracy": 0.723,
+        "logLoss": 0.528,
+        "brier": 0.1788,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1133,
+            "accuracy": 0.673,
+            "goldRule": 0.68
+          },
+          {
+            "minute": 15,
+            "examples": 1165,
+            "accuracy": 0.767,
+            "goldRule": 0.748
+          },
+          {
+            "minute": 20,
+            "examples": 1042,
+            "accuracy": 0.785,
+            "goldRule": 0.775
+          },
+          {
+            "minute": 25,
+            "examples": 912,
+            "accuracy": 0.807,
+            "goldRule": 0.793
+          },
+          {
+            "minute": 30,
+            "examples": 623,
+            "accuracy": 0.796,
+            "goldRule": 0.793
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 3034,
+            "predicted": 0.048,
+            "actual": 0.046
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 2438,
+            "predicted": 0.15,
+            "actual": 0.148
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 2602,
+            "predicted": 0.251,
+            "actual": 0.249
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 3424,
+            "predicted": 0.353,
+            "actual": 0.339
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 5512,
+            "predicted": 0.457,
+            "actual": 0.462
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 5882,
+            "predicted": 0.541,
+            "actual": 0.582
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 3520,
+            "predicted": 0.648,
+            "actual": 0.684
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 2711,
+            "predicted": 0.75,
+            "actual": 0.745
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 2754,
+            "predicted": 0.851,
+            "actual": 0.842
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 3268,
+            "predicted": 0.952,
+            "actual": 0.949
+          }
+        ]
       },
-      {
-        "from": 0.1,
-        "to": 0.2,
-        "examples": 3557,
-        "predicted": 0.15,
-        "actual": 0.158
-      },
-      {
-        "from": 0.2,
-        "to": 0.3,
-        "examples": 3576,
-        "predicted": 0.251,
-        "actual": 0.248
-      },
-      {
-        "from": 0.3,
-        "to": 0.4,
-        "examples": 4650,
-        "predicted": 0.352,
-        "actual": 0.316
-      },
-      {
-        "from": 0.4,
-        "to": 0.5,
-        "examples": 7976,
-        "predicted": 0.458,
-        "actual": 0.445
-      },
-      {
-        "from": 0.5,
-        "to": 0.6,
-        "examples": 8160,
-        "predicted": 0.541,
-        "actual": 0.566
-      },
-      {
-        "from": 0.6,
-        "to": 0.7,
-        "examples": 4745,
-        "predicted": 0.647,
-        "actual": 0.66
-      },
-      {
-        "from": 0.7,
-        "to": 0.8,
-        "examples": 3615,
-        "predicted": 0.748,
-        "actual": 0.762
-      },
-      {
-        "from": 0.8,
-        "to": 0.9,
-        "examples": 3340,
-        "predicted": 0.852,
-        "actual": 0.847
-      },
-      {
-        "from": 0.9,
-        "to": 1,
-        "examples": 4937,
-        "predicted": 0.957,
-        "actual": 0.965
+      "allRanks": {
+        "examples": 35145,
+        "accuracy": 0.726,
+        "logLoss": 0.5287,
+        "brier": 0.1791,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1133,
+            "accuracy": 0.688,
+            "goldRule": 0.68
+          },
+          {
+            "minute": 15,
+            "examples": 1165,
+            "accuracy": 0.764,
+            "goldRule": 0.748
+          },
+          {
+            "minute": 20,
+            "examples": 1042,
+            "accuracy": 0.789,
+            "goldRule": 0.775
+          },
+          {
+            "minute": 25,
+            "examples": 912,
+            "accuracy": 0.804,
+            "goldRule": 0.793
+          },
+          {
+            "minute": 30,
+            "examples": 623,
+            "accuracy": 0.801,
+            "goldRule": 0.793
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 3432,
+            "predicted": 0.045,
+            "actual": 0.056
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 2443,
+            "predicted": 0.15,
+            "actual": 0.17
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 2566,
+            "predicted": 0.251,
+            "actual": 0.255
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 3190,
+            "predicted": 0.352,
+            "actual": 0.346
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 5399,
+            "predicted": 0.457,
+            "actual": 0.456
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 5686,
+            "predicted": 0.541,
+            "actual": 0.588
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 3381,
+            "predicted": 0.647,
+            "actual": 0.677
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 2647,
+            "predicted": 0.749,
+            "actual": 0.748
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 2735,
+            "predicted": 0.851,
+            "actual": 0.808
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 3666,
+            "predicted": 0.954,
+            "actual": 0.949
+          }
+        ]
       }
-    ]
-  },
-  "ranks": []
+    },
+    {
+      "key": "SILVER",
+      "label": "Silver",
+      "games": 1331,
+      "weights": [
+        0.3743,
+        -0.1463,
+        0.0875,
+        0.0124,
+        0,
+        0.3471,
+        0.2107,
+        0.0524,
+        0.8559,
+        0,
+        0,
+        0.0208,
+        0
+      ],
+      "evaluation": {
+        "examples": 41403,
+        "accuracy": 0.731,
+        "logLoss": 0.5091,
+        "brier": 0.1722,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1331,
+            "accuracy": 0.69,
+            "goldRule": 0.687
+          },
+          {
+            "minute": 15,
+            "examples": 1350,
+            "accuracy": 0.753,
+            "goldRule": 0.745
+          },
+          {
+            "minute": 20,
+            "examples": 1268,
+            "accuracy": 0.795,
+            "goldRule": 0.784
+          },
+          {
+            "minute": 25,
+            "examples": 1118,
+            "accuracy": 0.811,
+            "goldRule": 0.807
+          },
+          {
+            "minute": 30,
+            "examples": 771,
+            "accuracy": 0.805,
+            "goldRule": 0.804
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 4237,
+            "predicted": 0.043,
+            "actual": 0.042
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 2703,
+            "predicted": 0.148,
+            "actual": 0.165
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 2827,
+            "predicted": 0.251,
+            "actual": 0.236
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 3686,
+            "predicted": 0.354,
+            "actual": 0.365
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 6189,
+            "predicted": 0.457,
+            "actual": 0.455
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 6673,
+            "predicted": 0.541,
+            "actual": 0.569
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 4051,
+            "predicted": 0.647,
+            "actual": 0.679
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 3113,
+            "predicted": 0.749,
+            "actual": 0.74
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3157,
+            "predicted": 0.851,
+            "actual": 0.852
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 4767,
+            "predicted": 0.957,
+            "actual": 0.957
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 41403,
+        "accuracy": 0.731,
+        "logLoss": 0.5073,
+        "brier": 0.1716,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1331,
+            "accuracy": 0.693,
+            "goldRule": 0.687
+          },
+          {
+            "minute": 15,
+            "examples": 1350,
+            "accuracy": 0.75,
+            "goldRule": 0.745
+          },
+          {
+            "minute": 20,
+            "examples": 1268,
+            "accuracy": 0.793,
+            "goldRule": 0.784
+          },
+          {
+            "minute": 25,
+            "examples": 1118,
+            "accuracy": 0.812,
+            "goldRule": 0.807
+          },
+          {
+            "minute": 30,
+            "examples": 771,
+            "accuracy": 0.817,
+            "goldRule": 0.804
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 3952,
+            "predicted": 0.045,
+            "actual": 0.039
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 2815,
+            "predicted": 0.149,
+            "actual": 0.149
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 2900,
+            "predicted": 0.251,
+            "actual": 0.236
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 3708,
+            "predicted": 0.354,
+            "actual": 0.356
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 6297,
+            "predicted": 0.457,
+            "actual": 0.459
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 6733,
+            "predicted": 0.542,
+            "actual": 0.568
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 4158,
+            "predicted": 0.647,
+            "actual": 0.682
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 3152,
+            "predicted": 0.749,
+            "actual": 0.746
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3291,
+            "predicted": 0.851,
+            "actual": 0.862
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 4397,
+            "predicted": 0.955,
+            "actual": 0.965
+          }
+        ]
+      }
+    },
+    {
+      "key": "GOLD",
+      "label": "Gold",
+      "games": 1461,
+      "weights": [
+        0.3925,
+        -0.1832,
+        0.0729,
+        0.0008,
+        0,
+        0.3265,
+        0.2574,
+        0.0771,
+        0,
+        0.2346,
+        0.0702,
+        0.0175,
+        0
+      ],
+      "evaluation": {
+        "examples": 45090,
+        "accuracy": 0.727,
+        "logLoss": 0.5181,
+        "brier": 0.1754,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1461,
+            "accuracy": 0.697,
+            "goldRule": 0.701
+          },
+          {
+            "minute": 15,
+            "examples": 1484,
+            "accuracy": 0.735,
+            "goldRule": 0.733
+          },
+          {
+            "minute": 20,
+            "examples": 1375,
+            "accuracy": 0.779,
+            "goldRule": 0.776
+          },
+          {
+            "minute": 25,
+            "examples": 1225,
+            "accuracy": 0.82,
+            "goldRule": 0.801
+          },
+          {
+            "minute": 30,
+            "examples": 857,
+            "accuracy": 0.834,
+            "goldRule": 0.805
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 4453,
+            "predicted": 0.045,
+            "actual": 0.042
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 3223,
+            "predicted": 0.149,
+            "actual": 0.15
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 3405,
+            "predicted": 0.251,
+            "actual": 0.243
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 4398,
+            "predicted": 0.352,
+            "actual": 0.351
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 6958,
+            "predicted": 0.457,
+            "actual": 0.446
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 7309,
+            "predicted": 0.542,
+            "actual": 0.557
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 4113,
+            "predicted": 0.647,
+            "actual": 0.673
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 3373,
+            "predicted": 0.748,
+            "actual": 0.755
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3285,
+            "predicted": 0.851,
+            "actual": 0.833
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 4573,
+            "predicted": 0.953,
+            "actual": 0.952
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 45090,
+        "accuracy": 0.726,
+        "logLoss": 0.5164,
+        "brier": 0.1749,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1461,
+            "accuracy": 0.698,
+            "goldRule": 0.701
+          },
+          {
+            "minute": 15,
+            "examples": 1484,
+            "accuracy": 0.741,
+            "goldRule": 0.733
+          },
+          {
+            "minute": 20,
+            "examples": 1375,
+            "accuracy": 0.777,
+            "goldRule": 0.776
+          },
+          {
+            "minute": 25,
+            "examples": 1225,
+            "accuracy": 0.815,
+            "goldRule": 0.801
+          },
+          {
+            "minute": 30,
+            "examples": 857,
+            "accuracy": 0.833,
+            "goldRule": 0.805
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 4560,
+            "predicted": 0.045,
+            "actual": 0.042
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 3280,
+            "predicted": 0.149,
+            "actual": 0.159
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 3430,
+            "predicted": 0.251,
+            "actual": 0.244
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 4434,
+            "predicted": 0.352,
+            "actual": 0.348
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 6902,
+            "predicted": 0.456,
+            "actual": 0.457
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 7210,
+            "predicted": 0.541,
+            "actual": 0.552
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 4103,
+            "predicted": 0.647,
+            "actual": 0.681
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 3359,
+            "predicted": 0.748,
+            "actual": 0.755
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3226,
+            "predicted": 0.852,
+            "actual": 0.832
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 4586,
+            "predicted": 0.954,
+            "actual": 0.955
+          }
+        ]
+      }
+    },
+    {
+      "key": "PLATINUM",
+      "label": "Platinum",
+      "games": 1475,
+      "weights": [
+        0.3792,
+        -0.2313,
+        0.0879,
+        0,
+        0.0115,
+        0.3979,
+        0.2591,
+        0,
+        0.7629,
+        0.0495,
+        0.0339,
+        0.0447,
+        0
+      ],
+      "evaluation": {
+        "examples": 44275,
+        "accuracy": 0.716,
+        "logLoss": 0.5311,
+        "brier": 0.1804,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1475,
+            "accuracy": 0.681,
+            "goldRule": 0.672
+          },
+          {
+            "minute": 15,
+            "examples": 1515,
+            "accuracy": 0.747,
+            "goldRule": 0.732
+          },
+          {
+            "minute": 20,
+            "examples": 1364,
+            "accuracy": 0.782,
+            "goldRule": 0.771
+          },
+          {
+            "minute": 25,
+            "examples": 1216,
+            "accuracy": 0.8,
+            "goldRule": 0.785
+          },
+          {
+            "minute": 30,
+            "examples": 789,
+            "accuracy": 0.8,
+            "goldRule": 0.783
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 4000,
+            "predicted": 0.048,
+            "actual": 0.047
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 3461,
+            "predicted": 0.149,
+            "actual": 0.175
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 3481,
+            "predicted": 0.25,
+            "actual": 0.257
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 4612,
+            "predicted": 0.353,
+            "actual": 0.343
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 7249,
+            "predicted": 0.457,
+            "actual": 0.443
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 7496,
+            "predicted": 0.541,
+            "actual": 0.545
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 4189,
+            "predicted": 0.647,
+            "actual": 0.671
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 3157,
+            "predicted": 0.748,
+            "actual": 0.778
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 2951,
+            "predicted": 0.851,
+            "actual": 0.86
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 3679,
+            "predicted": 0.952,
+            "actual": 0.953
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 44275,
+        "accuracy": 0.717,
+        "logLoss": 0.5305,
+        "brier": 0.1802,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1475,
+            "accuracy": 0.676,
+            "goldRule": 0.672
+          },
+          {
+            "minute": 15,
+            "examples": 1515,
+            "accuracy": 0.75,
+            "goldRule": 0.732
+          },
+          {
+            "minute": 20,
+            "examples": 1364,
+            "accuracy": 0.784,
+            "goldRule": 0.771
+          },
+          {
+            "minute": 25,
+            "examples": 1216,
+            "accuracy": 0.8,
+            "goldRule": 0.785
+          },
+          {
+            "minute": 30,
+            "examples": 789,
+            "accuracy": 0.805,
+            "goldRule": 0.783
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 4703,
+            "predicted": 0.045,
+            "actual": 0.061
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 3451,
+            "predicted": 0.149,
+            "actual": 0.188
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 3402,
+            "predicted": 0.251,
+            "actual": 0.28
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 4386,
+            "predicted": 0.353,
+            "actual": 0.342
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 6814,
+            "predicted": 0.456,
+            "actual": 0.448
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 7113,
+            "predicted": 0.54,
+            "actual": 0.541
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 4093,
+            "predicted": 0.646,
+            "actual": 0.66
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 3115,
+            "predicted": 0.749,
+            "actual": 0.761
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 2904,
+            "predicted": 0.851,
+            "actual": 0.841
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 4294,
+            "predicted": 0.955,
+            "actual": 0.947
+          }
+        ]
+      }
+    },
+    {
+      "key": "EMERALD",
+      "label": "Emerald",
+      "games": 1305,
+      "weights": [
+        0.3306,
+        -0.1675,
+        0.0961,
+        0.015,
+        0.0095,
+        0.322,
+        0.2974,
+        0.135,
+        0.2891,
+        0.0634,
+        0,
+        0,
+        0
+      ],
+      "evaluation": {
+        "examples": 38901,
+        "accuracy": 0.729,
+        "logLoss": 0.5166,
+        "brier": 0.1746,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1305,
+            "accuracy": 0.69,
+            "goldRule": 0.675
+          },
+          {
+            "minute": 15,
+            "examples": 1333,
+            "accuracy": 0.752,
+            "goldRule": 0.733
+          },
+          {
+            "minute": 20,
+            "examples": 1231,
+            "accuracy": 0.795,
+            "goldRule": 0.774
+          },
+          {
+            "minute": 25,
+            "examples": 1075,
+            "accuracy": 0.828,
+            "goldRule": 0.803
+          },
+          {
+            "minute": 30,
+            "examples": 672,
+            "accuracy": 0.829,
+            "goldRule": 0.823
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 4007,
+            "predicted": 0.045,
+            "actual": 0.051
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 2880,
+            "predicted": 0.15,
+            "actual": 0.173
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 2848,
+            "predicted": 0.25,
+            "actual": 0.243
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 3613,
+            "predicted": 0.353,
+            "actual": 0.349
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 6109,
+            "predicted": 0.458,
+            "actual": 0.462
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 6463,
+            "predicted": 0.541,
+            "actual": 0.573
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 3596,
+            "predicted": 0.647,
+            "actual": 0.686
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 2783,
+            "predicted": 0.749,
+            "actual": 0.777
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 2680,
+            "predicted": 0.852,
+            "actual": 0.864
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 3922,
+            "predicted": 0.955,
+            "actual": 0.948
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 38901,
+        "accuracy": 0.728,
+        "logLoss": 0.5157,
+        "brier": 0.1743,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 1305,
+            "accuracy": 0.693,
+            "goldRule": 0.675
+          },
+          {
+            "minute": 15,
+            "examples": 1333,
+            "accuracy": 0.751,
+            "goldRule": 0.733
+          },
+          {
+            "minute": 20,
+            "examples": 1231,
+            "accuracy": 0.798,
+            "goldRule": 0.774
+          },
+          {
+            "minute": 25,
+            "examples": 1075,
+            "accuracy": 0.828,
+            "goldRule": 0.803
+          },
+          {
+            "minute": 30,
+            "examples": 672,
+            "accuracy": 0.832,
+            "goldRule": 0.823
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 3988,
+            "predicted": 0.045,
+            "actual": 0.05
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 2933,
+            "predicted": 0.15,
+            "actual": 0.167
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 2845,
+            "predicted": 0.251,
+            "actual": 0.253
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 3611,
+            "predicted": 0.353,
+            "actual": 0.354
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 5957,
+            "predicted": 0.457,
+            "actual": 0.459
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 6258,
+            "predicted": 0.542,
+            "actual": 0.566
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 3663,
+            "predicted": 0.647,
+            "actual": 0.682
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 2837,
+            "predicted": 0.749,
+            "actual": 0.761
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 2779,
+            "predicted": 0.851,
+            "actual": 0.866
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 4030,
+            "predicted": 0.955,
+            "actual": 0.946
+          }
+        ]
+      }
+    },
+    {
+      "key": "DIAMOND",
+      "label": "Diamond",
+      "games": 2086,
+      "weights": [
+        0.319,
+        -0.1378,
+        0.1125,
+        0.0131,
+        0,
+        0.1937,
+        0.2554,
+        0.0433,
+        0.1967,
+        0,
+        0.0246,
+        0,
+        0
+      ],
+      "evaluation": {
+        "examples": 60039,
+        "accuracy": 0.733,
+        "logLoss": 0.5126,
+        "brier": 0.1727,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 2086,
+            "accuracy": 0.708,
+            "goldRule": 0.696
+          },
+          {
+            "minute": 15,
+            "examples": 2149,
+            "accuracy": 0.766,
+            "goldRule": 0.767
+          },
+          {
+            "minute": 20,
+            "examples": 1926,
+            "accuracy": 0.788,
+            "goldRule": 0.79
+          },
+          {
+            "minute": 25,
+            "examples": 1658,
+            "accuracy": 0.828,
+            "goldRule": 0.817
+          },
+          {
+            "minute": 30,
+            "examples": 925,
+            "accuracy": 0.827,
+            "goldRule": 0.815
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 6985,
+            "predicted": 0.043,
+            "actual": 0.061
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 4385,
+            "predicted": 0.149,
+            "actual": 0.166
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 4440,
+            "predicted": 0.251,
+            "actual": 0.239
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 5486,
+            "predicted": 0.353,
+            "actual": 0.317
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 9740,
+            "predicted": 0.458,
+            "actual": 0.43
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 10021,
+            "predicted": 0.54,
+            "actual": 0.548
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 5292,
+            "predicted": 0.646,
+            "actual": 0.675
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 4060,
+            "predicted": 0.749,
+            "actual": 0.772
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3910,
+            "predicted": 0.851,
+            "actual": 0.874
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 5720,
+            "predicted": 0.957,
+            "actual": 0.96
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 60039,
+        "accuracy": 0.734,
+        "logLoss": 0.511,
+        "brier": 0.1722,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 2086,
+            "accuracy": 0.701,
+            "goldRule": 0.696
+          },
+          {
+            "minute": 15,
+            "examples": 2149,
+            "accuracy": 0.77,
+            "goldRule": 0.767
+          },
+          {
+            "minute": 20,
+            "examples": 1926,
+            "accuracy": 0.793,
+            "goldRule": 0.79
+          },
+          {
+            "minute": 25,
+            "examples": 1658,
+            "accuracy": 0.828,
+            "goldRule": 0.817
+          },
+          {
+            "minute": 30,
+            "examples": 925,
+            "accuracy": 0.818,
+            "goldRule": 0.815
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 7017,
+            "predicted": 0.043,
+            "actual": 0.061
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 4445,
+            "predicted": 0.148,
+            "actual": 0.166
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 4506,
+            "predicted": 0.251,
+            "actual": 0.235
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 5595,
+            "predicted": 0.353,
+            "actual": 0.323
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 9440,
+            "predicted": 0.457,
+            "actual": 0.431
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 9691,
+            "predicted": 0.541,
+            "actual": 0.546
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 5426,
+            "predicted": 0.647,
+            "actual": 0.669
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 4121,
+            "predicted": 0.749,
+            "actual": 0.766
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3970,
+            "predicted": 0.85,
+            "actual": 0.875
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 5828,
+            "predicted": 0.957,
+            "actual": 0.959
+          }
+        ]
+      }
+    },
+    {
+      "key": "MASTER",
+      "label": "Master",
+      "games": 2907,
+      "weights": [
+        0.3411,
+        -0.1805,
+        0.1233,
+        0.0075,
+        0,
+        0.2861,
+        0.2716,
+        0,
+        0.0888,
+        0,
+        0.0332,
+        0.0157,
+        0
+      ],
+      "evaluation": {
+        "examples": 79923,
+        "accuracy": 0.728,
+        "logLoss": 0.513,
+        "brier": 0.1736,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 2907,
+            "accuracy": 0.703,
+            "goldRule": 0.696
+          },
+          {
+            "minute": 15,
+            "examples": 3059,
+            "accuracy": 0.778,
+            "goldRule": 0.772
+          },
+          {
+            "minute": 20,
+            "examples": 2588,
+            "accuracy": 0.801,
+            "goldRule": 0.781
+          },
+          {
+            "minute": 25,
+            "examples": 2030,
+            "accuracy": 0.832,
+            "goldRule": 0.819
+          },
+          {
+            "minute": 30,
+            "examples": 1024,
+            "accuracy": 0.815,
+            "goldRule": 0.805
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 8998,
+            "predicted": 0.043,
+            "actual": 0.042
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 5919,
+            "predicted": 0.149,
+            "actual": 0.144
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 5985,
+            "predicted": 0.251,
+            "actual": 0.235
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 7596,
+            "predicted": 0.353,
+            "actual": 0.33
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 13164,
+            "predicted": 0.458,
+            "actual": 0.429
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 13430,
+            "predicted": 0.54,
+            "actual": 0.534
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 6787,
+            "predicted": 0.647,
+            "actual": 0.662
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 5208,
+            "predicted": 0.748,
+            "actual": 0.764
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 5119,
+            "predicted": 0.851,
+            "actual": 0.835
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 7717,
+            "predicted": 0.957,
+            "actual": 0.952
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 79923,
+        "accuracy": 0.727,
+        "logLoss": 0.5124,
+        "brier": 0.1734,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 2907,
+            "accuracy": 0.705,
+            "goldRule": 0.696
+          },
+          {
+            "minute": 15,
+            "examples": 3059,
+            "accuracy": 0.779,
+            "goldRule": 0.772
+          },
+          {
+            "minute": 20,
+            "examples": 2588,
+            "accuracy": 0.802,
+            "goldRule": 0.781
+          },
+          {
+            "minute": 25,
+            "examples": 2030,
+            "accuracy": 0.832,
+            "goldRule": 0.819
+          },
+          {
+            "minute": 30,
+            "examples": 1024,
+            "accuracy": 0.823,
+            "goldRule": 0.805
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 8940,
+            "predicted": 0.043,
+            "actual": 0.041
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 5983,
+            "predicted": 0.15,
+            "actual": 0.143
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 6032,
+            "predicted": 0.251,
+            "actual": 0.234
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 7749,
+            "predicted": 0.353,
+            "actual": 0.331
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 12898,
+            "predicted": 0.458,
+            "actual": 0.432
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 13131,
+            "predicted": 0.54,
+            "actual": 0.532
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 6955,
+            "predicted": 0.647,
+            "actual": 0.652
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 5289,
+            "predicted": 0.749,
+            "actual": 0.767
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 5209,
+            "predicted": 0.851,
+            "actual": 0.833
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 7737,
+            "predicted": 0.957,
+            "actual": 0.953
+          }
+        ]
+      }
+    },
+    {
+      "key": "GRANDMASTER",
+      "label": "Grandmaster",
+      "games": 2600,
+      "weights": [
+        0.3896,
+        -0.206,
+        0.1211,
+        0.0095,
+        0,
+        0.4618,
+        0.2331,
+        0.3177,
+        0.8595,
+        0,
+        0.0109,
+        0.0561,
+        0
+      ],
+      "evaluation": {
+        "examples": 68987,
+        "accuracy": 0.731,
+        "logLoss": 0.5055,
+        "brier": 0.1709,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 2600,
+            "accuracy": 0.71,
+            "goldRule": 0.705
+          },
+          {
+            "minute": 15,
+            "examples": 2788,
+            "accuracy": 0.8,
+            "goldRule": 0.785
+          },
+          {
+            "minute": 20,
+            "examples": 2206,
+            "accuracy": 0.803,
+            "goldRule": 0.791
+          },
+          {
+            "minute": 25,
+            "examples": 1670,
+            "accuracy": 0.832,
+            "goldRule": 0.816
+          },
+          {
+            "minute": 30,
+            "examples": 821,
+            "accuracy": 0.842,
+            "goldRule": 0.829
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 7964,
+            "predicted": 0.04,
+            "actual": 0.046
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 4840,
+            "predicted": 0.148,
+            "actual": 0.162
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 4997,
+            "predicted": 0.251,
+            "actual": 0.231
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 6418,
+            "predicted": 0.352,
+            "actual": 0.327
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 10918,
+            "predicted": 0.458,
+            "actual": 0.444
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 11212,
+            "predicted": 0.54,
+            "actual": 0.544
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 6281,
+            "predicted": 0.646,
+            "actual": 0.652
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 4734,
+            "predicted": 0.748,
+            "actual": 0.761
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 4389,
+            "predicted": 0.851,
+            "actual": 0.862
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 7234,
+            "predicted": 0.959,
+            "actual": 0.963
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 68987,
+        "accuracy": 0.731,
+        "logLoss": 0.5052,
+        "brier": 0.1708,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 2600,
+            "accuracy": 0.711,
+            "goldRule": 0.705
+          },
+          {
+            "minute": 15,
+            "examples": 2788,
+            "accuracy": 0.799,
+            "goldRule": 0.785
+          },
+          {
+            "minute": 20,
+            "examples": 2206,
+            "accuracy": 0.802,
+            "goldRule": 0.791
+          },
+          {
+            "minute": 25,
+            "examples": 1670,
+            "accuracy": 0.832,
+            "goldRule": 0.816
+          },
+          {
+            "minute": 30,
+            "examples": 821,
+            "accuracy": 0.848,
+            "goldRule": 0.829
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 7260,
+            "predicted": 0.043,
+            "actual": 0.04
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 4933,
+            "predicted": 0.149,
+            "actual": 0.144
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 5109,
+            "predicted": 0.252,
+            "actual": 0.224
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 6588,
+            "predicted": 0.353,
+            "actual": 0.327
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 11327,
+            "predicted": 0.458,
+            "actual": 0.44
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 11598,
+            "predicted": 0.541,
+            "actual": 0.547
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 6389,
+            "predicted": 0.647,
+            "actual": 0.662
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 4719,
+            "predicted": 0.748,
+            "actual": 0.771
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 4483,
+            "predicted": 0.851,
+            "actual": 0.876
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 6581,
+            "predicted": 0.956,
+            "actual": 0.969
+          }
+        ]
+      }
+    },
+    {
+      "key": "CHALLENGER",
+      "label": "Challenger",
+      "games": 2444,
+      "weights": [
+        0.41,
+        -0.2059,
+        0.0916,
+        0.0055,
+        0,
+        0.3867,
+        0.2165,
+        0.3789,
+        0.4649,
+        0,
+        0.0087,
+        0.1176,
+        0
+      ],
+      "evaluation": {
+        "examples": 64744,
+        "accuracy": 0.726,
+        "logLoss": 0.5176,
+        "brier": 0.1751,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 2444,
+            "accuracy": 0.703,
+            "goldRule": 0.701
+          },
+          {
+            "minute": 15,
+            "examples": 2603,
+            "accuracy": 0.783,
+            "goldRule": 0.781
+          },
+          {
+            "minute": 20,
+            "examples": 2081,
+            "accuracy": 0.798,
+            "goldRule": 0.794
+          },
+          {
+            "minute": 25,
+            "examples": 1570,
+            "accuracy": 0.831,
+            "goldRule": 0.818
+          },
+          {
+            "minute": 30,
+            "examples": 695,
+            "accuracy": 0.793,
+            "goldRule": 0.768
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 6927,
+            "predicted": 0.043,
+            "actual": 0.049
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 4639,
+            "predicted": 0.149,
+            "actual": 0.152
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 4645,
+            "predicted": 0.25,
+            "actual": 0.217
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 6139,
+            "predicted": 0.353,
+            "actual": 0.322
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 10615,
+            "predicted": 0.458,
+            "actual": 0.437
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 11071,
+            "predicted": 0.541,
+            "actual": 0.542
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 6041,
+            "predicted": 0.647,
+            "actual": 0.664
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 4595,
+            "predicted": 0.748,
+            "actual": 0.762
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3963,
+            "predicted": 0.851,
+            "actual": 0.842
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 6109,
+            "predicted": 0.957,
+            "actual": 0.957
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 64744,
+        "accuracy": 0.726,
+        "logLoss": 0.5168,
+        "brier": 0.1749,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 2444,
+            "accuracy": 0.704,
+            "goldRule": 0.701
+          },
+          {
+            "minute": 15,
+            "examples": 2603,
+            "accuracy": 0.78,
+            "goldRule": 0.781
+          },
+          {
+            "minute": 20,
+            "examples": 2081,
+            "accuracy": 0.798,
+            "goldRule": 0.794
+          },
+          {
+            "minute": 25,
+            "examples": 1570,
+            "accuracy": 0.827,
+            "goldRule": 0.818
+          },
+          {
+            "minute": 30,
+            "examples": 695,
+            "accuracy": 0.797,
+            "goldRule": 0.768
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 6703,
+            "predicted": 0.044,
+            "actual": 0.047
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 4701,
+            "predicted": 0.149,
+            "actual": 0.144
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 4654,
+            "predicted": 0.251,
+            "actual": 0.218
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 6242,
+            "predicted": 0.353,
+            "actual": 0.324
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 10885,
+            "predicted": 0.458,
+            "actual": 0.437
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 11180,
+            "predicted": 0.541,
+            "actual": 0.543
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 6066,
+            "predicted": 0.647,
+            "actual": 0.672
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 4496,
+            "predicted": 0.747,
+            "actual": 0.771
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 3987,
+            "predicted": 0.85,
+            "actual": 0.846
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 5830,
+            "predicted": 0.955,
+            "actual": 0.961
+          }
+        ]
+      }
+    },
+    {
+      "key": "EMERALD+",
+      "label": "Emerald+",
+      "games": 11342,
+      "weights": [
+        0.3614,
+        -0.1818,
+        0.1109,
+        0.0096,
+        0,
+        0.3201,
+        0.2517,
+        0.1514,
+        0.3186,
+        0,
+        0.0169,
+        0.0269,
+        0
+      ],
+      "evaluation": {
+        "examples": 312594,
+        "accuracy": 0.729,
+        "logLoss": 0.5122,
+        "brier": 0.1731,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 11342,
+            "accuracy": 0.706,
+            "goldRule": 0.697
+          },
+          {
+            "minute": 15,
+            "examples": 11932,
+            "accuracy": 0.78,
+            "goldRule": 0.772
+          },
+          {
+            "minute": 20,
+            "examples": 10032,
+            "accuracy": 0.799,
+            "goldRule": 0.787
+          },
+          {
+            "minute": 25,
+            "examples": 8003,
+            "accuracy": 0.829,
+            "goldRule": 0.816
+          },
+          {
+            "minute": 30,
+            "examples": 4137,
+            "accuracy": 0.826,
+            "goldRule": 0.809
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 34728,
+            "predicted": 0.043,
+            "actual": 0.049
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 22788,
+            "predicted": 0.149,
+            "actual": 0.154
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 22914,
+            "predicted": 0.251,
+            "actual": 0.236
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 29438,
+            "predicted": 0.353,
+            "actual": 0.328
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 50714,
+            "predicted": 0.458,
+            "actual": 0.438
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 52100,
+            "predicted": 0.54,
+            "actual": 0.545
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 28087,
+            "predicted": 0.647,
+            "actual": 0.67
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 21150,
+            "predicted": 0.748,
+            "actual": 0.766
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 20190,
+            "predicted": 0.851,
+            "actual": 0.855
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 30485,
+            "predicted": 0.957,
+            "actual": 0.957
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 312594,
+        "accuracy": 0.729,
+        "logLoss": 0.5119,
+        "brier": 0.173,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 11342,
+            "accuracy": 0.704,
+            "goldRule": 0.697
+          },
+          {
+            "minute": 15,
+            "examples": 11932,
+            "accuracy": 0.779,
+            "goldRule": 0.772
+          },
+          {
+            "minute": 20,
+            "examples": 10032,
+            "accuracy": 0.799,
+            "goldRule": 0.787
+          },
+          {
+            "minute": 25,
+            "examples": 8003,
+            "accuracy": 0.83,
+            "goldRule": 0.816
+          },
+          {
+            "minute": 30,
+            "examples": 4137,
+            "accuracy": 0.824,
+            "goldRule": 0.809
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 33908,
+            "predicted": 0.043,
+            "actual": 0.047
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 22995,
+            "predicted": 0.149,
+            "actual": 0.151
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 23146,
+            "predicted": 0.251,
+            "actual": 0.231
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 29785,
+            "predicted": 0.353,
+            "actual": 0.33
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 50507,
+            "predicted": 0.458,
+            "actual": 0.438
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 51858,
+            "predicted": 0.541,
+            "actual": 0.545
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 28499,
+            "predicted": 0.647,
+            "actual": 0.666
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 21462,
+            "predicted": 0.748,
+            "actual": 0.768
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 20428,
+            "predicted": 0.851,
+            "actual": 0.858
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 30006,
+            "predicted": 0.956,
+            "actual": 0.958
+          }
+        ]
+      }
+    },
+    {
+      "key": "MASTER+",
+      "label": "Master+",
+      "games": 7951,
+      "weights": [
+        0.3774,
+        -0.1971,
+        0.1135,
+        0.0076,
+        0,
+        0.3592,
+        0.2433,
+        0.1759,
+        0.3857,
+        0,
+        0.0187,
+        0.0598,
+        0
+      ],
+      "evaluation": {
+        "examples": 213654,
+        "accuracy": 0.728,
+        "logLoss": 0.5114,
+        "brier": 0.173,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 7951,
+            "accuracy": 0.707,
+            "goldRule": 0.701
+          },
+          {
+            "minute": 15,
+            "examples": 8450,
+            "accuracy": 0.787,
+            "goldRule": 0.779
+          },
+          {
+            "minute": 20,
+            "examples": 6875,
+            "accuracy": 0.801,
+            "goldRule": 0.788
+          },
+          {
+            "minute": 25,
+            "examples": 5270,
+            "accuracy": 0.831,
+            "goldRule": 0.818
+          },
+          {
+            "minute": 30,
+            "examples": 2540,
+            "accuracy": 0.822,
+            "goldRule": 0.803
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 23772,
+            "predicted": 0.042,
+            "actual": 0.044
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 15485,
+            "predicted": 0.149,
+            "actual": 0.149
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 15610,
+            "predicted": 0.252,
+            "actual": 0.229
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 20256,
+            "predicted": 0.353,
+            "actual": 0.327
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 34765,
+            "predicted": 0.458,
+            "actual": 0.437
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 35683,
+            "predicted": 0.54,
+            "actual": 0.54
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 19195,
+            "predicted": 0.647,
+            "actual": 0.662
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 14405,
+            "predicted": 0.748,
+            "actual": 0.764
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 13501,
+            "predicted": 0.851,
+            "actual": 0.846
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 20982,
+            "predicted": 0.957,
+            "actual": 0.957
+          }
+        ]
+      },
+      "allRanks": {
+        "examples": 213654,
+        "accuracy": 0.728,
+        "logLoss": 0.5114,
+        "brier": 0.173,
+        "byMinute": [
+          {
+            "minute": 10,
+            "examples": 7951,
+            "accuracy": 0.706,
+            "goldRule": 0.701
+          },
+          {
+            "minute": 15,
+            "examples": 8450,
+            "accuracy": 0.786,
+            "goldRule": 0.779
+          },
+          {
+            "minute": 20,
+            "examples": 6875,
+            "accuracy": 0.801,
+            "goldRule": 0.788
+          },
+          {
+            "minute": 25,
+            "examples": 5270,
+            "accuracy": 0.831,
+            "goldRule": 0.818
+          },
+          {
+            "minute": 30,
+            "examples": 2540,
+            "accuracy": 0.824,
+            "goldRule": 0.803
+          }
+        ],
+        "calibration": [
+          {
+            "from": 0,
+            "to": 0.1,
+            "examples": 22903,
+            "predicted": 0.043,
+            "actual": 0.042
+          },
+          {
+            "from": 0.1,
+            "to": 0.2,
+            "examples": 15617,
+            "predicted": 0.149,
+            "actual": 0.143
+          },
+          {
+            "from": 0.2,
+            "to": 0.3,
+            "examples": 15795,
+            "predicted": 0.251,
+            "actual": 0.226
+          },
+          {
+            "from": 0.3,
+            "to": 0.4,
+            "examples": 20579,
+            "predicted": 0.353,
+            "actual": 0.328
+          },
+          {
+            "from": 0.4,
+            "to": 0.5,
+            "examples": 35110,
+            "predicted": 0.458,
+            "actual": 0.436
+          },
+          {
+            "from": 0.5,
+            "to": 0.6,
+            "examples": 35909,
+            "predicted": 0.54,
+            "actual": 0.54
+          },
+          {
+            "from": 0.6,
+            "to": 0.7,
+            "examples": 19410,
+            "predicted": 0.647,
+            "actual": 0.662
+          },
+          {
+            "from": 0.7,
+            "to": 0.8,
+            "examples": 14504,
+            "predicted": 0.748,
+            "actual": 0.77
+          },
+          {
+            "from": 0.8,
+            "to": 0.9,
+            "examples": 13679,
+            "predicted": 0.851,
+            "actual": 0.851
+          },
+          {
+            "from": 0.9,
+            "to": 1,
+            "examples": 20148,
+            "predicted": 0.956,
+            "actual": 0.96
+          }
+        ]
+      }
+    }
+  ]
 }
