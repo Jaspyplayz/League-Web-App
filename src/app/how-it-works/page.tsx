@@ -4,11 +4,17 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Panel } from "@/components/ui/panel";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { REPO_URL } from "@/components/site-header";
-import { WIN_CHANCE_FEATURES } from "@/lib/analyzer/win-chance";
+import {
+  rankModelHelps,
+  WIN_CHANCE_FEATURES,
+  whatIfChance,
+  withRank,
+  type Evaluation,
+} from "@/lib/analyzer/win-chance";
 import { SCORE_MODEL } from "@/lib/game-score";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { WIN_CHANCE_MODEL } from "@/lib/win-chance";
-import { WhatIfCalculator } from "./what-if-calculator";
+import { WhatIfCalculator, type RankWeights } from "./what-if-calculator";
 
 export const metadata: Metadata = {
   title: "How it works",
@@ -27,6 +33,16 @@ export default function HowItWorksPage() {
   }))
     .filter((w) => Math.abs(w.weight) >= 0.05)
     .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
+  // Ranks whose own model clearly beat the all-ranks model, so the match
+  // page uses it. Only the weights go to the browser, not the test results.
+  const usedRanks = winChance.ranks.filter(rankModelHelps);
+  const ranks: RankWeights[] = [
+    { label: winChance.rank, weights: winChance.weights },
+    ...usedRanks.map((r) => ({ label: r.label, weights: r.weights })),
+  ];
+  // What 3,000 gold and 2,000 XP ahead at 20:00 is worth, by rank.
+  const lead = { minute: 20, goldLead: 3000, xpLead: 2000, dragonLead: 0, inhibitorLead: 0, baron: 0 } as const;
+  const at20 = (e: Evaluation) => e.byMinute.find((m) => m.minute === 20)?.accuracy ?? 0;
 
   return (
     <main className="mx-auto flex w-full max-w-[860px] flex-col gap-12 px-6 pb-[88px] pt-14">
@@ -118,7 +134,7 @@ export default function HowItWorksPage() {
         </p>
 
         <h3 className="pt-2 text-lg font-semibold text-ink">Try it yourself</h3>
-        <WhatIfCalculator model={winChance} />
+        <WhatIfCalculator ranks={ranks} />
 
         <h3 className="pt-2 text-lg font-semibold text-ink">How good is it?</h3>
         <p>
@@ -151,6 +167,52 @@ export default function HowItWorksPage() {
           ahead later, when inhibitors, Baron and Elder start deciding games. It only ever runs on
           finished games: Riot doesn&apos;t allow predictions during a live game.
         </p>
+
+        {winChance.ranks.length > 0 && (
+          <>
+            <h3 className="pt-2 text-lg font-semibold text-ink">Does rank matter?</h3>
+            <p>
+              Maybe leads are worth less in Iron, where games get thrown more often. To check, each
+              rank (and Emerald+ and Master+) got a model of its own, trained only on games at that
+              rank, and both were tested on that rank&apos;s games they hadn&apos;t seen.
+            </p>
+            <Panel className="overflow-x-auto p-0">
+              <table className="w-full text-body">
+                <thead className="text-left font-mono text-label uppercase tracking-[0.12em] text-faint">
+                  <tr>
+                    <th className="px-4 py-2.5 font-normal">Rank</th>
+                    <th className="px-4 py-2.5 text-right font-normal">Games</th>
+                    <th className="px-4 py-2.5 text-right font-normal">Own model at 20:00</th>
+                    <th className="px-4 py-2.5 text-right font-normal">All ranks at 20:00</th>
+                    <th className="px-4 py-2.5 text-right font-normal">3k gold up at 20:00</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {winChance.ranks.map((r) => (
+                    <tr key={r.key} className="border-t border-line">
+                      <td className="px-4 py-2">{r.label}</td>
+                      <td className="px-4 py-2 text-right font-mono">
+                        {r.games.toLocaleString("en-US")}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono text-ink">
+                        {percent(at20(r.evaluation))}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono">{percent(at20(r.allRanks))}</td>
+                      <td className="px-4 py-2 text-right font-mono">
+                        {percent(whatIfChance(withRank(winChance, r), lead))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Panel>
+            <p>
+              {usedRanks.length === 0
+                ? "No rank's own model did clearly better than the all-ranks model, so every game uses the all-ranks one. A lead is worth about the same in Iron as in Challenger, and the all-ranks model learned from far more games."
+                : `Where a rank's own model did clearly better (${usedRanks.map((r) => r.label).join(", ")}), the match page uses it for players at that rank, and you can pick it in the calculator above. Everywhere else, the all-ranks model was just as good and learned from far more games.`}
+            </p>
+          </>
+        )}
       </Section>
 
       <Section title="4. Game score">

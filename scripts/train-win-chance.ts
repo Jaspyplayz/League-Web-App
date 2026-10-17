@@ -8,7 +8,9 @@
 // win_chance_games (filled by `npm run benchmarks`) and from the games opened
 // on the site (matches and match_timelines). It prints how accurate the model
 // is and what it learned, so you can compare before committing the new
-// win-chance-model.json.
+// win-chance-model.json. Besides the all-ranks model, it trains one for
+// each rank with enough games (WIN_CHANCE_RANKS), which needs the games'
+// tiers: benchmark games know theirs, games opened on the site don't.
 
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -19,12 +21,19 @@ import { plural } from "@/lib/analyzer/format";
 import type { TrimmedTimeline } from "@/lib/analyzer/trim";
 import {
   comparePatches,
+  MIN_RANK_GAIN,
+  MIN_RANK_GAMES,
+  rankModelHelps,
   toWinChanceGame,
   trainWinChanceModel,
   WIN_CHANCE_FEATURES,
+  WIN_CHANCE_RANKS,
+  whatIfChance,
   winChanceExamples,
+  withRank,
   type Evaluation,
   type WinChanceGame,
+  type WinChanceModel,
 } from "@/lib/analyzer/win-chance";
 import type { Match } from "@/lib/riot/types";
 
@@ -47,6 +56,7 @@ async function main() {
   try {
     await readSiteGames(db, found);
     await readBenchmarkGames(db, found);
+    await addMissingTiers(db, found);
   } finally {
     await db.$client.end();
   }
@@ -84,7 +94,42 @@ async function main() {
   for (const [i, feature] of WIN_CHANCE_FEATURES.entries()) {
     console.log(`  ${feature.key.padEnd(12)} ${model.weights[i].toFixed(3).padStart(8)}   ${feature.label}`);
   }
+  printRanks(model, games);
   console.log(`\nSaved ${OUTPUT}. Commit it to update the win chance on the site.`);
+}
+
+// Each rank's model next to the all-ranks model on the same games, and what
+// one lead is worth at each rank, so differences between ranks are easy to see.
+function printRanks(model: WinChanceModel, games: WinChanceGame[]) {
+  const percent = (x: number) => `${Math.round(x * 100)}%`;
+  const at20 = (e: Evaluation) => e.byMinute.find((m) => m.minute === 20)?.accuracy ?? 0;
+  // 3,000 gold and 2,000 XP ahead at 20:00, nothing else.
+  const lead = { minute: 20, goldLead: 3000, xpLead: 2000, dragonLead: 0, inhibitorLead: 0, baron: 0 } as const;
+
+  const ranked = games.filter((g) => g.tier).length;
+  console.log(`\n${plural(ranked, "game")} of ${games.length} have a rank (games opened on the site don't).`);
+  console.log("By rank (own model vs the all-ranks model, on games it didn't see):");
+  console.log("  rank          games   log loss       at 20:00     3k gold up at 20:00          used");
+  for (const rank of WIN_CHANCE_RANKS) {
+    const trained = model.ranks.find((r) => r.key === rank.key);
+    if (!trained) {
+      const count = games.filter((g) => g.tier && (rank.tiers as readonly string[]).includes(g.tier)).length;
+      console.log(`  ${rank.label.padEnd(12)} ${String(count).padStart(6)}   too few games (needs ${MIN_RANK_GAMES}), uses a bigger group`);
+      continue;
+    }
+    const { evaluation: own, allRanks: all } = trained;
+    console.log(
+      `  ${rank.label.padEnd(12)} ${String(trained.games).padStart(6)}   ` +
+        `${own.logLoss.toFixed(3)} vs ${all.logLoss.toFixed(3)}   ` +
+        `${percent(at20(own)).padStart(4)} vs ${percent(at20(all)).padStart(4)}   ` +
+        `${percent(whatIfChance(withRank(model, trained), lead)).padStart(4)} ` +
+        `(all ranks ${percent(whatIfChance(model, lead))})   ` +
+        (rankModelHelps(trained) ? "yes" : "no, all ranks is as good"),
+    );
+  }
+  console.log(
+    `  (lower log loss is better; a rank's own model is used when it's at least ${MIN_RANK_GAIN} lower)`,
+  );
 }
 
 function printEvaluation(title: string, e: Evaluation) {
@@ -148,6 +193,18 @@ async function readBenchmarkGames(db: Db, found: Map<string, WinChanceGame>) {
     if (rows.length === 0) return;
     for (const row of rows) found.set(row.matchId, row.game as WinChanceGame);
     after = rows[rows.length - 1].matchId;
+  }
+}
+
+// Games saved before win_chance_games recorded tiers get theirs from
+// benchmark_games, which keeps the tier of the player each game was
+// collected from.
+async function addMissingTiers(db: Db, found: Map<string, WinChanceGame>) {
+  const t = tables.benchmarkGames;
+  const rows = await db.selectDistinctOn([t.matchId], { matchId: t.matchId, tier: t.tier }).from(t);
+  for (const { matchId, tier } of rows) {
+    const game = found.get(matchId);
+    if (game && !game.tier) game.tier = tier;
   }
 }
 

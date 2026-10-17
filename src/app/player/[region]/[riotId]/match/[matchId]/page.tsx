@@ -6,6 +6,7 @@ import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { analyzeMatch, findPlayer, findPlayerByRiotId, isAnalyzable } from "@/lib/analyzer";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { loadMatch, loadTimeline } from "@/lib/match-store";
+import { savedSoloTier } from "@/lib/profile-store";
 import { isMatchIdFor, isRegion, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
@@ -107,7 +108,10 @@ async function Analysis({ params }: { params: Params }) {
     );
   }
 
-  const timeline = await settle(loadTimeline(region, match));
+  const [timeline, tier] = await Promise.all([
+    settle(loadTimeline(region, match)),
+    savedSoloTier(me.puuid),
+  ]);
   if (!timeline.ok) {
     return (
       <>
@@ -122,7 +126,7 @@ async function Analysis({ params }: { params: Params }) {
 
   const label = (name: string) => championName(dd, name);
   const analysis = analyzeMatch(match, timeline.value, me.puuid, label)!;
-  const winChance = matchWinChance(match, timeline.value, me.teamId);
+  const winChance = matchWinChance(match, timeline.value, me.teamId, tier);
   return (
     <>
       {back}

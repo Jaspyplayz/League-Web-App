@@ -41,28 +41,28 @@ There's no extra constant (bias) in the score, so an even game is always exactly
 
 ### The weights it learned
 
-From 4,185 ranked games on patches 16.16 to 16.20 (trained 2026-10-14):
+From 18,178 ranked games, Iron to Challenger, on patches 16.16 to 16.20 (trained 2026-10-17):
 
 | Feature | Weight | |
 |---|---|---|
-| `gold` | 0.406 | per 1,000 gold |
-| `goldLate` | −0.212 | per 1,000 gold, times minutes / 30 |
-| `xp` | 0.092 | per 1,000 XP |
+| `gold` | 0.397 | per 1,000 gold |
+| `goldLate` | −0.206 | per 1,000 gold, times minutes / 30 |
+| `xp` | 0.094 | per 1,000 XP |
 | `kills` | 0.002 | per kill |
 | `towers` | 0 | per tower |
-| `inhibitors` | 0.379 | per inhibitor down |
-| `dragons` | 0.252 | per dragon |
-| `soul` | 0.020 | soul |
-| `elderBuff` | 0.216 | Elder buff |
-| `baronBuff` | 0.128 | Baron buff |
-| `grubs` | 0.007 | per void grub |
-| `heralds` | 0.089 | per Rift Herald |
+| `inhibitors` | 0.373 | per inhibitor down |
+| `dragons` | 0.259 | per dragon |
+| `soul` | 0.037 | soul |
+| `elderBuff` | 0.246 | Elder buff |
+| `baronBuff` | 0.041 | Baron buff |
+| `grubs` | 0.026 | per void grub |
+| `heralds` | 0.041 | per Rift Herald |
 | `atakhans` | 0 | per Atakhan |
 
 Two things stand out:
 
 - **Kills and towers are worth almost nothing on their own.** Not because they don't matter, but because they pay gold, and the gold lead already counts that gold. Counting a kill again on top would count it twice. Inhibitors, dragons, Baron and Elder are different: most of what they're worth is the buff or the pressure, not the gold, so they keep a weight of their own.
-- **A gold lead counts for less as the game goes on.** `goldLate` is negative, so 1,000 gold is worth 0.406 − 0.212 × 10/30 = 0.34 at 10 minutes but only 0.406 − 0.212 = 0.19 at 30 minutes, when everyone is close to a full build.
+- **A gold lead counts for less as the game goes on.** `goldLate` is negative, so 1,000 gold is worth 0.397 − 0.206 × 10/30 = 0.33 at 10 minutes but only 0.397 − 0.206 = 0.19 at 30 minutes, when everyone is close to a full build.
 
 ### A worked example
 
@@ -70,16 +70,16 @@ A real minute: KR_8414727148 at 20:00. Blue is 2,302 gold and 1,432 XP ahead, wi
 
 ```
 feature    lead                  weight     adds
-gold       2.302                 0.406    0.935
-goldLate   2.302 × 20/30 = 1.535 −0.212   −0.326
-xp         1.432                 0.092    0.132
-kills      −5                    0.002   −0.009
+gold       2.302                 0.397    0.914
+goldLate   2.302 × 20/30 = 1.535 −0.206   −0.316
+xp         1.432                 0.094    0.135
+kills      −5                    0.002   −0.010
 towers     2                     0        0
-dragons    −1                    0.252   −0.252
-grubs      3                     0.007    0.022
-heralds    1                     0.089    0.089
-                                 score    0.590
-blue chance = 1 / (1 + e^(−0.590)) = 1 / (1 + 0.554) = 64%
+dragons    −1                    0.259   −0.259
+grubs      3                     0.026    0.077
+heralds    1                     0.041    0.041
+                                 score    0.582
+blue chance = 1 / (1 + e^(−0.582)) = 1 / (1 + 0.559) = 64%
 ```
 
 Red's 5 extra kills barely move it, because the gold they earned is already in the gold lead. Blue went on to win.
@@ -112,12 +112,39 @@ The current model, on games it didn't see:
 | Minute | Model | More gold wins |
 |---|---|---|
 | 10:00 | 70% | 70% |
-| 15:00 | 77% | 77% |
+| 15:00 | 77% | 76% |
 | 20:00 | 80% | 78% |
-| 25:00 | 83% | 82% |
-| 30:00 | 82% | 81% |
+| 25:00 | 82% | 81% |
+| 30:00 | 82% | 80% |
 
 Log loss 0.513 and Brier score 0.173. It's well calibrated: when it says 90 to 100%, blue wins 96% of the time, and when it says 10 to 20%, blue wins 15%. Gold explains most of a game, so the gold rule is hard to beat early; the model pulls ahead after 20 minutes, when inhibitors, Baron and Elder start deciding games. Patch 16.20 alone scores the same as all five patches, so nothing has changed enough to need a retrain yet.
+
+## Does rank matter?
+
+Maybe a lead is worth less in Iron, where games get thrown more often, than in Challenger. To check, training also fits a model for each tier on its own, plus Emerald+ and Master+ (`WIN_CHANCE_RANKS`), using only that rank's games. A rank needs at least 800 games (`MIN_RANK_GAMES`). Each rank model is cross-validated on its own games, and so is the all-ranks model on the same games (`allRanks`), so the two can be compared fairly.
+
+A game's rank is the tier of the benchmark player it was collected from (`tier` in each `win_chance_games` game; older rows get it from `benchmark_games`). Players in one game are matched by MMR, so the other nine are close to it. Games opened on the site have no rank and only train the all-ranks model.
+
+The result, on games each model didn't see (log loss, lower is better):
+
+| Rank | Games | Own model | All ranks | At 20:00, own vs all |
+|---|---|---|---|---|
+| Iron | 1,356 | 0.487 | 0.490 | 81% vs 81% |
+| Bronze | 1,133 | 0.528 | 0.529 | 79% vs 79% |
+| Silver | 1,331 | 0.509 | 0.507 | 80% vs 79% |
+| Gold | 1,461 | 0.518 | 0.516 | 78% vs 78% |
+| Platinum | 1,475 | 0.531 | 0.531 | 78% vs 78% |
+| Emerald | 1,305 | 0.517 | 0.516 | 80% vs 80% |
+| Diamond | 2,086 | 0.513 | 0.511 | 79% vs 79% |
+| Master | 2,907 | 0.513 | 0.512 | 80% vs 80% |
+| Grandmaster | 2,600 | 0.506 | 0.505 | 80% vs 80% |
+| Challenger | 2,444 | 0.518 | 0.517 | 80% vs 80% |
+| Emerald+ | 11,342 | 0.512 | 0.512 | 80% vs 80% |
+| Master+ | 7,951 | 0.511 | 0.511 | 80% vs 80% |
+
+**A lead is worth about the same at every rank.** The own models are no better than the all-ranks model, and most are a hair worse: they learned from a tenth of the games, so their weights wobble more. A 3,000 gold, 2,000 XP lead at 20:00 comes out between 70% and 74% at every rank. Some ranks are easier to call than others (Iron games 81% at 20:00, Gold 78%), but the all-ranks model already gets that right.
+
+So a rank's own model is only used when its log loss is at least 0.005 lower than the all-ranks model's on the same games (`MIN_RANK_GAIN`, `rankModelHelps`). Smaller gaps are within the luck of which games were collected. Today no rank clears that bar, so every game uses the all-ranks model. The check reruns with every retrain: if a future patch makes leads count differently in some rank, `modelForTier` picks that rank's model for players at that rank (their saved solo queue tier), falling back to Master+ or Emerald+, then all ranks. The How it works page shows the same comparison.
 
 ## Patches
 
@@ -132,17 +159,20 @@ If the newest patch's accuracy drops well below the rest, collect fresh games an
 
 The model learns from two places:
 
-- `win_chance_games`: both teams' numbers at every minute of each game `npm run benchmarks` collects, with no names or PUUIDs. Games older than 60 days are deleted at the end of each run.
+- `win_chance_games`: both teams' numbers at every minute of each game `npm run benchmarks` collects, with no names or PUUIDs, plus the tier it was collected at. Games older than 60 days are deleted at the end of each run.
 - `matches` and `match_timelines`: every game someone has opened on the site.
 
 ```sh
 npm run benchmarks                         # collects games (slow, needs RIOT_API_KEY)
+npm run benchmarks -- --players 40         # 4x the players per rank and server
 npm run train-win-chance                   # needs DATABASE_URL; makes no Riot calls
 npm run train-win-chance -- --patches 3    # only the 3 newest patches
 ```
 
 On Windows PowerShell, use `npm.cmd` when passing options after `--`.
 
-The script prints the accuracy and weights. If they look right, commit the new `win-chance-model.json`. Showing the win chance on the site costs nothing: the model is a small JSON file bundled with the code.
+The current model came from `--players 40` on 2026-10-16: about 7.5 hours on one dev key, taking the table from 4,077 to 18,114 games. Low ranks end up with fewer games than high ones because their players play less often, so more of their last 20 games are older than 60 days and get deleted. Training took about 2 minutes.
+
+The script prints the accuracy and weights, then the per-rank table above. If they look right, commit the new `win-chance-model.json`. Showing the win chance on the site costs nothing: the model is a JSON file bundled with the code (about 70 KB with every rank's test results; only the weights reach the browser).
 
 If you change `WIN_CHANCE_FEATURES`, retrain before deploying. A saved model trained on a different list is ignored. If you change `TEAM_STATS`, the saved `win_chance_games` rows no longer match, so empty the table and collect again.

@@ -2,6 +2,7 @@ import { listNames } from "@/lib/analyzer/format";
 import type { TrimmedTimeline } from "@/lib/analyzer/trim";
 import {
   biggestSwings,
+  modelForTier,
   teamWinChance,
   toWinChanceGame,
   type WinChanceModel,
@@ -21,18 +22,21 @@ export type MatchWinChance = {
   model: WinChanceModel;
 };
 
-// One team's win chance through a finished game. Null for games the model
-// doesn't cover (ARAM, Arena, remakes).
+// One team's win chance through a finished game, from the model for `tier`
+// (the player's saved solo queue tier, or null to use all ranks). Null for
+// games the model doesn't cover (ARAM, Arena, remakes).
 export function matchWinChance(
   match: Match,
   timeline: TrimmedTimeline,
   teamId: number,
+  tier: string | null,
 ): MatchWinChance | null {
   const game = toWinChanceGame(match, timeline);
   if (!game) return null;
-  const chances = teamWinChance(game, WIN_CHANCE_MODEL, teamId);
+  const model = modelForTier(WIN_CHANCE_MODEL, tier);
+  const chances = teamWinChance(game, model, teamId);
   if (!chances) return null;
-  return { chances, swings: biggestSwings(game, chances, teamId), model: WIN_CHANCE_MODEL };
+  return { chances, swings: biggestSwings(game, chances, teamId), model };
 }
 
 // A swing in words, leading with the side it went toward: "Your team took

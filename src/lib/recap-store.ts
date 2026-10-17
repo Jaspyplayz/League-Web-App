@@ -8,6 +8,7 @@ import { recapFacts } from "@/lib/analyzer/recap-facts";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { scoreGame } from "@/lib/game-score";
 import { database, loadMatch, loadTimeline, readCache } from "@/lib/match-store";
+import { savedSoloTier } from "@/lib/profile-store";
 import { RECAP_MODEL, writeRecap, type Recap } from "@/lib/recap";
 import type { Region } from "@/lib/regions";
 import { matchWinChance } from "@/lib/win-chance";
@@ -89,13 +90,15 @@ export async function createRecap(
     if (!me || !isAnalyzable(match)) {
       return { status: "failed", message: "This game is too short to recap." };
     }
-    const [timeline, dd] = await Promise.all([
+    const [timeline, dd, tier] = await Promise.all([
       loadTimeline(region, match),
       getDataDragon().catch(() => null),
+      savedSoloTier(puuid),
     ]);
     const label = (name: string) => championName(dd, name);
     const analysis = analyzeMatch(match, timeline, puuid, label)!;
-    const swings = matchWinChance(match, timeline, me.teamId)?.swings ?? null;
+    // The same rank's model as the match page, so the recap's swings match it.
+    const swings = matchWinChance(match, timeline, me.teamId, tier)?.swings ?? null;
     const score = scoreGame(match).get(me.participantId) ?? null;
 
     const recap = await writeRecap(recapFacts(match, analysis, swings, score, label));

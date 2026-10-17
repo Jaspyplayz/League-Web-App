@@ -15,6 +15,7 @@
 // docs/win-chance.md for the formula with a worked example.
 
 import type { Match } from "@/lib/riot/types";
+import { TIERS, tierName, type Tier } from "@/lib/tiers";
 import { isScorable, toScoreGame } from "./score";
 import type { TrimmedEvent, TrimmedFrame, TrimmedTimeline } from "./trim";
 
@@ -47,6 +48,11 @@ export type WinChanceGame = {
   patch: string; // "16.20"
   blueWin: boolean;
   frames: WinChanceFrame[];
+  // The ranked tier the game was played at ("GOLD"): the tier of the
+  // benchmark player it was collected from. Players in one game are matched
+  // by MMR, so the other nine are close to it. Missing for games opened on
+  // the site, which only train the all-ranks model.
+  tier?: string;
 };
 
 // How long buffs last and how long an inhibitor stays down, in ms.
@@ -261,6 +267,7 @@ export type Example = {
   minute: number;
   features: number[];
   blueWin: boolean;
+  tier?: string;
 };
 
 export function winChanceExamples(game: WinChanceGame): Example[] {
@@ -274,6 +281,7 @@ export function winChanceExamples(game: WinChanceGame): Example[] {
       minute: frame.t / 60,
       features: winChanceFeatures(frame),
       blueWin: game.blueWin,
+      tier: game.tier,
     }));
 }
 
@@ -296,6 +304,9 @@ export type Evaluation = {
 
 export type WinChanceModel = {
   trainedAt: string;
+  // Which games these weights came from: "All ranks", or one rank's label
+  // ("Gold", "Master+") after modelForTier picks a rank's model.
+  rank: string;
   games: number;
   // The patches the training games came from, oldest first.
   patches: string[];
@@ -308,7 +319,68 @@ export type WinChanceModel = {
   // The same check on just the newest patch's games, to spot a patch that
   // changed how much leads are worth. Null when it's the only patch.
   newestPatch: (Evaluation & { patch: string; games: number }) | null;
+  // A model of its own for each rank with enough games (see WIN_CHANCE_RANKS).
+  ranks: RankModel[];
 };
+
+// The ranks that get a model of their own: each tier, plus the two groups
+// players filter by most, Emerald+ and Master+. Leads may not be worth the
+// same everywhere: lower ranks throw more leads away, so a gold lead may
+// count for less there than in Challenger.
+export type WinChanceRank = { key: string; label: string; tiers: readonly Tier[] };
+
+export const WIN_CHANCE_RANKS: WinChanceRank[] = [
+  ...TIERS.map((tier) => ({ key: tier, label: tierName(tier), tiers: [tier] })),
+  { key: "EMERALD+", label: "Emerald+", tiers: TIERS.slice(TIERS.indexOf("EMERALD")) },
+  { key: "MASTER+", label: "Master+", tiers: TIERS.slice(TIERS.indexOf("MASTER")) },
+];
+
+// A rank needs this many games for a model of its own. With fewer, its
+// weights would swing with the luck of which games happened to be collected,
+// and the all-ranks model is the better guess.
+export const MIN_RANK_GAMES = 800;
+
+export type RankModel = {
+  key: string;
+  label: string;
+  games: number;
+  weights: number[];
+  // Cross-validated on this rank's games, like the all-ranks model.
+  evaluation: Evaluation;
+  // The all-ranks model's cross-validated guesses on the same games, so we
+  // can see whether a model of its own actually does better.
+  allRanks: Evaluation;
+};
+
+// How much lower a rank's own log loss on unseen games has to be than the
+// all-ranks model's on the same games before the rank's model is used.
+// Smaller gaps are within the luck of which games happened to be collected,
+// and the all-ranks model learned from far more games.
+export const MIN_RANK_GAIN = 0.005;
+
+// Whether a rank's own model clearly beats the all-ranks model on its games.
+export function rankModelHelps(rank: RankModel): boolean {
+  return rank.evaluation.logLoss <= rank.allRanks.logLoss - MIN_RANK_GAIN;
+}
+
+// The model for a game played at `tier` ("GOLD", or null when we don't know
+// the rank): that tier's own model, else the narrowest group that includes
+// it (Master+ before Emerald+), else the all-ranks model. Only rank models
+// that clearly beat the all-ranks model count (rankModelHelps).
+export function modelForTier(model: WinChanceModel, tier: string | null): WinChanceModel {
+  const tiersOf = (key: string) => WIN_CHANCE_RANKS.find((r) => r.key === key)?.tiers ?? [];
+  const fits = model.ranks
+    .filter(rankModelHelps)
+    .filter((r) => tier !== null && (tiersOf(r.key) as readonly string[]).includes(tier))
+    .sort((a, b) => tiersOf(a.key).length - tiersOf(b.key).length);
+  return fits.length > 0 ? withRank(model, fits[0]) : model;
+}
+
+// The all-ranks model with one rank's weights in place of its own.
+export function withRank(model: WinChanceModel, rank: RankModel): WinChanceModel {
+  const { label, games, weights, evaluation } = rank;
+  return { ...model, rank: label, games, weights, evaluation };
+}
 
 // Blue side's chance of winning (0 to 1) at one moment.
 export function blueWinChance(weights: readonly number[], features: number[]): number {
@@ -407,10 +479,12 @@ export function whatHappened(before: TeamState, after: TeamState): string[] {
 
 // Training: learns the weights on every example, and checks them with
 // cross-validation first. `games` is how many games the examples came from.
+// Then does the same for each rank with at least `minRankGames` games.
 export function trainWinChanceModel(
   examples: Example[],
   games: number,
   trainedAt: Date,
+  { minRankGames = MIN_RANK_GAMES } = {},
 ): WinChanceModel {
   const patches = [...new Set(examples.map((e) => e.patch))].sort(comparePatches);
   const newest = patches.at(-1);
@@ -419,6 +493,7 @@ export function trainWinChanceModel(
 
   return {
     trainedAt: trainedAt.toISOString(),
+    rank: ALL_RANKS,
     games,
     patches,
     features: featureKeys(),
@@ -432,7 +507,33 @@ export function trainWinChanceModel(
             ...evaluate(onNewest),
           }
         : null,
+    ranks: trainRanks(examples, predictions, minRankGames),
   };
+}
+
+export const ALL_RANKS = "All ranks";
+
+// One model per rank, each trained and cross-validated on that rank's games
+// only. Ranks with too few games are left out (modelForTier then falls back
+// to a group or all ranks).
+function trainRanks(examples: Example[], allPredictions: Prediction[], minGames: number): RankModel[] {
+  return WIN_CHANCE_RANKS.flatMap((rank) => {
+    const inRank = (e: Example) =>
+      e.tier !== undefined && (rank.tiers as readonly string[]).includes(e.tier);
+    const ours = examples.filter(inRank);
+    const games = new Set(ours.map((e) => e.matchId)).size;
+    if (games < minGames) return [];
+    return [
+      {
+        key: rank.key,
+        label: rank.label,
+        games,
+        weights: fitLogistic(ours),
+        evaluation: evaluate(crossValidate(ours)),
+        allRanks: evaluate(allPredictions.filter((p) => inRank(p.example))),
+      },
+    ];
+  });
 }
 
 type Prediction = { example: Example; blue: number };
@@ -587,7 +688,7 @@ export type WhatIf = {
   baron: -1 | 0 | 1;
 };
 
-export function whatIfChance(model: WinChanceModel, w: WhatIf): number {
+export function whatIfChance(model: Pick<WinChanceModel, "weights">, w: WhatIf): number {
   const zero = readTeam([]);
   // Your team plays blue: a lead goes on your side, a deficit on theirs.
   const you: TeamState = {

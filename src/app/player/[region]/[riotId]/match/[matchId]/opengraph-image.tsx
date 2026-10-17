@@ -4,6 +4,7 @@ import { findPlayerByRiotId, isAnalyzable } from "@/lib/analyzer";
 import { championIconUrl, championName, getDataDragon } from "@/lib/ddragon";
 import { matchCard, type MatchCard } from "@/lib/match-card";
 import { loadMatch, loadTimeline } from "@/lib/match-store";
+import { savedSoloTier } from "@/lib/profile-store";
 import { isMatchIdFor, isRegion } from "@/lib/regions";
 import { settle } from "@/lib/riot/client";
 import { fromSlug } from "@/lib/riot-id";
@@ -59,8 +60,12 @@ async function loadCard({
   const me = findPlayerByRiotId(match, id.gameName, id.tagLine);
   if (!me) return null;
 
-  const timeline = isAnalyzable(match) ? await settle(loadTimeline(region, match)) : null;
-  const winChance = timeline?.ok ? matchWinChance(match, timeline.value, me.teamId) : null;
+  const [timeline, tier] = await Promise.all([
+    isAnalyzable(match) ? settle(loadTimeline(region, match)) : null,
+    savedSoloTier(me.puuid),
+  ]);
+  // The same rank's model as the match page, so the card's swings match it.
+  const winChance = timeline?.ok ? matchWinChance(match, timeline.value, me.teamId, tier) : null;
   return {
     ...matchCard(
       match,

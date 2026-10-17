@@ -160,10 +160,14 @@ async function collectPlayer(
         .onConflictDoNothing();
       const timeline = trimTimeline(await call(() => getTimeline(region, matchId)));
       // And both teams' minute-by-minute numbers train the win chance
-      // model (npm run train-win-chance).
+      // model (npm run train-win-chance), tagged with this player's tier so
+      // each rank can get a model of its own.
       const chance = toWinChanceGame(match, timeline);
       if (chance) {
-        await db.insert(tables.winChanceGames).values(winChanceRow(chance, match)).onConflictDoNothing();
+        await db
+          .insert(tables.winChanceGames)
+          .values(winChanceRow({ ...chance, tier }, match))
+          .onConflictDoNothing();
       }
       const game = summarizeGame(match, timeline, puuid);
       if (!game) continue;

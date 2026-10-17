@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import { Panel } from "@/components/ui/panel";
-import { whatIfChance, type WhatIf, type WinChanceModel } from "@/lib/analyzer/win-chance";
+import { whatIfChance, type WhatIf } from "@/lib/analyzer/win-chance";
+
+// One rank's model to pick from: "All ranks", "Gold", "Master+"...
+export type RankWeights = { label: string; weights: number[] };
 
 // Sliders for a few leads, and the win chance the real model gives them. It
 // runs the same function as the match page, in the browser, so moving a
-// slider shows exactly what each lead is worth.
-export function WhatIfCalculator({ model }: { model: WinChanceModel }) {
+// slider shows exactly what each lead is worth, and switching the rank shows
+// how much the same lead is worth there.
+export function WhatIfCalculator({ ranks }: { ranks: RankWeights[] }) {
+  const [rank, setRank] = useState(0);
   const [w, setW] = useState<WhatIf>({
     minute: 20,
     goldLead: 2000,
@@ -17,11 +22,29 @@ export function WhatIfCalculator({ model }: { model: WinChanceModel }) {
     baron: 0,
   });
   const set = (key: keyof WhatIf) => (value: number) => setW((old) => ({ ...old, [key]: value }));
-  const chance = Math.round(whatIfChance(model, w) * 100);
+  const chance = Math.round(whatIfChance(ranks[rank], w) * 100);
 
   return (
     <Panel className="flex flex-wrap items-center gap-6 p-5">
       <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-4">
+        {ranks.length > 1 && (
+          <label className="flex flex-wrap items-center gap-3">
+            <span className="w-full font-mono sm:w-44 text-label uppercase tracking-[0.12em] text-faint">
+              Rank
+            </span>
+            <select
+              value={rank}
+              onChange={(e) => setRank(Number(e.target.value))}
+              className="bg-surface py-0.5 text-body text-ink"
+            >
+              {ranks.map((r, i) => (
+                <option key={r.label} value={i}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <Slider
           label="Game time"
           value={w.minute}
