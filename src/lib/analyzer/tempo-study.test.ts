@@ -9,6 +9,7 @@ import {
   estimateErrors,
   fitLogistic,
   hash,
+  momentRows,
   playsOf,
   predict,
   respawnRows,
@@ -190,6 +191,40 @@ describe("studyRows", () => {
       expect.objectContaining({ at: clock("14:30"), blueWon: true }),
     ]);
     expect(duels[0].before?.minute).toBe(14);
+  });
+});
+
+describe("momentRows", () => {
+  // Blue's jungler dies at 4:50 (level 3: back at 5:02) and kills red's mid
+  // laner at 5:30. Blue's jungler has spent 450 more on items every minute,
+  // which is 2,200 ahead from 5:00.
+  const game = studyGame([kill("4:50", 7, 2), kill("5:30", 2, 8, [], SPOTS.midLane)]);
+  const { moments, marks } = momentRows(game);
+  const at = (time: string) => moments.find((m) => m.at === clock(time))!;
+
+  it("checks both calls every 5 seconds from 2:00 to the end of the game", () => {
+    expect(moments[0].at).toBe(clock("2:00"));
+    expect(moments[1].at).toBe(clock("2:05"));
+    expect(moments.at(-1)!.at).toBe(clock("20:15"));
+  });
+
+  it("sees a death and a respawn at their second, where the minute strip waits for the next mark", () => {
+    expect(at("4:45")).toMatchObject({ second: "even", minute: "even" });
+    // Dead from 4:50: the strip's 4:00 block can't know.
+    expect(at("4:50")).toMatchObject({ second: "behind", minute: "even" });
+    // Back at 5:02, but the strip's 5:00 block still says dead until 6:00.
+    expect(at("5:05")).toMatchObject({ second: "ahead", minute: "behind" });
+  });
+
+  it("labels each moment with who won the next play within a minute", () => {
+    expect(at("4:45").nextPlay).toBe(0);
+    expect(at("4:50").nextPlay).toBe(1);
+    expect(at("7:00").nextPlay).toBeNull();
+    expect(at("5:35").sinceKillS).toBe(5);
+  });
+
+  it("counts how often the two agree at the minute marks", () => {
+    expect(marks).toEqual({ agree: 19, total: 19 });
   });
 });
 

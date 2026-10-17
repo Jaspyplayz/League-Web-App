@@ -54,8 +54,8 @@ export type MatchAnalysis = {
   // Both junglers' lane fights and visits before 14:00. Null unless you
   // played jungle.
   ganks: GankLog | null;
-  // Which jungler had the tempo each minute (beta). Null unless you played
-  // jungle.
+  // Which jungler had the tempo at every second (beta). Null unless you
+  // played jungle.
   tempo: TempoTimeline | null;
 };
 

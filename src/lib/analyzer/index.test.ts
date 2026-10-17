@@ -40,8 +40,9 @@ describe("analyzeMatch", () => {
     const jungle = analyzeMatch(game, timeline, "player-2")!;
     expect(jungle.tempo?.meId).toBe(2);
     expect(jungle.tempo?.enemyId).toBe(7);
-    // Minutes 1 to 19: frame 0 is the start and frame 20 the end.
-    expect(jungle.tempo?.minutes).toHaveLength(19);
+    // Every second, from 0:00 to the last frame at 20:00.
+    expect(jungle.tempo?.stretches[0].from).toBe(0);
+    expect(jungle.tempo?.stretches.at(-1)?.to).toBe(20 * 60_000);
   });
 
   it("returns null for a player who isn't in the match", () => {

@@ -1,17 +1,21 @@
 // The tempo timeline (beta): for a jungler, an estimate of which jungler had
-// the tempo at each minute of the game, next to what each of them did with it.
+// the tempo at every second of the game, next to what each of them did with
+// it.
 //
 // Tempo, the way junglers use the word, is the time advantage: the jungler who
 // has just spent their gold on items, is alive and has the levels can make the
 // next play, while the one who is dead, or still carrying the gold from their
 // last few camps, has to farm, recall or give way. Riot doesn't record tempo,
-// so this estimates it from what it does record, once a minute:
+// so this estimates it from what it does record:
 //
 // - Items: gold each jungler has already spent on items. Riot gives each
-//   player's total gold and unspent gold every minute; total minus unspent is
-//   what they've spent. Timelines saved before unspent gold was kept get an
-//   estimate from their shop visits instead (see itemGoldAt).
-// - Levels: each level counts as LEVEL_GOLD gold.
+//   player's total gold and unspent gold once a minute; total minus unspent
+//   is what they've spent. Purchases are logged to the second, so the amount
+//   steps up at the shop visit rather than at the next snapshot. Timelines
+//   saved before unspent gold was kept get an estimate from their shop visits
+//   instead (see itemGoldAt).
+// - Levels: each level counts as LEVEL_GOLD gold. Riot logs every skill point
+//   to the second, and each level gives one.
 // - Alive: a dead jungler has no tempo until they respawn. Riot records the
 //   moment of each death; the respawn time comes from the game's death timer
 //   formula.
@@ -52,7 +56,7 @@ export const HOLDING_GOLD = 700;
 
 export type TempoTone = "ahead" | "behind" | "even"; // from your point of view
 
-// One jungler at one minute mark.
+// One jungler at one of Riot's minute snapshots.
 export type JunglerState = {
   participantId: number;
   alive: boolean;
@@ -62,13 +66,19 @@ export type JunglerState = {
   gold: number; // total earned so far
   itemGold: number; // spent on items so far
   unspentGold: number; // earned but not spent yet
-  // Their last shop visit at or before this minute. Null before the first.
+  // Their last shop visit at or before this moment. Null before the first.
   lastShop: number | null;
   cs: number;
   position: MapPosition | null;
 };
 
-// Something a jungler did between one minute mark and the next.
+// One jungler at any second: the part of JunglerState the call is made from.
+export type JunglerMoment = Pick<
+  JunglerState,
+  "alive" | "respawnAt" | "level" | "itemGold" | "unspentGold" | "lastShop"
+>;
+
+// Something a jungler did, at the second it happened.
 export type Activity =
   | { type: "shop"; timestamp: number; afterDeath: boolean }
   // A kill they got (killed) or helped with (assist).
@@ -79,24 +89,42 @@ export type Activity =
       killed: boolean;
       position: MapPosition | null;
     }
-  | { type: "died"; timestamp: number; killerId: number; position: MapPosition | null }
+  | {
+      type: "died";
+      timestamp: number;
+      killerId: number;
+      position: MapPosition | null;
+      // When they were back, by the death timer formula.
+      respawnAt: number;
+    }
   // An epic monster they landed the last hit on (killed) or helped with.
-  | { type: "objective"; timestamp: number; kind: ObjectiveKind; killed: boolean }
-  // CS gained over the minute: jungle camps, plus any minions.
-  | { type: "farm"; cs: number };
+  | { type: "objective"; timestamp: number; kind: ObjectiveKind; killed: boolean };
 
-export type TempoMinute = {
-  timestamp: number;
+// The call at one moment, and what it was made from.
+export type TempoCall = {
   tone: TempoTone;
   // Your item gold lead, plus LEVEL_GOLD per level and PLAYER_GOLD per extra
   // player alive. Negative when the enemy jungler is ahead.
   lead: number;
+  you: JunglerMoment;
+  them: JunglerMoment;
+  // Players alive on each team.
+  alive: { ours: number; theirs: number };
+};
+
+// A stretch of the game where nothing the call is made from changed, so the
+// call held from `from` until `to`, when the next stretch starts.
+export type TempoStretch = TempoCall & { from: number; to: number };
+
+// The call at one of Riot's minute snapshots, which is all the first version
+// of the panel showed. The study (tempo-study.ts) compares the two.
+export type TempoMinute = {
+  timestamp: number;
+  tone: TempoTone;
+  lead: number;
   you: JunglerState;
   them: JunglerState;
-  // Players alive on each team at the minute mark.
   alive: { ours: number; theirs: number };
-  // What each jungler did from this minute mark until the next one.
-  next: { until: number; you: Activity[]; them: Activity[] };
 };
 
 // When an epic monster was up. Dragons, Elder and Baron come back after
@@ -115,7 +143,10 @@ export type ObjectiveWindow = {
 export type TempoTimeline = {
   meId: number;
   enemyId: number;
-  minutes: TempoMinute[];
+  // The whole game, from 0:00 to the end, in order.
+  stretches: TempoStretch[];
+  // Everything each jungler did that Riot logged to the second, in order.
+  activities: { you: Activity[]; them: Activity[] };
   objectives: ObjectiveWindow[];
   // False when this game's timeline was saved before Riot's unspent gold was
   // kept, so item gold is estimated from shop visits.
@@ -133,14 +164,125 @@ export function tempoTimeline(
   enemyId: number,
 ): TempoTimeline {
   const { frames, events } = timeline;
-  const teamOf = new Map(players.map((p) => [p.participantId, p.teamId]));
-  const myTeam = teamOf.get(meId)!;
+  const end = frames.at(-1)?.timestamp ?? 0;
   const deaths = deathSpans(timeline);
   const visits = new Map(
     [meId, enemyId].map((id) => [id, shopVisits(timeline, id, deaths)]),
   );
+  const skillPoints = new Map(
+    [meId, enemyId].map((id) => [
+      id,
+      events
+        .filter((e) => e.type === "SKILL_LEVEL_UP" && e.participantId === id)
+        .map((e) => e.timestamp),
+    ]),
+  );
+  const teamOf = new Map(players.map((p) => [p.participantId, p.teamId]));
+  const aliveOn = (team: number | undefined, t: number) =>
+    players.filter((p) => p.teamId === team && !deathAt(deaths, p.participantId, t)).length;
+
+  // One jungler at second t.
+  const jungler = (id: number, t: number): JunglerMoment => {
+    const i = Math.max(0, frames.findLastIndex((f) => f.timestamp <= t));
+    const next = frames[i + 1];
+    const theirVisits = visits.get(id)!;
+    // Item gold comes from a snapshot: the one before t until the jungler's
+    // first shop visit after it, then the next one, the first to show what
+    // they bought.
+    const shopped =
+      next !== undefined &&
+      theirVisits.some((v) => v.timestamp > frames[i].timestamp && v.timestamp <= t);
+    const source = shopped ? i + 1 : i;
+    const itemGold = itemGoldAt(frames, source, id, theirVisits);
+    // Each level gives one skill point. Points can be spent a little late,
+    // so the count is kept between the levels in the snapshots either side.
+    const lowest = frames[i].players[id - 1].level;
+    const highest = next ? next.players[id - 1].level : lowest;
+    const points = skillPoints.get(id)!.filter((at) => at <= t).length;
+    const death = deathAt(deaths, id, t);
+    return {
+      alive: !death,
+      respawnAt: death?.respawnAt ?? null,
+      level: Math.min(highest, Math.max(lowest, points)),
+      itemGold,
+      unspentGold: Math.max(0, frames[source].players[id - 1].gold - itemGold),
+      lastShop: theirVisits.findLast((v) => v.timestamp <= t)?.timestamp ?? null,
+    };
+  };
+
+  const callAt = (t: number): TempoCall => {
+    const you = jungler(meId, t);
+    const them = jungler(enemyId, t);
+    const alive = { ours: aliveOn(teamOf.get(meId), t), theirs: aliveOn(teamOf.get(enemyId), t) };
+    return { ...tempoTone(you, them, alive), you, them, alive };
+  };
+
+  // What the call is made from only changes at these moments: a snapshot, a
+  // death or respawn, or a jungler's skill point or shop visit. So it's
+  // worked out at each one and holds until the next, and every second of the
+  // game is covered without checking them one by one.
+  const changes = new Set([
+    0,
+    ...frames.map((f) => f.timestamp),
+    ...deaths.flatMap((d) => [d.diedAt, d.respawnAt]),
+    ...[meId, enemyId].flatMap((id) => [
+      ...visits.get(id)!.map((v) => v.timestamp),
+      ...skillPoints.get(id)!,
+    ]),
+  ]);
+  const times = [...changes].filter((t) => t >= 0 && t < end).sort((a, b) => a - b);
+  const stretches: TempoStretch[] = [];
+  let previous = "";
+  for (const [i, from] of times.entries()) {
+    const to = times[i + 1] ?? end;
+    const call = callAt(from);
+    // Some moments change nothing (a skill point the snapshot already
+    // counted, say), so they extend the stretch before.
+    const key = JSON.stringify(call);
+    if (key === previous) stretches[stretches.length - 1].to = to;
+    else stretches.push({ from, to, ...call });
+    previous = key;
+  }
+
   const kills = events.filter((e): e is ChampionKill => e.type === "CHAMPION_KILL");
   const monsters = events.filter((e): e is EliteMonsterKill => e.type === "ELITE_MONSTER_KILL");
+  const activities = (id: number) =>
+    activitiesOf(id, { visits: visits.get(id)!, kills, monsters, deaths });
+
+  return {
+    meId,
+    enemyId,
+    stretches,
+    activities: { you: activities(meId), them: activities(enemyId) },
+    objectives: objectiveWindows(monsters, teamOf.get(meId)!, end),
+    exactItemGold: frames
+      .slice(1)
+      .every((f) => [meId, enemyId].every((id) => f.players[id - 1].unspentGold !== undefined)),
+  };
+}
+
+// The stretch covering moment t. The last one also covers the very end of
+// the game. Null only for a timeline with no stretches.
+export function stretchAt(stretches: TempoStretch[], t: number): TempoStretch | null {
+  return stretches.find((s) => t < s.to) ?? stretches.at(-1) ?? null;
+}
+
+// The call at each of Riot's minute snapshots, the way the first version of
+// the panel made it: one block per minute, decided at its first second.
+// Frame 0 is the loading screen and the last frame is the end of the game,
+// so the minute marks are everything in between.
+export function tempoMinutes(
+  timeline: TrimmedTimeline,
+  players: Player[],
+  meId: number,
+  enemyId: number,
+): TempoMinute[] {
+  const { frames } = timeline;
+  const teamOf = new Map(players.map((p) => [p.participantId, p.teamId]));
+  const deaths = deathSpans(timeline);
+  const visits = new Map(
+    [meId, enemyId].map((id) => [id, shopVisits(timeline, id, deaths)]),
+  );
 
   const state = (i: number, id: number): JunglerState => {
     const frame = frames[i];
@@ -163,45 +305,17 @@ export function tempoTimeline(
     };
   };
 
-  // Frame 0 is the loading screen and the last frame is the end of the game,
-  // so the minute marks are everything in between.
   const minutes: TempoMinute[] = [];
   for (let i = 1; i < frames.length - 1; i++) {
     const t = frames[i].timestamp;
-    const until = frames[i + 1].timestamp;
     const you = state(i, meId);
     const them = state(i, enemyId);
-    const aliveOn = (team: number) =>
+    const aliveOn = (team: number | undefined) =>
       players.filter((p) => p.teamId === team && !deathAt(deaths, p.participantId, t)).length;
-    const alive = { ours: aliveOn(myTeam), theirs: aliveOn(teamOf.get(enemyId)!) };
-    const { tone, lead } = tempoTone(you, them, alive);
-    const activities = (id: number) =>
-      activitiesBetween(id, t, until, {
-        visits: visits.get(id)!,
-        kills,
-        monsters,
-        csGained: frames[i + 1].players[id - 1].cs - frames[i].players[id - 1].cs,
-      });
-    minutes.push({
-      timestamp: t,
-      tone,
-      lead,
-      you,
-      them,
-      alive,
-      next: { until, you: activities(meId), them: activities(enemyId) },
-    });
+    const alive = { ours: aliveOn(teamOf.get(meId)), theirs: aliveOn(teamOf.get(enemyId)) };
+    minutes.push({ timestamp: t, ...tempoTone(you, them, alive), you, them, alive });
   }
-
-  return {
-    meId,
-    enemyId,
-    minutes,
-    objectives: objectiveWindows(monsters, myTeam, frames.at(-1)?.timestamp ?? 0),
-    exactItemGold: frames
-      .slice(1)
-      .every((f) => [meId, enemyId].every((id) => f.players[id - 1].unspentGold !== undefined)),
-  };
+  return minutes;
 }
 
 // Who was up tempo, and by how much: item gold lead, plus LEVEL_GOLD per level
@@ -210,7 +324,7 @@ export function tempoTimeline(
 export function tempoTone(
   you: Pick<JunglerState, "alive" | "itemGold" | "level">,
   them: Pick<JunglerState, "alive" | "itemGold" | "level">,
-  alive: TempoMinute["alive"],
+  alive: TempoCall["alive"],
 ): { tone: TempoTone; lead: number } {
   const lead =
     you.itemGold -
@@ -333,30 +447,27 @@ export function goldAt(frames: TrimmedFrame[], participantId: number, t: number)
 
 // --- What each jungler did ---
 
-function activitiesBetween(
+// Every shop visit, takedown, death and epic monster for one jungler, in
+// order.
+function activitiesOf(
   id: number,
-  from: number,
-  to: number,
   data: {
     visits: ShopVisit[];
     kills: ChampionKill[];
     monsters: EliteMonsterKill[];
-    csGained: number;
+    deaths: DeathSpan[];
   },
 ): Activity[] {
-  const inWindow = (t: number) => t > from && t <= to;
-  const activities: Activity[] = [];
-  for (const v of data.visits) {
-    if (inWindow(v.timestamp)) activities.push({ type: "shop", ...v });
-  }
+  const activities: Activity[] = data.visits.map((v) => ({ type: "shop", ...v }));
   for (const k of data.kills) {
-    if (!inWindow(k.timestamp)) continue;
     if (k.victimId === id) {
+      const death = data.deaths.find((d) => d.participantId === id && d.diedAt === k.timestamp);
       activities.push({
         type: "died",
         timestamp: k.timestamp,
         killerId: k.killerId,
         position: k.position,
+        respawnAt: death?.respawnAt ?? k.timestamp,
       });
     } else if (k.killerId === id || k.assistingParticipantIds.includes(id)) {
       activities.push({
@@ -370,18 +481,11 @@ function activitiesBetween(
   }
   for (const m of data.monsters) {
     const kind = monsterKind(m);
-    if (!kind || !inWindow(m.timestamp)) continue;
-    if (m.killerId === id || m.assistingParticipantIds.includes(id)) {
+    if (kind && (m.killerId === id || m.assistingParticipantIds.includes(id))) {
       activities.push({ type: "objective", timestamp: m.timestamp, kind, killed: m.killerId === id });
     }
   }
-  activities.sort((a, b) => timeOf(a) - timeOf(b));
-  if (data.csGained > 0) activities.push({ type: "farm", cs: data.csGained });
-  return activities;
-}
-
-function timeOf(a: Activity): number {
-  return a.type === "farm" ? Infinity : a.timestamp;
+  return activities.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 function monsterKind(m: EliteMonsterKill): ObjectiveKind | null {
@@ -496,10 +600,10 @@ export function objectiveWindows(
 
 // --- Words for the page ---
 
-// "You were up tempo", with the reasons behind it, for one minute.
-// `you` and `them` are the two junglers' champion names.
+// "You were up tempo", with the reasons behind it, for one moment.
+// `names.them` is the enemy jungler's champion name.
 export function describeTempo(
-  m: TempoMinute,
+  m: TempoCall,
   names: { them: string },
 ): { title: string; reasons: string[] } {
   const title =

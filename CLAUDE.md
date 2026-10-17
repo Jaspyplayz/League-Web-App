@@ -17,7 +17,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Game score (the trained 0 to 100 rating): [docs/game-score.md](docs/game-score.md)
 - Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
 - AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
-- Tempo timeline (beta: which jungler had the time advantage each minute, and the study that checks it): [docs/tempo.md](docs/tempo.md)
+- Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
