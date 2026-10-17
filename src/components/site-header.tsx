@@ -34,8 +34,17 @@ export function SiteHeader() {
             Settings
           </Link>
           {/* Who's signed in depends on the visitor's cookies, so it streams in
-              after the rest of the header, which stays prerendered. */}
-          <Suspense>
+              after the rest of the header, which stays prerendered. The
+              invisible placeholder holds its space meanwhile: on phones the
+              links wrap onto a second line, and without it that line would
+              appear late and push the whole page down. */}
+          <Suspense
+            fallback={
+              <span aria-hidden="true" className={`${navLink} invisible`}>
+                Sign in
+              </span>
+            }
+          >
             <AccountMenu linkClassName={navLink} />
           </Suspense>
         </div>
