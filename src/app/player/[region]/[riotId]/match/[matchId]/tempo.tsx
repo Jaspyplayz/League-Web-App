@@ -1,16 +1,19 @@
 "use client";
 
-// The tempo timeline (beta), for junglers: one block per minute, blue when
-// you were up tempo and red when the enemy jungler was, with the epic
-// monsters taken above it and each jungler's shop visits and deaths below.
-// Picking a minute shows why it got that call and what each jungler did in
-// the minute after. How the call is made is in src/lib/analyzer/tempo.ts and
+// The tempo timeline (beta), for junglers: a strip across the whole game,
+// blue while you were up tempo and red while the enemy jungler was. It
+// changes at the second someone died, respawned, levelled up or shopped.
+// Above it are the epic monsters each team took; below it, when each jungler
+// was dead and when they shopped. Dragging along the strip, or pressing
+// play, shows why each moment got its call and what each jungler did in the
+// minute after. How the call is made is in src/lib/analyzer/tempo.ts and
 // docs/tempo.md.
 //
-// It's a Client Component so picking a minute doesn't reload the page. The
-// whole timeline is a few KB, so it all arrives with the page.
+// It's a Client Component so moving through the game doesn't reload the
+// page. The whole timeline is a few dozen KB, so it all arrives with the
+// page.
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatClock } from "@/lib/analyzer/format";
@@ -20,9 +23,11 @@ import {
   describeTempo,
   LEVEL_GOLD,
   PLAYER_GOLD,
+  stretchAt,
   TEMPO_LEAD,
   type Activity,
   type ObjectiveWindow,
+  type TempoStretch,
   type TempoTimeline,
   type TempoTone,
 } from "@/lib/analyzer/tempo";
@@ -50,57 +55,104 @@ const TONE_TEXT: Record<TempoTone, string> = {
   even: "text-ink-soft",
 };
 
-// The first clear is usually done by about 3:15, so the first minute worth
-// opening on is the first call from 3:00.
+// The first clear is usually done by about 3:15, so the timeline opens on
+// the first call either way from 3:00.
 const START_MS = 3 * 60_000;
+// Playback moves the clock every TICK_MS, by `speed` seconds of game time
+// per real second: at 30x a 30-minute game plays in a minute.
+const TICK_MS = 100;
+const SPEEDS = [10, 30, 60];
+// How far ahead "In the next minute" looks.
+const NEXT_MS = 60_000;
+
+// Stretches next to each other with the same call, joined. The strip draws
+// these, and the arrow buttons jump between them.
+type Run = { from: number; to: number; tone: TempoTone };
 
 export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
-  const { minutes } = tempo;
-  const [index, setIndex] = useState(() => {
-    const first = minutes.findIndex((m) => m.timestamp >= START_MS && m.tone !== "even");
-    if (first !== -1) return first;
-    return Math.max(0, minutes.findIndex((m) => m.timestamp >= START_MS));
-  });
-  const blocks = useRef<(HTMLButtonElement | null)[]>([]);
-  if (minutes.length === 0) return null;
+  const { stretches, activities } = tempo;
+  const end = stretches.at(-1)?.to ?? 0;
+  const [t, setT] = useState(() => openingMoment(joinRuns(stretches), end));
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(30);
+  const track = useRef<HTMLDivElement>(null);
 
-  const last = minutes.length - 1;
+  // While playing, move the clock forward and stop at the end.
+  useEffect(() => {
+    if (!playing) return;
+    const timer = setInterval(() => {
+      setT((now) => {
+        const next = Math.min(end, now + speed * TICK_MS);
+        if (next >= end) setPlaying(false);
+        return next;
+      });
+    }, TICK_MS);
+    return () => clearInterval(timer);
+  }, [playing, speed, end]);
+
+  const now = stretchAt(stretches, t);
+  if (!now || end === 0) return null;
+
   const them = names[tempo.enemyId] ?? "The enemy jungler";
   const you = names[tempo.meId] ?? "You";
-  const minute = minutes[index];
-  const nextMark = minutes[index + 1] ?? null;
-  const { title, reasons } = describeTempo(minute, { them });
-  const count = (tone: TempoTone) => minutes.filter((m) => m.tone === tone).length;
+  const { title, reasons } = describeTempo(now, { them });
+  const runs = joinRuns(stretches);
+  const run = runs.find((r) => t < r.to) ?? runs[runs.length - 1];
+  const changes = runs.slice(1).map((r) => r.from);
+  const previousChange = changes.findLast((c) => c < t);
+  const nextChange = changes.find((c) => c > t);
+  const timeIn = (tone: TempoTone) =>
+    runs.filter((r) => r.tone === tone).reduce((total, r) => total + r.to - r.from, 0);
 
-  // The minute blocks work like radio buttons: Tab reaches the picked one,
-  // and the arrow keys (or Home and End) move the pick.
-  const pick = (i: number, focus = false) => {
-    setIndex(i);
-    if (focus) blocks.current[i]?.focus();
+  // Where a moment sits along the strip, and how wide a span is.
+  const left = (ms: number) => `${(Math.min(ms, end) / end) * 100}%`;
+  const width = (from: number, to: number) => `${((Math.min(to, end) - from) / end) * 100}%`;
+
+  const moveTo = (ms: number) => {
+    setPlaying(false);
+    setT(Math.min(end, Math.max(0, ms)));
   };
+  // Pressing or dragging anywhere on the strip moves the clock there, to the
+  // second. Capturing the pointer keeps the drag going if it leaves the strip.
+  const seek = (clientX: number) => {
+    const box = track.current?.getBoundingClientRect();
+    if (!box || box.width === 0) return;
+    const share = (clientX - box.left) / box.width;
+    moveTo(Math.round((share * end) / 1000) * 1000);
+  };
+  // The strip works like a slider from the keyboard too: the arrow keys move
+  // 5 seconds, Page Up and Page Down a minute, Home and End to either end.
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const to =
-      e.key === "ArrowLeft" || e.key === "ArrowUp"
-        ? index - 1
-        : e.key === "ArrowRight" || e.key === "ArrowDown"
-          ? index + 1
-          : e.key === "Home"
-            ? 0
-            : e.key === "End"
-              ? last
-              : null;
+      e.key === "ArrowLeft" || e.key === "ArrowDown"
+        ? t - 5_000
+        : e.key === "ArrowRight" || e.key === "ArrowUp"
+          ? t + 5_000
+          : e.key === "PageDown"
+            ? t - 60_000
+            : e.key === "PageUp"
+              ? t + 60_000
+              : e.key === "Home"
+                ? 0
+                : e.key === "End"
+                  ? end
+                  : null;
     if (to === null) return;
     e.preventDefault();
-    pick(Math.min(last, Math.max(0, to)), true);
+    moveTo(to);
+  };
+  const play = () => {
+    // Pressing play at the end starts again from the beginning.
+    if (!playing && t >= end) setT(0);
+    setPlaying((p) => !p);
   };
 
-  // The strip's columns: a label, then one per minute, in every row.
-  const columns = { gridTemplateColumns: `4.5rem repeat(${minutes.length}, minmax(0, 1fr))` };
-  const minuteColumns = {
-    gridColumn: "2 / -1",
-    gridTemplateColumns: `repeat(${minutes.length}, minmax(0, 1fr))`,
-  };
-  const minuteRow = "grid gap-x-0.5";
+  // A label every 5 minutes (every 10 on phones), leaving out one that
+  // would hang off the end.
+  const ticks: number[] = [];
+  for (let minute = 5; minute * 60_000 < end * 0.96; minute += 5) ticks.push(minute * 60_000);
+  const nextUntil = Math.min(end, t + NEXT_MS);
+  const soon = (list: Activity[]) => list.filter((a) => a.timestamp > t && a.timestamp <= nextUntil);
 
   return (
     <section aria-labelledby="tempo-heading" className={`${panelClass} flex flex-col gap-[18px] p-6`}>
@@ -112,13 +164,14 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
           </span>
         </div>
         <p className="text-sm text-muted">
-          An experiment: which jungler had the time advantage each minute, so could make the next
-          play while the other had to farm, back or give way. A jungler counts as up tempo when
-          they&apos;re the only one alive, or when their lead adds up to at least{" "}
+          An experiment: which jungler had the time advantage at each moment of the game, so could
+          make the next play while the other had to farm, back or give way. A jungler counts as up
+          tempo when they&apos;re the only one alive, or when their lead adds up to at least{" "}
           {TEMPO_LEAD.toLocaleString("en-US")} gold: the gold they&apos;ve spent on items, plus{" "}
           {LEVEL_GOLD.toLocaleString("en-US")} for each level ahead and{" "}
-          {PLAYER_GOLD.toLocaleString("en-US")} for each extra player alive on their team. It shows
-          the situation, not whether anyone made the right call.
+          {PLAYER_GOLD.toLocaleString("en-US")} for each extra player alive on their team. It
+          changes the second someone dies, respawns, levels up or shops. It shows the situation,
+          not whether anyone made the right call.
         </p>
       </div>
 
@@ -128,141 +181,158 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
         <LegendSwatch className="bg-line-strong">Even</LegendSwatch>
       </div>
 
-      {/* On phones the strip keeps a usable size and scrolls sideways. */}
-      <div className="overflow-x-auto pb-1">
-        <div className="grid min-w-[560px] gap-y-1" style={columns}>
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-3">
           {/* The marks repeat what the details below say in words, so screen
-              readers skip them. */}
-          <RowLabel>Monsters</RowLabel>
-          <div aria-hidden="true" className={minuteRow} style={minuteColumns}>
-            {minutes.map((m) => (
-              <MonsterMarks
-                key={m.timestamp}
-                windows={tempo.objectives}
-                from={m.timestamp}
-                to={m.next.until}
+              readers skip them and get the time and call from the slider. */}
+          <div aria-hidden="true" className="flex w-[4.5rem] flex-none flex-col gap-1">
+            <RowLabel className="h-6">Monsters</RowLabel>
+            <RowLabel className="h-9">Tempo</RowLabel>
+            <RowLabel className="h-6">{you}</RowLabel>
+            <RowLabel className="h-6">{them}</RowLabel>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div
+              ref={track}
+              role="slider"
+              tabIndex={0}
+              aria-label="Game time"
+              aria-valuemin={0}
+              aria-valuemax={Math.floor(end / 1000)}
+              aria-valuenow={Math.floor(t / 1000)}
+              aria-valuetext={`${formatClock(t)}: ${title}`}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                seek(e.clientX);
+              }}
+              onPointerMove={(e) => {
+                if (e.currentTarget.hasPointerCapture(e.pointerId)) seek(e.clientX);
+              }}
+              onKeyDown={onKeyDown}
+              className="relative flex cursor-ew-resize touch-pan-y select-none flex-col gap-1 rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ahead-soft"
+            >
+              <div aria-hidden="true" className="relative h-6">
+                <MonsterMarks windows={tempo.objectives} left={left} />
+              </div>
+              <div aria-hidden="true" className="relative h-9 overflow-hidden rounded-[3px] bg-line-strong">
+                {runs.map((r) => (
+                  <span
+                    key={r.from}
+                    className={`absolute inset-y-0 ${TONE_FILL[r.tone]}`}
+                    style={{ left: left(r.from), width: width(r.from, r.to) }}
+                  />
+                ))}
+              </div>
+              <JunglerMarks activities={activities.you} tone="ahead" left={left} width={width} />
+              <JunglerMarks activities={activities.them} tone="behind" left={left} width={width} />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -inset-y-1 w-0.5 -translate-x-1/2 rounded-full bg-ink"
+                style={{ left: left(t) }}
               />
-            ))}
-          </div>
-
-          <RowLabel>Tempo</RowLabel>
-          <div
-            role="radiogroup"
-            aria-label={`Tempo by minute. You were up tempo for ${count("ahead")} minutes, ${them} for ${count("behind")}, and it was even for ${count("even")}.`}
-            onKeyDown={onKeyDown}
-            className={minuteRow}
-            style={minuteColumns}
-          >
-            {minutes.map((m, i) => (
-              <button
-                key={m.timestamp}
-                ref={(el) => {
-                  blocks.current[i] = el;
-                }}
-                type="button"
-                role="radio"
-                aria-checked={i === index}
-                aria-label={`${formatClock(m.timestamp)}: ${describeTempo(m, { them }).title}`}
-                tabIndex={i === index ? 0 : -1}
-                title={formatClock(m.timestamp)}
-                onClick={() => pick(i)}
-                className={`h-9 rounded-[3px] ${TONE_FILL[m.tone]} ${
-                  i === index
-                    ? "relative z-10 outline-2 outline-offset-1 outline-ink"
-                    : "hover:opacity-80"
-                }`}
-              />
-            ))}
-          </div>
-
-          <RowLabel>{you}</RowLabel>
-          <div aria-hidden="true" className={minuteRow} style={minuteColumns}>
-            {minutes.map((m) => (
-              <JunglerMarks key={m.timestamp} activities={m.next.you} tone="ahead" />
-            ))}
-          </div>
-          <RowLabel>{them}</RowLabel>
-          <div aria-hidden="true" className={minuteRow} style={minuteColumns}>
-            {minutes.map((m) => (
-              <JunglerMarks key={m.timestamp} activities={m.next.them} tone="behind" />
-            ))}
-          </div>
-
-          <span />
-          <div aria-hidden="true" className={minuteRow} style={minuteColumns}>
-            {minutes.map((m) => {
-              const whole = Math.round(m.timestamp / 60_000);
-              return (
-                <span key={m.timestamp} className="text-center font-mono text-label text-faint">
-                  {whole % 5 === 0 ? whole : ""}
+            </div>
+            <div aria-hidden="true" className="relative h-5">
+              {ticks.map((tick) => (
+                <span
+                  key={tick}
+                  className={`absolute top-1 -translate-x-1/2 font-mono text-label text-faint ${
+                    tick % 600_000 === 0 ? "" : "max-sm:hidden"
+                  }`}
+                  style={{ left: left(tick) }}
+                >
+                  {formatClock(tick)}
                 </span>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
+          <div className="flex items-center gap-1">
+            <StepButton
+              label="Previous change of tempo"
+              disabled={previousChange === undefined}
+              onClick={() => moveTo(previousChange ?? 0)}
+            >
+              <path d="M15 6l-6 6 6 6" />
+            </StepButton>
+            <StepButton label={playing ? "Pause" : "Play"} onClick={play}>
+              {playing ? <path d="M9 6v12M15 6v12" /> : <path d="M8 5l11 7-11 7z" />}
+            </StepButton>
+            <StepButton
+              label="Next change of tempo"
+              disabled={nextChange === undefined}
+              onClick={() => moveTo(nextChange ?? end)}
+            >
+              <path d="M9 6l6 6-6 6" />
+            </StepButton>
+            <span className="ml-2 font-mono text-sm text-muted">
+              {formatClock(t)} / {formatClock(end)}
+            </span>
+          </div>
+          <div
+            role="group"
+            aria-label="Playback speed"
+            className="inline-flex overflow-hidden rounded-lg border border-line-strong text-note"
+          >
+            {SPEEDS.map((x) => (
+              <button
+                key={x}
+                type="button"
+                aria-pressed={speed === x}
+                onClick={() => setSpeed(x)}
+                className={`px-3 py-1.5 font-mono ${
+                  speed === x ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
+                }`}
+              >
+                {x}×
+              </button>
+            ))}
           </div>
         </div>
       </div>
       <p className="text-note text-faint">
         Above the strip, the epic monsters each team took (D dragon, E Elder, G grubs, H Herald, B
-        Baron); below it, when each jungler shopped (●) or died (×). Each mark sits in the minute it
-        happened in.
+        Baron); below it, when each jungler was dead (the faded bars) and when they shopped (●).
+        Over the game you were up tempo for {minutes(timeIn("ahead"))}, {them} for{" "}
+        {minutes(timeIn("behind"))}, and it was even for {minutes(timeIn("even"))}.
       </p>
 
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-[260px] flex-[1_1_340px] flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1" aria-live="polite">
-              <span className="font-mono text-[32px] leading-none text-ink">
-                {formatClock(minute.timestamp)}
-              </span>
-              <span className={`text-body font-semibold ${TONE_TEXT[minute.tone]}`}>{title}</span>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="font-mono text-[32px] leading-none text-ink">{formatClock(t)}</span>
+              <span className={`text-body font-semibold ${TONE_TEXT[now.tone]}`}>{title}</span>
             </div>
-            <div className="flex gap-1">
-              <StepButton
-                label="Previous minute"
-                disabled={index === 0}
-                onClick={() => pick(index - 1)}
-              >
-                <path d="M15 6l-6 6 6 6" />
-              </StepButton>
-              <StepButton label="Next minute" disabled={index === last} onClick={() => pick(index + 1)}>
-                <path d="M9 6l6 6-6 6" />
-              </StepButton>
-            </div>
+            <span className="text-note text-faint">
+              From {formatClock(run.from)} to {formatClock(run.to)}
+            </span>
           </div>
           <ul className="flex flex-col gap-1.5 text-sm text-muted">
             {reasons.map((reason) => (
               <li key={reason}>{reason}</li>
             ))}
           </ul>
-          <MonstersUp windows={tempo.objectives} at={minute.timestamp} />
+          <MonstersUp windows={tempo.objectives} at={t} />
         </div>
 
         <div className="flex min-w-[260px] flex-[1_1_340px] flex-col gap-3">
           <h3 className="font-mono text-label uppercase tracking-[0.12em] text-faint">
-            Then, until {formatClock(minute.next.until)}
+            In the next minute, to {formatClock(nextUntil)}
           </h3>
           <div className="flex flex-wrap gap-5">
             <DidList
               title={`You (${you})`}
               tone="ahead"
-              activities={minute.next.you}
-              endedAt={
-                nextMark
-                  ? { clock: formatClock(nextMark.timestamp), position: nextMark.you.position }
-                  : null
-              }
+              activities={soon(activities.you)}
               names={names}
               myTeamId={myTeamId}
             />
             <DidList
               title={them}
               tone="behind"
-              activities={minute.next.them}
-              endedAt={
-                nextMark
-                  ? { clock: formatClock(nextMark.timestamp), position: nextMark.them.position }
-                  : null
-              }
+              activities={soon(activities.them)}
               names={names}
               myTeamId={myTeamId}
             />
@@ -271,8 +341,8 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
       </div>
 
       <p className="text-note text-faint">
-        Riot records gold, levels and positions once a minute, and nothing about waves, vision or
-        cooldowns, so this is an estimate.
+        Riot logs deaths, level-ups and purchases to the second, but gold only once a minute and
+        nothing about waves, vision or cooldowns, so this is an estimate.
         {tempo.exactItemGold
           ? ""
           : " This game was saved before Turnpoint kept unspent gold, so item gold is estimated from when each jungler shopped."}{" "}
@@ -285,71 +355,108 @@ export function Tempo({ tempo, names, myTeamId, docsHref }: Props) {
   );
 }
 
-function RowLabel({ children }: { children: string }) {
+// Where the timeline opens: the first moment from START_MS where either
+// jungler was up tempo for at least a few seconds, or START_MS if it was
+// even all game.
+function openingMoment(runs: Run[], end: number): number {
+  const first = runs.find((r) => r.tone !== "even" && r.to - Math.max(r.from, START_MS) >= 5_000);
+  return Math.min(end, first ? Math.max(START_MS, first.from) : START_MS);
+}
+
+function joinRuns(stretches: TempoStretch[]): Run[] {
+  const runs: Run[] = [];
+  for (const s of stretches) {
+    const last = runs.at(-1);
+    if (last && last.tone === s.tone) last.to = s.to;
+    else runs.push({ from: s.from, to: s.to, tone: s.tone });
+  }
+  return runs;
+}
+
+// 754_000 -> "13 minutes", rounded for the summary under the strip.
+function minutes(ms: number): string {
+  const whole = Math.round(ms / 60_000);
+  return whole === 0 ? "under a minute" : whole === 1 ? "1 minute" : `${whole} minutes`;
+}
+
+function RowLabel({ className, children }: { className: string; children: string }) {
   return (
-    <span
-      aria-hidden="true"
-      className="truncate pr-2 text-note leading-6 text-faint"
-      title={children}
-    >
+    <span className={`flex items-center truncate pr-2 text-note text-faint ${className}`} title={children}>
       {children}
     </span>
   );
 }
 
-// Epic monsters taken between one minute mark and the next, as letters in
-// the color of the team that took them.
+// Epic monsters taken, as letters in the color of the team that took them,
+// at the second they died.
 function MonsterMarks({
   windows,
-  from,
-  to,
+  left,
 }: {
   windows: ObjectiveWindow[];
-  from: number;
-  to: number;
+  left: (ms: number) => string;
 }) {
-  const taken = windows.filter((w) => w.takenAt !== null && w.takenAt > from && w.takenAt <= to);
-  return (
-    <span className="flex h-6 items-center justify-center gap-px font-mono text-label leading-none">
-      {taken.map((w) => (
-        <span
-          key={`${w.kind}-${w.spawnsAt}`}
-          title={`${w.ours ? "Your team" : "Enemy team"} took ${OBJECTIVE_NAMES[w.kind].name} at ${formatClock(w.takenAt!)}`}
-          className={w.ours ? "text-ahead-soft" : "text-behind"}
-        >
-          {OBJECTIVE_NAMES[w.kind].short}
-        </span>
-      ))}
-    </span>
-  );
+  return windows
+    .filter((w) => w.takenAt !== null)
+    .map((w) => (
+      <span
+        key={`${w.kind}-${w.spawnsAt}`}
+        title={`${w.ours ? "Your team" : "Enemy team"} took ${OBJECTIVE_NAMES[w.kind].name} at ${formatClock(w.takenAt!)}`}
+        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono text-label leading-none ${
+          w.ours ? "text-ahead-soft" : "text-behind"
+        }`}
+        style={{ left: left(w.takenAt!) }}
+      >
+        {OBJECTIVE_NAMES[w.kind].short}
+      </span>
+    ));
 }
 
-// A jungler's shop visits (●) and deaths (×) between one mark and the next.
-function JunglerMarks({ activities, tone }: { activities: Activity[]; tone: "ahead" | "behind" }) {
-  const color = tone === "ahead" ? "text-ahead-soft" : "text-behind";
+// A jungler's row: a faded bar while they were dead, and a dot at each shop
+// visit.
+function JunglerMarks({
+  activities,
+  tone,
+  left,
+  width,
+}: {
+  activities: Activity[];
+  tone: "ahead" | "behind";
+  left: (ms: number) => string;
+  width: (from: number, to: number) => string;
+}) {
   return (
-    <span
-      className={`flex h-6 items-center justify-center gap-px text-[13px] font-semibold leading-none ${color}`}
-    >
+    <div aria-hidden="true" className="relative h-6">
+      <span className="absolute inset-x-0 top-1/2 h-px bg-line" />
       {activities.map((a) =>
-        a.type === "shop" ? (
-          <span key={`shop-${a.timestamp}`} title={`Shopped at ${formatClock(a.timestamp)}`}>
-            ●
-          </span>
-        ) : a.type === "died" ? (
-          <span key={`died-${a.timestamp}`} title={`Died at ${formatClock(a.timestamp)}`}>
-            ×
-          </span>
+        a.type === "died" ? (
+          <span
+            key={`died-${a.timestamp}`}
+            title={`Dead from ${formatClock(a.timestamp)} to ${formatClock(a.respawnAt)}`}
+            className={`absolute top-1/2 h-2.5 min-w-[3px] -translate-y-1/2 rounded-sm opacity-40 ${
+              tone === "ahead" ? "bg-ahead" : "bg-behind"
+            }`}
+            style={{ left: left(a.timestamp), width: width(a.timestamp, a.respawnAt) }}
+          />
+        ) : a.type === "shop" ? (
+          <span
+            key={`shop-${a.timestamp}`}
+            title={`Shopped at ${formatClock(a.timestamp)}`}
+            className={`absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full ${
+              tone === "ahead" ? "bg-ahead-soft" : "bg-behind"
+            }`}
+            style={{ left: left(a.timestamp) }}
+          />
         ) : null,
       )}
-    </span>
+    </div>
   );
 }
 
-// Epic monsters up at the picked minute, or spawning before the next one.
+// Epic monsters up at the moment, or spawning in the minute after it.
 function MonstersUp({ windows, at }: { windows: ObjectiveWindow[]; at: number }) {
   const up = windows.filter((w) => w.spawnsAt <= at && at < w.endsAt);
-  const soon = windows.filter((w) => w.spawnsAt > at && w.spawnsAt <= at + 60_000);
+  const soon = windows.filter((w) => w.spawnsAt > at && w.spawnsAt <= at + NEXT_MS);
   if (up.length === 0 && soon.length === 0) return null;
   return (
     <ul className="flex flex-wrap gap-2">
@@ -374,33 +481,26 @@ function DidList({
   title,
   tone,
   activities,
-  endedAt,
   names,
   myTeamId,
 }: {
   title: string;
   tone: "ahead" | "behind";
   activities: Activity[];
-  // Where they were at the next minute mark, if there is one.
-  endedAt: { clock: string; position: MapPosition | null } | null;
   names: Record<number, string>;
   myTeamId: number;
 }) {
-  const lines = activities.map((a) => describeActivity(a, names, myTeamId));
-  if (endedAt?.position) {
-    lines.push(`At ${endedAt.clock}: ${describeSpot(endedAt.position, myTeamId)}`);
-  }
   return (
     <div className="flex min-w-[180px] flex-1 flex-col gap-1.5">
       <h4 className={`text-sm font-semibold ${tone === "ahead" ? "text-ahead-soft" : "text-behind"}`}>
         {title}
       </h4>
-      {lines.length === 0 ? (
-        <p className="text-sm text-faint">Nothing Riot recorded.</p>
+      {activities.length === 0 ? (
+        <p className="text-sm text-faint">No kills, deaths, epic monsters or shopping.</p>
       ) : (
         <ul className="flex flex-col gap-1 text-sm text-muted">
-          {lines.map((line, i) => (
-            <li key={i}>{line}</li>
+          {activities.map((a, i) => (
+            <li key={`${a.timestamp}-${i}`}>{describeActivity(a, names, myTeamId)}</li>
           ))}
         </ul>
       )}
@@ -418,10 +518,8 @@ function describeActivity(a: Activity, names: Record<number, string>, myTeamId: 
     case "takedown":
       return `${formatClock(a.timestamp)} ${a.killed ? "Killed" : "Helped kill"} ${name(a.victimId)}${where(a.position)}`;
     case "died":
-      return `${formatClock(a.timestamp)} ${a.killerId > 0 ? `Died to ${name(a.killerId)}` : "Died to a tower or minions"}${where(a.position)}`;
+      return `${formatClock(a.timestamp)} ${a.killerId > 0 ? `Died to ${name(a.killerId)}` : "Died to a tower or minions"}${where(a.position)}, back at ${formatClock(a.respawnAt)}`;
     case "objective":
       return `${formatClock(a.timestamp)} ${a.killed ? "Took" : "Helped take"} ${OBJECTIVE_NAMES[a.kind].name}`;
-    case "farm":
-      return `Farmed ${a.cs} CS`;
   }
 }

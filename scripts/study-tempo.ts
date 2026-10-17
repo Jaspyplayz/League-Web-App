@@ -9,7 +9,9 @@
 // Makes no Riot calls and doesn't touch the database. The question it asks:
 // at each minute, did the jungler the timeline calls "up tempo" go on to win
 // the next fight a jungler was in, or the next epic monster? And does
-// "spent on items" tell you more than plain "who has more gold"?
+// "spent on items" tell you more than plain "who has more gold"? The last
+// section asks the same of the call made every second, against the call made
+// once a minute.
 
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -24,11 +26,13 @@ import {
   estimateErrors,
   fitLogistic,
   hash,
+  momentRows,
   respawnRows,
   STUDY_FEATURES,
   STUDY_FOLDER,
   studyRows,
   type DuelRow,
+  type MomentRow,
   type ObjectiveRow,
   type RespawnRow,
   type StudyFeature,
@@ -95,6 +99,7 @@ function main() {
   tiersSection(labeled, objectives);
   robustnessSection(games, labeled);
   bootstrapSection(labeled, objectives, definitions, check);
+  secondsSection(games);
 
   const report = lines.join("\n") + "\n";
   console.log(report);
@@ -733,6 +738,76 @@ function bootstrap(sample: Sample, measures: [string, (s: Sample) => number][]):
 
 function aucOf(rows: StudyRow[], key: StudyFeature): number {
   return auc(rows.map((r) => ({ score: r.f[key], won: r.nextPlay === 1 })));
+}
+
+// Does making the call every second, the way the panel does now, predict the
+// next play better than making it once a minute, the way it first did? Both
+// are checked every 5 seconds against the same next play, with the same
+// settings. Nothing is tuned here, so the check half is only a second look.
+function secondsSection(games: StudyGame[]) {
+  const all = games.map((g) => momentRows(g));
+  const moments = all.flatMap((r) => r.moments);
+  const labeled = moments.filter((m) => m.nextPlay !== null);
+  const agree = all.reduce((total, r) => total + r.marks.agree, 0);
+  const marks = all.reduce((total, r) => total + r.marks.total, 0);
+  const differ = (m: MomentRow) => m.second !== m.minute;
+
+  const right = (rows: MomentRow[], tone: (m: MomentRow) => TempoTone) =>
+    callAccuracy(rows.map((m) => ({ tone: tone(m), won: m.nextPlay === 1 })));
+  const row = (label: string, rows: MomentRow[]) => {
+    const second = right(rows, (m) => m.second);
+    const minute = right(rows, (m) => m.minute);
+    const gap = (second.right - minute.right) * 100;
+    say(
+      `| ${label} | ${rows.length} | ${pct(second.right)} of ${pct(second.share)} | ${pct(minute.right)} of ${pct(minute.share)} | ${gap > 0 ? "+" : ""}${gap.toFixed(1)} points |`,
+    );
+  };
+
+  say();
+  say(`## Second by second against the minute strip`);
+  say();
+  say(`- ${plural(moments.length, "moment")} every 5 seconds from 2:00; ${labeled.length} (${pct(labeled.length / moments.length)}) had a next play within a minute.`);
+  say(`- At the ${marks} minute marks, the two calls agree at ${pct(agree / marks)} of them. They're made from the same snapshot there; the level can differ when a skill point is logged just before it.`);
+  say(`- The two calls differ at ${pct(moments.filter(differ).length / moments.length)} of moments.`);
+  say();
+  say(`"Right" counts only the moments each version calls (not even).`);
+  say();
+  say(`| Moments | Count | Second by second: right of called | Minute strip: right of called | Difference |`);
+  say(`|---|---|---|---|---|`);
+  row("All games", labeled);
+  row("Check half", labeled.filter((m) => !isTuning(m.matchId)));
+  row("Only where the two differ", labeled.filter(differ));
+  row("Leaving out the 20 s after any kill", labeled.filter((m) => m.sinceKillS > 20));
+  for (const [label, tiers] of TIER_GROUPS) {
+    row(label, labeled.filter((m) => tiers.includes(m.tier)));
+  }
+
+  // How sure is the difference? Whole games are redrawn 200 times, as in
+  // "How sure"; each game's calls and right calls are added up once first,
+  // so a redraw only adds a few numbers per game.
+  const perGame = [...Map.groupBy(labeled, (m) => m.matchId).values()].map((rows) => {
+    const second = right(rows, (m) => m.second);
+    const minute = right(rows, (m) => m.minute);
+    return [second.calls, second.right * second.calls, minute.calls, minute.right * minute.calls];
+  });
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+    return seed / 2_147_483_648;
+  };
+  const gaps: number[] = [];
+  for (let draw = 0; draw < 200; draw++) {
+    const sum = [0, 0, 0, 0];
+    for (let i = 0; i < perGame.length; i++) {
+      const game = perGame[Math.floor(random() * perGame.length)];
+      game.forEach((x, j) => (sum[j] += x));
+    }
+    gaps.push(sum[1] / sum[0] - sum[3] / sum[2]);
+  }
+  gaps.sort((a, b) => a - b);
+  const points = (x: number) => (x * 100).toFixed(1);
+  say();
+  say(`95% range for the difference (all games), from redrawing the games 200 times: ${points(quantile(gaps, 0.025))} to ${points(quantile(gaps, 0.975))} points.`);
 }
 
 // --- Helpers ---

@@ -12,7 +12,9 @@ import {
   PLAYER_GOLD,
   respawnSeconds,
   shopVisits,
+  stretchAt,
   TEMPO_LEAD,
+  tempoMinutes,
   tempoTimeline,
   tempoTone,
   type TempoMinute,
@@ -204,47 +206,175 @@ describe("tempoTone", () => {
   });
 });
 
-describe("tempoTimeline", () => {
-  // You earn 400 gold a minute and Lee Sin 600. You shop at 6:40 with what
-  // you have; Lee Sin doesn't shop until 9:20. Lee Sin dies at 10:50.
-  const timeline = game(
-    12,
-    (minute, id) => ({
-      gold: 500 + minute * (id === ENEMY ? 600 : 400),
-      unspentGold:
-        id === ME
-          ? minute <= 6
-            ? minute * 400
-            : (minute - 7) * 400 + 100
-          : id === ENEMY
-            ? minute <= 9
-              ? minute * 600
-              : (minute - 10) * 600 + 50
-            : 0,
-      level: Math.min(18, 1 + minute),
-      cs: minute * 5,
-      position: id === ME ? SPOTS.jungle : id === ENEMY ? SPOTS.topLane : null,
-    }),
-    [
-      buy("0:04", ME),
-      buy("0:04", ENEMY),
-      buy("6:40", ME),
-      buy("6:41", ME),
-      buy("9:20", ENEMY),
-      kill("10:50", ME, ENEMY, [3], SPOTS.midLane),
-      monster("11:20", 100, "DRAGON", "FIRE_DRAGON", ME, [4, 5]),
-    ],
-  );
-  const tempo = tempoTimeline(timeline, players, ME, ENEMY);
-  const at = (m: number) => tempo.minutes.find((x) => x.timestamp === m * 60_000)!;
+// You earn 400 gold a minute and Lee Sin 600. You shop at 6:40 with what you
+// have; Lee Sin doesn't shop until 9:20. Lee Sin dies at 10:50. Everyone is
+// level 1 + the minute at each snapshot.
+const timeline = game(
+  12,
+  (minute, id) => ({
+    gold: 500 + minute * (id === ENEMY ? 600 : 400),
+    unspentGold:
+      id === ME
+        ? minute <= 6
+          ? minute * 400
+          : (minute - 7) * 400 + 100
+        : id === ENEMY
+          ? minute <= 9
+            ? minute * 600
+            : (minute - 10) * 600 + 50
+          : 0,
+    level: Math.min(18, 1 + minute),
+    cs: minute * 5,
+    position: id === ME ? SPOTS.jungle : id === ENEMY ? SPOTS.topLane : null,
+  }),
+  [
+    buy("0:04", ME),
+    buy("0:04", ENEMY),
+    buy("6:40", ME),
+    buy("6:41", ME),
+    buy("9:20", ENEMY),
+    kill("10:50", ME, ENEMY, [3], SPOTS.midLane),
+    monster("11:20", 100, "DRAGON", "FIRE_DRAGON", ME, [4, 5]),
+  ],
+);
 
-  it("has one entry per minute mark, leaving out the start and the end of the game", () => {
-    expect(tempo.minutes.map((m) => m.timestamp / 60_000)).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-    ]);
+// The same game with old timelines' missing unspent gold.
+const withoutUnspent: TrimmedTimeline = {
+  ...timeline,
+  frames: timeline.frames.map((f) => ({
+    ...f,
+    players: f.players.map(({ unspentGold, ...rest }) => (void unspentGold, rest)),
+  })),
+};
+
+function skillPoint(at: string, participantId: number): TrimmedEvent {
+  return { type: "SKILL_LEVEL_UP", timestamp: clock(at), participantId, skillSlot: 1 };
+}
+
+describe("tempoTimeline", () => {
+  const tempo = tempoTimeline(timeline, players, ME, ENEMY);
+  const at = (time: string) => stretchAt(tempo.stretches, clock(time))!;
+
+  it("covers every second from 0:00 to the end of the game, in order", () => {
+    const { stretches } = tempo;
+    expect(stretches[0].from).toBe(0);
+    expect(stretches.at(-1)!.to).toBe(clock("12:30"));
+    for (const [i, s] of stretches.entries()) {
+      expect(s.to).toBeGreaterThan(s.from);
+      if (i > 0) expect(s.from).toBe(stretches[i - 1].to);
+    }
     expect(tempo.meId).toBe(ME);
     expect(tempo.enemyId).toBe(ENEMY);
     expect(tempo.exactItemGold).toBe(true);
+  });
+
+  it("agrees with the call at each minute mark", () => {
+    for (const m of tempoMinutes(timeline, players, ME, ENEMY)) {
+      const s = stretchAt(tempo.stretches, m.timestamp)!;
+      expect(s.tone).toBe(m.tone);
+      expect(s.lead).toBe(m.lead);
+    }
+  });
+
+  it("counts what you bought from the second you shopped, not from the next snapshot", () => {
+    // Until 6:40 your items are the 6:00 snapshot's; from then, 7:00's.
+    expect(at("6:39").you.itemGold).toBe(500);
+    expect(at("6:39").tone).toBe("even");
+    expect(at("6:40").you.itemGold).toBe(3200);
+    expect(at("6:40").you.lastShop).toBe(clock("6:40"));
+    expect(at("6:40").tone).toBe("ahead");
+    expect(at("6:40").lead).toBe(2700);
+  });
+
+  it("swings at the exact second of a death, and back at the respawn", () => {
+    // Lee Sin died at 10:50 at level 11: 35 seconds, back at 11:25.
+    expect(at("10:49").tone).toBe("behind");
+    expect(at("10:50").tone).toBe("ahead");
+    expect(at("10:50").them.alive).toBe(false);
+    expect(at("10:50").them.respawnAt).toBe(clock("11:25"));
+    expect(at("10:50").alive).toEqual({ ours: 5, theirs: 4 });
+    expect(at("11:24").tone).toBe("ahead");
+    expect(at("11:25").tone).toBe("behind");
+    expect(at("11:25").alive).toEqual({ ours: 5, theirs: 5 });
+    // The jump is exact to the millisecond.
+    expect(stretchAt(tempo.stretches, clock("10:50") - 1)!.tone).toBe("behind");
+  });
+
+  it("levels up at the skill point, kept between the snapshots either side", () => {
+    // Five skill points by 3:30 means level 5 before the 4:00 snapshot says
+    // so; a sixth at 3:40 can't go past it.
+    const points = ["0:10", "1:05", "2:01", "3:02", "3:30", "3:40"].map((t) => skillPoint(t, ME));
+    const leveled = tempoTimeline(
+      { ...timeline, events: [...timeline.events, ...points].sort((a, b) => a.timestamp - b.timestamp) },
+      players,
+      ME,
+      ENEMY,
+    );
+    const call = (time: string) => stretchAt(leveled.stretches, clock(time))!;
+    expect(call("3:29").you.level).toBe(4);
+    expect(call("3:29").tone).toBe("even");
+    expect(call("3:30").you.level).toBe(5);
+    expect(call("3:30").lead).toBe(LEVEL_GOLD);
+    expect(call("3:30").tone).toBe("ahead");
+    expect(call("3:45").you.level).toBe(5);
+    // Lee Sin logged no skill points, so his level is the snapshot's.
+    expect(call("3:30").them.level).toBe(4);
+  });
+
+  it("estimates item gold for timelines saved without unspent gold", () => {
+    const estimated = tempoTimeline(withoutUnspent, players, ME, ENEMY);
+    expect(estimated.exactItemGold).toBe(false);
+    // Gold at 6:40, read between 6:00 (2,900) and 7:00 (3,300).
+    expect(stretchAt(estimated.stretches, clock("6:40"))!.you.itemGold).toBe(3167);
+    expect(stretchAt(estimated.stretches, clock("6:40"))!.tone).toBe("ahead");
+  });
+
+  it("lists everything each jungler did, to the second", () => {
+    expect(tempo.activities.you).toEqual([
+      { type: "shop", timestamp: clock("0:04"), afterDeath: false },
+      { type: "shop", timestamp: clock("6:40"), afterDeath: false },
+      {
+        type: "takedown",
+        timestamp: clock("10:50"),
+        victimId: ENEMY,
+        killed: true,
+        position: SPOTS.midLane,
+      },
+      { type: "objective", timestamp: clock("11:20"), kind: "dragon", killed: true },
+    ]);
+    expect(tempo.activities.them).toEqual([
+      { type: "shop", timestamp: clock("0:04"), afterDeath: false },
+      { type: "shop", timestamp: clock("9:20"), afterDeath: false },
+      {
+        type: "died",
+        timestamp: clock("10:50"),
+        killerId: ME,
+        position: SPOTS.midLane,
+        respawnAt: clock("11:25"),
+      },
+    ]);
+  });
+
+  it("gives the mirror answer from the enemy jungler's side", () => {
+    const mirror = tempoTimeline(timeline, players, ENEMY, ME);
+    expect(mirror.stretches).toHaveLength(tempo.stretches.length);
+    for (const [i, s] of tempo.stretches.entries()) {
+      const other = mirror.stretches[i];
+      expect(other.from).toBe(s.from);
+      expect(other.tone).toBe(FLIP[s.tone]);
+      expect(other.lead + s.lead).toBe(0);
+      expect(other.alive).toEqual({ ours: s.alive.theirs, theirs: s.alive.ours });
+      expect(other.you).toEqual(s.them);
+    }
+  });
+});
+
+describe("tempoMinutes", () => {
+  const minutes = tempoMinutes(timeline, players, ME, ENEMY);
+  const at = (m: number) => minutes.find((x) => x.timestamp === m * 60_000)!;
+
+  it("has one entry per minute mark, leaving out the start and the end of the game", () => {
+    expect(minutes.map((m) => m.timestamp / 60_000)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   });
 
   it("is even while neither jungler has shopped since the start", () => {
@@ -271,7 +401,6 @@ describe("tempoTimeline", () => {
   });
 
   it("puts the alive jungler up tempo while the other is dead", () => {
-    // Lee Sin died at 10:50 at level 11: 35 seconds, back at 11:25.
     expect(at(11).them.alive).toBe(false);
     expect(at(11).them.respawnAt).toBe(clock("11:25"));
     expect(at(11).tone).toBe("ahead");
@@ -280,71 +409,23 @@ describe("tempoTimeline", () => {
     expect(at(12).alive).toEqual({ ours: 5, theirs: 5 });
   });
 
-  it("lists what each jungler did until the next minute", () => {
-    expect(at(6).next).toEqual({
-      until: clock("7:00"),
-      you: [
-        { type: "shop", timestamp: clock("6:40"), afterDeath: false },
-        { type: "farm", cs: 5 },
-      ],
-      them: [{ type: "farm", cs: 5 }],
-    });
-    expect(at(10).next.you).toEqual([
-      {
-        type: "takedown",
-        timestamp: clock("10:50"),
-        victimId: ENEMY,
-        killed: true,
-        position: SPOTS.midLane,
-      },
-      { type: "farm", cs: 5 },
-    ]);
-    expect(at(10).next.them[0]).toEqual({
-      type: "died",
-      timestamp: clock("10:50"),
-      killerId: ME,
-      position: SPOTS.midLane,
-    });
-    expect(at(11).next.you[0]).toEqual({
-      type: "objective",
-      timestamp: clock("11:20"),
-      kind: "dragon",
-      killed: true,
-    });
-  });
-
-  it("covers the last minute up to the end of the game", () => {
-    expect(at(12).next.until).toBe(clock("12:30"));
-  });
-
   it("estimates item gold for timelines saved without unspent gold", () => {
-    const old: TrimmedTimeline = {
-      ...timeline,
-      frames: timeline.frames.map((f) => ({
-        ...f,
-        players: f.players.map(({ unspentGold, ...rest }) => (void unspentGold, rest)),
-      })),
-    };
-    const estimated = tempoTimeline(old, players, ME, ENEMY);
-    expect(estimated.exactItemGold).toBe(false);
-    const seven = estimated.minutes[6];
-    // Gold at 6:40, read between 6:00 (2,900) and 7:00 (3,300).
+    const seven = tempoMinutes(withoutUnspent, players, ME, ENEMY)[6];
     expect(seven.you.itemGold).toBe(3167);
     expect(seven.tone).toBe("ahead");
   });
 
   it("gives the mirror answer from the enemy jungler's side", () => {
-    const mirror = tempoTimeline(timeline, players, ENEMY, ME);
-    const flip = { ahead: "behind", behind: "ahead", even: "even" };
-    for (const [i, m] of tempo.minutes.entries()) {
-      expect(mirror.minutes[i].tone).toBe(flip[m.tone]);
-      expect(mirror.minutes[i].lead + m.lead).toBe(0);
-      expect(mirror.minutes[i].alive).toEqual({ ours: m.alive.theirs, theirs: m.alive.ours });
+    const mirror = tempoMinutes(timeline, players, ENEMY, ME);
+    for (const [i, m] of minutes.entries()) {
+      expect(mirror[i].tone).toBe(FLIP[m.tone]);
+      expect(mirror[i].lead + m.lead).toBe(0);
+      expect(mirror[i].alive).toEqual({ ours: m.alive.theirs, theirs: m.alive.ours });
     }
   });
 });
 
-describe("tempoTimeline on made-up games", () => {
+describe("tempo on made-up games", () => {
   // A small seeded random number generator, so a failure can be replayed.
   function random(seed: number) {
     return () => {
@@ -359,12 +440,14 @@ describe("tempoTimeline on made-up games", () => {
       const minutes = 16 + Math.floor(r() * 25);
       const gold = Array.from({ length: 10 }, () => 300 + r() * 200);
       const events: TrimmedEvent[] = [];
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 60; i++) {
         const at = Math.floor(r() * minutes * 60);
         const time = `${Math.floor(at / 60)}:${String(at % 60).padStart(2, "0")}`;
         const id = 1 + Math.floor(r() * 10);
-        if (r() < 0.5) events.push(buy(time, id));
-        else events.push(kill(time, ((id + 4) % 10) + 1, id));
+        const roll = r();
+        if (roll < 0.35) events.push(buy(time, id));
+        else if (roll < 0.7) events.push(kill(time, ((id + 4) % 10) + 1, id));
+        else events.push(skillPoint(time, id));
       }
       const timeline = game(
         minutes,
@@ -375,20 +458,30 @@ describe("tempoTimeline on made-up games", () => {
         }),
         events,
       );
+
       const mine = tempoTimeline(timeline, players, ME, ENEMY);
       const theirs = tempoTimeline(timeline, players, ENEMY, ME);
-      for (const [i, m] of mine.minutes.entries()) {
-        const other = theirs.minutes[i];
-        expect(other.lead + m.lead).toBe(0);
-        if (!m.you.alive && m.them.alive) expect(m.tone).toBe("behind");
-        if (m.you.alive && !m.them.alive) expect(m.tone).toBe("ahead");
-        expect(m.alive.ours).toBeGreaterThanOrEqual(0);
-        expect(m.alive.ours).toBeLessThanOrEqual(5);
+      expect(theirs.stretches).toHaveLength(mine.stretches.length);
+      for (const [i, s] of mine.stretches.entries()) {
+        expect(theirs.stretches[i].lead + s.lead).toBe(0);
+        expect(theirs.stretches[i].tone).toBe(FLIP[s.tone]);
+        if (i > 0) expect(s.from).toBe(mine.stretches[i - 1].to);
+        if (!s.you.alive && s.them.alive) expect(s.tone).toBe("behind");
+        if (s.you.alive && !s.them.alive) expect(s.tone).toBe("ahead");
+        expect(s.alive.ours).toBeGreaterThanOrEqual(0);
+        expect(s.alive.ours).toBeLessThanOrEqual(5);
+        expect(s.you.level).toBeGreaterThanOrEqual(1);
+        expect(s.you.level).toBeLessThanOrEqual(18);
+      }
+
+      for (const m of tempoMinutes(timeline, players, ME, ENEMY)) {
         expect(m.you.itemGold + m.you.unspentGold).toBe(m.you.gold);
       }
     }
   });
 });
+
+const FLIP = { ahead: "behind", behind: "ahead", even: "even" } as const;
 
 describe("objectiveWindows", () => {
   it("brings dragons back five minutes after each one is taken", () => {
@@ -500,7 +593,6 @@ describe("describeTempo", () => {
       you: jungler,
       them: { ...jungler, participantId: ENEMY, level: 6, itemGold: 1300, unspentGold: 1240, lastShop: clock("3:41") },
       alive: { ours: 5, theirs: 5 },
-      next: { until: clock("9:00"), you: [], them: [] },
       ...overrides,
     };
   };

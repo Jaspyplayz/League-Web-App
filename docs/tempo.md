@@ -1,6 +1,6 @@
 # Tempo timeline (beta)
 
-The tempo timeline shows, minute by minute, which jungler had the tempo: the time advantage that lets one jungler make the next play (invade, gank, start an objective) while the other has to farm, back or give way. It's on the match page of any game where you played jungle, below the gank log, marked **Beta**.
+The tempo timeline shows, second by second, which jungler had the tempo: the time advantage that lets one jungler make the next play (invade, gank, start an objective) while the other has to farm, back or give way. It's on the match page of any game where you played jungle, below the gank log, marked **Beta**.
 
 It's an experiment. Riot doesn't record tempo, so the timeline estimates it from what Riot does record. This page explains how the estimate is made, and how well it held up in 1,923 real games.
 
@@ -10,12 +10,12 @@ Like the rest of the match page, it describes the situation and never grades a d
 
 ## How the call is made
 
-Once a minute, Riot records every player's gold, level and position, and it logs every kill and every item bought with its exact time. From those, at each minute mark, the timeline works out for both junglers:
+Once a minute, Riot records every player's gold, level and position. It also logs every kill, every item bought and every skill point with its exact time. From those, the timeline works out for both junglers at every second of the game:
 
 | Input | Where it comes from |
 |---|---|
-| Items | Gold spent on items so far: total gold minus unspent gold, both from Riot's snapshot. |
-| Level | Riot's snapshot. |
+| Items | Gold spent on items so far: total gold minus unspent gold, from Riot's once-a-minute snapshot. Purchases are logged to the second, so the amount steps up at the shop visit: until the jungler's first shop visit after a snapshot it's that snapshot's, and from the visit on it's the next snapshot's, the first one to show what they bought. |
+| Level | Each level gives one skill point, and Riot logs each one to the second. Points can be spent a little late, so the count is kept between the levels in the snapshots either side. |
 | Alive | Riot logs the moment of each death. The respawn time comes from the game's death timer: a base time for the level, plus up to 50% more as the game goes on. |
 | Players alive | The same death timers, for all ten players. |
 
@@ -31,9 +31,11 @@ lead = items lead + 2,000 × levels ahead + 2,000 × extra players alive on your
 
 So a level up, a player up or 2,000 more gold spent on items each count the same, and any one of them is enough on its own. The three numbers are `LEVEL_GOLD`, `PLAYER_GOLD` and `TEMPO_LEAD` in `tempo.ts`, and the study below is where they came from.
 
+Nothing the call uses can change between those logged moments (a snapshot, a death or respawn, a jungler's skill point or shop visit), so the call is worked out once at each of them and holds until the next. Those stretches, a couple of hundred in a typical game, are what the panel draws.
+
 ### A worked example
 
-A real minute: Qiyana against Shaco at 16:00.
+A real moment: Qiyana against Shaco at 16:00.
 
 | | Qiyana | Shaco | Counts as |
 |---|---|---|---|
@@ -44,7 +46,7 @@ A real minute: Qiyana against Shaco at 16:00.
 
 At 9:00 in the same game, Qiyana had spent 934 more on items, at the same level with everyone alive. That's even: in the study, a side ahead by 500 to 2,000 won only 52% to 54% of next plays, too close to a coin flip to call.
 
-The panel shows these lines for whichever minute you pick, so the total can always be checked by hand.
+The panel shows these lines for whichever moment you pick, so the total can always be checked by hand.
 
 ### Games saved before unspent gold was kept
 
@@ -52,14 +54,15 @@ Turnpoint started keeping unspent gold in saved timelines with this feature. For
 
 ## What the panel shows
 
-- **The strip**: one block per minute, blue when you were up tempo, red when the enemy jungler was, gray when it was even. Above it are the epic monsters each team took; below it, when each jungler shopped (●) or died (×).
-- **The picked minute**: the numbers behind the call, any epic monster that was up or about to spawn, and what each jungler did until the next minute mark: kills, deaths, epic monsters, shop visits, CS, and where they were at the next mark.
+- **The strip**: the whole game, blue while you were up tempo, red while the enemy jungler was and gray while it was even, changing at the second something changed. Above it are the epic monsters each team took; below it, when each jungler was dead (the faded bars) and when they shopped (●).
+- **Moving through the game**: press or drag anywhere on the strip, or press play to watch it at 10, 30 or 60 times game speed. The arrow buttons jump to the previous or next change of tempo. From the keyboard the strip works like a slider: the arrow keys move 5 seconds, Page Up and Page Down a minute.
+- **The moment you're on**: the numbers behind the call, how long the call held, any epic monster that was up or about to spawn, and what each jungler did in the minute after: kills, deaths, epic monsters and shop visits.
 
 Epic monster spawn times come from the game's timers (`DRAGON_SPAWN_MS` and the rest). None of the 13,738 epic monsters in the study was taken before its timer said it was up.
 
 ## The study
 
-The three numbers were set on half of the study's games, then checked on the other half, which played no part in setting them.
+The three numbers were set on half of the study's games, then checked on the other half, which played no part in setting them. The study makes the call at Riot's minute marks, the way the first version of the panel did; [Second by second](#second-by-second) checks the call the panel makes now.
 
 ### What counts as being right
 
@@ -145,6 +148,27 @@ The next play is one way of measuring "right", and it has choices in it, so the 
 
 The call is still right 61.0% of the time in quiet minutes, with no kill in the minute before, so it isn't only picking the winner of a fight that's already happening. It's a little less sure further ahead, as you'd expect: a lot changes in two minutes.
 
+### Second by second
+
+The first version of the panel made the call once a minute, at Riot's snapshots. Early death timers are 10 to 20 seconds, so most early deaths came and went between two snapshots and never showed in the colors. The call made at every second fixes that, but is it more often right? The study checked both on the same 1,923 games with the same three numbers: every 5 seconds from 2:00, each call against the next play within a minute.
+
+| Moments | Count | Every second | Once a minute |
+|---|---|---|---|
+| All games | 464,064 | 63.9% of 62.9% | 60.3% of 61.6% |
+| Check games only | 235,836 | 64.0% of 63.5% | 60.8% of 62.5% |
+| Only where the two calls differ | 163,217 | 60.5% of 61.4% | 49.5% of 57.7% |
+| No kill in the 20 seconds before | 263,518 | 62.4% of 54.4% | 60.1% of 59.9% |
+| Master and up | 216,639 | 64.4% of 62.2% | 60.8% of 60.9% |
+| Emerald, Diamond | 70,390 | 64.0% of 62.6% | 60.4% of 61.1% |
+| Gold, Platinum | 73,129 | 62.4% of 63.4% | 58.3% of 62.3% |
+| Iron, Bronze, Silver | 103,906 | 63.9% of 64.3% | 60.7% of 63.0% |
+
+- The call made every second is right 63.9% of the time, against 60.3% for the call made once a minute, and makes a call about as often. The 95% range of the gain, from redrawing the games, is 3.4 to 3.7 points.
+- The two calls differ at 36% of moments. There, the once-a-minute call is a coin flip (49.5%), because it's usually still showing a situation that has already changed, and the call made every second is right 60.5% of the time.
+- Leaving out the 20 seconds after a kill, when the next play is often the rest of the same fight, the gain is smaller (2.2 points), and the call made every second calls fewer of those moments.
+- At the minute marks themselves the two agree 98.7% of the time. The rest are skill points logged a moment before a snapshot that still shows the old level.
+- It holds at every rank, by 3.2 to 4.1 points.
+
 ### What didn't help
 
 - **Shop timing.** This was the surprise. When both junglers had earned about the same gold (within 250), the one who had spent more of it on items won no more next plays than the other: 47% to 53% across the whole range, with no trend. In this data the next play went to whoever had earned more, whether or not they'd been back to spend it. Either a minute is too short to see it, or once-a-minute snapshots are too coarse. The call still uses gold spent on items, which matches how junglers think about tempo and did as well as total gold, and the strip shows every shop visit so you can see the timing yourself.
@@ -178,19 +202,20 @@ So the gains over the first guess and over the junglers' gold are real, and the 
 
 ## Limits
 
-- Riot records gold, levels and positions once a minute. Anything between two snapshots is unknown, and a lot can change in a minute.
+- Riot records gold and positions once a minute. Item gold comes from those snapshots, stepping up at each shop visit, so two visits in the same minute show as one step at the first.
+- A level counts as 2,000 gold, the whole threshold on its own, so a jungler who levels a few seconds before the other is up tempo for those seconds. The strip shows these as thin slivers.
 - Riot records nothing about waves, vision, cooldowns or summoner spells, so the call can't include them.
 - About 1 in 10 deaths ends sooner than the death timer says, and the study couldn't find out why, so a player can be counted dead for a while after they're back.
 - All the study's games are from Oceania. Other servers play the same game, but weren't checked.
 - A study game's rank is the rank of the player whose match history it came from. The other nine players are usually close to it.
-- Leads are small in the first minutes, so early minutes are usually even.
+- Leads are small in the first minutes, so early on the call is usually even.
 
 ## Running the study again
 
 ```sh
 npm run tempo-games                                         # Oceania, every tier (slow, needs RIOT_API_KEY)
 npm run tempo-games -- --region na --players 4 --games 6    # a smaller sample from NA
-npm run study-tempo -- --out tempo-report.md                # the report; makes no Riot calls
+npm run study-tempo -- --out tempo-report.md                # the report, ending with the second-by-second check; makes no Riot calls
 npm run study-tempo -- --tiers gold,platinum                # only some ranks
 ```
 

@@ -12,12 +12,21 @@ import { playedPosition } from "./matchup";
 import {
   deathSpans,
   itemGoldAt,
+  objectiveWindows,
   shopVisits,
+  stretchAt,
+  tempoMinutes,
   tempoTimeline,
   type ObjectiveWindow,
   type TempoTone,
 } from "./tempo";
-import { trimTimeline, type ChampionKill, type TrimmedEvent, type TrimmedTimeline } from "./trim";
+import {
+  trimTimeline,
+  type ChampionKill,
+  type EliteMonsterKill,
+  type TrimmedEvent,
+  type TrimmedTimeline,
+} from "./trim";
 
 // Where the collector saves games, one JSON file each. Git ignores .cache.
 export const STUDY_FOLDER = ".cache/tempo-study";
@@ -184,8 +193,8 @@ export function studyRows(game: StudyGame, nextPlayMs = NEXT_PLAY_MS): StudyRows
   const red = game.participants.find((p) => p.teamId === 200 && p.position === "JUNGLE")!;
   const { timeline } = game;
   const { frames, events } = timeline;
-  const exact = tempoTimeline(timeline, game.participants, blue.participantId, red.participantId);
-  const estimated = tempoTimeline(
+  const exact = tempoMinutes(timeline, game.participants, blue.participantId, red.participantId);
+  const estimated = tempoMinutes(
     withoutUnspentGold(timeline),
     game.participants,
     blue.participantId,
@@ -210,11 +219,11 @@ export function studyRows(game: StudyGame, nextPlayMs = NEXT_PLAY_MS): StudyRows
   const kills = events.filter((e): e is ChampionKill => e.type === "CHAMPION_KILL");
 
   const rows: StudyRow[] = [];
-  for (const [index, m] of exact.minutes.entries()) {
-    const i = index + 1; // minutes[0] is frame 1
+  for (const [index, m] of exact.entries()) {
+    const i = index + 1; // exact[0] is frame 1
     const minute = Math.round(m.timestamp / 60_000);
     if (minute < FIRST_MINUTE) continue;
-    const est = estimated.minutes[index];
+    const est = estimated[index];
     const sinceShop = (lastShop: number | null) => (m.timestamp - (lastShop ?? 0)) / 60_000;
     const next = plays.find((p) => p.timestamp > m.timestamp && p.timestamp <= m.timestamp + nextPlayMs);
     const lastKill = kills.findLast((k) => k.timestamp <= m.timestamp);
@@ -253,7 +262,8 @@ export function studyRows(game: StudyGame, nextPlayMs = NEXT_PLAY_MS): StudyRows
 
   const rowAt = (t: number) => rows.findLast((r) => r.minute * 60_000 <= t) ?? null;
   const rowBefore = (t: number) => rows.findLast((r) => r.minute * 60_000 < t) ?? null;
-  const objectives: ObjectiveRow[] = exact.objectives
+  const monsters = events.filter((e): e is EliteMonsterKill => e.type === "ELITE_MONSTER_KILL");
+  const objectives: ObjectiveRow[] = objectiveWindows(monsters, 100, frames.at(-1)?.timestamp ?? 0)
     .filter((w) => w.takenAt !== null && w.ours !== null)
     .map((w) => ({
       matchId: game.matchId,
@@ -287,6 +297,67 @@ export function studyRows(game: StudyGame, nextPlayMs = NEXT_PLAY_MS): StudyRows
     }));
 
   return { minutes: rows, objectives, duels };
+}
+
+// --- Second by second against the minute strip ---
+
+// How often the comparison checks the two calls.
+export const MOMENT_STEP_MS = 5_000;
+
+// One moment of a game with two calls on it, both from blue's side: the one
+// the panel makes now, at that second, and the one the first version made,
+// at the minute mark before it.
+export type MomentRow = {
+  matchId: string;
+  tier: string;
+  at: number;
+  second: TempoTone;
+  minute: TempoTone;
+  // Did blue's side win the next jungler fight or epic monster within a
+  // minute? Null when nothing happened.
+  nextPlay: 0 | 1 | null;
+  // Seconds since the last champion kill, as in StudyRow.
+  sinceKillS: number;
+};
+
+// Both calls every MOMENT_STEP_MS from minute 2 to the end of the game, plus
+// how often they agree at the minute marks themselves, where they're made
+// from the same snapshot and should agree almost always.
+export function momentRows(
+  game: StudyGame,
+  stepMs = MOMENT_STEP_MS,
+): { moments: MomentRow[]; marks: { agree: number; total: number } } {
+  const blue = game.participants.find((p) => p.teamId === 100 && p.position === "JUNGLE")!;
+  const red = game.participants.find((p) => p.teamId === 200 && p.position === "JUNGLE")!;
+  const { timeline } = game;
+  const ids = [blue.participantId, red.participantId] as const;
+  const { stretches } = tempoTimeline(timeline, game.participants, ...ids);
+  const minutes = tempoMinutes(timeline, game.participants, ...ids);
+  const plays = playsOf(timeline.events, game.participants, [...ids]);
+  const kills = timeline.events.filter((e): e is ChampionKill => e.type === "CHAMPION_KILL");
+  const end = timeline.frames.at(-1)?.timestamp ?? 0;
+
+  const moments: MomentRow[] = [];
+  for (let at = FIRST_MINUTE * 60_000; at < end; at += stepMs) {
+    const minute = minutes.findLast((m) => m.timestamp <= at);
+    const second = stretchAt(stretches, at);
+    if (!minute || !second) continue;
+    const next = plays.find((p) => p.timestamp > at && p.timestamp <= at + NEXT_PLAY_MS);
+    const lastKill = kills.findLast((k) => k.timestamp <= at);
+    moments.push({
+      matchId: game.matchId,
+      tier: game.tier,
+      at,
+      second: second.tone,
+      minute: minute.tone,
+      nextPlay: next ? (next.blueWon ? 1 : 0) : null,
+      sinceKillS: lastKill ? (at - lastKill.timestamp) / 1000 : Infinity,
+    });
+  }
+
+  const marks = minutes.filter((m) => Math.round(m.timestamp / 60_000) >= FIRST_MINUTE);
+  const agree = marks.filter((m) => stretchAt(stretches, m.timestamp)?.tone === m.tone).length;
+  return { moments, marks: { agree, total: marks.length } };
 }
 
 // --- Checks on the inputs ---
