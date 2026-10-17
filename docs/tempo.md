@@ -157,15 +157,15 @@ The first version of the panel made the call once a minute, at Riot's snapshots.
 | All games | 464,064 | 63.9% of 62.9% | 60.3% of 61.6% |
 | Check games only | 235,836 | 64.0% of 63.5% | 60.8% of 62.5% |
 | Only where the two calls differ | 163,217 | 60.5% of 61.4% | 49.5% of 57.7% |
-| No kill in the 20 seconds before | 263,526 | 62.4% of 54.4% | 60.1% of 59.9% |
+| No kill in the 20 seconds before | 263,518 | 62.4% of 54.4% | 60.1% of 59.9% |
 | Master and up | 216,639 | 64.4% of 62.2% | 60.8% of 60.9% |
 | Emerald, Diamond | 70,390 | 64.0% of 62.6% | 60.4% of 61.1% |
 | Gold, Platinum | 73,129 | 62.4% of 63.4% | 58.3% of 62.3% |
 | Iron, Bronze, Silver | 103,906 | 63.9% of 64.3% | 60.7% of 63.0% |
 
-- The call made every second is right 63.9% of the time, against 60.3% for the call made once a minute, and makes a call about as often. The 95% range of the gain, from redrawing the games, is 3.2 to 3.9 points.
-- The two calls differ at 35% of moments. There, the once-a-minute call is a coin flip (49.5%), because it's usually still showing a situation that has already changed, and the call made every second is right 60.5% of the time.
-- Leaving out the 20 seconds after a kill, when the next play is often the rest of the same fight, the gain is smaller (2.3 points), and the call made every second calls fewer of those moments.
+- The call made every second is right 63.9% of the time, against 60.3% for the call made once a minute, and makes a call about as often. The 95% range of the gain, from redrawing the games, is 3.4 to 3.7 points.
+- The two calls differ at 36% of moments. There, the once-a-minute call is a coin flip (49.5%), because it's usually still showing a situation that has already changed, and the call made every second is right 60.5% of the time.
+- Leaving out the 20 seconds after a kill, when the next play is often the rest of the same fight, the gain is smaller (2.2 points), and the call made every second calls fewer of those moments.
 - At the minute marks themselves the two agree 98.7% of the time. The rest are skill points logged a moment before a snapshot that still shows the old level.
 - It holds at every rank, by 3.2 to 4.1 points.
 
