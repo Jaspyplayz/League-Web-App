@@ -24,7 +24,11 @@ import { panelClass } from "@/components/ui/panel";
 
 type Params = Promise<{ region: string; riotId: string; matchId: string }>;
 
-export const metadata = { title: "Match analysis" };
+export const metadata = {
+  title: "Match analysis",
+  description:
+    "One League of Legends game minute by minute: the lead over your lane opponent, the turning points and each team's chance to win.",
+};
 
 export default function MatchPage({ params }: { params: Params }) {
   return (

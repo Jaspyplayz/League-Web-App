@@ -53,7 +53,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col font-sans">
         <SiteHeader />
-        <div className="flex flex-1 flex-col">{children}</div>
+        {/* At least a screen tall, so the footer starts below the fold. Pages
+            stream in a piece at a time, and a footer in view would jump down
+            with every piece (Lighthouse counts that as layout shift). */}
+        <div className="flex min-h-svh flex-1 flex-col">{children}</div>
         <SiteFooter />
         <ThemeWatcher />
         {/* Vercel Web Analytics counts page views without cookies. Under npm run

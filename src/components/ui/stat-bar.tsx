@@ -24,9 +24,12 @@ export function StatBar({
         className={`h-full ${tone === "ahead" ? "bg-ahead" : "bg-behind"}`}
         style={{ width: `${pct}%` }}
       />
-      {/* The shadow keeps the number readable where it sits on top of the bar. */}
-      <span className="absolute inset-y-0 right-1.5 flex items-center font-mono text-xs text-ink [text-shadow:0_0_3px_var(--color-page)]">
-        {label}
+      {/* A see-through backdrop in the page color keeps the number readable
+          where it sits on top of the bar, in both themes. */}
+      <span className="absolute inset-y-0 right-1 flex items-center">
+        <span className="rounded-sm bg-page/75 px-1 font-mono text-xs leading-4 text-ink">
+          {label}
+        </span>
       </span>
     </div>
   );
