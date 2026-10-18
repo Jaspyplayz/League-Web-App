@@ -1,6 +1,6 @@
 # Win chance
 
-The win chance is each team's chance of winning at every minute of a finished Summoner's Rift game, like the win probability line on sports broadcasts. The match page's **Win chance** panel draws your team's chance as a line, and **Biggest swings** lists the minutes that moved it most, with what each team took in that minute ("The enemy team took Baron and 2 kills, 68% → 38%").
+The win chance is each team's chance of winning at every minute of a finished Summoner's Rift game, like the win probability line on sports broadcasts. The match page's **Win chance** panel draws your team's chance as a line, and **Biggest swings** lists the minutes that moved it most, with what each team took in that minute ("The enemy team took Baron and 2 kills, 68% → 38%"). The replay reads it at every second and grades each play by it (see [In the replay](#in-the-replay)).
 
 The code is in [`src/lib/analyzer/win-chance.ts`](../src/lib/analyzer/win-chance.ts), the trained model is [`src/lib/analyzer/win-chance-model.json`](../src/lib/analyzer/win-chance-model.json), and [`scripts/train-win-chance.ts`](../scripts/train-win-chance.ts) trains it. The panel is `match/[matchId]/win-chance.tsx`, fed by `matchWinChance` in [`src/lib/win-chance.ts`](../src/lib/win-chance.ts).
 
@@ -87,6 +87,10 @@ Red's 5 extra kills barely move it, because the gold they earned is already in t
 ### Biggest swings
 
 `biggestSwings` compares each minute with the one before. A minute where your team's chance moved by at least 8 points (`MIN_SWING`) counts, and the panel shows the three biggest, in game order. What each side took in that minute comes from the same numbers the model reads (kills, towers, dragons, Baron...), so it describes what happened without saying whether any play was right or wrong. A swing with nothing listed means the gold and XP difference moved on its own, from farm and plates.
+
+### In the replay
+
+The [replay](replay.md) reads the same model at every second: kills, towers and epic monsters from their events, and gold and XP from its estimates between the snapshots (a kill's gold arrives at the second of the kill). Its plays list grades every fight and objective by how much it moved your team's chance. See [how the plays are graded](replay.md#how-the-plays-are-graded).
 
 ## How it learns
 
