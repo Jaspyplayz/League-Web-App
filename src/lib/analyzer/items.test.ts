@@ -494,6 +494,29 @@ describe("itemHistory", () => {
     expect(history.at(-1)!.slots).toEqual([DORANS_BLADE, HEALTH_POTION, BISCUIT, 0, 0, 0]);
   });
 
+  it("holds a biscuit until a slot is free", () => {
+    // From a real game (Ahri): all six slots were full at 6:00.
+    const events = [
+      ...start,
+      usedUp(130_000, BISCUIT),
+      usedUp(250_000, BISCUIT),
+      bought(300_000, LONG_SWORD),
+      bought(300_200, LONG_SWORD),
+      bought(301_000, DAGGER),
+      bought(301_200, DAGGER),
+      usedUp(420_000, LONG_SWORD),
+      usedUp(420_000, LONG_SWORD),
+      bought(420_000, SERRATED_DIRK),
+    ];
+    const history = itemHistory(events, ME);
+    expect(inventoryAt(history, 400_000).slots).toEqual([
+      DORANS_BLADE, HEALTH_POTION, LONG_SWORD, LONG_SWORD, DAGGER, DAGGER,
+    ]);
+    expect(history.at(-1)!.slots).toEqual([
+      DORANS_BLADE, HEALTH_POTION, SERRATED_DIRK, BISCUIT, DAGGER, DAGGER,
+    ]);
+  });
+
   it("ignores other players, and items the player never had", () => {
     const events = [...start, bought(10_000, LONG_SWORD, 8), usedUp(130_000, SERRATED_DIRK)];
     expect(itemHistory(events, ME)).toEqual(itemHistory(start, ME));

@@ -64,7 +64,14 @@ function main() {
         const row = roleSlots.get(key) ?? { players: 0, same: 0 };
         row.players++;
         if (riot === rebuilt) row.same++;
-        else roleSlotMisses.push(`${game.match.metadata.matchId} ${check.championName}: Riot ${riot}, rebuilt ${rebuilt}`);
+        // The first few with their events, the rest by name.
+        else {
+          roleSlotMisses.push(
+            roleSlotMisses.length < EXAMPLES
+              ? example(game, check, [], Infinity)
+              : `${game.match.metadata.matchId} ${check.championName}: Riot ${riot}, rebuilt ${rebuilt}`,
+          );
+        }
         roleSlots.set(key, row);
       }
 
@@ -118,7 +125,9 @@ function main() {
   for (const [key, row] of [...roleSlots].sort((a, b) => b[1].players - a[1].players)) {
     console.log(`- ${key}: ${plural(row.players, "player")}, ${row.same} the same`);
   }
-  console.log(`\nDifferent: ${roleSlotMisses.slice(0, 15).join("; ") || "none"}\n`);
+  console.log(`\nThe first players with a different item there, with all their item events:\n`);
+  for (const line of roleSlotMisses.slice(0, EXAMPLES)) console.log(`${line}\n`);
+  console.log(`Others: ${roleSlotMisses.slice(EXAMPLES, 15).join("; ") || "none"}\n`);
 
   console.log(`## More than six items\n`);
   console.log(`${plural(tooMany.length, "player")} held more than six items at some point in the rebuild, so it missed an item leaving. The first ones, with their item events up to that moment:\n`);

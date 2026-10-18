@@ -38,7 +38,8 @@ const FIDDLESTICKS = "fiddlesticks"; // Riot spells it FiddleSticks
 const EYE_OF_THE_HERALD = 3513;
 
 // Items that stack in one slot: Health Potion, Control Ward, and the
-// biscuits from the Biscuit Delivery rune, one every 2 minutes until 6:00.
+// biscuits from the Biscuit Delivery rune, one every 2 minutes until 6:00,
+// which wait for an empty slot when the six are full.
 const CONTROL_WARD = 2055;
 const BISCUIT = 2010;
 const BISCUIT_TIMES = [2 * 60_000, 4 * 60_000, 6 * 60_000];
@@ -61,6 +62,7 @@ const SUPPORT_UPGRADES = new Set([3869, 3870, 3871, 3876, 3877]);
 // six are full.
 const MAGICAL_FOOTWEAR = 2422;
 const MAGICAL_FOOTWEAR_MS = 12 * 60_000;
+const WAITS_FOR_SLOT = new Set([BISCUIT, MAGICAL_FOOTWEAR]);
 
 // Items that turn into another without a purchase: the support item's steps;
 // tier 2 boots into tier 3 (finishing the mid lane quest upgrades them for
@@ -184,11 +186,11 @@ export function itemHistory(
   // until the quest's hidden item first leaves.
   const role = { id: 0, count: 0 };
   let roleTakes: (id: number) => boolean = () => false;
-  let footwearWaiting = false; // Magical Footwear's boots, waiting for a slot
+  // Free items waiting for an empty slot (see WAITS_FOR_SLOT).
+  const waiting: number[] = [];
   // Purchases and sales that can still be undone, latest last.
   const undoable: Undoable[] = [];
 
-  const hasEmptySlot = () => slots.length < ITEM_SLOTS || slots.some((s) => s.count === 0);
   const give = (id: number) => {
     if (TRINKETS.has(id)) {
       trinket = id;
@@ -204,12 +206,10 @@ export function itemHistory(
       stack.count++;
       return;
     }
-    if (id === MAGICAL_FOOTWEAR && !hasEmptySlot()) {
-      footwearWaiting = true;
-      return;
-    }
     const empty = slots.findIndex((s) => s.count === 0);
     if (empty !== -1) slots[empty] = { id, count: 1 };
+    else if (slots.length < ITEM_SLOTS) slots.push({ id, count: 1 });
+    else if (WAITS_FOR_SLOT.has(id)) waiting.push(id);
     // Past six items only when the events say so, which the game doesn't
     // allow; then they're shown rather than hidden.
     else slots.push({ id, count: 1 });
@@ -232,6 +232,13 @@ export function itemHistory(
     slot.count--;
     if (slot.count === 0) empty(slot);
     return true;
+  };
+  // Takes an item off the waiting list, when it's used before a slot is
+  // free. False if it wasn't waiting.
+  const stopWaiting = (id: number): boolean => {
+    const i = waiting.indexOf(id);
+    if (i !== -1) waiting.splice(i, 1);
+    return i !== -1;
   };
   // Past six items, an emptied slot goes instead of staying empty, so the
   // extra one is only shown for as long as it's there.
@@ -294,8 +301,7 @@ export function itemHistory(
       // Footwear's too, even while they wait for a slot), or a support's
       // control ward, which the purchase at the same moment puts there.
       if (quest === BOT_LANE_QUEST && BOOTS.has(id)) {
-        if (id === MAGICAL_FOOTWEAR && footwearWaiting) footwearWaiting = false;
-        else if (!take(id)) return false;
+        if (!take(id) && !stopWaiting(id)) return false;
         give(id);
         return true;
       }
@@ -303,15 +309,10 @@ export function itemHistory(
         if (!bought.includes(id) && take(id)) give(id);
         return true;
       }
-      if (id === MAGICAL_FOOTWEAR && footwearWaiting) {
-        footwearWaiting = false;
-        usedUp.push(id);
-        return true;
-      }
       const next = id === BOUNTY_OF_WORLDS ? upgradeAfter(at) : TURNS_INTO[id];
       const builtInto = bought.filter((b) => b !== id && !CONSUMABLES.has(b));
       if (next !== undefined && builtInto.length === 0) return turnInto(id, next);
-      if (!take(id)) return false;
+      if (!take(id) && !stopWaiting(id)) return false;
       usedUp.push(id);
       return true;
     };
@@ -326,7 +327,7 @@ export function itemHistory(
           if (!leave(e.itemId)) notYet.push(e.itemId);
           break;
         case "ITEM_SOLD":
-          take(e.itemId);
+          if (!take(e.itemId)) stopWaiting(e.itemId);
           undoable.push({ kind: "sold", itemId: e.itemId, usedUp: [], trinketBefore: null });
           break;
         case "ITEM_PURCHASED": {
@@ -366,10 +367,8 @@ export function itemHistory(
       }
     }
     for (const id of notYet) leave(id);
-    if (footwearWaiting && hasEmptySlot()) {
-      footwearWaiting = false;
-      give(MAGICAL_FOOTWEAR);
-    }
+    // Waiting items take any slot that emptied, or wait on.
+    for (const id of waiting.splice(0)) give(id);
 
     // Everything at one millisecond (components going into an item) is one
     // change.
