@@ -46,6 +46,7 @@ type RowProps = {
   t: number;
   // Null when the game's items can't be rebuilt.
   items: Record<number, ItemInfo> | null;
+  bootsSlot: boolean;
 };
 
 export function ReplayScoreboard({
@@ -53,6 +54,7 @@ export function ReplayScoreboard({
   t,
   people,
   items,
+  bootsSlot,
   myTeamId,
   winningTeamId,
 }: {
@@ -61,6 +63,9 @@ export function ReplayScoreboard({
   // Your team first, each team in role order.
   people: ReplayPerson[];
   items: Record<number, ItemInfo>;
+  // Whether anyone gets the boots slot the bot lane quest unlocks during
+  // the game, so the items column makes room for it from the start.
+  bootsSlot: boolean;
   myTeamId: number;
   winningTeamId: number;
 }) {
@@ -101,6 +106,7 @@ export function ReplayScoreboard({
               now: moment(person.participantId),
               t,
               items: showItems ? items : null,
+              bootsSlot,
             }));
           return (
             <div key={team.teamId} className="row-span-2 grid min-w-0 grid-rows-subgrid gap-2">
@@ -135,7 +141,10 @@ export function ReplayScoreboard({
                       Gold
                     </th>
                     {showItems && (
-                      <th scope="col" className="w-[176px] py-1.5 pl-1.5 pr-2 font-medium">
+                      <th
+                        scope="col"
+                        className={`${bootsSlot ? "w-[200px]" : "w-[176px]"} py-1.5 pl-1.5 pr-2 font-medium`}
+                      >
                         Items
                       </th>
                     )}
@@ -186,7 +195,7 @@ function outline(tag: ReplayPerson["tag"]): string {
   return "";
 }
 
-function TableRow({ person, now, t, items }: RowProps) {
+function TableRow({ person, now, t, items, bootsSlot }: RowProps) {
   return (
     <tr className={`border-t border-line ${outline(person.tag)}`}>
       <th scope="row" className="py-1.5 pl-2 pr-2 text-left font-normal">
@@ -205,7 +214,7 @@ function TableRow({ person, now, t, items }: RowProps) {
       <td className="px-1.5 py-1.5 font-mono">{formatThousands(now.gold)}</td>
       {items && now.items && (
         <td className="py-1.5 pl-1.5 pr-2">
-          <ItemRow inventory={now.items} items={items} />
+          <ItemRow inventory={now.items} items={items} bootsSlot={bootsSlot} />
         </td>
       )}
     </tr>
@@ -215,7 +224,7 @@ function TableRow({ person, now, t, items }: RowProps) {
 // The same as a table row, on two or three lines: name and K/D/A, then CS
 // and gold with the words written out (there are no column headings), then
 // items.
-function PhoneRow({ person, now, t, items }: RowProps) {
+function PhoneRow({ person, now, t, items, bootsSlot }: RowProps) {
   return (
     <li className={`flex gap-2.5 border-t border-line px-2 py-2 ${outline(person.tag)}`}>
       <ChampionPicture person={person} now={now} />
@@ -233,7 +242,7 @@ function PhoneRow({ person, now, t, items }: RowProps) {
             {now.cs} CS · {formatThousands(now.gold)} gold
           </span>
         </div>
-        {items && now.items && <ItemRow inventory={now.items} items={items} />}
+        {items && now.items && <ItemRow inventory={now.items} items={items} bootsSlot={bootsSlot} />}
       </div>
     </li>
   );
@@ -283,15 +292,35 @@ function DeadNote({ now, t }: { now: PlayerMoment; t: number }) {
   return <div className="font-mono text-label text-faint">Dead, back in {formatClock(left)}</div>;
 }
 
-// Six item slots and the trinket, drawn round like in the game.
-function ItemRow({ inventory, items }: { inventory: Inventory; items: Record<number, ItemInfo> }) {
+// Six item slots and the trinket, drawn round like in the game. In games
+// where a bot laner finishes their quest, their boots move to a slot of
+// their own, between the six and the trinket; everyone else gets a gap
+// there so the trinkets still line up.
+function ItemRow({
+  inventory,
+  items,
+  bootsSlot,
+}: {
+  inventory: Inventory;
+  items: Record<number, ItemInfo>;
+  bootsSlot: boolean;
+}) {
   return (
     <div role="group" aria-label="Items" className="flex gap-[3px]">
       {inventory.slots.map((id, slot) => (
         // Two of the same item can share an id, so key by slot.
         <ItemSlot key={slot} info={items[id]} />
       ))}
-      <ItemSlot info={items[inventory.trinket]} className="ml-1 rounded-full" />
+      {bootsSlot &&
+        (inventory.boots > 0 ? (
+          <ItemSlot info={items[inventory.boots]} className="ml-1 rounded-[5px]" />
+        ) : (
+          <span aria-hidden className="ml-1 w-5 shrink-0" />
+        ))}
+      <ItemSlot
+        info={items[inventory.trinket]}
+        className={`rounded-full ${bootsSlot ? "" : "ml-1"}`}
+      />
     </div>
   );
 }

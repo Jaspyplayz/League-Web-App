@@ -4,12 +4,12 @@
 //   npm run tempo-games                                     Oceania, every tier
 //   npm run tempo-games -- --tiers master,grandmaster,challenger --players 40
 //   npm run tempo-games -- --region na --tiers gold --players 2 --games 3   a quick test
-//   npm run tempo-games -- --raw --players 3 --games 5      whole games for the item check
+//   npm run tempo-games -- --items --players 3 --games 5    games for the item check
 //
 // Needs RIOT_API_KEY in .env.local. Then `npm run study-tempo` reads the
-// folder and prints the report. With --raw it saves each game whole, as Riot
-// sends it, into .cache/item-check instead, for `npm run check-items`
-// (docs/replay.md).
+// folder and prints the report. With --items it saves each game's whole
+// timeline and final items into .cache/item-check instead, for
+// `npm run check-items` (docs/replay.md).
 //
 // Like the benchmark collector, it picks players spread across each tier's
 // ladder and downloads their recent ranked games, staying under 70 calls every
@@ -26,7 +26,7 @@ import { parseArgs } from "node:util";
 import { loadEnvConfig } from "@next/env";
 import { samplePlayers } from "@/lib/analyzer/benchmarks";
 import { plural } from "@/lib/analyzer/format";
-import { ITEM_CHECK_FOLDER } from "@/lib/analyzer/item-check";
+import { ITEM_CHECK_FOLDER, toItemCheckGame } from "@/lib/analyzer/item-check";
 import { STUDY_FOLDER, toStudyGame } from "@/lib/analyzer/tempo-study";
 import { createPacer } from "@/lib/pace";
 import { isRegion, type Region } from "@/lib/regions";
@@ -54,11 +54,11 @@ const { values: args } = parseArgs({
     tiers: { type: "string", default: [...TIERS].reverse().join(",") },
     players: { type: "string", default: "20" },
     games: { type: "string", default: "10" },
-    raw: { type: "boolean", default: false },
+    items: { type: "boolean", default: false },
   },
 });
 
-const FOLDER = args.raw ? ITEM_CHECK_FOLDER : STUDY_FOLDER;
+const FOLDER = args.items ? ITEM_CHECK_FOLDER : STUDY_FOLDER;
 
 async function main() {
   const region = args.region;
@@ -94,7 +94,9 @@ async function main() {
           // Remakes and short games are skipped before downloading the timeline.
           if (match.info.queueId !== RANKED_SOLO_QUEUE || match.info.gameDuration < 15 * 60) continue;
           const timeline = await call(() => getTimeline(region, matchId));
-          const game = args.raw ? { match, timeline } : toStudyGame(match, timeline, tier, region);
+          const game = args.items
+            ? toItemCheckGame(match, timeline)
+            : toStudyGame(match, timeline, tier, region);
           if (!game) continue;
           writeFileSync(join(FOLDER, `${matchId}.json`), JSON.stringify(game));
           saved++;
@@ -110,7 +112,7 @@ async function main() {
     }
     console.log(`${tierName(tier)}: saved ${plural(saved, "game")} from ${plural(players.length, "player")}`);
   }
-  const next = args.raw ? "npm run check-items" : "npm run study-tempo";
+  const next = args.items ? "npm run check-items" : "npm run study-tempo";
   console.log(`\n${FOLDER} now holds ${plural(savedIds().length, "game")}. Next: ${next}`);
 }
 

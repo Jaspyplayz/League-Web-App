@@ -13,6 +13,19 @@ const WORLD_ATLAS = 3865;
 const RUNIC_COMPASS = 3866;
 const BOUNTY_OF_WORLDS = 3867;
 const REALMSPIKE = 3871; // Zaz'Zak's Realmspike, one of the support upgrades
+const EYE_OF_THE_HERALD = 3513;
+const BOOTS = 1001;
+const DAGGER = 1042;
+const BERSERKERS = 3006; // Berserker's Greaves, from Boots and two Daggers
+const GUNMETAL = 3172; // Gunmetal Greaves, their tier 3
+const SORCERERS = 3020; // Sorcerer's Shoes
+const SPELLSLINGERS = 3175; // their tier 3
+const ELIXIR = 2140; // Elixir of Wrath
+const STOPWATCH = 2420;
+const BROKEN_STOPWATCH = 2421;
+const ZHONYAS = 3157; // built from a Stopwatch, among others
+const BOT_LANE_QUEST = 1202; // a hidden item Riot logs leaving when the quest is done
+const MAGICAL_FOOTWEAR = 2422;
 
 const bought = (timestamp: number, itemId: number, participantId = ME): TrimmedEvent => ({
   type: "ITEM_PURCHASED",
@@ -52,11 +65,12 @@ const last = (events: TrimmedEvent[]) => itemHistory(events, ME).at(-1)!;
 describe("itemHistory", () => {
   it("starts empty and puts each new item in the first empty slot, trinkets in their own", () => {
     const history = itemHistory(start, ME);
-    expect(history[0]).toEqual({ from: 0, slots: [0, 0, 0, 0, 0, 0], trinket: 0 });
+    expect(history[0]).toEqual({ from: 0, slots: [0, 0, 0, 0, 0, 0], trinket: 0, boots: 0 });
     expect(history.at(-1)).toEqual({
       from: 2_000,
       slots: [DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0],
       trinket: STEALTH_WARD,
+      boots: 0,
     });
   });
 
@@ -148,6 +162,100 @@ describe("itemHistory", () => {
     expect(inventoryAt(history, 500_000).slots).toEqual([RUNIC_COMPASS, HEALTH_POTION, 0, 0, 0, 0]);
     expect(inventoryAt(history, 730_000).slots[0]).toBe(BOUNTY_OF_WORLDS);
     expect(inventoryAt(history, 733_000).slots[0]).toBe(REALMSPIKE);
+  });
+
+  it("puts the Eye of the Herald in the trinket slot until it's used", () => {
+    // From a real game: the trinket leaves with nothing bought, then the Eye
+    // leaves when it's used, and the trinket is back at the end.
+    const events = [
+      usedUp(282_621, STEALTH_WARD),
+      bought(282_621, ORACLE_LENS),
+      usedUp(1_125_896, ORACLE_LENS),
+      usedUp(1_129_622, EYE_OF_THE_HERALD),
+    ];
+    const history = itemHistory(events, ME);
+    expect(inventoryAt(history, 1_126_000).trinket).toBe(EYE_OF_THE_HERALD);
+    expect(inventoryAt(history, 1_130_000).trinket).toBe(ORACLE_LENS);
+  });
+
+  it("brings the old trinket back when a swap is undone", () => {
+    const events = [usedUp(400_000, STEALTH_WARD), bought(400_000, ORACLE_LENS)];
+    expect(last([...events, undo(401_000, ORACLE_LENS, 0)]).trinket).toBe(STEALTH_WARD);
+  });
+
+  it("turns tier 2 boots into tier 3 when they leave with nothing bought", () => {
+    const events = [
+      ...start,
+      bought(300_000, BOOTS),
+      usedUp(500_000, BOOTS),
+      bought(500_000, SORCERERS),
+      usedUp(1_100_000, SORCERERS),
+    ];
+    expect(inventoryAt(itemHistory(events, ME), 1_000_000).slots[2]).toBe(SORCERERS);
+    expect(last(events).slots[2]).toBe(SPELLSLINGERS);
+  });
+
+  it("upgrades boots bought already upgraded, whichever order Riot logs it in", () => {
+    // From a real game: the boots leave at the same millisecond they're bought.
+    const events = [
+      ...start,
+      bought(300_000, BOOTS),
+      usedUp(896_752, BOOTS),
+      usedUp(896_752, SORCERERS),
+      bought(896_752, SORCERERS),
+    ];
+    expect(last(events).slots).toEqual([DORANS_BLADE, HEALTH_POTION, SPELLSLINGERS, 0, 0, 0]);
+  });
+
+  it("drops an elixir drunk as it's bought", () => {
+    const events = [...start, usedUp(2_295_731, ELIXIR), bought(2_295_731, ELIXIR)];
+    expect(last(events).slots).toEqual([DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0]);
+  });
+
+  it("breaks a used Stopwatch, but uses it up when an item is built from it", () => {
+    const withWatch = [...start, bought(1_000_000, STOPWATCH)];
+    expect(last([...withWatch, usedUp(1_200_000, STOPWATCH)]).slots[2]).toBe(BROKEN_STOPWATCH);
+    expect(
+      last([...withWatch, usedUp(1_200_000, STOPWATCH), bought(1_200_000, ZHONYAS)]).slots[2],
+    ).toBe(ZHONYAS);
+  });
+
+  it("moves a bot laner's boots to their own slot when the role quest is done", () => {
+    // From a real game: the quest's hidden item and the boots leave together,
+    // and boots bought later go to the new slot too.
+    const events = [
+      ...start,
+      bought(856_904, BOOTS),
+      usedUp(892_256, BOT_LANE_QUEST),
+      usedUp(892_256, BOOTS),
+      bought(900_000, DAGGER),
+      bought(900_100, DAGGER),
+      usedUp(916_671, BOOTS),
+      usedUp(916_671, DAGGER),
+      usedUp(916_671, DAGGER),
+      bought(916_671, BERSERKERS),
+    ];
+    const history = itemHistory(events, ME);
+    expect(inventoryAt(history, 893_000)).toMatchObject({
+      slots: [DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0],
+      boots: BOOTS,
+    });
+    expect(history.at(-1)).toMatchObject({
+      slots: [DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0],
+      boots: BERSERKERS,
+    });
+    expect(last([...events, usedUp(1_500_000, BERSERKERS)]).boots).toBe(GUNMETAL);
+  });
+
+  it("gives Magical Footwear's boots by 12:00, or sooner if they're upgraded sooner", () => {
+    const upgraded = [usedUp(1_246_849, MAGICAL_FOOTWEAR), bought(1_246_849, 3111)];
+    const history = itemHistory([...start, ...upgraded], ME);
+    expect(inventoryAt(history, 12 * 60_000 - 1).slots[2]).toBe(0);
+    expect(inventoryAt(history, 12 * 60_000).slots[2]).toBe(MAGICAL_FOOTWEAR);
+    expect(history.at(-1)!.slots[2]).toBe(3111);
+    // Never upgraded: Riot lists it at the end.
+    const kept = itemHistory(start, ME, [DORANS_BLADE, MAGICAL_FOOTWEAR, 0, 0, 0, 0, STEALTH_WARD]);
+    expect(kept.at(-1)!.slots).toContain(MAGICAL_FOOTWEAR);
   });
 
   it("ignores other players, and items the player never had", () => {

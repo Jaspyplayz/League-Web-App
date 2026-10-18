@@ -149,7 +149,7 @@ function replayItems(a: MatchAnalysis, dd: DataDragon | null): Record<number, It
   if (!dd) return items;
   for (const player of a.replay.players) {
     for (const change of player.items ?? []) {
-      for (const id of [...change.slots, change.trinket]) {
+      for (const id of [...change.slots, change.boots, change.trinket]) {
         const name = id > 0 ? itemName(dd, id) : null;
         if (name) items[id] = { name, iconUrl: itemIconUrl(dd, id) };
       }
