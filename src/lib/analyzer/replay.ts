@@ -5,7 +5,8 @@
 // Riot logs kills, deaths, skill points and item changes to the
 // millisecond, so those are exact. Gold, CS and positions are only
 // snapshotted once a minute, so between two snapshots they're estimates:
-// gold and CS read off a straight line from one to the next, positions from
+// gold steps up at each kill and grows steadily otherwise (goldAt), CS reads
+// off a straight line from one snapshot to the next, and positions come from
 // the path in positions.ts. Respawn times come from the game's death timer
 // formula (respawnSeconds in tempo.ts).
 //
@@ -192,7 +193,7 @@ export function scoreboardAt(data: ReplayData, t: number): Scoreboard {
       level: Math.min(highest, Math.max(lowest, points)),
       ...scores,
       cs: Math.round(between(p.cs, snapshots, t)),
-      gold: Math.round(between(p.gold, snapshots, t)),
+      gold: Math.round(goldAt(p.gold, snapshots, data.kills, p.participantId, t)),
       items: p.items ? inventoryAt(p.items, t) : null,
       respawnAt,
       position: positionAt(p.path, t),
@@ -240,9 +241,48 @@ export function monsterMarks(objectives: ReplayObjective[]): ReplayObjective[] {
   return marks;
 }
 
+// The base gold for a kill: the killer gets 300 and everyone who helped
+// shares 150. The timeline doesn't record what each kill really paid (first
+// blood and shutdowns pay more, a kill on someone who keeps dying less).
+export const KILL_GOLD = 300;
+export const ASSIST_GOLD = 150;
+
+// A player's total gold at moment t (ms). Riot snapshots it once a minute.
+// In between, the gold for a kill they got or helped with arrives at the
+// second of the kill, and the rest of what they earned that minute (minions,
+// monsters, towers, their gold per second) at a steady pace. Each kill counts
+// the base reward, scaled down if the minute paid less than that in total,
+// so the estimate always lands on the next snapshot.
+export function goldAt(
+  gold: number[],
+  snapshots: number[],
+  kills: Pick<ReplayKill, "timestamp" | "killerId" | "assists">[],
+  participantId: number,
+  t: number,
+): number {
+  const after = snapshots.findIndex((s) => s >= t);
+  if (after === -1) return gold.at(-1) ?? 0;
+  if (after === 0) return gold[0];
+  const from = snapshots[after - 1];
+  const to = snapshots[after];
+  // Their base reward for the kills after `start`, up to and including `end`.
+  const killGold = (start: number, end: number) =>
+    kills.reduce((sum, k) => {
+      if (k.timestamp <= start || k.timestamp > end) return sum;
+      if (k.killerId === participantId) return sum + KILL_GOLD;
+      if (k.assists.includes(participantId)) return sum + ASSIST_GOLD / k.assists.length;
+      return sum;
+    }, 0);
+  const earned = gold[after] - gold[after - 1];
+  const fromKills = killGold(from, to);
+  const scale = fromKills > earned ? Math.max(0, earned) / fromKills : 1;
+  const steady = earned - fromKills * scale;
+  return gold[after - 1] + steady * ((t - from) / (to - from)) + killGold(from, t) * scale;
+}
+
 // A once-a-minute number at moment t, on a straight line between the
 // snapshots either side of it.
-function between(values: number[], snapshots: number[], t: number): number {
+export function between(values: number[], snapshots: number[], t: number): number {
   const after = snapshots.findIndex((s) => s >= t);
   if (after === -1) return values.at(-1) ?? 0;
   if (after === 0) return values[0];

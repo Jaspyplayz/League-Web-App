@@ -17,7 +17,7 @@
 import type { Match } from "@/lib/riot/types";
 import { TIERS, tierName, type Tier } from "@/lib/tiers";
 import { isScorable, toScoreGame } from "./score";
-import type { TrimmedEvent, TrimmedFrame, TrimmedTimeline } from "./trim";
+import type { PlayerFrame, TrimmedEvent, TrimmedTimeline } from "./trim";
 
 // What we record about each team at each minute, in this order. Saved as
 // plain arrays (not objects) so thousands of games stay a few MB.
@@ -95,9 +95,10 @@ export function toWinChanceGame(match: Match, timeline: TrimmedTimeline): WinCha
 }
 
 // One team's numbers at one frame of the game. `teamOf` maps each
-// participantId to their team.
+// participantId to their team. The frame only needs each player's gold and
+// XP, so the replay can pass its estimates for any second (plays.ts).
 export function teamStateAt(
-  frame: TrimmedFrame,
+  frame: { timestamp: number; players: Pick<PlayerFrame, "gold" | "xp">[] },
   events: TrimmedEvent[],
   teamOf: Map<number, number>,
   teamId: number,
@@ -382,6 +383,12 @@ export function withRank(model: WinChanceModel, rank: RankModel): WinChanceModel
   return { ...model, rank: label, games, weights, evaluation };
 }
 
+// Whether a saved model was trained on today's feature list. One trained on
+// a different list can't be used until it's retrained.
+export function modelFits(model: Pick<WinChanceModel, "features">): boolean {
+  return model.features.join() === featureKeys().join();
+}
+
 // Blue side's chance of winning (0 to 1) at one moment.
 export function blueWinChance(weights: readonly number[], features: number[]): number {
   return sigmoid(dot(weights, features));
@@ -393,7 +400,7 @@ export function winChanceCurve(
   game: WinChanceGame,
   model: WinChanceModel,
 ): { t: number; blue: number }[] | null {
-  if (model.features.join() !== featureKeys().join()) return null;
+  if (!modelFits(model)) return null;
   return game.frames.map((frame) => ({
     t: frame.t,
     blue: frame.t > 0 ? blueWinChance(model.weights, winChanceFeatures(frame)) : 0.5,
