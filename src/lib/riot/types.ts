@@ -70,6 +70,9 @@ export type Participant = {
   item4: number;
   item5: number;
   item6: number; // trinket
+  // What's in the slot the player's role quest adds at the end: a bot
+  // laner's boots, a support's control wards. Missing in older games.
+  roleBoundItem?: number;
   summoner1Id: number; // summoner spells, e.g. 4 = Flash (names come from Data Dragon)
   summoner2Id: number;
   champLevel: number; // level at the end of the game

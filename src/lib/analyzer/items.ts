@@ -7,10 +7,9 @@
 // Some items come, go or change without a purchase in the log, so they have
 // rules of their own below: free items (the starting trinket, the support
 // item, Magical Footwear's boots), items that upgrade themselves (tier 3
-// boots, Muramana and the like), the Eye of the Herald, and the boots slot a
-// bot laner gets for finishing their role quest. scripts/check-items.ts checks
-// the rules against the items Riot lists at the end of real games
-// (docs/replay.md).
+// boots, Muramana and the like), the Eye of the Herald, the slot each role's
+// quest adds, and Viego. scripts/check-items.ts checks the rules against the
+// items Riot lists at the end of real games (docs/replay.md).
 //
 // Timelines saved before Turnpoint kept sales and used-up items only have
 // the purchases, which isn't enough: the components of every finished item
@@ -36,7 +35,8 @@ const EYE_OF_THE_HERALD = 3513;
 
 // Items that stack in one slot: Health Potion, Control Ward, and the
 // biscuits from the Biscuit Delivery rune.
-const STACKS = new Set([2003, 2010, 2055]);
+const CONTROL_WARD = 2055;
+const STACKS = new Set([2003, 2010, CONTROL_WARD]);
 
 // The support item. Supports start with World Atlas, which the log doesn't
 // show them buying. It turns into Runic Compass, then Bounty of Worlds, then
@@ -71,21 +71,36 @@ const TURNS_INTO: Record<number, number> = {
   3119: 3121, // Winter's Approach into Fimbulwinter
 };
 
-// Finishing the bot lane role quest moves the player's boots out of their
-// six slots into a slot of their own, where any boots bought later go too.
-// Riot logs the quest's own hidden item leaving at that moment.
+// Each role's quest is tracked with a hidden item that's never bought, kept
+// in a slot of the role's own: 1200 to 1204 while the quest is under way
+// (top, mid, bot lane, support, jungle), then another one once it's done
+// (1207 to 1209 for bot lane, support and jungle in the check's games).
+// Riot logs the hidden item leaving whenever something else goes in that
+// slot:
+// - A bot laner's boots, once their quest is done. Boots bought later go
+//   there too.
+// - A support's control wards, all game long. Riot logs each ward that goes
+//   there as bought and leaving at once, with the hidden item.
+const QUEST_ITEMS = new Set([1200, 1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208, 1209]);
 const BOT_LANE_QUEST = 1202;
+const SUPPORT_QUEST = new Set([1203, 1208]);
 const BOOTS = new Set([
   1001, MAGICAL_FOOTWEAR, 3006, 3008, 3009, 3020, 3047, 3111, 3158, 3168, 3170, 3171, 3172, 3173,
   3174, 3175,
 ]);
 
+// Viego possessing an enemy logs every item he holds leaving at once (his
+// quest's hidden item too), and going back to himself logs every item the
+// enemy held leaving. Neither changes his own items.
+const VIEGO = "Viego";
+
 export type Inventory = {
   // Item ids by slot, 0 for an empty slot, like Riot's item0 to item5.
   slots: number[];
   trinket: number; // 0 for none
-  // The bot lane quest's boots slot. 0 when empty or not unlocked.
-  boots: number;
+  // The item in the slot the player's role quest adds (see QUEST_ITEMS): a
+  // bot laner's boots or a support's control wards. 0 when empty.
+  roleItem: number;
 };
 
 // A player's items from `from` (ms) until the next change.
@@ -107,24 +122,37 @@ export function keepsItemChanges({ events }: Pick<TrimmedTimeline, "events">): b
   return events.some((e) => e.type === "ITEM_DESTROYED" || e.type === "ITEM_SOLD");
 }
 
-// What one purchase used up, so undoing it can give those back: Riot logs
-// components leaving when an item is built from them, but not coming back
-// when the purchase is undone.
-type Purchase = { itemId: number; usedUp: number[]; trinketBefore: number | null };
+// A purchase or sale, so undoing it can put things back. For a purchase,
+// what it used up and the trinket it replaced: Riot logs components leaving
+// when an item is built from them, but not coming back when the purchase is
+// undone.
+type Undoable = {
+  kind: "bought" | "sold";
+  itemId: number;
+  usedUp: number[];
+  trinketBefore: number | null;
+};
+
+type Options = {
+  // The items Riot lists for the player at the end (item0 to item6). They
+  // tell which trinket a player kept all game, which support upgrade they
+  // picked, and whether free items they never used up were there.
+  finalItems?: number[];
+  // The player's champion, for Viego.
+  champion?: string;
+};
 
 // Every change to one player's items, in order. The first entry is what they
-// start the game with. `finalItems` are the items Riot lists for them at the
-// end (item0 to item6): they tell which trinket a player kept all game,
-// which support upgrade they picked, and whether free items they never used
-// up were there.
+// start the game with.
 export function itemHistory(
   events: TrimmedEvent[],
   participantId: number,
-  finalItems: number[] = [],
+  { finalItems = [], champion = "" }: Options = {},
 ): ItemChange[] {
-  const logged = events.filter(
+  let logged = events.filter(
     (e): e is ItemEvent => isItemEvent(e) && e.participantId === participantId,
   );
+  if (champion === VIEGO) logged = withoutPossessions(logged);
   const mine = [...freeItems(logged, finalItems), ...logged].sort(
     (a, b) => a.timestamp - b.timestamp || leavingFirst(a) - leavingFirst(b),
   );
@@ -133,23 +161,26 @@ export function itemHistory(
   const slots: { id: number; count: number }[] = [];
   let trinket = 0;
   let setAside = 0; // the trinket the Eye of the Herald replaced
-  let boots = 0;
-  let bootsSlot = false;
+  // The slot the player's role quest adds, and what goes in it: nothing
+  // until the quest's hidden item first leaves.
+  const role = { id: 0, count: 0 };
+  let roleTakes: (id: number) => boolean = () => false;
   // The support upgrade Bounty of Worlds turns into: the one they still had
   // at the end, or else one they sold.
   const upgrade =
     finalItems.find((id) => SUPPORT_UPGRADES.has(id)) ??
     mine.map(itemOf).find((id) => SUPPORT_UPGRADES.has(id)) ??
     0;
-  const purchases: Purchase[] = [];
+  const undoable: Undoable[] = [];
 
   const give = (id: number) => {
     if (TRINKETS.has(id)) {
       trinket = id;
       return;
     }
-    if (bootsSlot && BOOTS.has(id)) {
-      boots = id;
+    if (roleTakes(id)) {
+      role.count = role.id === id ? role.count + 1 : 1;
+      role.id = id;
       return;
     }
     const stack = STACKS.has(id) ? slots.find((s) => s.id === id) : undefined;
@@ -170,8 +201,9 @@ export function itemHistory(
       trinket = 0;
       return true;
     }
-    if (id === boots) {
-      boots = 0;
+    if (id === role.id) {
+      role.count--;
+      if (role.count === 0) role.id = 0;
       return true;
     }
     const slot = slots.find((s) => s.id === id && s.count > 0);
@@ -188,8 +220,8 @@ export function itemHistory(
   };
   // An item turning into another where it is. 0 empties the slot.
   const turnInto = (id: number, next: number): boolean => {
-    if (id === boots) {
-      boots = next;
+    if (id === role.id) {
+      role.id = next;
       return true;
     }
     const slot = slots.find((s) => s.id === id && s.count > 0);
@@ -199,19 +231,24 @@ export function itemHistory(
     return true;
   };
 
-  const history: ItemChange[] = [{ from: 0, slots: emptySlots(), trinket: 0, boots: 0 }];
+  const history: ItemChange[] = [{ from: 0, slots: emptySlots(), trinket: 0, roleItem: 0 }];
   for (const group of byMillisecond(mine)) {
     const at = group[0].timestamp;
     // What was bought at this millisecond: an item leaving at the same time
     // was used up building one of them.
     const bought = group.filter((e) => e.type === "ITEM_PURCHASED").map((e) => e.itemId);
     const usedUp: number[] = [];
-    const questDone = group.some((e) => e.type === "ITEM_DESTROYED" && e.itemId === BOT_LANE_QUEST);
-    if (questDone) bootsSlot = true;
+    // A role quest's hidden item leaving: something is going in its slot.
+    const destroyed = group.flatMap((e) => (e.type === "ITEM_DESTROYED" ? [e.itemId] : []));
+    const quest = destroyed.find((id) => QUEST_ITEMS.has(id));
+    const supportQuest = quest !== undefined && SUPPORT_QUEST.has(quest);
+    if (quest === BOT_LANE_QUEST) roleTakes = (id) => BOOTS.has(id);
+    if (supportQuest) roleTakes = (id) => id === CONTROL_WARD;
 
     // An item leaving without being sold. False when the player didn't have
     // it, at least not yet.
     const leave = (id: number): boolean => {
+      if (QUEST_ITEMS.has(id)) return true;
       if (id === EYE_OF_THE_HERALD && trinket === EYE_OF_THE_HERALD) {
         trinket = setAside;
         return true;
@@ -223,8 +260,14 @@ export function itemHistory(
         if (!bought.some((b) => TRINKETS.has(b))) [setAside, trinket] = [id, EYE_OF_THE_HERALD];
         return true;
       }
-      if (questDone && BOOTS.has(id) && take(id)) {
-        boots = id;
+      // Moving to the role quest's slot: a bot laner's boots, or a support's
+      // control ward, which the purchase at the same moment puts there.
+      if (quest === BOT_LANE_QUEST && BOOTS.has(id) && take(id)) {
+        give(id);
+        return true;
+      }
+      if (supportQuest && id === CONTROL_WARD) {
+        if (!bought.includes(id) && take(id)) give(id);
         return true;
       }
       const next = id === BOUNTY_OF_WORLDS ? upgrade : TURNS_INTO[id];
@@ -245,39 +288,47 @@ export function itemHistory(
           break;
         case "ITEM_SOLD":
           take(e.itemId);
+          undoable.push({ kind: "sold", itemId: e.itemId, usedUp: [], trinketBefore: null });
           break;
         case "ITEM_PURCHASED": {
           const before = trinket;
           give(e.itemId);
-          purchases.push({
+          undoable.push({
+            kind: "bought",
             itemId: e.itemId,
             usedUp: usedUp.splice(0),
             trinketBefore: TRINKETS.has(e.itemId) ? before : null,
           });
           break;
         }
-        case "ITEM_UNDO":
-          if (e.beforeId > 0 && e.afterId === 0) {
-            // Undoing a purchase: the item goes, and what it used up comes back.
-            take(e.beforeId);
-            const i = purchases.findLastIndex((p) => p.itemId === e.beforeId);
-            if (i !== -1) {
-              const [undone] = purchases.splice(i, 1);
-              for (const id of undone.usedUp) give(id);
-              if (undone.trinketBefore !== null) trinket = undone.trinketBefore;
-            }
-          } else if (e.beforeId === 0 && e.afterId > 0) {
-            // Undoing a sale: the item comes back.
-            give(e.afterId);
+        case "ITEM_UNDO": {
+          // Riot logs an undone purchase as the item before and nothing
+          // after. An undone sale, and an undone purchase that replaced
+          // another item (a trinket, the support item's upgrade), both come
+          // as nothing before and the item after, so then it's whichever of
+          // the two happened last.
+          const id = e.beforeId || e.afterId;
+          const undoesPurchase = e.afterId === 0;
+          const i = undoable.findLastIndex(
+            (u) => u.itemId === id && (!undoesPurchase || u.kind === "bought"),
+          );
+          const undone = i === -1 ? null : undoable.splice(i, 1)[0];
+          if (undone?.kind === "sold") {
+            give(id);
+          } else if (undone || undoesPurchase) {
+            take(id);
+            for (const item of undone?.usedUp ?? []) give(item);
+            if (undone && undone.trinketBefore !== null) trinket = undone.trinketBefore;
           }
           break;
+        }
       }
     }
     for (const id of notYet) leave(id);
 
     // Everything at one millisecond (components going into an item) is one
     // change.
-    const now: ItemChange = { from: at, slots: currentSlots(slots), trinket, boots };
+    const now: ItemChange = { from: at, slots: currentSlots(slots), trinket, roleItem: role.id };
     const last = history[history.length - 1];
     if (sameInventory(last, now)) continue;
     if (last.from === at) history[history.length - 1] = now;
@@ -295,6 +346,14 @@ type ItemEvent = Extract<
   TrimmedEvent,
   { type: "ITEM_PURCHASED" | "ITEM_SOLD" | "ITEM_DESTROYED" | "ITEM_UNDO" }
 >;
+
+// Viego's events without his possessions (see VIEGO): several items leaving
+// at once with nothing bought or sold, which for him is never a real change.
+function withoutPossessions(events: ItemEvent[]): ItemEvent[] {
+  return byMillisecond(events)
+    .filter((group) => group.length === 1 || group.some((e) => e.type !== "ITEM_DESTROYED"))
+    .flat();
+}
 
 // Items a player gets without a purchase in the log, as purchases at the
 // moment they arrive: the trinket everyone starts with (a Stealth Ward, or
@@ -386,7 +445,7 @@ function currentSlots(slots: { id: number }[]): number[] {
 function sameInventory(a: Inventory, b: Inventory): boolean {
   return (
     a.trinket === b.trinket &&
-    a.boots === b.boots &&
+    a.roleItem === b.roleItem &&
     a.slots.length === b.slots.length &&
     a.slots.every((id, i) => id === b.slots[i])
   );

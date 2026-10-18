@@ -13,6 +13,7 @@ const WORLD_ATLAS = 3865;
 const RUNIC_COMPASS = 3866;
 const BOUNTY_OF_WORLDS = 3867;
 const REALMSPIKE = 3871; // Zaz'Zak's Realmspike, one of the support upgrades
+const CELESTIAL_OPPOSITION = 3869; // another
 const EYE_OF_THE_HERALD = 3513;
 const BOOTS = 1001;
 const DAGGER = 1042;
@@ -24,7 +25,13 @@ const ELIXIR = 2140; // Elixir of Wrath
 const STOPWATCH = 2420;
 const BROKEN_STOPWATCH = 2421;
 const ZHONYAS = 3157; // built from a Stopwatch, among others
-const BOT_LANE_QUEST = 1202; // a hidden item Riot logs leaving when the quest is done
+// Hidden items for the role quests, which Riot logs leaving when something
+// goes in the slot the quest adds.
+const BOT_LANE_QUEST = 1202;
+const SUPPORT_QUEST = 1203;
+const SUPPORT_QUEST_DONE = 1208;
+const JUNGLE_QUEST_DONE = 1209;
+const CONTROL_WARD = 2055;
 const MAGICAL_FOOTWEAR = 2422;
 
 const bought = (timestamp: number, itemId: number, participantId = ME): TrimmedEvent => ({
@@ -65,12 +72,12 @@ const last = (events: TrimmedEvent[]) => itemHistory(events, ME).at(-1)!;
 describe("itemHistory", () => {
   it("starts empty and puts each new item in the first empty slot, trinkets in their own", () => {
     const history = itemHistory(start, ME);
-    expect(history[0]).toEqual({ from: 0, slots: [0, 0, 0, 0, 0, 0], trinket: 0, boots: 0 });
+    expect(history[0]).toEqual({ from: 0, slots: [0, 0, 0, 0, 0, 0], trinket: 0, roleItem: 0 });
     expect(history.at(-1)).toEqual({
       from: 2_000,
       slots: [DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0],
       trinket: STEALTH_WARD,
-      boots: 0,
+      roleItem: 0,
     });
   });
 
@@ -144,8 +151,10 @@ describe("itemHistory", () => {
   });
 
   it("gives a player who never changed trinket the one Riot lists at the end, all game", () => {
-    const final = [DORANS_BLADE, 0, 0, 0, 0, 0, STEALTH_WARD];
-    expect(itemHistory([bought(1_000, DORANS_BLADE)], ME, final)[0].trinket).toBe(STEALTH_WARD);
+    const finalItems = [DORANS_BLADE, 0, 0, 0, 0, 0, STEALTH_WARD];
+    expect(itemHistory([bought(1_000, DORANS_BLADE)], ME, { finalItems })[0].trinket).toBe(
+      STEALTH_WARD,
+    );
   });
 
   it("starts supports with World Atlas and upgrades it in its slot, up to the one they picked", () => {
@@ -157,7 +166,9 @@ describe("itemHistory", () => {
       usedUp(729_746, RUNIC_COMPASS),
       usedUp(732_629, BOUNTY_OF_WORLDS),
     ];
-    const history = itemHistory(events, ME, [REALMSPIKE, 0, 0, 0, 0, 0, ORACLE_LENS]);
+    const history = itemHistory(events, ME, {
+      finalItems: [REALMSPIKE, 0, 0, 0, 0, 0, ORACLE_LENS],
+    });
     expect(inventoryAt(history, 0).slots).toEqual([WORLD_ATLAS, 0, 0, 0, 0, 0]);
     expect(inventoryAt(history, 500_000).slots).toEqual([RUNIC_COMPASS, HEALTH_POTION, 0, 0, 0, 0]);
     expect(inventoryAt(history, 730_000).slots[0]).toBe(BOUNTY_OF_WORLDS);
@@ -179,8 +190,33 @@ describe("itemHistory", () => {
   });
 
   it("brings the old trinket back when a swap is undone", () => {
-    const events = [usedUp(400_000, STEALTH_WARD), bought(400_000, ORACLE_LENS)];
-    expect(last([...events, undo(401_000, ORACLE_LENS, 0)]).trinket).toBe(STEALTH_WARD);
+    // From a real game: Riot logs undoing a purchase that replaced an item
+    // like an undone sale, nothing before and the item after.
+    const events = [
+      bought(10_374, STEALTH_WARD),
+      usedUp(1_518_580, STEALTH_WARD),
+      bought(1_518_580, ORACLE_LENS),
+    ];
+    expect(last([...events, undo(1_520_150, 0, ORACLE_LENS)]).trinket).toBe(STEALTH_WARD);
+    expect(last([...events, undo(1_520_150, ORACLE_LENS, 0)]).trinket).toBe(STEALTH_WARD);
+  });
+
+  it("brings Bounty of Worlds back when picking its upgrade is undone", () => {
+    // From a real game: the upgrade is undone, then a different one picked.
+    const events = [
+      usedUp(409_000, WORLD_ATLAS),
+      usedUp(729_000, RUNIC_COMPASS),
+      usedUp(900_263, BOUNTY_OF_WORLDS),
+      bought(900_263, REALMSPIKE),
+      undo(902_703, 0, REALMSPIKE),
+    ];
+    const history = itemHistory(events, ME, {
+      finalItems: [CELESTIAL_OPPOSITION, 0, 0, 0, 0, 0, STEALTH_WARD],
+    });
+    expect(inventoryAt(history, 901_000).slots[0]).toBe(REALMSPIKE);
+    expect(inventoryAt(history, 903_000).slots).toEqual([BOUNTY_OF_WORLDS, 0, 0, 0, 0, 0]);
+    const picked = [...events, usedUp(950_000, BOUNTY_OF_WORLDS), bought(950_000, CELESTIAL_OPPOSITION)];
+    expect(last(picked).slots).toEqual([CELESTIAL_OPPOSITION, 0, 0, 0, 0, 0]);
   });
 
   it("turns tier 2 boots into tier 3 when they leave with nothing bought", () => {
@@ -238,13 +274,66 @@ describe("itemHistory", () => {
     const history = itemHistory(events, ME);
     expect(inventoryAt(history, 893_000)).toMatchObject({
       slots: [DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0],
-      boots: BOOTS,
+      roleItem: BOOTS,
     });
     expect(history.at(-1)).toMatchObject({
       slots: [DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0],
-      boots: BERSERKERS,
+      roleItem: BERSERKERS,
     });
-    expect(last([...events, usedUp(1_500_000, BERSERKERS)]).boots).toBe(GUNMETAL);
+    expect(last([...events, usedUp(1_500_000, BERSERKERS)]).roleItem).toBe(GUNMETAL);
+  });
+
+  it("keeps a support's control wards in the role quest's slot", () => {
+    // From a real game (Leona): each ward that goes in the empty slot is
+    // logged as bought and leaving, with the quest's hidden item leaving.
+    const goesInSlot = (timestamp: number, questItem: number) => [
+      usedUp(timestamp, CONTROL_WARD),
+      usedUp(timestamp, questItem),
+      bought(timestamp, CONTROL_WARD),
+    ];
+    const events = [
+      bought(1_000, DORANS_BLADE),
+      ...goesInSlot(399_194, SUPPORT_QUEST),
+      usedUp(505_942, CONTROL_WARD), // placed
+      ...goesInSlot(757_190, SUPPORT_QUEST),
+      bought(875_540, CONTROL_WARD), // a second one stacks there
+      usedUp(895_756, CONTROL_WARD),
+      ...goesInSlot(1_588_743, SUPPORT_QUEST_DONE),
+      bought(1_589_044, CONTROL_WARD),
+    ];
+    const history = itemHistory(events, ME);
+    const at = (t: number) => inventoryAt(history, t);
+    expect(at(400_000)).toMatchObject({ slots: [DORANS_BLADE, 0, 0, 0, 0, 0], roleItem: CONTROL_WARD });
+    expect(at(600_000).roleItem).toBe(0);
+    expect(at(880_000).roleItem).toBe(CONTROL_WARD);
+    expect(at(900_000).roleItem).toBe(CONTROL_WARD);
+    expect(history.at(-1)).toMatchObject({ slots: [DORANS_BLADE, 0, 0, 0, 0, 0], roleItem: CONTROL_WARD });
+    // Anyone else keeps control wards with their other items.
+    expect(last([...start, bought(300_000, CONTROL_WARD)]).slots[2]).toBe(CONTROL_WARD);
+  });
+
+  it("ignores Viego's possessions, which log his items and the enemy's leaving", () => {
+    // From a real game: his own items and his quest's hidden item leave when
+    // he possesses an enemy, and the enemy's items when he goes back.
+    const events = [
+      ...start,
+      bought(300_000, LONG_SWORD),
+      bought(300_200, LONG_SWORD),
+      usedUp(500_000, LONG_SWORD),
+      usedUp(500_000, LONG_SWORD),
+      bought(500_000, SERRATED_DIRK),
+      usedUp(871_957, DORANS_BLADE),
+      usedUp(871_957, HEALTH_POTION),
+      usedUp(871_957, SERRATED_DIRK),
+      usedUp(871_957, JUNGLE_QUEST_DONE),
+      usedUp(881_976, 1086),
+      usedUp(881_976, SERRATED_DIRK),
+      usedUp(881_976, BOOTS),
+      usedUp(900_000, HEALTH_POTION), // drunk
+    ];
+    const expected = [DORANS_BLADE, 0, SERRATED_DIRK, 0, 0, 0];
+    expect(itemHistory(events, ME, { champion: "Viego" }).at(-1)!.slots).toEqual(expected);
+    expect(last(events).slots).not.toEqual(expected);
   });
 
   it("gives Magical Footwear's boots by 12:00, or sooner if they're upgraded sooner", () => {
@@ -254,7 +343,9 @@ describe("itemHistory", () => {
     expect(inventoryAt(history, 12 * 60_000).slots[2]).toBe(MAGICAL_FOOTWEAR);
     expect(history.at(-1)!.slots[2]).toBe(3111);
     // Never upgraded: Riot lists it at the end.
-    const kept = itemHistory(start, ME, [DORANS_BLADE, MAGICAL_FOOTWEAR, 0, 0, 0, 0, STEALTH_WARD]);
+    const kept = itemHistory(start, ME, {
+      finalItems: [DORANS_BLADE, MAGICAL_FOOTWEAR, 0, 0, 0, 0, STEALTH_WARD],
+    });
     expect(kept.at(-1)!.slots).toContain(MAGICAL_FOOTWEAR);
   });
 

@@ -46,7 +46,7 @@ type RowProps = {
   t: number;
   // Null when the game's items can't be rebuilt.
   items: Record<number, ItemInfo> | null;
-  bootsSlot: boolean;
+  roleSlot: boolean;
 };
 
 export function ReplayScoreboard({
@@ -54,7 +54,7 @@ export function ReplayScoreboard({
   t,
   people,
   items,
-  bootsSlot,
+  roleSlot,
   myTeamId,
   winningTeamId,
 }: {
@@ -63,9 +63,9 @@ export function ReplayScoreboard({
   // Your team first, each team in role order.
   people: ReplayPerson[];
   items: Record<number, ItemInfo>;
-  // Whether anyone gets the boots slot the bot lane quest unlocks during
+  // Whether anyone puts something in the slot their role quest adds during
   // the game, so the items column makes room for it from the start.
-  bootsSlot: boolean;
+  roleSlot: boolean;
   myTeamId: number;
   winningTeamId: number;
 }) {
@@ -106,7 +106,7 @@ export function ReplayScoreboard({
               now: moment(person.participantId),
               t,
               items: showItems ? items : null,
-              bootsSlot,
+              roleSlot,
             }));
           return (
             <div key={team.teamId} className="row-span-2 grid min-w-0 grid-rows-subgrid gap-2">
@@ -143,7 +143,7 @@ export function ReplayScoreboard({
                     {showItems && (
                       <th
                         scope="col"
-                        className={`${bootsSlot ? "w-[200px]" : "w-[176px]"} py-1.5 pl-1.5 pr-2 font-medium`}
+                        className={`${roleSlot ? "w-[200px]" : "w-[176px]"} py-1.5 pl-1.5 pr-2 font-medium`}
                       >
                         Items
                       </th>
@@ -195,7 +195,7 @@ function outline(tag: ReplayPerson["tag"]): string {
   return "";
 }
 
-function TableRow({ person, now, t, items, bootsSlot }: RowProps) {
+function TableRow({ person, now, t, items, roleSlot }: RowProps) {
   return (
     <tr className={`border-t border-line ${outline(person.tag)}`}>
       <th scope="row" className="py-1.5 pl-2 pr-2 text-left font-normal">
@@ -214,7 +214,7 @@ function TableRow({ person, now, t, items, bootsSlot }: RowProps) {
       <td className="px-1.5 py-1.5 font-mono">{formatThousands(now.gold)}</td>
       {items && now.items && (
         <td className="py-1.5 pl-1.5 pr-2">
-          <ItemRow inventory={now.items} items={items} bootsSlot={bootsSlot} />
+          <ItemRow inventory={now.items} items={items} roleSlot={roleSlot} />
         </td>
       )}
     </tr>
@@ -224,7 +224,7 @@ function TableRow({ person, now, t, items, bootsSlot }: RowProps) {
 // The same as a table row, on two or three lines: name and K/D/A, then CS
 // and gold with the words written out (there are no column headings), then
 // items.
-function PhoneRow({ person, now, t, items, bootsSlot }: RowProps) {
+function PhoneRow({ person, now, t, items, roleSlot }: RowProps) {
   return (
     <li className={`flex gap-2.5 border-t border-line px-2 py-2 ${outline(person.tag)}`}>
       <ChampionPicture person={person} now={now} />
@@ -242,7 +242,7 @@ function PhoneRow({ person, now, t, items, bootsSlot }: RowProps) {
             {now.cs} CS · {formatThousands(now.gold)} gold
           </span>
         </div>
-        {items && now.items && <ItemRow inventory={now.items} items={items} bootsSlot={bootsSlot} />}
+        {items && now.items && <ItemRow inventory={now.items} items={items} roleSlot={roleSlot} />}
       </div>
     </li>
   );
@@ -292,18 +292,18 @@ function DeadNote({ now, t }: { now: PlayerMoment; t: number }) {
   return <div className="font-mono text-label text-faint">Dead, back in {formatClock(left)}</div>;
 }
 
-// Six item slots and the trinket, drawn round like in the game. In games
-// where a bot laner finishes their quest, their boots move to a slot of
-// their own, between the six and the trinket; everyone else gets a gap
-// there so the trinkets still line up.
+// Six item slots and the trinket, drawn round like in the game. Between
+// them, in games where it's used, the slot each role's quest adds: a bot
+// laner's boots once their quest is done, a support's control wards. Players
+// with nothing there get a gap, so the trinkets still line up.
 function ItemRow({
   inventory,
   items,
-  bootsSlot,
+  roleSlot,
 }: {
   inventory: Inventory;
   items: Record<number, ItemInfo>;
-  bootsSlot: boolean;
+  roleSlot: boolean;
 }) {
   return (
     <div role="group" aria-label="Items" className="flex gap-[3px]">
@@ -311,15 +311,15 @@ function ItemRow({
         // Two of the same item can share an id, so key by slot.
         <ItemSlot key={slot} info={items[id]} />
       ))}
-      {bootsSlot &&
-        (inventory.boots > 0 ? (
-          <ItemSlot info={items[inventory.boots]} className="ml-1 rounded-[5px]" />
+      {roleSlot &&
+        (inventory.roleItem > 0 ? (
+          <ItemSlot info={items[inventory.roleItem]} className="ml-1 rounded-[5px]" />
         ) : (
           <span aria-hidden className="ml-1 w-5 shrink-0" />
         ))}
       <ItemSlot
         info={items[inventory.trinket]}
-        className={`rounded-full ${bootsSlot ? "" : "ml-1"}`}
+        className={`rounded-full ${roleSlot ? "" : "ml-1"}`}
       />
     </div>
   );

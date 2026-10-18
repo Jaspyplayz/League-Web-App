@@ -294,7 +294,7 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
         t={t}
         people={people}
         items={items}
-        bootsSlot={replay.players.some((p) => p.items?.some((change) => change.boots > 0))}
+        roleSlot={replay.players.some((p) => p.items?.some((change) => change.roleItem > 0))}
         myTeamId={myTeamId}
         winningTeamId={winningTeamId}
       />

@@ -89,8 +89,9 @@ export type TeamMoment = {
 export type Scoreboard = { players: PlayerMoment[]; teams: TeamMoment[] };
 
 // The final items say which trinket a player kept all game and which
-// support upgrade they picked (see itemHistory).
-type Player = Pick<Participant, "participantId" | "teamId"> & FinalItems;
+// support upgrade they picked, and the champion whether it's Viego (see
+// itemHistory).
+type Player = Pick<Participant, "participantId" | "teamId" | "championName"> & FinalItems;
 
 // Everything scoreboardAt needs, from the timeline. `myTeamId` is the team
 // of the player whose page it is.
@@ -139,7 +140,12 @@ export function replayData(
       skillPoints: events
         .filter((e) => e.type === "SKILL_LEVEL_UP" && e.participantId === p.participantId)
         .map((e) => e.timestamp),
-      items: exactItems ? itemHistory(events, p.participantId, finalItems(p)) : null,
+      items: exactItems
+        ? itemHistory(events, p.participantId, {
+            finalItems: finalItems(p),
+            champion: p.championName,
+          })
+        : null,
     })),
     kills,
     objectives,

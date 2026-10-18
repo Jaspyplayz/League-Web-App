@@ -11,11 +11,15 @@ import { trimTimeline } from "./trim";
 
 export const ITEM_CHECK_FOLDER = ".cache/item-check";
 
-type CheckedPlayer = Pick<Participant, "participantId" | "championName" | "teamPosition"> & FinalItems;
+type CheckedPlayer = Pick<
+  Participant,
+  "participantId" | "championName" | "teamPosition" | "roleBoundItem"
+> &
+  FinalItems;
 
 // A game as the check keeps it: the whole timeline, and each player's
-// champion, role and final items. Like the tempo study's games, it leaves
-// out who played: no Riot IDs or PUUIDs.
+// champion, role and final items, the role quest's slot included. Like the
+// tempo study's games, it leaves out who played: no Riot IDs or PUUIDs.
 export type ItemCheckGame = {
   match: { metadata: { matchId: string }; info: { participants: CheckedPlayer[] } };
   timeline: Timeline;
@@ -39,6 +43,7 @@ export function toItemCheckGame(match: Match, timeline: Timeline): ItemCheckGame
             item4,
             item5,
             item6,
+            roleBoundItem: p.roleBoundItem,
           };
         }),
       },
@@ -59,20 +64,25 @@ export type ItemCheck = {
   missing: number[];
   extra: number[];
   trinket: { riot: number; rebuilt: number };
-  // What the rebuild has in the bot lane quest's boots slot, which Riot
-  // doesn't list with the other items. 0 for none.
-  boots: number;
+  // The slot the role quest adds, which Riot lists apart from the other
+  // items (undefined for games from before Riot listed it). 0 for empty.
+  roleItem: { riot: number | undefined; rebuilt: number };
   // When the rebuild first held more than six items, which the game doesn't
-  // allow, so it missed an item leaving. Null if it never did.
-  tooMany: number | null;
+  // allow, so it missed an item leaving, and what they were. Null if it
+  // never did.
+  tooMany: { at: number; slots: number[] } | null;
 };
 
 export function checkItems(game: ItemCheckGame): ItemCheck[] {
   const { events } = trimTimeline(game.timeline);
   return game.match.info.participants.map((p) => {
     const final = finalItems(p);
-    const history = itemHistory(events, p.participantId, final);
+    const history = itemHistory(events, p.participantId, {
+      finalItems: final,
+      champion: p.championName,
+    });
     const rebuilt = inventoryAt(history, Infinity);
+    const crowded = history.find((change) => change.slots.length > 6);
     const riot = final.slice(0, 6).filter((id) => id > 0);
     const ours = rebuilt.slots.filter((id) => id > 0);
     return {
@@ -81,8 +91,8 @@ export function checkItems(game: ItemCheckGame): ItemCheck[] {
       missing: without(riot, ours),
       extra: without(ours, riot),
       trinket: { riot: final[6], rebuilt: rebuilt.trinket },
-      boots: rebuilt.boots,
-      tooMany: history.find((change) => change.slots.length > 6)?.from ?? null,
+      roleItem: { riot: p.roleBoundItem, rebuilt: rebuilt.roleItem },
+      tooMany: crowded ? { at: crowded.from, slots: crowded.slots } : null,
     };
   });
 }
