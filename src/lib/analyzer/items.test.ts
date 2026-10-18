@@ -410,6 +410,23 @@ describe("itemHistory", () => {
     expect(last([...start, bought(300_000, CONTROL_WARD)]).slots[2]).toBe(CONTROL_WARD);
   });
 
+  it("loses a support's control ward still in the role quest's slot when the quest is done", () => {
+    // From a real game (Pyke): the ward leaves with the quest's hidden item
+    // as the support item upgrades, and Riot lists the slot empty at the end.
+    const events = [
+      usedUp(438_000, WORLD_ATLAS),
+      usedUp(572_000, CONTROL_WARD),
+      usedUp(572_000, SUPPORT_QUEST),
+      bought(572_000, CONTROL_WARD),
+      usedUp(776_000, CONTROL_WARD),
+      usedUp(776_000, RUNIC_COMPASS),
+      usedUp(776_000, SUPPORT_QUEST),
+    ];
+    const history = itemHistory(events, ME);
+    expect(inventoryAt(history, 600_000).roleItem).toBe(CONTROL_WARD);
+    expect(history.at(-1)).toMatchObject({ slots: [BOUNTY_OF_WORLDS, 0, 0, 0, 0, 0], roleItem: 0 });
+  });
+
   it("ignores Viego's possessions, which log his items and the enemy's leaving", () => {
     // From a real game: his own items and his quest's hidden item leave when
     // he possesses an enemy, and the enemy's items when he goes back.

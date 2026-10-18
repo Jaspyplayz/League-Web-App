@@ -95,7 +95,7 @@ const TURNS_INTO: Record<number, number> = {
 //   slot"). Boots bought later go there too.
 // - A support's control wards, all game long ("Control wards always go into
 //   your role quest slot"). Riot logs each ward that goes there as bought and
-//   leaving at once.
+//   leaving at once. A ward still there when the quest is done is lost.
 // - A jungler's pet, which leaves their items when it evolves at the end of
 //   their quest.
 export const QUEST_ITEMS = new Set([
@@ -297,18 +297,17 @@ export function itemHistory(
         if (!bought.some((b) => TRINKETS.has(b))) [setAside, trinket] = [id, EYE_OF_THE_HERALD];
         return true;
       }
-      // Moving to the role quest's slot: a bot laner's boots (Magical
-      // Footwear's too, even while they wait for a slot), or a support's
-      // control ward, which the purchase at the same moment puts there.
+      // A bot laner's boots moving to the role quest's slot (Magical
+      // Footwear's too, even while they wait for a slot).
       if (quest === BOT_LANE_QUEST && BOOTS.has(id)) {
         if (!take(id) && !stopWaiting(id)) return false;
         give(id);
         return true;
       }
-      if (supportQuest && id === CONTROL_WARD) {
-        if (!bought.includes(id) && take(id)) give(id);
-        return true;
-      }
+      // A support's control ward going in the role quest's slot, which the
+      // purchase at the same moment puts there. With nothing bought, it's
+      // the ward already there leaving as their quest is done.
+      if (supportQuest && id === CONTROL_WARD && bought.includes(id)) return true;
       const next = id === BOUNTY_OF_WORLDS ? upgradeAfter(at) : TURNS_INTO[id];
       const builtInto = bought.filter((b) => b !== id && !CONSUMABLES.has(b));
       if (next !== undefined && builtInto.length === 0) return turnInto(id, next);
