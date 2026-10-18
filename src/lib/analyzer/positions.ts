@@ -112,10 +112,7 @@ export function positionPath(
 // the fountain at 0:00, so there's always a point to start from.
 export function positionAt(path: PathPoint[], t: number): MapPosition {
   // The last point at or before t, and the next one.
-  const i = Math.max(
-    0,
-    path.findLastIndex((p) => p.at <= t),
-  );
+  const i = Math.max(0, path.findLastIndex((p) => p.at <= t));
   const from = path[i];
   const to = path[i + 1];
   // Before a jump they stay where they were.

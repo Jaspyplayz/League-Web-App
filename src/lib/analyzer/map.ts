@@ -12,7 +12,7 @@ import type { MapPosition } from "@/lib/riot/types";
 export type MapArea = "top" | "mid" | "bot" | "base" | "jungle";
 
 const BASE_SIZE = 4000; // each base is roughly a 4000 x 4000 corner
-const MAP_SIZE = 14900;
+export const MAP_SIZE = 14900;
 const SIDE_LANE_WIDTH = 2600; // distance from the map edge
 const MID_LANE_WIDTH = 1800; // distance from the diagonal, |x - y|
 

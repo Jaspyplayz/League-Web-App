@@ -53,6 +53,8 @@ export type ReplayKill = {
   assists: number[];
   // When the victim was back on the map.
   respawnAt: number;
+  // Where the victim died. Riot leaves it out now and then.
+  position: MapPosition | null;
 };
 
 // An epic monster, tower or inhibitor, and the team that took it.
@@ -122,6 +124,7 @@ export function replayData(
         victimId: e.victimId,
         assists: e.assistingParticipantIds,
         respawnAt: respawns[kills.length].respawnAt,
+        position: e.position,
       });
     } else if (e.type === "ELITE_MONSTER_KILL") {
       const kind = monsterKind(e.monsterType, e.monsterSubType);

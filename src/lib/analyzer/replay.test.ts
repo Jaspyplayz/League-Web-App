@@ -72,6 +72,7 @@ describe("replayData", () => {
       victimId: 3,
       assists: [7],
       respawnAt: clock("4:30") + respawnSeconds(3, clock("4:30")) * 1000,
+      position: null,
     });
   });
 

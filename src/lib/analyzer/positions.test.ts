@@ -82,6 +82,11 @@ describe("positionPath and positionAt", () => {
     ]);
   });
 
+  it("walks in a straight line when there isn't time to get there any faster", () => {
+    // 10 seconds to cover 6,519, which takes 16.3 at 400 a second.
+    expect(where(path([purchase("6:50")]), "6:55")).toEqual({ x: 3750, y: 750 });
+  });
+
   it("can spread the walk out of the fountain over the time until they're seen next", () => {
     const route = path([purchase("6:30")], MID, { ...REPLAY_PATHS, walkOut: null });
     expect(where(route, "6:45")).toEqual({ x: 3750, y: 750 });
