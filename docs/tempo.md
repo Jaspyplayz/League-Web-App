@@ -1,10 +1,10 @@
 # Tempo timeline (beta)
 
-The tempo timeline shows, second by second, which jungler had the tempo: the time advantage that lets one jungler make the next play (invade, gank, start an objective) while the other has to farm, back or give way. It's on the match page of any game where you played jungle, below the gank log, marked **Beta**.
+The tempo timeline shows, second by second, which jungler had the tempo: the time advantage that lets one jungler make the next play (invade, gank, start an objective) while the other has to farm, back or give way. When you played jungle, it's part of the [replay](replay.md) on the match page, marked **Beta**.
 
 It's an experiment. Riot doesn't record tempo, so the timeline estimates it from what Riot does record. This page explains how the estimate is made, and how well it held up in 1,923 real games.
 
-The code is in [`src/lib/analyzer/tempo.ts`](../src/lib/analyzer/tempo.ts) and the panel is `match/[matchId]/tempo.tsx`. The study that set its numbers is [`src/lib/analyzer/tempo-study.ts`](../src/lib/analyzer/tempo-study.ts), run by [`scripts/study-tempo.ts`](../scripts/study-tempo.ts) on games that [`scripts/collect-tempo-games.ts`](../scripts/collect-tempo-games.ts) downloads.
+The code is in [`src/lib/analyzer/tempo.ts`](../src/lib/analyzer/tempo.ts) and its parts of the replay are drawn by `match/[matchId]/tempo.tsx`. The study that set its numbers is [`src/lib/analyzer/tempo-study.ts`](../src/lib/analyzer/tempo-study.ts), run by [`scripts/study-tempo.ts`](../scripts/study-tempo.ts) on games that [`scripts/collect-tempo-games.ts`](../scripts/collect-tempo-games.ts) downloads.
 
 Like the rest of the match page, it describes the situation and never grades a decision. Whether to fight, farm or back depends on waves, vision, cooldowns and health, none of which Riot records between snapshots, and Riot's policies rule out tools that tell players what to do.
 
@@ -52,11 +52,11 @@ The panel shows these lines for whichever moment you pick, so the total can alwa
 
 Turnpoint started keeping unspent gold in saved timelines with this feature. For a game saved before that, item gold is estimated instead: the gold the jungler had earned by their last shop visit, as if they spent all of it there. Riot logs each purchase with its exact time but only records gold once a minute, so the gold at the moment of the visit is read off a straight line between the snapshots either side. In the study, the estimate was 90 gold off at the median and gave the same call as the exact numbers at 96.8% of minute marks. The panel says when a game uses it.
 
-## What the panel shows
+## What the replay shows for junglers
 
-- **The strip**: the whole game, blue while you were up tempo, red while the enemy jungler was and gray while it was even, changing at the second something changed. Above it are the epic monsters each team took; below it, when each jungler was dead (the faded bars) and when they shopped (●).
-- **Moving through the game**: press or drag anywhere on the strip, or press play to watch it at 10, 30 or 60 times game speed. The arrow buttons jump to the previous or next change of tempo. From the keyboard the strip works like a slider: the arrow keys move 5 seconds, Page Up and Page Down a minute.
-- **The moment you're on**: the numbers behind the call, how long the call held, any epic monster that was up or about to spawn, and what each jungler did in the minute after: kills, deaths, epic monsters and shop visits.
+- **The strip**: a row of the replay's timeline, blue while you were up tempo, red while the enemy jungler was and gray while it was even, changing at the second something changed. Under it, when each jungler was dead (the faded bars) and when they shopped (●).
+- **Moving through the game**: the replay's controls ([replay.md](replay.md#what-it-shows)). For junglers, the arrow buttons jump to the previous or next change of tempo.
+- **The moment you're on**: under the scoreboard, the numbers behind the call, how long the call held, any epic monster that was up or about to spawn, and what each jungler did in the minute after: kills, deaths, epic monsters and shop visits.
 
 Epic monster spawn times come from the game's timers (`DRAGON_SPAWN_MS` and the rest). None of the 13,738 epic monsters in the study was taken before its timer said it was up.
 
@@ -221,6 +221,6 @@ npm run study-tempo -- --tiers gold,platinum                # only some ranks
 
 On Windows PowerShell, use `npm.cmd` when passing options after `--`.
 
-The downloader keeps under 70 Riot calls every 2 minutes. It uses the Oceania server by default because the benchmark collector uses NA, EUW and KR, so the two can run at the same time. The games stay on your computer in `.cache/tempo-study`, one JSON file each, without names or PUUIDs. Git ignores the folder and nothing goes in the database. Downloading all ten tiers took about two hours.
+The downloader keeps under 70 Riot calls every 2 minutes. It uses the Oceania server by default because the benchmark collector uses NA, EUW and KR, so the two can run at the same time. The games stay on your computer in `.cache/tempo-study`, one JSON file each, without names or PUUIDs. Git ignores the folder and nothing goes in the database. Downloading all ten tiers took about two hours. With `--items`, it downloads games for the replay's item check instead ([replay.md](replay.md#running-the-item-check)).
 
 When a report suggests different numbers, for example after a big patch, change `LEVEL_GOLD`, `PLAYER_GOLD` and `TEMPO_LEAD` in `tempo.ts`, and update the results here.
