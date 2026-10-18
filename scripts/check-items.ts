@@ -37,7 +37,8 @@ function main() {
   const misses = new Map<string, Miss>();
   const tooMany: string[] = [];
   // The role quest's slot at the end, Riot's against the rebuild's, for
-  // every player with something there in either.
+  // every player with an item there in either (not just the quest's hidden
+  // item).
   const roleSlots = new Map<string, { players: number; same: number }>();
   const roleSlotMisses: string[] = [];
   const eventTypes = new Map<string, number>();

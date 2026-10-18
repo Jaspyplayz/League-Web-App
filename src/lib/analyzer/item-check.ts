@@ -6,7 +6,7 @@
 // `npm run tempo-games -- --items`.
 
 import type { Match, Participant, Timeline } from "@/lib/riot/types";
-import { finalItems, inventoryAt, itemHistory, type FinalItems } from "./items";
+import { finalItems, inventoryAt, itemHistory, QUEST_ITEMS, type FinalItems } from "./items";
 import { trimTimeline } from "./trim";
 
 export const ITEM_CHECK_FOLDER = ".cache/item-check";
@@ -65,7 +65,8 @@ export type ItemCheck = {
   extra: number[];
   trinket: { riot: number; rebuilt: number };
   // The slot the role quest adds, which Riot lists apart from the other
-  // items (undefined for games from before Riot listed it). 0 for empty.
+  // items (undefined for games from before Riot listed it). 0 for empty,
+  // which is when Riot lists the quest's hidden item there.
   roleItem: { riot: number | undefined; rebuilt: number };
   // When the rebuild first held more than six items, which the game doesn't
   // allow, so it missed an item leaving, and what they were. Null if it
@@ -91,10 +92,16 @@ export function checkItems(game: ItemCheckGame): ItemCheck[] {
       missing: without(riot, ours),
       extra: without(ours, riot),
       trinket: { riot: final[6], rebuilt: rebuilt.trinket },
-      roleItem: { riot: p.roleBoundItem, rebuilt: rebuilt.roleItem },
+      roleItem: { riot: roleSlot(p.roleBoundItem), rebuilt: rebuilt.roleItem },
       tooMany: crowded ? { at: crowded.from, slots: crowded.slots } : null,
     };
   });
+}
+
+// Riot lists the quest's hidden item in the role quest's slot when nothing
+// else is there, which the rebuild counts as empty.
+function roleSlot(item: number | undefined): number | undefined {
+  return item !== undefined && QUEST_ITEMS.has(item) ? 0 : item;
 }
 
 // What's left of `a` after taking out one of it for each id in `b`, so two

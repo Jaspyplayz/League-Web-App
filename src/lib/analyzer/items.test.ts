@@ -9,11 +9,13 @@ const SERRATED_DIRK = 3134; // built from two Long Swords
 const HEALTH_POTION = 2003;
 const STEALTH_WARD = 3340;
 const ORACLE_LENS = 3364;
+const SCARECROW_EFFIGY = 3330; // Fiddlesticks' Stealth Ward
 const WORLD_ATLAS = 3865;
 const RUNIC_COMPASS = 3866;
 const BOUNTY_OF_WORLDS = 3867;
 const REALMSPIKE = 3871; // Zaz'Zak's Realmspike, one of the support upgrades
 const CELESTIAL_OPPOSITION = 3869; // another
+const BLOODSONG = 3877; // and another
 const EYE_OF_THE_HERALD = 3513;
 const BOOTS = 1001;
 const DAGGER = 1042;
@@ -21,15 +23,26 @@ const BERSERKERS = 3006; // Berserker's Greaves, from Boots and two Daggers
 const GUNMETAL = 3172; // Gunmetal Greaves, their tier 3
 const SORCERERS = 3020; // Sorcerer's Shoes
 const SPELLSLINGERS = 3175; // their tier 3
+const MERCURYS = 3111; // Mercury's Treads
+const CHAINLACED = 3173; // Chainlaced Crushers, their tier 3
 const ELIXIR = 2140; // Elixir of Wrath
-const STOPWATCH = 2420;
-const BROKEN_STOPWATCH = 2421;
-const ZHONYAS = 3157; // built from a Stopwatch, among others
+const SEEKERS_ARMGUARD = 2420;
+const SHATTERED_ARMGUARD = 2421;
+const ZHONYAS = 3157; // built from a Seeker's Armguard, among others
+const TEAR = 3070; // Tear of the Goddess
+const FORBIDDEN_IDOL = 3114;
+const RUBY_CRYSTAL = 1028;
+const UNCHARGED_DIADEM = 2526; // built from those three
+const DIADEM_OF_SONGS = 2530; // what it turns into once the Tear is charged
+const BISCUIT = 2010;
+const SCORCHCLAW_PUP = 1101; // a jungle pet
 // Hidden items for the role quests, which Riot logs leaving when something
 // goes in the slot the quest adds.
+const MID_LANE_QUEST = 1201;
 const BOT_LANE_QUEST = 1202;
 const SUPPORT_QUEST = 1203;
 const SUPPORT_QUEST_DONE = 1208;
+const JUNGLE_QUEST = 1204;
 const JUNGLE_QUEST_DONE = 1209;
 const CONTROL_WARD = 2055;
 const MAGICAL_FOOTWEAR = 2422;
@@ -60,7 +73,8 @@ const undo = (timestamp: number, beforeId: number, afterId: number): TrimmedEven
   afterId,
 });
 
-// The usual start: a Doran's Blade, a potion and the free trinket.
+// The usual start: a Doran's Blade, a potion and the free trinket, which
+// everyone has from the start but Riot sometimes logs as bought.
 const start = [
   bought(1_000, DORANS_BLADE),
   bought(1_500, HEALTH_POTION),
@@ -70,11 +84,16 @@ const start = [
 const last = (events: TrimmedEvent[]) => itemHistory(events, ME).at(-1)!;
 
 describe("itemHistory", () => {
-  it("starts empty and puts each new item in the first empty slot, trinkets in their own", () => {
+  it("starts with just the trinket and puts each new item in the first empty slot", () => {
     const history = itemHistory(start, ME);
-    expect(history[0]).toEqual({ from: 0, slots: [0, 0, 0, 0, 0, 0], trinket: 0, roleItem: 0 });
+    expect(history[0]).toEqual({
+      from: 0,
+      slots: [0, 0, 0, 0, 0, 0],
+      trinket: STEALTH_WARD,
+      roleItem: 0,
+    });
     expect(history.at(-1)).toEqual({
-      from: 2_000,
+      from: 1_500,
       slots: [DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0],
       trinket: STEALTH_WARD,
       roleItem: 0,
@@ -150,6 +169,16 @@ describe("itemHistory", () => {
     expect(history.at(-1)!.trinket).toBe(ORACLE_LENS);
   });
 
+  it("keeps the starting trinket when buying another one is undone", () => {
+    // From a real game (Irelia): Riot doesn't log the trinket she started
+    // with, only buying one and undoing it.
+    const events = [bought(6_688, STEALTH_WARD), undo(8_692, 0, STEALTH_WARD)];
+    expect(last(events).trinket).toBe(STEALTH_WARD);
+    // Fiddlesticks starts with his own.
+    const fiddlesticks = itemHistory([bought(6_000, ORACLE_LENS)], ME, { champion: "FiddleSticks" });
+    expect(fiddlesticks[0].trinket).toBe(SCARECROW_EFFIGY);
+  });
+
   it("gives a player who never changed trinket the one Riot lists at the end, all game", () => {
     const finalItems = [DORANS_BLADE, 0, 0, 0, 0, 0, STEALTH_WARD];
     expect(itemHistory([bought(1_000, DORANS_BLADE)], ME, { finalItems })[0].trinket).toBe(
@@ -219,6 +248,35 @@ describe("itemHistory", () => {
     expect(last(picked).slots).toEqual([CELESTIAL_OPPOSITION, 0, 0, 0, 0, 0]);
   });
 
+  it("turns Bounty of Worlds into the upgrade the player had then, when they swap it later", () => {
+    // From a real game (Braum): the first upgrade only shows up when it's
+    // sold. Buying the support item again goes through its steps at once,
+    // here as two control wards are bought, and ends in the one Riot lists.
+    const events = [
+      usedUp(412_000, WORLD_ATLAS),
+      usedUp(916_000, RUNIC_COMPASS),
+      usedUp(932_000, BOUNTY_OF_WORLDS),
+      sold(1_807_000, BLOODSONG),
+      bought(1_808_000, WORLD_ATLAS),
+      usedUp(1_810_000, WORLD_ATLAS),
+      usedUp(1_810_000, CONTROL_WARD),
+      usedUp(1_810_000, SUPPORT_QUEST_DONE),
+      bought(1_810_000, CONTROL_WARD),
+      bought(1_810_000, CONTROL_WARD),
+      usedUp(1_811_000, RUNIC_COMPASS),
+      usedUp(1_815_000, BOUNTY_OF_WORLDS),
+    ];
+    const history = itemHistory(events, ME, {
+      finalItems: [CELESTIAL_OPPOSITION, 0, 0, 0, 0, 0, ORACLE_LENS],
+    });
+    expect(inventoryAt(history, 1_000_000).slots[0]).toBe(BLOODSONG);
+    expect(inventoryAt(history, 1_810_000)).toMatchObject({
+      slots: [RUNIC_COMPASS, 0, 0, 0, 0, 0],
+      roleItem: CONTROL_WARD,
+    });
+    expect(history.at(-1)!.slots).toEqual([CELESTIAL_OPPOSITION, 0, 0, 0, 0, 0]);
+  });
+
   it("turns tier 2 boots into tier 3 when they leave with nothing bought", () => {
     const events = [
       ...start,
@@ -243,17 +301,57 @@ describe("itemHistory", () => {
     expect(last(events).slots).toEqual([DORANS_BLADE, HEALTH_POTION, SPELLSLINGERS, 0, 0, 0]);
   });
 
+  it("undoes a purchase whose item has already turned into another", () => {
+    // From a real game (Hwei): with the mid lane quest done, boots are
+    // upgraded as they're bought, and undoing that names neither item.
+    const events = [
+      ...start,
+      bought(440_000, BOOTS),
+      usedUp(721_000, MID_LANE_QUEST),
+      usedUp(763_000, BOOTS),
+      usedUp(763_000, MERCURYS),
+      bought(763_000, MERCURYS),
+      undo(764_000, 0, 0),
+      usedUp(764_500, BOOTS),
+      usedUp(764_500, SORCERERS),
+      bought(764_500, SORCERERS),
+    ];
+    const history = itemHistory(events, ME);
+    expect(inventoryAt(history, 763_000).slots[2]).toBe(CHAINLACED);
+    expect(inventoryAt(history, 764_000).slots[2]).toBe(BOOTS);
+    expect(history.at(-1)!.slots).toEqual([DORANS_BLADE, HEALTH_POTION, SPELLSLINGERS, 0, 0, 0]);
+  });
+
   it("drops an elixir drunk as it's bought", () => {
     const events = [...start, usedUp(2_295_731, ELIXIR), bought(2_295_731, ELIXIR)];
     expect(last(events).slots).toEqual([DORANS_BLADE, HEALTH_POTION, 0, 0, 0, 0]);
   });
 
-  it("breaks a used Stopwatch, but uses it up when an item is built from it", () => {
-    const withWatch = [...start, bought(1_000_000, STOPWATCH)];
-    expect(last([...withWatch, usedUp(1_200_000, STOPWATCH)]).slots[2]).toBe(BROKEN_STOPWATCH);
+  it("shatters a used Seeker's Armguard, but uses it up when an item is built from it", () => {
+    const withArmguard = [...start, bought(1_000_000, SEEKERS_ARMGUARD)];
+    expect(last([...withArmguard, usedUp(1_200_000, SEEKERS_ARMGUARD)]).slots[2]).toBe(
+      SHATTERED_ARMGUARD,
+    );
     expect(
-      last([...withWatch, usedUp(1_200_000, STOPWATCH), bought(1_200_000, ZHONYAS)]).slots[2],
+      last([...withArmguard, usedUp(1_200_000, SEEKERS_ARMGUARD), bought(1_200_000, ZHONYAS)])
+        .slots[2],
     ).toBe(ZHONYAS);
+  });
+
+  it("turns an item built from a charged Tear into its next form at once", () => {
+    // From a real game (Sona): Riot logs the new item leaving as it's bought.
+    const events = [
+      ...start,
+      bought(209_000, TEAR),
+      bought(960_000, FORBIDDEN_IDOL),
+      bought(961_000, RUBY_CRYSTAL),
+      usedUp(1_169_000, FORBIDDEN_IDOL),
+      usedUp(1_169_000, RUBY_CRYSTAL),
+      usedUp(1_169_000, TEAR),
+      bought(1_169_000, UNCHARGED_DIADEM),
+      usedUp(1_169_000, UNCHARGED_DIADEM),
+    ];
+    expect(last(events).slots).toEqual([DORANS_BLADE, HEALTH_POTION, DIADEM_OF_SONGS, 0, 0, 0]);
   });
 
   it("moves a bot laner's boots to their own slot when the role quest is done", () => {
@@ -336,6 +434,23 @@ describe("itemHistory", () => {
     expect(last(events).slots).not.toEqual(expected);
   });
 
+  it("takes Viego's pet away when his jungle quest is done", () => {
+    // From a real game: possessing logs the pet leaving with his other items
+    // and the quest's hidden item, but the pet evolving logs only those two.
+    const events = [
+      bought(9_705, SCORCHCLAW_PUP),
+      bought(300_000, SERRATED_DIRK),
+      usedUp(446_160, SCORCHCLAW_PUP),
+      usedUp(446_160, SERRATED_DIRK),
+      usedUp(446_160, JUNGLE_QUEST),
+      usedUp(1_096_373, JUNGLE_QUEST),
+      usedUp(1_096_373, SCORCHCLAW_PUP),
+    ];
+    const history = itemHistory(events, ME, { champion: "Viego" });
+    expect(inventoryAt(history, 500_000).slots).toEqual([SCORCHCLAW_PUP, SERRATED_DIRK, 0, 0, 0, 0]);
+    expect(history.at(-1)!.slots).toEqual([0, SERRATED_DIRK, 0, 0, 0, 0]);
+  });
+
   it("gives Magical Footwear's boots by 12:00, or sooner if they're upgraded sooner", () => {
     const upgraded = [usedUp(1_246_849, MAGICAL_FOOTWEAR), bought(1_246_849, 3111)];
     const history = itemHistory([...start, ...upgraded], ME);
@@ -349,8 +464,38 @@ describe("itemHistory", () => {
     expect(kept.at(-1)!.slots).toContain(MAGICAL_FOOTWEAR);
   });
 
+  it("holds Magical Footwear's boots until a slot is free", () => {
+    // From real games (Ekko, Kaisa): all six slots were full at 12:00.
+    const events = [
+      ...start,
+      bought(300_000, LONG_SWORD),
+      bought(300_200, LONG_SWORD),
+      bought(400_000, DAGGER),
+      bought(400_200, DAGGER),
+      sold(780_000, DORANS_BLADE),
+      usedUp(900_000, MAGICAL_FOOTWEAR),
+      bought(900_000, SORCERERS),
+    ];
+    const history = itemHistory(events, ME);
+    expect(inventoryAt(history, 12 * 60_000).slots).toEqual([
+      DORANS_BLADE, HEALTH_POTION, LONG_SWORD, LONG_SWORD, DAGGER, DAGGER,
+    ]);
+    expect(inventoryAt(history, 780_000).slots[0]).toBe(MAGICAL_FOOTWEAR);
+    expect(history.at(-1)!.slots[0]).toBe(SORCERERS);
+  });
+
+  it("gives Biscuit Delivery's biscuits at 2, 4 and 6 minutes", () => {
+    // From a real game (Kaisa): Riot logs each biscuit eaten but none
+    // arriving, and she kept the last one.
+    const events = [...start, usedUp(190_988, BISCUIT), usedUp(308_823, BISCUIT)];
+    const history = itemHistory(events, ME);
+    expect(inventoryAt(history, 125_000).slots[2]).toBe(BISCUIT);
+    expect(inventoryAt(history, 200_000).slots[2]).toBe(0);
+    expect(history.at(-1)!.slots).toEqual([DORANS_BLADE, HEALTH_POTION, BISCUIT, 0, 0, 0]);
+  });
+
   it("ignores other players, and items the player never had", () => {
-    const events = [...start, bought(10_000, LONG_SWORD, 8), usedUp(130_000, 2010)];
+    const events = [...start, bought(10_000, LONG_SWORD, 8), usedUp(130_000, SERRATED_DIRK)];
     expect(itemHistory(events, ME)).toEqual(itemHistory(start, ME));
   });
 });
