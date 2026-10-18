@@ -221,6 +221,6 @@ npm run study-tempo -- --tiers gold,platinum                # only some ranks
 
 On Windows PowerShell, use `npm.cmd` when passing options after `--`.
 
-The downloader keeps under 70 Riot calls every 2 minutes. It uses the Oceania server by default because the benchmark collector uses NA, EUW and KR, so the two can run at the same time. The games stay on your computer in `.cache/tempo-study`, one JSON file each, without names or PUUIDs. Git ignores the folder and nothing goes in the database. Downloading all ten tiers took about two hours. With `--items`, it downloads games for the replay's item check instead ([replay.md](replay.md#running-the-item-check)).
+The downloader keeps under 70 Riot calls every 2 minutes. It uses the Oceania server by default because the benchmark collector uses NA, EUW and KR, so the two can run at the same time. The games stay on your computer in `.cache/tempo-study`, one JSON file each, without names or PUUIDs. Git ignores the folder and nothing goes in the database. Downloading all ten tiers took about two hours. With `--items`, it downloads games for the replay's item check instead ([replay.md](replay.md#running-the-checks)).
 
 When a report suggests different numbers, for example after a big patch, change `LEVEL_GOLD`, `PLAYER_GOLD` and `TEMPO_LEAD` in `tempo.ts`, and update the results here.

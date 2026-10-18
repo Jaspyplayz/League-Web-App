@@ -1,12 +1,13 @@
 # Replay (beta)
 
-The replay plays a whole game back second by second. Drag along its timeline or press play, and the scoreboard under it shows every player's level, kills, deaths, assists, CS, gold and items at that moment, with each team's kills, gold, towers and epic monsters. It's on the match page of every game, after the jungle sections and before the win chance graph, marked **Beta**. When you played jungle, it also has the [tempo strip](tempo.md).
+The replay plays a whole game back second by second. Drag along its timeline or press play, and the map shows where every champion was at that moment, and the scoreboard beside it every player's level, kills, deaths, assists, CS, gold and items, with each team's kills, gold, towers and epic monsters. It's on the match page of every game, after the jungle sections and before the win chance graph, marked **Beta**. When you played jungle, it also has the [tempo strip](tempo.md).
 
-The code is in [`src/lib/analyzer/replay.ts`](../src/lib/analyzer/replay.ts) (the scoreboard at any second) and [`src/lib/analyzer/items.ts`](../src/lib/analyzer/items.ts) (each player's items). The panel is `match/[matchId]/replay.tsx`, with the scoreboard in `replay-scoreboard.tsx`.
+The code is in [`src/lib/analyzer/replay.ts`](../src/lib/analyzer/replay.ts) (the map and scoreboard at any second), [`src/lib/analyzer/items.ts`](../src/lib/analyzer/items.ts) (each player's items) and [`src/lib/analyzer/positions.ts`](../src/lib/analyzer/positions.ts) (each champion's spot on the map). The panel is `match/[matchId]/replay.tsx`, with the map in `replay-map.tsx` and the scoreboard in `replay-scoreboard.tsx`.
 
 ## What it shows
 
 - **The timeline**: the whole game, with a tick for every kill (blue for your team's, red for the enemy's) and a letter for every epic monster (D dragon, E Elder, G grubs, H Herald, B Baron, A Atakhan). Press or drag anywhere on it, or press play to watch at 10, 30 or 60 times game speed. The arrow buttons jump to the previous or next kill (for junglers, change of tempo). From the keyboard it works like a slider: the arrow keys move 5 seconds, Page Up and Page Down a minute.
+- **The map**: all ten champions, in blue for your team and red for the enemy's. Your ring is thicker and your opponent's dashed, like the scoreboard's outlines. A dead champion stays faded where they died, with the time until they're back, and a cross marks each kill for 10 seconds. It sits beside the scoreboard when both fit, and above it otherwise.
 - **The moment you're on**: the game clock, how far ahead or behind your team was in gold, and the kill score.
 - **Both teams**: your team first, each in role order, with the winning team in blue and the losing team in red, like the scoreboard at the bottom of the page. Your row has a solid outline and your opponent's a dashed one. A dead player's picture is faded, with how long until they're back. On phones each team is a list instead of a table, so nothing has to scroll sideways while you drag the timeline.
 
@@ -22,8 +23,9 @@ Riot's match timeline has two kinds of data: events, each logged with its exact 
 | CS and gold | Only in the once-a-minute snapshots. Between two snapshots, they're read off a straight line from one to the next, so they're estimates. Gold is all the gold earned so far, spent or not. |
 | Towers, inhibitors, epic monsters | Their events, so exact. |
 | Items | Rebuilt from the item events. See below. |
+| Spot on the map | Riot's snapshots, plus the spots of deaths, kills and epic monsters and the fountain at shop visits, joined up. Exact at the snapshots, deaths and fountain visits, estimates in between. See below. |
 
-`replayData` runs on the server and keeps only what the scoreboard needs, so the page sends a few dozen KB instead of the whole timeline. `scoreboardAt` runs in the browser every time the clock moves.
+`replayData` runs on the server and keeps only what the map and scoreboard need, so the page sends a few dozen KB instead of the whole timeline. `scoreboardAt` runs in the browser every time the clock moves.
 
 ## How items are rebuilt
 
@@ -64,22 +66,59 @@ The check only sees the end of each game. In between, the sign that the rebuild 
 
 Turnpoint started keeping item sales and used-up items in saved timelines with this feature. When the match page opens a game saved before that, it fetches the timeline from Riot once more and saves the new copy. If Riot can't be reached, the replay shows everything but the items and says why.
 
+## How the map is worked out
+
+Riot's timeline has every champion's position once a minute. Between two snapshots, some events say where a champion was, or must have been. `positionPath` puts them in order for each champion and joins them up:
+
+1. **Snapshots**: where Riot says they were, every minute.
+2. **Deaths**: the spot Riot logs with the kill. The champion stays there, faded, until they're back. That's also where Riot's snapshots put a dead champion: in the check below, every snapshot taken while someone was dead had them exactly at the spot they died.
+3. **The fountain**, when they come back after a death, and whenever they buy, sell or undo in the shop, which only works at the fountain (or while dead, which doesn't count). Recalling takes them there at once, so it's a jump: they stay where they were until the moment they're at the fountain. Ornn can buy items anywhere, so his purchases don't count.
+4. **Kills they got or helped with**, at the kill's spot, and **epic monsters they took**, at the monster's pit, since Riot doesn't log where a monster died. Atakhan is left out, because he can spawn in either of two pits. An assist can come from a heal or shield far away, and some ultimates cross the map, so a kill or monster is left out when they couldn't have got there in time from the spot before it, or from there to the spot after it: at 500 units a second, plus 1,500 for a dash, a Flash or an ability's range.
+5. **Leaving the fountain**, they walk straight to the next spot at 400 units a second, about a champion's speed with boots, and wait there. Players head straight back out after shopping, so spreading the walk over the whole time until the next snapshot would leave them dawdling near the fountain.
+
+Between those spots, a champion moves in a straight line. The map is about 14,900 units across, and a lane about 800 wide.
+
+### How close it gets
+
+The only positions known for certain are Riot's snapshots, so the check leaves out one snapshot at a time, works out that moment from everything else, and measures how far the estimate is from Riot's spot. It adds each kind of spot in turn. On one ranked game so far (28 minutes, 280 snapshots left out):
+
+| Built from | Median miss | 90% of misses within | Within 2,000 |
+|---|---|---|---|
+| Snapshots only | 3,511 | 7,080 | 25.4% |
+| + deaths | 3,138 | 7,389 | 32.9% |
+| + the fountain at shop visits | 3,511 | 8,089 | 30.4% |
+| + walking straight out of the fountain | 2,434 | 7,384 | 42.9% |
+| + kills they took part in | 1,947 | 6,145 | 50.4% |
+| + epic monsters | 1,841 | 5,614 | 51.8% |
+| + leaving out what they couldn't reach | 1,827 | 5,614 | 52.1% |
+
+- Shop visits only helped once champions walked straight back out. Spread over the time until the next snapshot, the walk left them near the fountain while Riot had them back in lane.
+- Walking speeds from 300 to 500 units a second came within 250 units of each other. The replay uses 400.
+- Junglers are the hardest to place (median miss 2,772) and top laners the easiest (1,362).
+- Of 149 shop events, 4 were followed by a snapshot too far from the fountain to have walked to: three were Ornn's, which is why his purchases don't count.
+
+With one snapshot left out, the estimate spans two minutes, while the replay's never spans more than one, so the replay is closer than this.
+
 ## Limits
 
 - The order of items in the six slots is a guess: Riot doesn't log slots, so each item goes in the first empty one. Which items a player has is what the check tests.
 - Gold and CS between snapshots are estimates, so they can be off by a few hundred gold or a few CS in the middle of a minute.
 - An item that changes with no event and isn't in the final items can't be seen.
 - A dead player can come back a little sooner than "back in" says (see the death timer row above).
+- Between snapshots, positions are estimates. Riot doesn't log walls, teleports or detours, so a champion can walk through a wall, or across the map after a teleport. In a fight, champions on the same spot overlap.
 
-## Running the item check
+## Running the checks
 
 ```sh
 npm run tempo-games -- --items --players 3 --games 5   # downloads games into .cache/item-check (needs RIOT_API_KEY)
-npm run check-items                                    # the report; makes no Riot calls
+npm run check-items                                    # the item check; makes no Riot calls
+npm run check-positions                                # the position check, on the same games
 ```
 
 On Windows PowerShell, use `npm.cmd` when passing options after `--`.
 
-The downloader is the tempo study's (docs/tempo.md), on the Oceania server by default. With `--items` it keeps each game's whole timeline and every player's champion, role and final items, without names or PUUIDs. Git ignores the folder and nothing goes in the database. The report starts with how many players' items matched, then lists every kind of miss with the item events behind a couple of examples, which is where a new rule comes from. The check is in [`src/lib/analyzer/item-check.ts`](../src/lib/analyzer/item-check.ts) and [`scripts/check-items.ts`](../scripts/check-items.ts).
+The downloader is the tempo study's (docs/tempo.md), on the Oceania server by default. With `--items` it keeps each game's whole timeline and every player's champion, role and final items, without names or PUUIDs. Git ignores the folder and nothing goes in the database.
 
-Run it again after a patch that adds items that transform or arrive for free, and add a rule to `items.ts` (with a test) for anything new it finds.
+The item check's report starts with how many players' items matched, then lists every kind of miss with the item events behind a couple of examples, which is where a new rule comes from. It's in [`src/lib/analyzer/item-check.ts`](../src/lib/analyzer/item-check.ts) and [`scripts/check-items.ts`](../scripts/check-items.ts). Run it again after a patch that adds items that transform or arrive for free, and add a rule to `items.ts` (with a test) for anything new it finds.
+
+The position check's report has the table above, the same by role, and the numbers behind the rules: where dead champions are, shop visits away from the fountain, and how far killers, helpers and monster takers were from the spot. It's in [`src/lib/analyzer/position-check.ts`](../src/lib/analyzer/position-check.ts) and [`scripts/check-positions.ts`](../scripts/check-positions.ts).
