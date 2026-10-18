@@ -46,9 +46,19 @@ Riot logs four kinds of item event, each with the item and the exact time: bough
 
 ### How well it matches
 
-The check plays each game's events to the end and compares the result with the items Riot lists for every player after the game (`item0` to `item5`, and `item6` for the trinket). Slots don't count, since Riot doesn't log them.
+The check plays each game's events to the end and compares the result with the items Riot lists for every player after the game (`item0` to `item5`, `item6` for the trinket, and `roleBoundItem` for the role quest's slot). Slots don't count, since Riot doesn't log them.
 
-RESULTS_PLACEHOLDER
+On 137 ranked solo games from the Oceania server, Iron to Challenger, downloaded on October 17, 2026 (patch 16.20):
+
+| | Players right |
+|---|---|
+| All six items | 1,370 of 1,370 (100%) |
+| Trinket | 1,370 of 1,370 (100%) |
+| Role quest's slot, for the 403 players with an item in it | 403 of 403 (100%) |
+
+It took six rounds. With only the plain rules (1 to 4), 48.1% of players' six items were right. Each round added rules for what the one before missed: 94.2%, then 98.4%, then 100%. The last two rounds fixed things the end of the game doesn't show: three players held a seventh item for a while, and one support's role quest slot was off.
+
+The check only sees the end of each game. In between, the sign that the rebuild missed something is a player holding more than six items, which the report lists; no one does now.
 
 ### Games saved before items were kept
 
