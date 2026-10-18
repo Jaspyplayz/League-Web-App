@@ -1,6 +1,6 @@
 // Shrinks a raw match-v5 timeline down to what the analyzer reads, so it can
 // be stored in Postgres. A raw timeline is a few hundred KB; most of that is
-// event types we never use (wards placed, items sold, ...) and per-frame stats
+// event types we never use (wards placed, level-ups, ...) and per-frame stats
 // like armor and ability haste.
 //
 // The trimmed shape is what gets saved in the match_timelines table, so
@@ -12,7 +12,10 @@ import type { MapPosition, Timeline, TimelineEvent } from "@/lib/riot/types";
 // Version 2 added item purchases and skill level-ups, for the Build tab.
 // unspentGold came later without a new version: it's optional, and the tempo
 // timeline estimates it for timelines saved before it existed, so there's no
-// need to fetch them all again.
+// need to fetch them all again. Item sales and used-up items came later too,
+// for the replay's items. Only the match page needs them, so it fetches a
+// timeline saved without them once more (see loadTimeline in match-store.ts),
+// rather than every page that reads timelines fetching them all again.
 export const TRIM_VERSION = 2;
 
 // One player at one moment of the game.
@@ -93,6 +96,22 @@ export type ItemUndo = {
   afterId: number;
 };
 
+export type ItemSold = {
+  type: "ITEM_SOLD";
+  timestamp: number;
+  participantId: number;
+  itemId: number;
+};
+
+// An item leaving a player's inventory without being sold: a component used
+// up by an item built from it, a potion drunk, a control ward placed.
+export type ItemDestroyed = {
+  type: "ITEM_DESTROYED";
+  timestamp: number;
+  participantId: number;
+  itemId: number;
+};
+
 export type SkillLevelUp = {
   type: "SKILL_LEVEL_UP";
   timestamp: number;
@@ -107,6 +126,8 @@ export type TrimmedEvent =
   | TurretPlateDestroyed
   | ItemPurchased
   | ItemUndo
+  | ItemSold
+  | ItemDestroyed
   | SkillLevelUp;
 
 export type TrimmedTimeline = {
@@ -181,6 +202,8 @@ function trimEvent(e: TimelineEvent): TrimmedEvent | null {
         laneType: str(e.laneType),
       };
     case "ITEM_PURCHASED":
+    case "ITEM_SOLD":
+    case "ITEM_DESTROYED":
       return {
         type: e.type,
         timestamp: e.timestamp,

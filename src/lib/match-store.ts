@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { after } from "next/server";
 import { getDb, tables, type Db } from "@/db";
 import { matchRow, participantRows } from "@/db/rows";
+import { keepsItemChanges } from "@/lib/analyzer/items";
 import {
   TRIM_VERSION,
   trimTimeline,
@@ -87,7 +88,14 @@ export async function loadMatches(
 const MATCH_CONCURRENCY = 5;
 
 // Costs one Riot call the first time anyone opens a match, and none after.
-export async function loadTimeline(region: Region, match: Match): Promise<TrimmedTimeline> {
+// The match page passes `items`: a timeline saved before Turnpoint kept item
+// sales and used-up items is fetched once more, so the replay can show each
+// player's items. If Riot can't answer, the saved copy does without them.
+export async function loadTimeline(
+  region: Region,
+  match: Match,
+  { items = false }: { items?: boolean } = {},
+): Promise<TrimmedTimeline> {
   const { matchId } = match.metadata;
   const cached = await readCache((db) =>
     db.query.matchTimelines.findFirst({
@@ -98,7 +106,10 @@ export async function loadTimeline(region: Region, match: Match): Promise<Trimme
   // A row trimmed by an older version of trimTimeline may be missing fields
   // the analyzer now reads, so it's fetched again and replaced.
   if (cached?.trimVersion === TRIM_VERSION) {
-    return { frames: cached.frames as TrimmedFrame[], events: cached.events as TrimmedEvent[] };
+    const saved = { frames: cached.frames as TrimmedFrame[], events: cached.events as TrimmedEvent[] };
+    if (!items || keepsItemChanges(saved)) return saved;
+    const fresh = await settle(fetchTimeline(region, match));
+    return fresh.ok ? fresh.value : saved;
   }
 
   return fetchTimeline(region, match);

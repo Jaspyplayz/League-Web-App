@@ -22,6 +22,7 @@ import {
 } from "./matchup";
 import { findObjectives, type Objective } from "./objectives";
 import { pathingVsLanes, type Pathing } from "./pathing";
+import { replayData, type ReplayData } from "./replay";
 import { tempoTimeline, type TempoTimeline } from "./tempo";
 import type { TrimmedTimeline } from "./trim";
 import { findTurningPoints, type TurningPoint } from "./turning-points";
@@ -57,6 +58,9 @@ export type MatchAnalysis = {
   // Which jungler had the tempo at every second (beta). Null unless you
   // played jungle.
   tempo: TempoTimeline | null;
+  // Every player's level, K/D/A, CS, gold and items at any second, for the
+  // replay (beta).
+  replay: ReplayData;
 };
 
 export function isAnalyzable(match: Match): boolean {
@@ -128,7 +132,7 @@ export function analyzeMatch(
     });
   }
 
-  const replay = jungleReplay(timeline, participants, me, opponent);
+  const jungle = jungleReplay(timeline, participants, me, opponent);
   return {
     me,
     opponent,
@@ -139,15 +143,16 @@ export function analyzeMatch(
     deaths,
     teamGold: teamGoldSeries(frames, participants, me.teamId),
     objectives: findObjectives(events, me.teamId),
-    jungleReplay: replay,
-    pathing: replay ? pathingVsLanes(replay) : null,
-    ganks: replay
+    jungleReplay: jungle,
+    pathing: jungle ? pathingVsLanes(jungle) : null,
+    ganks: jungle
       ? gankLog(
-          replay,
+          jungle,
           events.filter((e) => e.type === "CHAMPION_KILL"),
           participants,
         )
       : null,
-    tempo: replay ? tempoTimeline(timeline, participants, replay.meId, replay.enemyJunglerId) : null,
+    tempo: jungle ? tempoTimeline(timeline, participants, jungle.meId, jungle.enemyJunglerId) : null,
+    replay: replayData(timeline, participants, me.teamId),
   };
 }

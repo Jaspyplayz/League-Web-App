@@ -109,7 +109,8 @@ async function Analysis({ params }: { params: Params }) {
   }
 
   const [timeline, tier] = await Promise.all([
-    settle(loadTimeline(region, match)),
+    // `items`, so the replay can show what everyone was carrying.
+    settle(loadTimeline(region, match, { items: true })),
     savedSoloTier(me.puuid),
   ]);
   if (!timeline.ok) {
