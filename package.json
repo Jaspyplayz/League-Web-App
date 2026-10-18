@@ -21,7 +21,8 @@
     "train-win-chance": "tsx --conditions=react-server scripts/train-win-chance.ts",
     "tempo-games": "tsx --conditions=react-server scripts/collect-tempo-games.ts",
     "study-tempo": "tsx --conditions=react-server scripts/study-tempo.ts",
-    "check-items": "tsx --conditions=react-server scripts/check-items.ts"
+    "check-items": "tsx --conditions=react-server scripts/check-items.ts",
+    "check-positions": "tsx --conditions=react-server scripts/check-positions.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
