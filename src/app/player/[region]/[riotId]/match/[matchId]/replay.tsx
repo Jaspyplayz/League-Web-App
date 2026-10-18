@@ -3,9 +3,11 @@
 // The replay (beta): the whole game on one timeline you can drag or play,
 // with the map and scoreboard at that second under it, so you can see where
 // every champion was and each player's level, kills, CS, gold and items at
-// any moment. For junglers it adds the tempo strip and why each moment got
-// its call (tempo.tsx). How the numbers are worked out is in
-// src/lib/analyzer/replay.ts, positions.ts and docs/replay.md.
+// any moment. Above them, your team's chance to win at that second, and
+// under them every play of the game, graded by how much it changed that
+// chance (replay-plays.tsx). For junglers it adds the tempo strip and why
+// each moment got its call (tempo.tsx). How the numbers are worked out is in
+// src/lib/analyzer/replay.ts, positions.ts, plays.ts and docs/replay.md.
 //
 // It's a Client Component so moving through the game doesn't reload the
 // page. Everything it draws arrives with the page, a few dozen KB.
@@ -15,6 +17,7 @@ import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatClock, formatGap } from "@/lib/analyzer/format";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
+import type { ReplayChances } from "@/lib/analyzer/plays";
 import {
   monsterMarks,
   scoreboardAt,
@@ -26,6 +29,7 @@ import type { TempoTimeline } from "@/lib/analyzer/tempo";
 import { StepButton } from "./jungle-map";
 import { LegendSwatch } from "./legend-swatch";
 import { ReplayMap } from "./replay-map";
+import { ChanceRow, PlayMarks, playStart, ReplayPlays } from "./replay-plays";
 import { ReplayScoreboard, type ItemInfo, type ReplayPerson } from "./replay-scoreboard";
 import {
   JunglerMarks,
@@ -39,6 +43,9 @@ import {
 
 type Props = {
   replay: ReplayData;
+  // Your team's chance to win at every second, and the graded plays. Null for
+  // games the win chance model doesn't cover.
+  chances: ReplayChances | null;
   // Null unless you played jungle.
   tempo: TempoTimeline | null;
   // Your team first, each team in role order.
@@ -57,7 +64,16 @@ type Props = {
 const TICK_MS = 100;
 const SPEEDS = [10, 30, 60];
 
-export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, tempoDocsHref }: Props) {
+export function Replay({
+  replay,
+  chances,
+  tempo,
+  people,
+  items,
+  winningTeamId,
+  docsHref,
+  tempoDocsHref,
+}: Props) {
   const { end, kills, myTeamId } = replay;
   const runs = tempo ? joinRuns(tempo.stretches) : null;
   // Junglers start on the first moment either jungler was up tempo, everyone
@@ -87,10 +103,20 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
   const them = tempo ? (names[tempo.enemyId] ?? "The enemy jungler") : "";
   const you = tempo ? (names[tempo.meId] ?? "You") : "";
 
-  // The arrow buttons jump between changes of tempo for junglers, and
-  // between kills for everyone else.
-  const stops = runs ? runs.slice(1).map((r) => r.from) : [...new Set(kills.map((k) => k.timestamp))];
-  const stopName = runs ? "change of tempo" : "kill";
+  // The arrow buttons jump between plays. Without the win chance model, they
+  // jump between changes of tempo for junglers and kills for everyone else.
+  const plays = chances?.plays ?? null;
+  const stops = plays
+    ? plays.map(playStart)
+    : runs
+      ? runs.slice(1).map((r) => r.from)
+      : [...new Set(kills.map((k) => k.timestamp))];
+  const stopName = plays ? "play" : runs ? "change of tempo" : "kill";
+  // Your team's chance to win at the clock, from the second it's in (rounded
+  // up, so a kill counts from the moment it happens).
+  const chance = chances
+    ? chances.perSecond[Math.min(chances.perSecond.length - 1, Math.ceil(t / 1000))] / 1000
+    : null;
   const previousStop = stops.findLast((s) => s < t);
   const nextStop = stops.find((s) => s > t);
 
@@ -150,7 +176,8 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
     `${formatClock(t)}: ` +
     (gold && ours && theirs
       ? `${gold.tone === "even" ? "gold even" : `your team ${gold.text} in gold`}, ${ours.kills} kills to ${theirs.kills}`
-      : "");
+      : "") +
+    (chance !== null ? `, ${percent(chance)} chance to win` : "");
 
   return (
     <section aria-labelledby="replay-heading" className={`${panelClass} flex flex-col gap-[18px] p-6`}>
@@ -165,11 +192,20 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
           The whole game, second by second. Drag along the timeline or press play, and the map
           shows where every champion was at that moment, and the scoreboard their level, kills, CS,
           gold and items.
+          {chances
+            ? " The line on top is your team's chance to win, and the plays under the scoreboard are graded by how much each one moved it."
+            : ""}
           {tempo ? " The tempo strip shows which jungler had the time advantage." : ""}
         </p>
       </div>
 
       <div className="flex flex-wrap gap-x-[18px] gap-y-2 text-note text-muted">
+        {chances && (
+          <>
+            <LegendSwatch className="bg-ahead/40">Your team favored</LegendSwatch>
+            <LegendSwatch className="bg-behind/40">Enemy team favored</LegendSwatch>
+          </>
+        )}
         <LegendSwatch className="bg-ahead">Kill by your team</LegendSwatch>
         <LegendSwatch className="bg-behind">Kill by the enemy team</LegendSwatch>
         {tempo && <TempoLegend them={them} />}
@@ -180,6 +216,12 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
           {/* The marks repeat what the scoreboard says in words, so screen
               readers skip them and get the time and score from the slider. */}
           <div aria-hidden="true" className="flex w-[4.5rem] flex-none flex-col gap-1">
+            {chances && (
+              <>
+                <RowLabel className="h-14">Win chance</RowLabel>
+                <RowLabel className="h-6">Plays</RowLabel>
+              </>
+            )}
             <RowLabel className="h-6">Monsters</RowLabel>
             <RowLabel className="h-6">Kills</RowLabel>
             {tempo && (
@@ -210,6 +252,12 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
               onKeyDown={onKeyDown}
               className="relative flex cursor-ew-resize touch-pan-y select-none flex-col gap-1 rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ahead-soft"
             >
+              {chances && (
+                <>
+                  <ChanceRow perSecond={chances.perSecond} />
+                  <PlayMarks plays={chances.plays} left={left} />
+                </>
+              )}
               <MonsterMarks marks={monsterMarks(replay.objectives)} myTeamId={myTeamId} left={left} />
               <KillMarks kills={kills} names={names} teamOf={teamOf} myTeamId={myTeamId} left={left} />
               {tempo && runs && (
@@ -242,7 +290,7 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
             <StepButton
               label={`Previous ${stopName}`}
               disabled={previousStop === undefined}
@@ -260,9 +308,21 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
             >
               <path d="M9 6l6 6-6 6" />
             </StepButton>
-            <span className="ml-2 font-mono text-sm text-muted">
+            <span className="ml-2 whitespace-nowrap font-mono text-sm text-muted">
               {formatClock(t)} / {formatClock(end)}
             </span>
+            {chance !== null && (
+              <span className="ml-3 whitespace-nowrap text-sm text-muted">
+                Your team&apos;s chance to win{" "}
+                <span
+                  className={`font-mono font-semibold ${
+                    chance > 0.5 ? "text-ahead-soft" : chance < 0.5 ? "text-behind" : "text-ink"
+                  }`}
+                >
+                  {percent(chance)}
+                </span>
+              </span>
+            )}
           </div>
           <div
             role="group"
@@ -286,6 +346,9 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
         </div>
       </div>
       <p className="text-note text-faint">
+        {chances
+          ? "Each dot under the win chance line is a play: blue when it raised your team's chance, red when it lowered it, grey when it barely moved it, bigger the more it moved, and square when it took an objective. "
+          : ""}
         Letters mark the epic monsters each team took (D dragon, E Elder, G grubs, H Herald, B
         Baron, A Atakhan), in blue for your team and red for the enemy&apos;s, and ticks mark the
         kills. {runs ? tempoNote(runs, them) : ""}
@@ -311,6 +374,18 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
         <TempoReadout tempo={tempo} t={t} names={names} myTeamId={myTeamId} docsHref={tempoDocsHref} />
       )}
 
+      {chances && (
+        <ReplayPlays
+          chances={chances}
+          replay={replay}
+          names={names}
+          t={t}
+          onPick={moveTo}
+          tempo={tempo}
+          them={them}
+        />
+      )}
+
       <p className="text-note text-faint">
         Riot logs kills, deaths, level-ups and items to the second, but positions, gold and CS only
         once a minute, so between those snapshots they&apos;re estimates.{" "}
@@ -321,6 +396,11 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
       </p>
     </section>
   );
+}
+
+// 0.6143 -> "61%".
+function percent(chance: number): string {
+  return `${Math.round(chance * 100)}%`;
 }
 
 function RowLabel({ className, children }: { className: string; children: string }) {
