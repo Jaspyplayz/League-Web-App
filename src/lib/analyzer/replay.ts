@@ -1,18 +1,19 @@
-// The replay (beta): every player's level, kills, deaths, assists, CS, gold
-// and items at any second of the game, and each team's totals, for the
-// scoreboard under the match page's timeline.
+// The replay (beta): every player's level, kills, deaths, assists, CS, gold,
+// items and spot on the map at any second of the game, and each team's
+// totals, for the map and scoreboard under the match page's timeline.
 //
 // Riot logs kills, deaths, skill points and item changes to the
-// millisecond, so those are exact. Gold and CS are only snapshotted once a
-// minute, so between two snapshots they're read off a straight line from one
-// to the next: an estimate. Respawn times come from the game's death timer
+// millisecond, so those are exact. Gold, CS and positions are only
+// snapshotted once a minute, so between two snapshots they're estimates:
+// gold and CS read off a straight line from one to the next, positions from
+// the path in positions.ts. Respawn times come from the game's death timer
 // formula (respawnSeconds in tempo.ts).
 //
-// replayData runs on the server and keeps only what the scoreboard needs, so
-// the page sends a few dozen KB rather than the whole timeline. scoreboardAt
-// runs in the browser each time the clock moves.
+// replayData runs on the server and keeps only what the map and scoreboard
+// need, so the page sends a few dozen KB rather than the whole timeline.
+// scoreboardAt runs in the browser each time the clock moves.
 
-import type { Participant } from "@/lib/riot/types";
+import type { MapPosition, Participant } from "@/lib/riot/types";
 import {
   finalItems,
   inventoryAt,
@@ -23,6 +24,7 @@ import {
   type ItemChange,
 } from "./items";
 import { monsterKind, type ObjectiveKind } from "./objectives";
+import { positionAt, positionPath, type PathPoint } from "./positions";
 import { deathSpans } from "./tempo";
 import type { TrimmedTimeline } from "./trim";
 
@@ -39,6 +41,8 @@ export type ReplayPlayer = {
   // Their items after each change. Null when the game was saved before
   // Turnpoint kept item sales and used-up items.
   items: ItemChange[] | null;
+  // Where they were through the game (positions.ts).
+  path: PathPoint[];
 };
 
 export type ReplayKill = {
@@ -49,6 +53,8 @@ export type ReplayKill = {
   assists: number[];
   // When the victim was back on the map.
   respawnAt: number;
+  // Where the victim died. Riot leaves it out now and then.
+  position: MapPosition | null;
 };
 
 // An epic monster, tower or inhibitor, and the team that took it.
@@ -76,6 +82,9 @@ export type PlayerMoment = {
   items: Inventory | null;
   // While they're dead, when they'll be back. Null while alive.
   respawnAt: number | null;
+  // Their spot on the map: exact at Riot's snapshots, deaths and visits to
+  // the fountain, estimated in between.
+  position: MapPosition;
 };
 
 export type TeamMoment = {
@@ -115,6 +124,7 @@ export function replayData(
         victimId: e.victimId,
         assists: e.assistingParticipantIds,
         respawnAt: respawns[kills.length].respawnAt,
+        position: e.position,
       });
     } else if (e.type === "ELITE_MONSTER_KILL") {
       const kind = monsterKind(e.monsterType, e.monsterSubType);
@@ -146,6 +156,7 @@ export function replayData(
             champion: p.championName,
           })
         : null,
+      path: positionPath(timeline, p, respawns),
     })),
     kills,
     objectives,
@@ -184,6 +195,7 @@ export function scoreboardAt(data: ReplayData, t: number): Scoreboard {
       gold: Math.round(between(p.gold, snapshots, t)),
       items: p.items ? inventoryAt(p.items, t) : null,
       respawnAt,
+      position: positionAt(p.path, t),
     };
   });
 

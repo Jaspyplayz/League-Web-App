@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { monsterMarks, replayData, scoreboardAt, type ReplayObjective } from "./replay";
 import { respawnSeconds } from "./tempo";
-import { clock, frames, kill, participants } from "./test-fixtures";
+import { clock, frames, kill, participants, SPOTS } from "./test-fixtures";
 import type { TrimmedEvent, TrimmedTimeline } from "./trim";
 
 // participantId 1-5 are blue side (team 100), 6-10 red side (team 200).
@@ -72,6 +72,7 @@ describe("replayData", () => {
       victimId: 3,
       assists: [7],
       respawnAt: clock("4:30") + respawnSeconds(3, clock("4:30")) * 1000,
+      position: null,
     });
   });
 
@@ -118,6 +119,16 @@ describe("scoreboardAt", () => {
     expect(scoreboardAt(replay, clock("4:30")).players[2].respawnAt).toBe(back);
     expect(scoreboardAt(replay, back - 1).players[2].respawnAt).toBe(back);
     expect(scoreboardAt(replay, back).players[2].respawnAt).toBeNull();
+  });
+
+  it("puts the victim, killer and helpers of a kill at its spot on the map", () => {
+    const fight = replayData(
+      { ...timeline, events: [kill("4:30", 8, 3, [7], SPOTS.midLane)] },
+      players,
+      BLUE,
+    );
+    const spot = (id: number) => scoreboardAt(fight, clock("4:30")).players[id - 1].position;
+    expect([spot(3), spot(7), spot(8)]).toEqual([SPOTS.midLane, SPOTS.midLane, SPOTS.midLane]);
   });
 
   it("adds up each team's kills, gold and objectives at that moment", () => {

@@ -18,7 +18,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
 - AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
-- Replay (beta: the whole game second by second, with every player's items, and the check behind them): [docs/replay.md](docs/replay.md)
+- Replay (beta: the whole game second by second, with every player's items and spot on the map, and the checks behind them): [docs/replay.md](docs/replay.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
@@ -42,7 +42,8 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   score.ts is the trained 0 to 100 game score (score-model.json),
                   win-chance.ts each team's chance to win at every minute,
                   tempo.ts the jungle tempo timeline (tempo-study.ts checks it)
-                  and replay.ts the replay, with items.ts (item-check.ts checks it)
+                  and replay.ts the replay, with items.ts and positions.ts
+                  (item-check.ts and position-check.ts check them)
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
@@ -72,7 +73,7 @@ docs/             Design and research docs
 | `npm run train-score` | Retrain the game score on saved games and update `score-model.json` ([docs/game-score.md](docs/game-score.md)) |
 | `npm run train-win-chance` | Train the win chance model on saved games and write `win-chance-model.json` ([docs/win-chance.md](docs/win-chance.md)) |
 | `npm run tempo-games` / `study-tempo` | Download games for the tempo study into the git-ignored `.cache/tempo-study`, then print its report ([docs/tempo.md](docs/tempo.md)) |
-| `npm run tempo-games -- --items` / `check-items` | Download games into `.cache/item-check`, then check the replay's rebuilt items against Riot's ([docs/replay.md](docs/replay.md#running-the-item-check)) |
+| `npm run tempo-games -- --items` / `check-items` / `check-positions` | Download games into `.cache/item-check`, then check the replay's rebuilt items against Riot's, or its map positions against Riot's snapshots ([docs/replay.md](docs/replay.md#running-the-checks)) |
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass.
 

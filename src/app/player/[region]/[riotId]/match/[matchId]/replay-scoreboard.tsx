@@ -341,7 +341,7 @@ function ItemSlot({ info, className = "rounded-[5px]" }: { info?: ItemInfo; clas
 
 // A Data Dragon image, or an empty box of the same size when there's none
 // (an empty slot, or Data Dragon couldn't be reached), so rows don't jump.
-function Picture({
+export function Picture({
   src,
   alt,
   title,

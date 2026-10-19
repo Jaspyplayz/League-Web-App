@@ -1,11 +1,11 @@
 "use client";
 
 // The replay (beta): the whole game on one timeline you can drag or play,
-// with the scoreboard at that second under it, so you can see every
-// player's level, kills, CS, gold and items at any moment. For junglers it
-// adds the tempo strip and why each moment got its call (tempo.tsx). How the
-// numbers are worked out is in src/lib/analyzer/replay.ts and
-// docs/replay.md.
+// with the map and scoreboard at that second under it, so you can see where
+// every champion was and each player's level, kills, CS, gold and items at
+// any moment. For junglers it adds the tempo strip and why each moment got
+// its call (tempo.tsx). How the numbers are worked out is in
+// src/lib/analyzer/replay.ts, positions.ts and docs/replay.md.
 //
 // It's a Client Component so moving through the game doesn't reload the
 // page. Everything it draws arrives with the page, a few dozen KB.
@@ -25,6 +25,7 @@ import {
 import type { TempoTimeline } from "@/lib/analyzer/tempo";
 import { StepButton } from "./jungle-map";
 import { LegendSwatch } from "./legend-swatch";
+import { ReplayMap } from "./replay-map";
 import { ReplayScoreboard, type ItemInfo, type ReplayPerson } from "./replay-scoreboard";
 import {
   JunglerMarks,
@@ -161,8 +162,9 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
           </span>
         </div>
         <p className="text-sm text-muted">
-          The whole game, second by second. Drag along the timeline or press play, and the
-          scoreboard shows every player&apos;s level, kills, CS, gold and items at that moment.
+          The whole game, second by second. Drag along the timeline or press play, and the map
+          shows where every champion was at that moment, and the scoreboard their level, kills, CS,
+          gold and items.
           {tempo ? " The tempo strip shows which jungler had the time advantage." : ""}
         </p>
       </div>
@@ -289,23 +291,29 @@ export function Replay({ replay, tempo, people, items, winningTeamId, docsHref, 
         kills. {runs ? tempoNote(runs, them) : ""}
       </p>
 
-      <ReplayScoreboard
-        board={board}
-        t={t}
-        people={people}
-        items={items}
-        roleSlot={replay.players.some((p) => p.items?.some((change) => change.roleItem > 0))}
-        myTeamId={myTeamId}
-        winningTeamId={winningTeamId}
-      />
+      {/* The map beside the scoreboard when both fit, above it otherwise. */}
+      <div className="flex flex-wrap items-start gap-6">
+        <ReplayMap board={board} t={t} people={people} kills={kills} myTeamId={myTeamId} />
+        <div className="min-w-0 flex-[1_1_560px]">
+          <ReplayScoreboard
+            board={board}
+            t={t}
+            people={people}
+            items={items}
+            roleSlot={replay.players.some((p) => p.items?.some((change) => change.roleItem > 0))}
+            myTeamId={myTeamId}
+            winningTeamId={winningTeamId}
+          />
+        </div>
+      </div>
 
       {tempo && (
         <TempoReadout tempo={tempo} t={t} names={names} myTeamId={myTeamId} docsHref={tempoDocsHref} />
       )}
 
       <p className="text-note text-faint">
-        Riot logs kills, deaths, level-ups and items to the second, but gold and CS only once a
-        minute, so between those snapshots they&apos;re estimates.{" "}
+        Riot logs kills, deaths, level-ups and items to the second, but positions, gold and CS only
+        once a minute, so between those snapshots they&apos;re estimates.{" "}
         <a href={docsHref} className="text-ahead-soft hover:text-ahead-bright">
           How the replay is worked out
         </a>

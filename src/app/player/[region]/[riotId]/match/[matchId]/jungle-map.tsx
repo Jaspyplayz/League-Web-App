@@ -12,7 +12,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatClock, formatSigned } from "@/lib/analyzer/format";
 import { LANES, laneTone, type JungleReplay, type Lane } from "@/lib/analyzer/jungle-replay";
-import { describeSpot } from "@/lib/analyzer/map";
+import { describeSpot, MAP_SIZE } from "@/lib/analyzer/map";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
 import type { MapPosition } from "@/lib/riot/types";
 import { LegendSwatch } from "./legend-swatch";
@@ -34,7 +34,7 @@ type Props = {
 // Riot's map coordinates run from 0 to about 14,900 on both axes, with the
 // blue base at the bottom left. The SVG uses the same units, flipped
 // vertically because SVG's y axis points down.
-const SIZE = 14900;
+const SIZE = MAP_SIZE;
 const toSvg = ({ x, y }: MapPosition) => ({ cx: x, cy: SIZE - y });
 
 // The first clear is usually done by about 3:15, so minute 3 is where the
@@ -257,14 +257,16 @@ const LANE_PATHS: Record<Lane, string> = {
   bot: "M3500 13700 L13700 13700 L13700 3500",
 };
 
-// A simple drawing of Summoner's Rift: river, lanes tinted by who's ahead,
-// both bases, and the Dragon and Baron pits.
-function MapBackground({
+// A simple drawing of Summoner's Rift: river, lanes, both bases, and the
+// Dragon and Baron pits. With `laneLeads`, each lane is tinted by who's ahead
+// there. The replay's map (replay-map.tsx) draws it too, inside its own
+// <svg viewBox="0 0 14900 14900">.
+export function MapBackground({
   myTeamId,
-  laneLeads,
+  laneLeads = { top: null, mid: null, bot: null },
 }: {
   myTeamId: number;
-  laneLeads: Record<Lane, number | null>;
+  laneLeads?: Record<Lane, number | null>;
 }) {
   const blueIsMine = myTeamId === 100;
   return (
