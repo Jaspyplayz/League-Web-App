@@ -40,7 +40,7 @@ jobs:
           BASE_URL: ${{ github.event.deployment_status.environment_url }}
           # Only needed if Vercel's preview protection is on (see docs/SETUP.md).
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-traces
