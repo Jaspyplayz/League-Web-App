@@ -55,7 +55,7 @@ export function userFromClaims(claims: Claims): SignedInUser | null {
   const meta = claims.user_metadata ?? {};
   const name = [meta.full_name, meta.name, meta.user_name, claims.email]
     .filter((value): value is string => typeof value === "string")
-    .map(withoutEmail)
+    .map(cleanName)
     .find((value) => value !== "");
   const provider = String(claims.app_metadata?.provider ?? "");
 
@@ -66,19 +66,24 @@ export function userFromClaims(claims: Claims): SignedInUser | null {
   };
 }
 
-// The header shows this name to everyone looking at the screen, so it never
-// includes an email address. Some profiles put one in the name, like
-// "Jaspyplayz (jasper@example.com)": that part is dropped. When the email is
-// all there is, only the part before the @ is kept.
+// The header shows this name to everyone looking at the screen, so it's one
+// clean name: never an email address, and nothing in brackets. Some profiles
+// add a second name or an email after the first, like "Jaspyplayz
+// (jaspyplayz)" or "Jaspyplayz <jasper@example.com>": that part is dropped.
+// When the email is all there is, only the part before the @ is kept.
 const EMAIL = /\S+@\S+\.\S+/;
 
-export function withoutEmail(name: string): string {
+export function cleanName(name: string): string {
   const trimmed = name.trim();
-  if (!EMAIL.test(trimmed)) return trimmed;
   const rest = trimmed
-    .replace(/\(\s*\S+@\S+\s*\)/g, "")
+    .replace(/\([^)]*\)?|\[[^\]]*\]?|<[^>]*>?/g, "") // (...), [...], <...>, even if cut off
     .replace(EMAIL, "")
-    .replace(/[\s,;:<>|-]+$/, "")
+    .replace(/[\s,;:|-]+$/, "")
     .trim();
-  return rest !== "" ? rest : trimmed.split("@")[0].replace(/^[(<\s]+/, "");
+  if (rest !== "") return rest;
+  // Nothing but brackets or an email: keep what's inside, minus any email domain.
+  return trimmed
+    .replace(/[()[\]<>]/g, "")
+    .trim()
+    .split("@")[0];
 }
