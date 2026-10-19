@@ -21,6 +21,9 @@
   --color-surface-hover: #171c24;
   --color-line: #1e2430;
   --color-line-strong: #262c37;
+  /* Summoner's Rift's walls on the maps: darker than the page here, a mid
+     gray in light mode, so the ground between them stands out in both. */
+  --color-wall: #06080b;
 
   --color-ink: #e8ecf2;
   --color-ink-soft: #c3cad5;
@@ -66,6 +69,7 @@
   --color-surface-hover: #eef1f5;
   --color-line: #e2e6ec;
   --color-line-strong: #d3d9e2;
+  --color-wall: #c9d0db;
 
   --color-ink: #141922;
   --color-ink-soft: #323b49;

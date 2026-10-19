@@ -14,6 +14,7 @@ import { formatClock, formatSigned } from "@/lib/analyzer/format";
 import { LANES, laneTone, type JungleReplay, type Lane } from "@/lib/analyzer/jungle-replay";
 import { describeSpot, MAP_SIZE } from "@/lib/analyzer/map";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
+import { RIFT_OUTLINE } from "@/lib/analyzer/rift";
 import type { MapPosition } from "@/lib/riot/types";
 import { LegendSwatch } from "./legend-swatch";
 import { panelClass } from "@/components/ui/panel";
@@ -257,10 +258,16 @@ const LANE_PATHS: Record<Lane, string> = {
   bot: "M3500 13700 L13700 13700 L13700 3500",
 };
 
-// A simple drawing of Summoner's Rift: river, lanes, both bases, and the
-// Dragon and Baron pits. With `laneLeads`, each lane is tinted by who's ahead
-// there. The replay's map (replay-map.tsx) draws it too, inside its own
-// <svg viewBox="0 0 14900 14900">.
+// The Rift's walls, as this season's games show them (rift.ts). The outline
+// has a loop around the edge of the ground and one around each wall, so with
+// a square around the whole map, "evenodd" fills what's outside the ground
+// and inside the walls.
+const WALLS = `M-200 -200H${SIZE + 200}V${SIZE + 200}H-200Z${RIFT_OUTLINE}`;
+
+// Summoner's Rift: its walls, with the river, lanes, both bases and the
+// Dragon and Baron pits marked. With `laneLeads`, each lane is tinted by
+// who's ahead there. The replay's map (replay-map.tsx) draws it too, inside
+// its own <svg viewBox="0 0 14900 14900">.
 export function MapBackground({
   myTeamId,
   laneLeads = { top: null, mid: null, bot: null },
@@ -271,7 +278,9 @@ export function MapBackground({
   const blueIsMine = myTeamId === 100;
   return (
     <g>
-      {/* The river runs from top left to bottom right. */}
+      <rect width={SIZE} height={SIZE} fill="var(--color-surface)" />
+      {/* The river runs from top left to bottom right. The walls drawn over
+          it and the lanes give them their real edges. */}
       <path
         d="M1800 1800 L13100 13100"
         stroke="var(--color-line)"
@@ -310,6 +319,9 @@ export function MapBackground({
         fill={`var(--color-${blueIsMine ? "behind" : "ahead"})`}
         opacity={0.18}
       />
+      {/* A class rather than fill="var(--color-wall)": Tailwind only keeps
+          the colors its classes use. */}
+      <path d={WALLS} className="fill-wall" fillRule="evenodd" />
       <g fill="var(--color-faint)" fontSize={700} textAnchor="middle" fontFamily="var(--font-mono)">
         <text {...pitText({ x: 9866, y: 4414 })}>D</text>
         <text {...pitText({ x: 5007, y: 10471 })}>B</text>
