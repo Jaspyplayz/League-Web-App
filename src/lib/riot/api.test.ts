@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // See client.test.ts: "server-only" only works inside Next.js's server build.
 vi.mock("server-only", () => ({}));
 
-const { getActiveGame, getPlatformStatus, getTopMasteries } = await import("./api");
+const { getActiveGame, getPlatformStatus, getTopMasteries, resetActiveGameCache } = await import(
+  "./api"
+);
 const { resetCooldowns } = await import("./client");
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -12,6 +14,7 @@ beforeEach(() => {
   vi.stubEnv("RIOT_API_KEY", "RGAPI-test");
   vi.stubGlobal("fetch", fetchMock);
   resetCooldowns();
+  resetActiveGameCache();
 });
 
 afterEach(() => {
@@ -33,6 +36,22 @@ describe("getActiveGame", () => {
   it("returns null when the player isn't in a game", async () => {
     fetchMock.mockResolvedValueOnce(new Response("{}", { status: 404 }));
     await expect(getActiveGame("na", "abc")).resolves.toBeNull();
+  });
+
+  it("reuses an answer for a minute instead of asking Riot again", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation(async () => new Response("{}", { status: 404 }));
+      await getActiveGame("na", "abc");
+      await getActiveGame("na", "abc");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(61_000);
+      await getActiveGame("na", "abc");
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

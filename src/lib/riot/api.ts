@@ -132,16 +132,40 @@ export function getTimeline(region: Region, matchId: string) {
 
 // The game this player is in right now, or null when they aren't in one
 // (Riot answers 404 for that, which is an answer rather than a failure).
+// Every profile visit asks, so each answer is reused for a minute: reloading
+// a profile doesn't spend another request, and a badge a minute out of date
+// is fine. Like the match cache, each Vercel server instance keeps its own.
+const ACTIVE_GAME_TTL_MS = 60 * 1000;
+const MAX_CACHED_ACTIVE_GAMES = 500;
+const activeGameCache = new Map<string, { at: number; game: ActiveGame | null }>();
+
 export async function getActiveGame(region: Region, puuid: string): Promise<ActiveGame | null> {
+  const key = `${region}:${puuid}`;
+  const cached = activeGameCache.get(key);
+  if (cached && Date.now() - cached.at < ACTIVE_GAME_TTL_MS) return cached.game;
+
+  let game: ActiveGame | null;
   try {
-    return await riotGet<ActiveGame>(
+    game = await riotGet<ActiveGame>(
       REGIONS[region].platform,
       `/lol/spectator/v5/active-games/by-summoner/${puuid}`,
     );
   } catch (error) {
-    if (error instanceof RiotApiError && error.kind === "not-found") return null;
-    throw error;
+    if (!(error instanceof RiotApiError && error.kind === "not-found")) throw error;
+    game = null;
   }
+
+  activeGameCache.delete(key); // so re-adding moves it to the newest end
+  activeGameCache.set(key, { at: Date.now(), game });
+  if (activeGameCache.size > MAX_CACHED_ACTIVE_GAMES) {
+    activeGameCache.delete(activeGameCache.keys().next().value!);
+  }
+  return game;
+}
+
+// For tests: forget remembered live games.
+export function resetActiveGameCache() {
+  activeGameCache.clear();
 }
 
 // Riot's own list of problems and maintenance on one server, the same one

@@ -23,7 +23,7 @@ This doc is the plan for the first version. It will change as we build.
 3. **Match detail**: all 10 players, items, damage, and the standout analysis for the searched player (lead/deficit chart and turning points).
 4. **Insights tab** on the profile: trends across recent games.
 
-Out of scope for v1: user accounts, live game data, mobile app, every queue type beyond ranked solo/flex and normal draft.
+Out of scope for v1: user accounts, live game scouting, mobile app, every queue type beyond ranked solo/flex and normal draft. The only live data is the profile's "In game" badge (spectator-v5): it says the looked-up player is in a game, with the mode and minutes, and never shows the other players or their champions, which Riot's policy treats as scouting.
 
 ## Data model sketch
 
