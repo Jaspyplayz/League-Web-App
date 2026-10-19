@@ -49,7 +49,9 @@ export function participantRows(match: Match): (typeof matchParticipants.$inferI
 // Version 2 added XP at 15, early takedowns, vision and the jungle stats.
 // Version 3 also saves each game's minute-by-minute team numbers for the win
 // chance model (win_chance_games), so older games get fetched once more.
-export const BENCHMARK_STATS_VERSION = 3;
+// Version 4 added the habits (level 6 first, first scuttles, first gank and
+// first back).
+export const BENCHMARK_STATS_VERSION = 4;
 
 export function benchmarkRow(
   game: GameTrend,
@@ -82,6 +84,10 @@ export function benchmarkRow(
     objectiveShare: game.objectiveShare,
     enemyJungleKills: game.enemyJungleKills,
     scuttles: game.scuttles,
+    level6First: game.level6First,
+    firstScuttleLead: game.firstScuttleLead,
+    firstGankS: game.firstGankS,
+    firstBackS: game.firstBackS,
     statsVersion: BENCHMARK_STATS_VERSION,
   };
 }

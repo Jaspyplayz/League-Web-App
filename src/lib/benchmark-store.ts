@@ -64,6 +64,10 @@ async function readBenchmarks(tier: Tier): Promise<BenchmarkGame[]> {
     objectiveShare: r.objectiveShare,
     enemyJungleKills: r.enemyJungleKills,
     scuttles: r.scuttles,
+    level6First: r.level6First,
+    firstScuttleLead: r.firstScuttleLead,
+    firstGankS: r.firstGankS,
+    firstBackS: r.firstBackS,
   }));
 }
 

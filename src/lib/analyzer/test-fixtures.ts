@@ -132,4 +132,8 @@ export const NO_EXTRA_STATS = {
   objectiveShare: null,
   enemyJungleKills: null,
   scuttles: null,
+  level6First: null,
+  firstScuttleLead: null,
+  firstGankS: null,
+  firstBackS: null,
 } satisfies Partial<GameTrend>;
