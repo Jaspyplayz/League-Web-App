@@ -174,3 +174,11 @@ export type StatusEntry = {
   maintenance_status: "scheduled" | "in_progress" | "complete" | null;
   titles: { locale: string; content: string }[];
 };
+
+// champion-mastery-v4: how much a player has played one champion.
+export type ChampionMastery = {
+  championId: number; // a number like 103; Data Dragon's championIds turns it into "Ahri"
+  championLevel: number;
+  championPoints: number;
+  lastPlayTime: number; // ms since 1970
+};

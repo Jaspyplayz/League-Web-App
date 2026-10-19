@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // See client.test.ts: "server-only" only works inside Next.js's server build.
 vi.mock("server-only", () => ({}));
 
-const { getActiveGame, getPlatformStatus } = await import("./api");
+const { getActiveGame, getPlatformStatus, getTopMasteries } = await import("./api");
 const { resetCooldowns } = await import("./client");
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -42,6 +42,16 @@ describe("getPlatformStatus", () => {
     await getPlatformStatus("kr");
     expect(String(fetchMock.mock.calls[0][0])).toBe(
       "https://kr.api.riotgames.com/lol/status/v4/platform-data",
+    );
+  });
+});
+
+describe("getTopMasteries", () => {
+  it("asks for the player's top five champions", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("[]"));
+    await getTopMasteries("na", "abc");
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      "https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/abc/top?count=5",
     );
   });
 });

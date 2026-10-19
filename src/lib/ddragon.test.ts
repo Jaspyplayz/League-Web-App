@@ -17,7 +17,7 @@ const dd = buildDataDragon(
   "15.20.1",
   {
     data: {
-      Ahri: { id: "Ahri", name: "Ahri", tags: ["Mage", "Assassin"] },
+      Ahri: { id: "Ahri", key: "103", name: "Ahri", tags: ["Mage", "Assassin"] },
       Fiddlesticks: { id: "Fiddlesticks", name: "Fiddlesticks" },
       MonkeyKing: { id: "MonkeyKing", name: "Wukong" },
     },
@@ -64,6 +64,10 @@ describe("champions", () => {
 
   it("matches ids whatever their capitals", () => {
     expect(championIconUrl(dd, "FiddleSticks")).toBe(`${CDN}/champion/Fiddlesticks.png`);
+  });
+
+  it("maps champion numbers to ids", () => {
+    expect(dd.championIds[103]).toBe("Ahri");
   });
 
   it("uses the first tag as the champion's class", () => {

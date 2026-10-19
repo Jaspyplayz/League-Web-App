@@ -21,6 +21,9 @@ export type DataDragon = {
   // Keyed by lowercased champion id, because match data and Data Dragon don't
   // always agree on capitals ("FiddleSticks" vs "Fiddlesticks").
   champions: Record<string, Champion>;
+  // Champion mastery names champions by number (championId 103) instead of
+  // by id ("Ahri"), so this maps one to the other.
+  championIds: Record<number, string>;
   // Item id (as in match data) -> item name.
   items: Record<number, string>;
   // Match data names spells by number (summoner1Id = 4), but the image file
@@ -32,7 +35,9 @@ export type DataDragon = {
 };
 
 // The parts of Data Dragon's JSON files we read.
-type ChampionFile = { data: Record<string, { id: string; name: string; tags?: string[] }> };
+type ChampionFile = {
+  data: Record<string, { id: string; key?: string; name: string; tags?: string[] }>;
+};
 type ItemFile = { data: Record<string, { name: string }> };
 type SummonerFile = { data: Record<string, { id: string; key: string; name: string }> };
 type RunesFile = {
@@ -79,8 +84,10 @@ export function buildDataDragon(
   runesFile: RunesFile,
 ): DataDragon {
   const champions: DataDragon["champions"] = {};
-  for (const { id, name, tags = [] } of Object.values(championFile.data)) {
+  const championIds: DataDragon["championIds"] = {};
+  for (const { id, key, name, tags = [] } of Object.values(championFile.data)) {
     champions[id.toLowerCase()] = { id, name, tags };
+    if (key) championIds[Number(key)] = id;
   }
 
   const items: DataDragon["items"] = {};
@@ -106,7 +113,7 @@ export function buildDataDragon(
     }
   }
 
-  return { version, champions, items, spells, runeStyles, runes };
+  return { version, champions, championIds, items, spells, runeStyles, runes };
 }
 
 export function championName(dd: DataDragon | null, championName: string): string {
