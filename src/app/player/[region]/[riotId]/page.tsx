@@ -80,7 +80,7 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
               puuid={puuid}
               profile={profile.value}
               queue={queue}
-              beforeParam={search.before}
+              gamesParam={search.games}
               playerPath={playerPath}
               ranks={<RankCards puuid={puuid} profile={profile.value} />}
             />

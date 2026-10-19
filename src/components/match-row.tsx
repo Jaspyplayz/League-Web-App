@@ -27,6 +27,7 @@ export function MatchRow({
   teams,
   badges = [],
   details,
+  id,
 }: {
   match: MatchSummary;
   dd: DataDragon | null;
@@ -35,6 +36,7 @@ export function MatchRow({
   teams?: { region: Region; players: [TeamPlayer[], TeamPlayer[]] };
   badges?: string[]; // highlights like "Double kill", from matchBadges()
   details?: ReactNode;
+  id?: string; // so "Show 10 more games" can scroll to the first new row
 }) {
   // VICTORY and DEFEAT, like the game's own end screen.
   const result = m.remake ? "Remake" : m.win ? "Victory" : "Defeat";
@@ -128,7 +130,7 @@ export function MatchRow({
   );
 
   return (
-    <li>
+    <li id={id} className="scroll-mt-4">
       {details ? (
         <ExpandableRow
           row={content}
