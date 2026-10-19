@@ -111,6 +111,24 @@ export async function savedSoloTier(puuid: string): Promise<string | null> {
   return entry?.tier ?? null;
 }
 
+// The player's saved solo queue rank, for the signed-in player's spot in the
+// header ("Grandmaster · 312 LP"). Null when unranked or never looked up.
+// Database only, so every page view stays free of Riot calls.
+export async function savedSoloRank(
+  puuid: string,
+): Promise<Pick<LeagueEntry, "tier" | "rank" | "leaguePoints"> | null> {
+  const entry = await readCache((db) =>
+    db.query.rankedEntries.findFirst({
+      where: and(
+        eq(tables.rankedEntries.puuid, puuid),
+        eq(tables.rankedEntries.queueType, "RANKED_SOLO_5x5"),
+      ),
+      columns: { tier: true, rank: true, leaguePoints: true },
+    }),
+  );
+  return entry ?? null;
+}
+
 async function readProfile(region: Region, puuid: string): Promise<Profile | undefined> {
   return readCache(async (db) => {
     const player = await db.query.players.findFirst({

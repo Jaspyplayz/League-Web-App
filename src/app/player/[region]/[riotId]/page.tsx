@@ -12,7 +12,7 @@ import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import { fromSlug, toSlug, type RiotId } from "@/lib/riot-id";
-import { ProfileHeader } from "./profile-header";
+import { ProfileHeader, RankCards } from "./profile-header";
 import { RecentMatches } from "./recent-matches";
 
 type Params = Promise<{ region: string; riotId: string }>;
@@ -82,6 +82,7 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
               queue={queue}
               beforeParam={search.before}
               playerPath={playerPath}
+              ranks={<RankCards puuid={puuid} profile={profile.value} />}
             />
           </Suspense>
         </>

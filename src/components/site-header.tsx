@@ -1,51 +1,58 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { AccountMenu } from "./account-menu";
+import { GearIcon, SearchIcon } from "./icons";
 import { LogoMark } from "./logo";
-import { GitHubIcon } from "./icons";
+import { NavTab } from "./nav-tab";
+import { navTabClass } from "./nav-tab-style";
 
 export const REPO_URL = "https://github.com/Jaspyplayz/League-Web-App";
 
-const navLink =
-  "flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-[15px] text-ink-soft transition-colors hover:bg-surface hover:text-ink";
+// Square icon buttons with cut corners, for search and settings.
+const iconButton =
+  "hud-cut-sm flex size-10 items-center justify-center border border-frame text-ink-soft transition-colors hover:bg-surface hover:text-ink";
 
+// The "client bar": like the top of the League client. The logo (which also
+// takes you home) and a How it works tab on the left; search, settings and
+// your account on the right. GitHub lives in the footer.
 export function SiteHeader() {
   return (
     <header className="border-b border-line">
       <nav
         aria-label="Main"
-        className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-6 py-4"
+        className="mx-auto flex min-h-16 max-w-[1200px] flex-wrap items-stretch gap-x-6 gap-y-2 px-6"
       >
         <Link href="/" className="flex items-center gap-2.5 text-ink">
           <LogoMark />
-          <span className="font-display text-[26px] font-bold uppercase tracking-[0.02em]">
+          <span className="font-display text-[26px] font-bold uppercase tracking-[0.04em]">
             Turnpoint
           </span>
         </Link>
-        <div className="flex flex-wrap items-center gap-1">
-          <Link href="/how-it-works" className={navLink}>
-            How it works
+        {/* NavTab reads the URL to underline the page you're on; until it
+            loads, the same link shows without the underline. */}
+        <Suspense
+          fallback={
+            <Link href="/how-it-works" className={navTabClass(false)}>
+              How it works
+            </Link>
+          }
+        >
+          <NavTab href="/how-it-works">How it works</NavTab>
+        </Suspense>
+
+        <div className="ml-auto flex items-center gap-2.5 py-3">
+          {/* The search box is on the home page; this jumps straight to it. */}
+          <Link href="/#riotId" aria-label="Search for a player" className={iconButton}>
+            <SearchIcon />
           </Link>
-          <a href={REPO_URL} className={navLink}>
-            <GitHubIcon />
-            GitHub
-          </a>
-          <Link href="/settings" className={navLink}>
-            Settings
+          <Link href="/settings" aria-label="Settings" className={iconButton}>
+            <GearIcon />
           </Link>
           {/* Who's signed in depends on the visitor's cookies, so it streams in
               after the rest of the header, which stays prerendered. The
-              invisible placeholder holds its space meanwhile: on phones the
-              links wrap onto a second line, and without it that line would
-              appear late and push the whole page down. */}
-          <Suspense
-            fallback={
-              <span aria-hidden="true" className={`${navLink} invisible`}>
-                Sign in
-              </span>
-            }
-          >
-            <AccountMenu linkClassName={navLink} />
+              placeholder holds its space meanwhile so nothing jumps. */}
+          <Suspense fallback={<span aria-hidden="true" className="h-10 w-24" />}>
+            <AccountMenu />
           </Suspense>
         </div>
       </nav>
