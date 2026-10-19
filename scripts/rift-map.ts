@@ -2,11 +2,12 @@
 // the games `npm run tempo-games` saved for the tempo study and the item
 // check (docs/replay.md).
 //
-//   npm run rift-map -- --counts    prints how many positions fell in each cell
+//   npm run rift-map -- --counts    saves how many positions fell in each cell
+//                                   to .cache/rift-counts.json
 //
 // Makes no Riot calls and doesn't touch the database.
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { ITEM_CHECK_FOLDER, type ItemCheckGame } from "@/lib/analyzer/item-check";
@@ -40,17 +41,21 @@ function main() {
   }
 
   const counts = countPositions([...timelines.values()]);
+  const positions = counts.reduce((sum, n) => sum + n, 0);
   if (args.counts) {
-    console.log(
+    const out = ".cache/rift-counts.json";
+    writeFileSync(
+      out,
       JSON.stringify({
         cell: RIFT_CELL,
         cells: RIFT_CELLS,
         games: timelines.size,
-        positions: counts.reduce((sum, n) => sum + n, 0),
+        positions,
         patches: Object.fromEntries(patches),
         rows: encodeCounts(counts),
       }),
     );
+    console.log(`Counted ${positions} positions in ${timelines.size} games into ${out}.`);
   }
 }
 
