@@ -130,6 +130,11 @@ export function itemName(dd: DataDragon, itemId: number): string | null {
   return dd.items[itemId] ?? null;
 }
 
+// Riot's minimap picture of Summoner's Rift (map 11), for the replay's map.
+export function riftMapUrl(dd: DataDragon): string {
+  return `${BASE}/cdn/${dd.version}/img/map/map11.png`;
+}
+
 export function itemIconUrl(dd: DataDragon, itemId: number): string {
   return `${BASE}/cdn/${dd.version}/img/item/${itemId}.png`;
 }

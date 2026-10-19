@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { jungleReplay } from "./jungle-replay";
-import { clock, frames, kill, participants, SPOTS } from "./test-fixtures";
-import type { TrimmedEvent } from "./trim";
+import { frames, participants, SPOTS } from "./test-fixtures";
 
 // In the fixtures, 2 is the blue jungler (Vi) and 7 the red jungler (Lee Sin).
 const players = participants();
@@ -29,28 +28,6 @@ describe("jungleReplay", () => {
     expect(replay.frames).toHaveLength(16);
     expect(replay.frames[3].positions[1]).toEqual(SPOTS.jungle);
     expect(replay.frames[4].positions[1]).toBeNull();
-  });
-
-  it("puts each kill and objective in the minute leading up to its frame", () => {
-    const dragon: TrimmedEvent = {
-      type: "ELITE_MONSTER_KILL",
-      timestamp: clock("6:30"),
-      killerTeamId: 200,
-      monsterType: "DRAGON",
-      monsterSubType: "FIRE_DRAGON",
-      killerId: 7,
-      assistingParticipantIds: [],
-    };
-    const timeline = {
-      frames: frames(15),
-      events: [kill("3:10", 2, 6), kill("4:00", 7, 1), dragon],
-    };
-    const replay = jungleReplay(timeline, players, vi, leeSin)!;
-    expect(replay.frames[4].kills.map((k) => k.timestamp)).toEqual([clock("3:10"), clock("4:00")]);
-    expect(replay.frames[5].kills).toEqual([]);
-    expect(replay.frames[7].objectives).toEqual([
-      { timestamp: clock("6:30"), kind: "dragon", ours: false, count: 1 },
-    ]);
   });
 
   it("adds up gold and XP per lane, with the support in bot lane", () => {

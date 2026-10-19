@@ -26,11 +26,11 @@ import {
   type ReplayObjective,
 } from "@/lib/analyzer/replay";
 import type { TempoTimeline } from "@/lib/analyzer/tempo";
-import { StepButton } from "./jungle-map";
 import { LegendSwatch } from "./legend-swatch";
 import { ReplayMap } from "./replay-map";
 import { ChanceRow, PlayMarks, playStart, ReplayPlays } from "./replay-plays";
 import { ReplayScoreboard, type ItemInfo, type ReplayPerson } from "./replay-scoreboard";
+import { StepButton } from "./step-button";
 import {
   JunglerMarks,
   joinRuns,
@@ -53,6 +53,8 @@ type Props = {
   // Name and image of every item the replay shows.
   items: Record<number, ItemInfo>;
   winningTeamId: number;
+  // Riot's picture of Summoner's Rift, null without Data Dragon.
+  mapUrl: string | null;
   // Where the full explanations live (docs/replay.md and docs/tempo.md on
   // GitHub).
   docsHref: string;
@@ -71,6 +73,7 @@ export function Replay({
   people,
   items,
   winningTeamId,
+  mapUrl,
   docsHref,
   tempoDocsHref,
 }: Props) {
@@ -356,7 +359,14 @@ export function Replay({
 
       {/* The map beside the scoreboard when both fit, above it otherwise. */}
       <div className="flex flex-wrap items-start gap-6">
-        <ReplayMap board={board} t={t} people={people} kills={kills} myTeamId={myTeamId} />
+        <ReplayMap
+          board={board}
+          t={t}
+          people={people}
+          kills={kills}
+          myTeamId={myTeamId}
+          mapUrl={mapUrl}
+        />
         <div className="min-w-0 flex-[1_1_560px]">
           <ReplayScoreboard
             board={board}

@@ -8,8 +8,8 @@
 // tempo study and the item check and saves the walls, and their outline for
 // drawing, in rift-map.json (docs/replay.md).
 //
-// The maps draw the outline (RIFT_OUTLINE, in jungle-map.tsx) and the
-// replay walks champions around the walls (walkingRoute, in positions.ts).
+// The replay's map draws the outline (RIFT_OUTLINE, in map-background.tsx)
+// and walks champions around the walls (walkingRoute, in positions.ts).
 
 import type { MapPosition } from "@/lib/riot/types";
 import { MAP_SIZE } from "./map";

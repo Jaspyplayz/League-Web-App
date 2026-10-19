@@ -26,10 +26,10 @@
 // TEMPO_LEAD more is "up tempo". docs/tempo.md explains how these numbers were
 // worked out from real games, and how well they held up.
 //
-// Like the jungle map and the gank log, it lays out the situation and never
-// grades a decision. Whether to fight, farm or back depends on things Riot
-// doesn't record (waves, vision, cooldowns, health), and Riot's policies rule
-// out tools that tell players what to do.
+// Like the gank log, it lays out the situation and never grades a decision.
+// Whether to fight, farm or back depends on things Riot doesn't record
+// (waves, vision, cooldowns, health), and Riot's policies rule out tools that
+// tell players what to do.
 
 import type { MapPosition } from "@/lib/riot/types";
 import { formatClock, formatGap } from "./format";

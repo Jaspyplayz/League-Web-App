@@ -2,10 +2,10 @@
 // jungler took part in, for you and for the enemy jungler, with how many
 // players joined on each side, how it ended and how the lane was doing.
 //
-// Like the jungle map, it shows the situation and doesn't grade the gank.
-// Jasper (a Grandmaster jungler) pointed out that ganking a losing lane can be
-// right when you're up numbers or have tracked the enemy jungler, so the
-// numbers are laid out for the player to judge.
+// It shows the situation and doesn't grade the gank. Jasper (a Grandmaster
+// jungler) pointed out that ganking a losing lane can be right when you're up
+// numbers or have tracked the enemy jungler, so the numbers are laid out for
+// the player to judge.
 //
 // What the data can and can't see: Riot logs every kill with its spot, so a
 // gank that killed someone is exact. A gank where nobody died leaves no

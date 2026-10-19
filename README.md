@@ -26,7 +26,8 @@ Across your recent games it turns those moments into patterns you can act on, li
 - **Turning points:** the 1 to 3 biggest swings in your lane, each with a plain-English reason.
 - **Deaths:** each one labeled solo killed, ganked, teamfight or caught.
 - **Team gold** over time with dragons, Baron, towers and other objectives marked.
-- **Jungle replay map and pathing:** where both junglers went in the first minutes.
+- **Replay (beta):** the whole game second by second on this season's Summoner's Rift, with every player's items and every play graded by the win chance.
+- **Jungle pathing and early ganks:** which side of the map you played in the first minutes, and every gank before 14:00.
 - Full scoreboard for all 10 players, and private notes on any game when signed in.
 
 ![A match row expanded on the profile, with the game score and badges for every player](docs/screenshots/match-panel.png)
