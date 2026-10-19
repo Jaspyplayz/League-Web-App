@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
+import { compareHabits } from "@/lib/analyzer/habit-trends";
 import { checkWeaknesses, computeTrends } from "@/lib/analyzer/trends";
 import { loadBenchmarks, loadBenchmarkTiers } from "@/lib/benchmark-store";
 import {
@@ -24,6 +25,7 @@ import { AnalysisProgress } from "./analysis-progress";
 import { loadChosenPlayer, readChoice } from "./chosen-player";
 import { CompareWithPlayer } from "./compare-with-player";
 import { FocusPanel } from "./focus";
+import { HabitsSection } from "./habits";
 import { InsightsFilterBar } from "./insights-filters";
 import { TierComparison } from "./tier-comparison";
 import { LaningChart } from "./laning-chart";
@@ -203,6 +205,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   // Null when none of your games has enough of that rank's games to compare.
   const benchmarks = tier ? await loadBenchmarks(tier) : [];
   const comparison = compareWithBenchmarks(games, benchmarks, classOf);
+  const habits = compareHabits(games, benchmarks);
   const playerComparison = theirs
     ? compareWithBenchmarks(games, theirs.games, classOf, MIN_PLAYER_GAMES)
     : null;
@@ -238,6 +241,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
           dd={dd}
         />
       )}
+      {habits && <HabitsSection report={habits} tier={tier} />}
       <CompareWithPlayer
         chosen={chosen}
         comparison={playerComparison}

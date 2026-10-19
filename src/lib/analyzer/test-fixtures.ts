@@ -154,4 +154,5 @@ export const NO_EXTRA_STATS = {
   objectiveShare: null,
   enemyJungleKills: null,
   scuttles: null,
+  habits: null,
 } satisfies Partial<GameTrend>;

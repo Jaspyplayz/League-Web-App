@@ -91,6 +91,8 @@ export type Participant = {
   challenges?: {
     enemyJungleMonsterKills?: number; // monsters killed in the enemy jungle
     scuttleCrabKills?: number;
+    // Scuttle crabs taken at their first spawn (3:30), 0 to 2.
+    initialCrabCount?: number;
   };
 };
 

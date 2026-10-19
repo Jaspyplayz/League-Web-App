@@ -266,6 +266,13 @@ export const benchmarkGames = pgTable(
     objectiveShare: real("objective_share"),
     enemyJungleKills: integer("enemy_jungle_kills"),
     scuttles: integer("scuttles"),
+    // Habits (src/lib/analyzer/habits.ts), added in stats version 4. Null
+    // means it didn't happen or doesn't apply, as in Habits, and older rows
+    // have nulls until the script refills them (HABITS_VERSION in rows.ts).
+    level6First: boolean("level_6_first"),
+    firstScuttleLead: integer("first_scuttle_lead"),
+    firstGankS: integer("first_gank_s"),
+    firstBackS: integer("first_back_s"),
     statsVersion: integer("stats_version").notNull().default(1),
     collectedAt: timestamptz("collected_at").notNull().defaultNow(),
   },

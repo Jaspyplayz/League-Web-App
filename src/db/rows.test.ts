@@ -79,6 +79,7 @@ describe("benchmarkRow", () => {
         objectiveShare: 0.5,
         enemyJungleKills: 12,
         scuttles: 2,
+        habits: { level6First: true, firstScuttleLead: 1, firstGankS: 245, firstBackS: 410 },
       },
       "puuid-1",
       "kr",
@@ -109,6 +110,10 @@ describe("benchmarkRow", () => {
       objectiveShare: 0.5,
       enemyJungleKills: 12,
       scuttles: 2,
+      level6First: true,
+      firstScuttleLead: 1,
+      firstGankS: 245,
+      firstBackS: 410,
       statsVersion: BENCHMARK_STATS_VERSION,
     });
   });
