@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import type { Region } from "@/lib/regions";
 import type { RiotApiError } from "@/lib/riot/client";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
+import { RiotStatus } from "./riot-status";
 
 // Turns a failed Riot call into a message a visitor can act on.
 const MESSAGES: Record<RiotApiError["kind"], { title: string; body: (e: RiotApiError) => string }> =
@@ -25,7 +28,9 @@ const MESSAGES: Record<RiotApiError["kind"], { title: string; body: (e: RiotApiE
     },
   };
 
-export function RiotErrorNotice({ error }: { error: RiotApiError }) {
+// Pass the region when there is one: if Riot didn't answer, the notice also
+// lists any outage Riot itself is reporting for that server.
+export function RiotErrorNotice({ error, region }: { error: RiotApiError; region?: Region }) {
   const { title, body } = MESSAGES[error.kind];
   return (
     <div
@@ -34,6 +39,11 @@ export function RiotErrorNotice({ error }: { error: RiotApiError }) {
     >
       <p className="font-semibold">{title}</p>
       <p className="text-muted">{body(error)}</p>
+      {error.kind === "unavailable" && region && (
+        <Suspense fallback={null}>
+          <RiotStatus region={region} />
+        </Suspense>
+      )}
       {/* The sample game is served from the database, so it still works
           while Riot can't be reached. "not-found" is about this one player,
           so a sample wouldn't help there. */}

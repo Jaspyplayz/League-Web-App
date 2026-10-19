@@ -76,7 +76,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   await connection();
 
   const account = await settle(getAccount(region, id));
-  if (!account.ok) return <RiotErrorNotice error={account.error} />;
+  if (!account.ok) return <RiotErrorNotice error={account.error} region={region} />;
   if (!account.value) notFound();
   const { puuid, gameName, tagLine } = account.value;
   const playerPath = `/player/${region}/${toSlug(account.value)}`;
@@ -102,7 +102,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
     return (
       <>
         {header}
-        <RiotErrorNotice error={loaded.error} />
+        <RiotErrorNotice error={loaded.error} region={region} />
       </>
     );
   }

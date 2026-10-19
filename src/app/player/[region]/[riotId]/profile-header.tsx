@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { ProfileIcon, RankEmblem } from "@/components/game-icons";
+import { LiveBadge } from "@/components/live-badge";
 import { PinButton } from "@/components/saved-players";
 import { ThisIsMe } from "@/components/this-is-me";
 import { secondsUntilUpdate } from "@/db/freshness";
@@ -44,6 +46,10 @@ export async function ProfileHeader({ region, puuid, gameName, tagLine, profile 
             </h1>
             <PinButton region={region} gameName={gameName} tagLine={tagLine} />
             <ThisIsMe region={region} puuid={puuid} gameName={gameName} tagLine={tagLine} />
+            {/* Its own Suspense boundary, so a slow answer never holds up the header. */}
+            <Suspense fallback={null}>
+              <LiveBadge region={region} puuid={puuid} />
+            </Suspense>
           </div>
           <p className="text-muted">
             {REGIONS[region].label}

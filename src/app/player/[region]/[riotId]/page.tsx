@@ -54,7 +54,7 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
   await connection();
 
   const account = await settle(getAccount(region, id));
-  if (!account.ok) return <RiotErrorNotice error={account.error} />;
+  if (!account.ok) return <RiotErrorNotice error={account.error} region={region} />;
   if (!account.value) return <PlayerNotFound region={region} id={id} />;
 
   const { puuid, gameName, tagLine } = account.value;
@@ -89,7 +89,7 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
       ) : (
         <>
           <PlayerName gameName={gameName} tagLine={tagLine} />
-          <RiotErrorNotice error={profile.error} />
+          <RiotErrorNotice error={profile.error} region={region} />
         </>
       )}
     </>
