@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isProvider, safeNextPath, userFromClaims, withoutEmail } from "./sign-in";
+import { isProvider, safeNextPath, userFromClaims, cleanName } from "./sign-in";
 
 describe("isProvider", () => {
   it("accepts the providers we offer", () => {
@@ -37,20 +37,30 @@ describe("safeNextPath", () => {
   );
 });
 
-describe("withoutEmail", () => {
+describe("cleanName", () => {
   it("keeps names without an email as they are", () => {
-    expect(withoutEmail("  Jasper L ")).toBe("Jasper L");
-    expect(withoutEmail("jaspy#0")).toBe("jaspy#0");
+    expect(cleanName("  Jasper L ")).toBe("Jasper L");
+    expect(cleanName("jaspy#0")).toBe("jaspy#0");
   });
 
   it("drops an email inside or after the name", () => {
-    expect(withoutEmail("Jaspyplayz (jasper@example.com)")).toBe("Jaspyplayz");
-    expect(withoutEmail("Jaspyplayz <jasper@example.com>")).toBe("Jaspyplayz");
-    expect(withoutEmail("Jaspyplayz - jasper@example.com")).toBe("Jaspyplayz");
+    expect(cleanName("Jaspyplayz (jasper@example.com)")).toBe("Jaspyplayz");
+    expect(cleanName("Jaspyplayz <jasper@example.com>")).toBe("Jaspyplayz");
+    expect(cleanName("Jaspyplayz - jasper@example.com")).toBe("Jaspyplayz");
+  });
+
+  it("drops a second name in brackets", () => {
+    expect(cleanName("Jaspyplayz (jaspyplayz)")).toBe("Jaspyplayz");
+    expect(cleanName("Jaspyplayz [JP]")).toBe("Jaspyplayz");
+    expect(cleanName("Jaspyplayz (jaspypl")).toBe("Jaspyplayz");
+  });
+
+  it("keeps the inside when the brackets are all there is", () => {
+    expect(cleanName("(jaspy)")).toBe("jaspy");
   });
 
   it("keeps the part before the @ when the name is only an email", () => {
-    expect(withoutEmail("jasper@example.com")).toBe("jasper");
+    expect(cleanName("jasper@example.com")).toBe("jasper");
   });
 });
 
