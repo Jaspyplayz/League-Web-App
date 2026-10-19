@@ -52,6 +52,8 @@ export function participantRows(match: Match): (typeof matchParticipants.$inferI
 // Version 4 added the habits (level 6 first, first scuttles, first gank and
 // first back).
 export const BENCHMARK_STATS_VERSION = 4;
+// The first version with habits.
+export const HABITS_VERSION = 4;
 
 export function benchmarkRow(
   game: GameTrend,
@@ -84,10 +86,10 @@ export function benchmarkRow(
     objectiveShare: game.objectiveShare,
     enemyJungleKills: game.enemyJungleKills,
     scuttles: game.scuttles,
-    level6First: game.level6First,
-    firstScuttleLead: game.firstScuttleLead,
-    firstGankS: game.firstGankS,
-    firstBackS: game.firstBackS,
+    level6First: game.habits?.level6First ?? null,
+    firstScuttleLead: game.habits?.firstScuttleLead ?? null,
+    firstGankS: game.habits?.firstGankS ?? null,
+    firstBackS: game.habits?.firstBackS ?? null,
     statsVersion: BENCHMARK_STATS_VERSION,
   };
 }

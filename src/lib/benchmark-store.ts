@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { count, eq } from "drizzle-orm";
 import { cacheLife } from "next/cache";
 import { getDb, tables } from "@/db";
+import { HABITS_VERSION } from "@/db/rows";
 import type { BenchmarkGame } from "@/lib/analyzer/compare";
 import type { DeathLabel } from "@/lib/analyzer/deaths";
 import { isTier, TIERS, type Tier } from "@/lib/tiers";
@@ -64,10 +65,17 @@ async function readBenchmarks(tier: Tier): Promise<BenchmarkGame[]> {
     objectiveShare: r.objectiveShare,
     enemyJungleKills: r.enemyJungleKills,
     scuttles: r.scuttles,
-    level6First: r.level6First,
-    firstScuttleLead: r.firstScuttleLead,
-    firstGankS: r.firstGankS,
-    firstBackS: r.firstBackS,
+    // A null habit means "didn't happen" in rows from version 4 on, and
+    // "not collected yet" in older ones, so older rows get none at all.
+    habits:
+      r.statsVersion >= HABITS_VERSION
+        ? {
+            level6First: r.level6First,
+            firstScuttleLead: r.firstScuttleLead,
+            firstGankS: r.firstGankS,
+            firstBackS: r.firstBackS,
+          }
+        : null,
   }));
 }
 

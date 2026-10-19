@@ -56,7 +56,11 @@ export type GameTrend = {
   // Junglers only, from Riot's own per-game counts.
   enemyJungleKills: number | null;
   scuttles: number | null;
-} & Habits; // level 6 first, first scuttles, first gank and first back (habits.ts)
+
+  // Level 6 first, first scuttles, first gank and first back (habits.ts).
+  // Null only in benchmark games collected before they were added.
+  habits: Habits | null;
+};
 
 // A game counts for trends when it's long enough to analyze and the player
 // had an opponent in their role. That leaves out remakes, ARAM and Arena
@@ -110,7 +114,7 @@ export function summarizeGame(
     objectiveShare: jungle ? objectiveShare(events, me.teamId) : null,
     enemyJungleKills: jungle ? (me.challenges?.enemyJungleMonsterKills ?? null) : null,
     scuttles: jungle ? (me.challenges?.scuttleCrabKills ?? null) : null,
-    ...findHabits(timeline, me, opponent, jungle),
+    habits: findHabits(timeline, me, opponent, jungle),
   };
 }
 
