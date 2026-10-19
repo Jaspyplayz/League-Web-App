@@ -15,6 +15,8 @@ export type MyPlayer = {
   region: Region;
   gameName: string;
   tagLine: string;
+  // From the player's saved profile, for the header. Null until looked up.
+  profileIconId: number | null;
 };
 
 export async function readMyPlayer(userId: string): Promise<MyPlayer | null> {
@@ -27,6 +29,7 @@ export async function readMyPlayer(userId: string): Promise<MyPlayer | null> {
         region: tables.players.region,
         gameName: tables.players.gameName,
         tagLine: tables.players.tagLine,
+        profileIconId: tables.players.profileIconId,
       })
       .from(tables.userPlayers)
       .innerJoin(tables.players, eq(tables.userPlayers.puuid, tables.players.puuid))
