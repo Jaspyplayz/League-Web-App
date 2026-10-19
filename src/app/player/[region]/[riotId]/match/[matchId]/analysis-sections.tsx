@@ -2,6 +2,7 @@ import type { TurningPointMarker } from "@/components/diff-chart";
 import { REPO_URL } from "@/components/site-header";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
+import type { ReplayChances } from "@/lib/analyzer/plays";
 import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
 import { championIconUrl, itemIconUrl, itemName, type DataDragon } from "@/lib/ddragon";
 import type { Region } from "@/lib/regions";
@@ -32,6 +33,7 @@ export function AnalysisSections({
   match,
   analysis: a,
   winChance,
+  chances,
   dd,
   label,
 }: {
@@ -40,6 +42,9 @@ export function AnalysisSections({
   analysis: MatchAnalysis;
   // Null for games the win chance model doesn't cover.
   winChance: MatchWinChance | null;
+  // The replay's win chance at every second and its graded plays, null with
+  // winChance.
+  chances: ReplayChances | null;
   dd: DataDragon | null;
   label: (championName: string) => string;
 }) {
@@ -91,6 +96,7 @@ export function AnalysisSections({
       )}
       <Replay
         replay={a.replay}
+        chances={chances}
         tempo={a.tempo}
         people={replayPeople(participants, a, dd, label)}
         items={replayItems(a, dd)}

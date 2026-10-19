@@ -103,6 +103,27 @@ describe("scoreboardAt", () => {
     expect(player("20:00", 3)).toMatchObject({ gold: 8503, cs: 140 });
   });
 
+  it("adds a kill's gold at the second of the kill, and the rest of the minute's steadily", () => {
+    // Red mid (8) kills blue mid at 4:30 with red jungle's (7) help. Of the
+    // 400 gold each earns from 4:00 to 5:00, 300 is the kill for 8 and 150
+    // the assist for 7.
+    expect(player("4:00", 8).gold).toBe(2108);
+    expect(player("4:30", 8).gold).toBe(2108 + 50 + 300);
+    expect(player("4:30", 7).gold).toBe(2107 + 125 + 150);
+    expect(player("5:00", 8).gold).toBe(2508);
+  });
+
+  it("scales a kill's gold down when the minute paid less than that in total", () => {
+    const poor = replayData(
+      { frames: frames(2, (minute) => ({ gold: 500 + 200 * minute })), events: [kill("1:30", 8, 3)] },
+      players,
+      BLUE,
+    );
+    const gold = (time: string) => scoreboardAt(poor, clock(time)).players[7].gold;
+    // 200 earned from 1:00 to 2:00, all of it put down to the kill.
+    expect([gold("1:29"), gold("1:30"), gold("2:00")]).toEqual([700, 900, 900]);
+  });
+
   it("levels up at the skill point, kept between the levels in the snapshots either side", () => {
     // Level 1 until 2:00 in the snapshots; the first point at 0:30 can't
     // make it more than that.
@@ -132,10 +153,10 @@ describe("scoreboardAt", () => {
   });
 
   it("adds up each team's kills, gold and objectives at that moment", () => {
-    expect(team("8:15", BLUE)).toEqual({
+    expect(team("7:15", BLUE)).toEqual({
       teamId: BLUE,
       kills: 0,
-      gold: 5 * (500 + 8.25 * 400) + (1 + 2 + 3 + 4 + 5),
+      gold: 5 * (500 + 7.25 * 400) + (1 + 2 + 3 + 4 + 5),
       taken: { dragon: 1 },
     });
     expect(team("8:15", RED)).toMatchObject({ kills: 1, taken: { grubs: 1 } });

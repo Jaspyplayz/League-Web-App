@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { analyzeMatch, findPlayer, findPlayerByRiotId, isAnalyzable } from "@/lib/analyzer";
+import { replayChances } from "@/lib/analyzer/plays";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { loadMatch, loadTimeline } from "@/lib/match-store";
 import { savedSoloTier } from "@/lib/profile-store";
@@ -128,6 +129,11 @@ async function Analysis({ params }: { params: Params }) {
   const label = (name: string) => championName(dd, name);
   const analysis = analyzeMatch(match, timeline.value, me.puuid, label)!;
   const winChance = matchWinChance(match, timeline.value, me.teamId, tier);
+  // The replay's win chance at every second and its graded plays, from the
+  // same model as the win chance chart.
+  const chances = winChance
+    ? replayChances(timeline.value, analysis.replay, winChance.model, me.participantId)
+    : null;
   return (
     <>
       {back}
@@ -137,6 +143,7 @@ async function Analysis({ params }: { params: Params }) {
         match={match}
         analysis={analysis}
         winChance={winChance}
+        chances={chances}
         dd={dd}
         label={label}
       />

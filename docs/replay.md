@@ -1,15 +1,16 @@
 # Replay (beta)
 
-The replay plays a whole game back second by second. Drag along its timeline or press play, and the map shows where every champion was at that moment, and the scoreboard beside it every player's level, kills, deaths, assists, CS, gold and items, with each team's kills, gold, towers and epic monsters. It's on the match page of every game, after the jungle sections and before the win chance graph, marked **Beta**. When you played jungle, it also has the [tempo strip](tempo.md).
+The replay plays a whole game back second by second. Drag along its timeline or press play, and the map shows where every champion was at that moment, and the scoreboard beside it every player's level, kills, deaths, assists, CS, gold and items, with each team's kills, gold, towers and epic monsters. The timeline also shows your team's chance to win at every second, and under the scoreboard every play of the game is graded by how much it moved that chance. It's on the match page of every game, after the jungle sections and before the win chance graph, marked **Beta**. When you played jungle, it also has the [tempo strip](tempo.md).
 
-The code is in [`src/lib/analyzer/replay.ts`](../src/lib/analyzer/replay.ts) (the map and scoreboard at any second), [`src/lib/analyzer/items.ts`](../src/lib/analyzer/items.ts) (each player's items) and [`src/lib/analyzer/positions.ts`](../src/lib/analyzer/positions.ts) (each champion's spot on the map). The panel is `match/[matchId]/replay.tsx`, with the map in `replay-map.tsx` and the scoreboard in `replay-scoreboard.tsx`.
+The code is in [`src/lib/analyzer/replay.ts`](../src/lib/analyzer/replay.ts) (the map and scoreboard at any second), [`src/lib/analyzer/items.ts`](../src/lib/analyzer/items.ts) (each player's items), [`src/lib/analyzer/positions.ts`](../src/lib/analyzer/positions.ts) (each champion's spot on the map) and [`src/lib/analyzer/plays.ts`](../src/lib/analyzer/plays.ts) (the chance to win at every second, and the plays). The panel is `match/[matchId]/replay.tsx`, with the map in `replay-map.tsx`, the scoreboard in `replay-scoreboard.tsx` and the plays in `replay-plays.tsx`.
 
 ## What it shows
 
-- **The timeline**: the whole game, with a tick for every kill (blue for your team's, red for the enemy's) and a letter for every epic monster (D dragon, E Elder, G grubs, H Herald, B Baron, A Atakhan). Press or drag anywhere on it, or press play to watch at 10, 30 or 60 times game speed. The arrow buttons jump to the previous or next kill (for junglers, change of tempo). From the keyboard it works like a slider: the arrow keys move 5 seconds, Page Up and Page Down a minute.
+- **The timeline**: the whole game. On top, your team's chance to win at every second (blue above even, red below), then a dot for every play (blue when it raised your team's chance, red when it lowered it, grey when it barely moved it, bigger the more it moved), a letter for every epic monster (D dragon, E Elder, G grubs, H Herald, B Baron, A Atakhan) and a tick for every kill (blue for your team's, red for the enemy's). Press or drag anywhere on it, or press play to watch at 10, 30 or 60 times game speed. The arrow buttons jump to the previous or next play. From the keyboard it works like a slider: the arrow keys move 5 seconds, Page Up and Page Down a minute.
 - **The map**: all ten champions, in blue for your team and red for the enemy's. Your ring is thicker and your opponent's dashed, like the scoreboard's outlines. A dead champion stays faded where they died, with the time until they're back, and a cross marks each kill for 10 seconds. It sits beside the scoreboard when both fit, and above it otherwise.
-- **The moment you're on**: the game clock, how far ahead or behind your team was in gold, and the kill score.
+- **The moment you're on**: the game clock, your team's chance to win, how far ahead or behind your team was in gold, and the kill score.
 - **Both teams**: your team first, each in role order, with the winning team in blue and the losing team in red, like the scoreboard at the bottom of the page. Your row has a solid outline and your opponent's a dashed one. A dead player's picture is faded, with how long until they're back. On phones each team is a list instead of a table, so nothing has to scroll sideways while you drag the timeline.
+- **Plays**: every fight, epic monster, tower and inhibitor, with a grade: how much it changed your team's chance to win. Pick one to jump the replay to it and see each kill and objective in it, the chance before and after, and, for junglers, who had tempo just before. **Yours** shows only the plays you took part in, and the line above the list counts your grades. See [how the plays are graded](#how-the-plays-are-graded).
 
 ## Where each number comes from
 
@@ -20,12 +21,14 @@ Riot's match timeline has two kinds of data: events, each logged with its exact 
 | Kills, deaths, assists | Kill events, so exact to the second. |
 | Dead, back in | The time of the death, plus the game's death timer: a base time for the level, plus up to 50% more as the game goes on. About 1 in 10 deaths ends sooner than the timer says (see [tempo.md](tempo.md#death-timers)). |
 | Level | Each level gives one skill point, and Riot logs each one to the second. Points can be spent a little late, so the count is kept between the levels in the snapshots either side. |
-| CS and gold | Only in the once-a-minute snapshots. Between two snapshots, they're read off a straight line from one to the next, so they're estimates. Gold is all the gold earned so far, spent or not. |
+| CS | Only in the once-a-minute snapshots. Between two snapshots, it's read off a straight line from one to the next, so it's an estimate. |
+| Gold | Only in the once-a-minute snapshots too: all the gold earned so far, spent or not. Between two snapshots, a kill's gold arrives at the second of the kill, and the rest of the minute's gold at a steady pace. Riot doesn't log what each kill paid, so each counts the base reward, 300 for the killer and 150 shared by the helpers, scaled down if the minute paid less than that. At each snapshot it's exact again. |
+| Chance to win | The [win chance](win-chance.md) model, read at that second: kills, towers and epic monsters from their events, gold and XP from the estimates. At each minute mark it's the same as the Win chance graph. |
 | Towers, inhibitors, epic monsters | Their events, so exact. |
 | Items | Rebuilt from the item events. See below. |
 | Spot on the map | Riot's snapshots, plus the spots of deaths, kills and epic monsters and the fountain at shop visits, joined up. Exact at the snapshots, deaths and fountain visits, estimates in between. See below. |
 
-`replayData` runs on the server and keeps only what the map and scoreboard need, so the page sends a few dozen KB instead of the whole timeline. `scoreboardAt` runs in the browser every time the clock moves.
+`replayData` runs on the server and keeps only what the map and scoreboard need, so the page sends a few dozen KB instead of the whole timeline. `scoreboardAt` runs in the browser every time the clock moves. `replayChances` runs on the server too and sends the chance at every second (about 7 KB for a 30-minute game) and the graded plays, not the model.
 
 ## How items are rebuilt
 
@@ -80,32 +83,60 @@ Between those spots, a champion moves in a straight line. The map is about 14,90
 
 ### How close it gets
 
-The only positions known for certain are Riot's snapshots, so the check leaves out one snapshot at a time, works out that moment from everything else, and measures how far the estimate is from Riot's spot. It adds each kind of spot in turn. On one ranked game so far (28 minutes, 280 snapshots left out):
+The only positions known for certain are Riot's snapshots, so the check leaves out one snapshot at a time, works out that moment from everything else, and measures how far the estimate is from Riot's spot. It adds each kind of spot in turn. On the same 137 games as the item check (1,370 players, 40,500 snapshots left out), in map units, with the map about 14,900 across and a lane about 800 wide:
 
 | Built from | Median miss | 90% of misses within | Within 2,000 |
 |---|---|---|---|
-| Snapshots only | 3,511 | 7,080 | 25.4% |
-| + deaths | 3,138 | 7,389 | 32.9% |
-| + the fountain at shop visits | 3,511 | 8,089 | 30.4% |
-| + walking straight out of the fountain | 2,434 | 7,384 | 42.9% |
-| + kills they took part in | 1,947 | 6,145 | 50.4% |
-| + epic monsters | 1,841 | 5,614 | 51.8% |
-| + leaving out what they couldn't reach | 1,827 | 5,614 | 52.1% |
+| Snapshots only | 3,639 | 7,780 | 27.6% |
+| + deaths | 2,970 | 7,448 | 39.1% |
+| + the fountain at shop visits | 3,204 | 7,810 | 37.9% |
+| + walking straight out of the fountain | 1,846 | 7,033 | 52.6% |
+| + kills they took part in | 1,485 | 5,496 | 60.8% |
+| + epic monsters | 1,433 | 5,269 | 62.1% |
+| + leaving out what they couldn't reach | 1,437 | 5,294 | 62.0% |
 
 - Shop visits only helped once champions walked straight back out. Spread over the time until the next snapshot, the walk left them near the fountain while Riot had them back in lane.
-- Walking speeds from 300 to 500 units a second came within 250 units of each other. The replay uses 400.
-- Junglers are the hardest to place (median miss 2,772) and top laners the easiest (1,362).
-- Of 149 shop events, 4 were followed by a snapshot too far from the fountain to have walked to: three were Ornn's, which is why his purchases don't count.
+- Walking speeds from 350 to 500 units a second came within 170 units of each other, and 300 was 260 further off. The replay uses 400, 50 units behind the best (450).
+- Leaving out kills and monsters a champion couldn't have reached made no difference over 137 games. It helped a little on the first game the check ran on, and it's kept because it stops the odd champion crossing the map for a kill they weren't near.
+- By role, the median miss was 1,229 for mid laners, 1,309 for top, 1,310 for bottom, 1,454 for supports and 2,014 for junglers, who move between camps with nothing logged on the way.
+- 5,169 of the 5,286 snapshots taken while a champion was dead (by the death timer) had them exactly where they died. The other 117 were back sooner (see the death timer row above).
+- Killers were a median of 568 units from the kill's spot in snapshots within 3 seconds of it, helpers 767, and players who took an epic monster 680 from its pit, which is why those spots count.
+- Of 22,866 shop visits by living champions, 318 (1.4%) were followed by a snapshot too far from the fountain to have walked to. They were spread over many champions (Yone had the most, 15), so only Ornn's purchases, which he can make anywhere, are skipped.
+- All ten paths come to a median of 27 KB per game, 44 KB at most.
 
 With one snapshot left out, the estimate spans two minutes, while the replay's never spans more than one, so the replay is closer than this.
+
+## How the plays are graded
+
+A play is a run of kills, epic monsters, towers and inhibitors less than 20 seconds apart, so a fight at Baron and the tower right after it are one play. Its grade is your team's chance to win just after its last event minus just before its first, in points: from 52.0% to 59.6% is +7.6. Plays never overlap, so between them only gold and XP move the chance (farming, plates and passive gold), plus a buff running out or an inhibitor coming back.
+
+| Grade | Your team's chance moved by |
+|---|---|
+| Great | +4 points or more |
+| Good | +1 to +4 |
+| Even | less than 1 either way |
+| Inaccuracy | −1 to −4 |
+| Mistake | −4 or more |
+
+It grades what a play did to the game, not whether it was the right call: a fight you didn't join still moves your team's chance, and so does the enemy taking Dragon. It's called "Win Probability Added" in sports.
+
+Things that shape the grades:
+
+- **A kill counts through its gold.** The model learned that a kill on its own is worth almost nothing, because the gold it pays is already in the gold lead (see [win-chance.md](win-chance.md#the-weights-it-learned)). So a kill's grade comes from the base reward arriving at the second of the kill. In an even game that's 2.8 points for a solo kill at 5:00 and 4.1 with a helper, falling to 2.0 and 3.0 by 20:00, because the model counts a gold lead for less as builds fill up. The extra gold of a shutdown arrives spread over the minute, so the play doesn't count it.
+- **Towers and Baron count mostly through their gold.** The model learned that a tower is worth the gold it pays, and Riot doesn't log tower gold, so it reaches the replay spread over the rest of the minute: a tower on its own reads Even. Baron's buff adds about a point at once, and its gold arrives the same way. Dragons, Elder and inhibitors count in full at the second they're taken.
+- **The same play is worth less once a game is decided.** In the game below, a fight won 6 for 3 with two towers added 0.2 points, because the team was already at 99%. That's how win probability works in any sport: the plays that decide a game happen while it's close.
+
+On Jasper's 28-minute Qiyana game, a win, his 16 plays came out as 3 Great, 6 Good, 5 Even, 1 Inaccuracy and 1 Mistake. The Mistake was a fight lost 1 for 2 at 6:30 (−4.1), and the biggest Great a fight won 4 for 1 with Dragon at 14:56 (+8.6). After 20 minutes, with his team above 95%, every play read Even or Good.
 
 ## Limits
 
 - The order of items in the six slots is a guess: Riot doesn't log slots, so each item goes in the first empty one. Which items a player has is what the check tests.
-- Gold and CS between snapshots are estimates, so they can be off by a few hundred gold or a few CS in the middle of a minute.
+- Gold and CS between snapshots are estimates, so they can be off by a few hundred gold or a few CS in the middle of a minute. The chance to win between minute marks is an estimate for the same reason.
 - An item that changes with no event and isn't in the final items can't be seen.
 - A dead player can come back a little sooner than "back in" says (see the death timer row above).
 - Between snapshots, positions are estimates. Riot doesn't log walls, teleports or detours, so a champion can walk through a wall, or across the map after a teleport. In a fight, champions on the same spot overlap.
+- Plays are grouped by time only, so two things 15 seconds apart on opposite sides of the map make one play.
+- A play's grade uses the base kill gold, so shutdowns and first blood count for less than they paid, and kills on players who keep dying for more.
 
 ## Running the checks
 

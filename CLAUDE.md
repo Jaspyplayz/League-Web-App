@@ -18,7 +18,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
 - AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
-- Replay (beta: the whole game second by second, with every player's items and spot on the map, and the checks behind them): [docs/replay.md](docs/replay.md)
+- Replay (beta: the whole game second by second, with every player's items and spot on the map, every play graded by the win chance, and the checks behind them): [docs/replay.md](docs/replay.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
@@ -43,7 +43,8 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   win-chance.ts each team's chance to win at every minute,
                   tempo.ts the jungle tempo timeline (tempo-study.ts checks it)
                   and replay.ts the replay, with items.ts and positions.ts
-                  (item-check.ts and position-check.ts check them)
+                  (item-check.ts and position-check.ts check them) and
+                  plays.ts (the chance to win at every second, plays graded by it)
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
