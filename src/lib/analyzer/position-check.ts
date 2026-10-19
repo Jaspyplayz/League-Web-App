@@ -20,6 +20,7 @@ import {
   REPLAY_PATHS,
   type PathOptions,
 } from "./positions";
+import { RIFT_WALLS } from "./rift";
 import { deathSpans } from "./tempo";
 import type { TrimmedTimeline } from "./trim";
 
@@ -30,9 +31,11 @@ const NOTHING: PathOptions = {
   monsters: false,
   reachable: false,
   walkOut: null,
+  walls: null,
 };
 const SHOP: PathOptions = { ...NOTHING, deaths: true, shop: true };
 const WALK: PathOptions = { ...SHOP, walkOut: 0.4 };
+const REACHABLE: PathOptions = { ...WALK, kills: true, monsters: true, reachable: true };
 
 // The ways of building a path the check compares. Each adds to the one
 // before, except the walking speeds, which are tried side by side.
@@ -47,10 +50,8 @@ export const POSITION_VARIANTS: { label: string; options: PathOptions }[] = [
   { label: "+ walking out of the fountain, 500 a second", options: { ...SHOP, walkOut: 0.5 } },
   { label: "400 a second, + kills they took part in", options: { ...WALK, kills: true } },
   { label: "+ epic monsters", options: { ...WALK, kills: true, monsters: true } },
-  {
-    label: "+ only what they could reach",
-    options: { ...WALK, kills: true, monsters: true, reachable: true },
-  },
+  { label: "+ only what they could reach", options: REACHABLE },
+  { label: "+ walking around walls", options: { ...REACHABLE, walls: RIFT_WALLS } },
 ];
 
 // A kill or monster counts as next to a snapshot within this long of it.

@@ -6,6 +6,7 @@ import {
   championName,
   itemIconUrl,
   itemName,
+  riftMapUrl,
   runeIconUrl,
   statShardName,
   summonerSpell,
@@ -90,6 +91,12 @@ describe("items", () => {
 
   it("returns null for items Data Dragon doesn't have", () => {
     expect(itemName(dd, 999999)).toBeNull();
+  });
+});
+
+describe("map", () => {
+  it("builds the link to Riot's picture of Summoner's Rift", () => {
+    expect(riftMapUrl(dd)).toBe(`${CDN}/map/map11.png`);
   });
 });
 

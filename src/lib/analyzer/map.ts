@@ -54,7 +54,7 @@ const MID_LANE_CORE = 1100;
 
 // A short, plain description of a spot from one team's point of view, like
 // "top lane", "your bot side jungle" or "river (top side)". Used for the
-// jungle map's captions and screen-reader text.
+// replay map's screen-reader text and the tempo timeline's activity list.
 //
 // "Top side" is the half of the map above the mid lane diagonal (where top
 // lane is), "bot side" the half below it. The river runs the other way,

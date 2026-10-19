@@ -5,14 +5,19 @@ import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
 import type { ReplayChances } from "@/lib/analyzer/plays";
 import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
-import { championIconUrl, itemIconUrl, itemName, type DataDragon } from "@/lib/ddragon";
+import {
+  championIconUrl,
+  itemIconUrl,
+  itemName,
+  riftMapUrl,
+  type DataDragon,
+} from "@/lib/ddragon";
 import type { Region } from "@/lib/regions";
 import type { Match } from "@/lib/riot/types";
 import type { MatchWinChance } from "@/lib/win-chance";
 import { AnalysisTabs } from "./analysis-tabs";
 import { Deaths } from "./deaths";
 import { Ganks } from "./ganks";
-import { JungleMap, type MapPlayer } from "./jungle-map";
 import { LeadChart } from "./lead-chart";
 import { Matchup } from "./match-header";
 import { PathingGrid } from "./pathing";
@@ -30,7 +35,7 @@ import { WinChance } from "./win-chance";
 //   turning points, your team's win chance, the recap and your notes.
 // - Deep dive: @10 and @15 stats, team gold with objectives, deaths, the
 //   replay (beta, with the tempo timeline for junglers) and, for junglers,
-//   the jungle map, early pathing and early ganks.
+//   early pathing and early ganks.
 export function AnalysisSections({
   region,
   match,
@@ -63,12 +68,6 @@ export function AnalysisSections({
     minute: p.timestamp / 60_000,
     label: `${formatClock(p.timestamp)} ${p.title}`,
     tone: p.swing > 0 ? "ahead" : "behind",
-  }));
-  const mapPlayers: MapPlayer[] = participants.map((p) => ({
-    participantId: p.participantId,
-    name: label(p.championName),
-    iconUrl: dd ? championIconUrl(dd, p.championName) : null,
-    ours: p.teamId === a.me.teamId,
   }));
 
   const summary = (
@@ -124,13 +123,11 @@ export function AnalysisSections({
         people={replayPeople(participants, a, dd, label)}
         items={replayItems(a, dd)}
         winningTeamId={participants.find((p) => p.win)?.teamId ?? 0}
+        mapUrl={dd ? riftMapUrl(dd) : null}
         docsHref={`${REPO_URL}/blob/main/docs/replay.md`}
         tempoDocsHref={`${REPO_URL}/blob/main/docs/tempo.md`}
       />
 
-      {a.jungleReplay && (
-        <JungleMap replay={a.jungleReplay} players={mapPlayers} myTeamId={a.me.teamId} />
-      )}
       {a.pathing && <PathingGrid pathing={a.pathing} />}
       {a.ganks && a.opponent && (
         <Ganks ganks={a.ganks} enemyJungler={label(a.opponent.championName)} />

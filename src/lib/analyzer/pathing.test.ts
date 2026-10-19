@@ -34,8 +34,6 @@ function replay(
     frames.push({
       timestamp: minute * 60_000,
       positions,
-      kills: [],
-      objectives: [],
       laneLeads: leads(minute),
     });
   }

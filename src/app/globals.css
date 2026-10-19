@@ -24,6 +24,10 @@
   --color-line-strong: #2a3a4a;
   /* The steel outline around cards, like the frames in the game's HUD. */
   --color-frame: #3a4f63;
+  /* Summoner's Rift in the game's own colors, the same in both themes, so
+     the replay's drawing of the map matches Riot's picture of it. */
+  --color-rift-ground: #919a70;
+  --color-rift-wall: #000a13;
 
   --color-ink: #e8ecf2;
   --color-ink-soft: #c3cad5;

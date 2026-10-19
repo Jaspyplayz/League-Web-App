@@ -22,7 +22,8 @@
     "tempo-games": "tsx --conditions=react-server scripts/collect-tempo-games.ts",
     "study-tempo": "tsx --conditions=react-server scripts/study-tempo.ts",
     "check-items": "tsx --conditions=react-server scripts/check-items.ts",
-    "check-positions": "tsx --conditions=react-server scripts/check-positions.ts"
+    "check-positions": "tsx --conditions=react-server scripts/check-positions.ts",
+    "rift-map": "tsx --conditions=react-server scripts/rift-map.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

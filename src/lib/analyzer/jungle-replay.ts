@@ -1,6 +1,6 @@
 // The jungle replay: for a jungler, where both junglers really were at every
-// minute, what happened in that minute, and how each lane was doing. It's the
-// "fog of war lifted" view of a game.
+// minute and how each lane was doing. The early pathing grid (pathing.ts) and
+// the gank log (ganks.ts) are built on it.
 //
 // It shows the situation rather than grading it. Jasper (a Grandmaster
 // jungler) pointed out that most jungle decisions are situational: ganking a
@@ -11,8 +11,7 @@
 import type { MapPosition, Participant } from "@/lib/riot/types";
 import { laneOf } from "./map";
 import { playedPosition, playerAt } from "./matchup";
-import { findObjectives, type Objective } from "./objectives";
-import type { ChampionKill, TrimmedFrame, TrimmedTimeline } from "./trim";
+import type { TrimmedFrame, TrimmedTimeline } from "./trim";
 
 export type Lane = "top" | "mid" | "bot";
 export const LANES: Lane[] = ["top", "mid", "bot"];
@@ -36,9 +35,6 @@ export type ReplayFrame = {
   timestamp: number;
   // positions[0] is participantId 1. Null if Riot left the position out.
   positions: (MapPosition | null)[];
-  // Kills and objectives since the previous frame.
-  kills: ChampionKill[];
-  objectives: Objective[];
   // Your team's gold + XP minus the enemy team's, per lane. Bot lane counts
   // both the bot laner and the support. Null when the lane's players can't be
   // matched up, e.g. a missing position.
@@ -59,30 +55,20 @@ export function jungleReplay(
   opponent: Participant | null,
 ): JungleReplay | null {
   if (playedPosition(me) !== "JUNGLE" || !opponent) return null;
-  const { frames, events } = timeline;
-  const kills = events.filter((e) => e.type === "CHAMPION_KILL");
-  const objectives = findObjectives(events, me.teamId);
   const lanes = laneRosters(participants, me.teamId);
 
   return {
     meId: me.participantId,
     enemyJunglerId: opponent.participantId,
-    frames: frames.map((frame, i) => {
-      // Everything after the previous snapshot, up to and including this one.
-      const from = i === 0 ? -Infinity : frames[i - 1].timestamp;
-      const inWindow = (t: number) => t > from && t <= frame.timestamp;
-      return {
-        timestamp: frame.timestamp,
-        positions: frame.players.map((p) => p.position),
-        kills: kills.filter((k) => inWindow(k.timestamp)),
-        objectives: objectives.filter((o) => inWindow(o.timestamp)),
-        laneLeads: {
-          top: laneLead(frame, lanes.top),
-          mid: laneLead(frame, lanes.mid),
-          bot: laneLead(frame, lanes.bot),
-        },
-      };
-    }),
+    frames: timeline.frames.map((frame) => ({
+      timestamp: frame.timestamp,
+      positions: frame.players.map((p) => p.position),
+      laneLeads: {
+        top: laneLead(frame, lanes.top),
+        mid: laneLead(frame, lanes.mid),
+        bot: laneLead(frame, lanes.bot),
+      },
+    })),
   };
 }
 

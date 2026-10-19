@@ -11,7 +11,7 @@ import { formatClock } from "@/lib/analyzer/format";
 import { describeSpot, MAP_SIZE } from "@/lib/analyzer/map";
 import type { PlayerMoment, ReplayKill, Scoreboard } from "@/lib/analyzer/replay";
 import type { MapPosition } from "@/lib/riot/types";
-import { MapBackground } from "./jungle-map";
+import { MapBackground } from "./map-background";
 import { Picture, type ReplayPerson } from "./replay-scoreboard";
 
 // How long a kill's cross stays on the map.
@@ -23,6 +23,7 @@ export function ReplayMap({
   people,
   kills,
   myTeamId,
+  mapUrl,
 }: {
   board: Scoreboard;
   t: number;
@@ -30,6 +31,8 @@ export function ReplayMap({
   people: ReplayPerson[];
   kills: ReplayKill[];
   myTeamId: number;
+  // Riot's picture of the map, null without Data Dragon.
+  mapUrl: string | null;
 }) {
   const moment = (id: number) => board.players.find((p) => p.participantId === id)!;
   const teamOf = new Map(people.map((p) => [p.participantId, p.teamId]));
@@ -53,13 +56,7 @@ export function ReplayMap({
         aria-label={label}
         className="relative aspect-square w-full overflow-hidden rounded-[14px] border border-line bg-page"
       >
-        <svg
-          viewBox={`0 0 ${MAP_SIZE} ${MAP_SIZE}`}
-          aria-hidden="true"
-          className="absolute inset-0 size-full"
-        >
-          <MapBackground myTeamId={myTeamId} />
-        </svg>
+        <MapBackground pictureUrl={mapUrl} />
         {recent.map((k, i) =>
           k.position ? (
             <KillCross
