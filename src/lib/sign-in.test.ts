@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isProvider, safeNextPath, userFromClaims } from "./sign-in";
+import { isProvider, safeNextPath, userFromClaims, withoutEmail } from "./sign-in";
 
 describe("isProvider", () => {
   it("accepts the providers we offer", () => {
@@ -37,6 +37,23 @@ describe("safeNextPath", () => {
   );
 });
 
+describe("withoutEmail", () => {
+  it("keeps names without an email as they are", () => {
+    expect(withoutEmail("  Jasper L ")).toBe("Jasper L");
+    expect(withoutEmail("jaspy#0")).toBe("jaspy#0");
+  });
+
+  it("drops an email inside or after the name", () => {
+    expect(withoutEmail("Jaspyplayz (jasper@example.com)")).toBe("Jaspyplayz");
+    expect(withoutEmail("Jaspyplayz <jasper@example.com>")).toBe("Jaspyplayz");
+    expect(withoutEmail("Jaspyplayz - jasper@example.com")).toBe("Jaspyplayz");
+  });
+
+  it("keeps the part before the @ when the name is only an email", () => {
+    expect(withoutEmail("jasper@example.com")).toBe("jasper");
+  });
+});
+
 describe("userFromClaims", () => {
   const ID = "4f6c1d2e-8a3b-4c5d-9e7f-0a1b2c3d4e5f";
 
@@ -63,9 +80,17 @@ describe("userFromClaims", () => {
       userFromClaims({ sub: ID, email: "a@b.com", user_metadata: { full_name: "  " } }),
     ).toEqual({
       id: ID,
-      name: "a@b.com",
+      name: "a",
       provider: null,
     });
+  });
+
+  it("never shows an email address as the name", () => {
+    expect(
+      userFromClaims({ sub: ID, user_metadata: { full_name: "Jaspyplayz (jasper@example.com)" } })
+        ?.name,
+    ).toBe("Jaspyplayz");
+    expect(userFromClaims({ sub: ID, email: "jasper.l@example.com" })?.name).toBe("jasper.l");
   });
 
   it("still returns a name when the profile is empty", () => {
