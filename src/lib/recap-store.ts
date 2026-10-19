@@ -3,15 +3,10 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { and, count, eq, gte, inArray } from "drizzle-orm";
 import { tables } from "@/db";
-import { analyzeMatch, findPlayer, isAnalyzable } from "@/lib/analyzer";
-import { recapFacts } from "@/lib/analyzer/recap-facts";
-import { championName, getDataDragon } from "@/lib/ddragon";
-import { scoreGame } from "@/lib/game-score";
-import { database, loadMatch, loadTimeline, readCache } from "@/lib/match-store";
-import { savedSoloTier } from "@/lib/profile-store";
+import { loadMatchFacts } from "@/lib/match-facts";
+import { database, loadMatch, readCache } from "@/lib/match-store";
 import { RECAP_MODEL, writeRecap, type Recap } from "@/lib/recap";
 import type { Region } from "@/lib/regions";
-import { matchWinChance } from "@/lib/win-chance";
 
 // Reads and writes AI recaps in the match_recaps table (see src/db/schema.ts).
 
@@ -86,22 +81,10 @@ export async function createRecap(
     }
 
     const match = await loadMatch(region, matchId);
-    const me = findPlayer(match, puuid);
-    if (!me || !isAnalyzable(match)) {
-      return { status: "failed", message: "This game is too short to recap." };
-    }
-    const [timeline, dd, tier] = await Promise.all([
-      loadTimeline(region, match),
-      getDataDragon().catch(() => null),
-      savedSoloTier(puuid),
-    ]);
-    const label = (name: string) => championName(dd, name);
-    const analysis = analyzeMatch(match, timeline, puuid, label)!;
-    // The same rank's model as the match page, so the recap's swings match it.
-    const swings = matchWinChance(match, timeline, me.teamId, tier)?.swings ?? null;
-    const score = scoreGame(match).get(me.participantId) ?? null;
+    const facts = await loadMatchFacts(region, match, puuid);
+    if (!facts) return { status: "failed", message: "This game is too short to recap." };
 
-    const recap = await writeRecap(recapFacts(match, analysis, swings, score, label));
+    const recap = await writeRecap(facts);
     if (!recap) return { status: "failed", message: "Couldn't write a recap for this game." };
 
     await db

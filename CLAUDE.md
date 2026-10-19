@@ -19,6 +19,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Replay (beta: the whole game second by second, with every player's items and spot on the map, every play graded by the win chance, and the checks behind them): [docs/replay.md](docs/replay.md)
+- MCP server (Claude and other AI apps can look players up and read the analyzer's results at `/api/mcp`): [docs/mcp.md](docs/mcp.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
@@ -32,7 +33,8 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   .../match/[matchId]/ under it is the match analysis page
                   and .../insights/ the trends across the last 20 to 100 games,
                   .../log/ the Log tab (one card per day, src/lib/daily-log.ts);
-                  settings/ holds preferences saved in the browser (theme)
+                  settings/ holds preferences saved in the browser (theme);
+                  api/mcp/ is the MCP server, with its tools in src/lib/mcp/
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (rate limits, retries) and one function per endpoint
