@@ -163,7 +163,9 @@ export function ProfileIcon({
 }) {
   const frame = "hud-cut border-2 border-frame";
   return (
-    <div className="relative w-fit shrink-0">
+    // Spans rather than divs, so the icon can sit inside a button (the
+    // header's account menu).
+    <span className="relative block w-fit shrink-0">
       {dd && iconId !== null ? (
         <GameImage src={profileIconUrl(dd, iconId)} alt="" size={size} className={frame} />
       ) : (
@@ -181,7 +183,7 @@ export function ProfileIcon({
           {level}
         </span>
       )}
-    </div>
+    </span>
   );
 }
 
@@ -221,12 +223,12 @@ function Placeholder({
   children?: ReactNode;
 }) {
   return (
-    <div
+    <span
       style={{ width: size, height: size }}
       className={`flex shrink-0 items-center justify-center bg-line ${className}`}
     >
       {children}
-    </div>
+    </span>
   );
 }
 
