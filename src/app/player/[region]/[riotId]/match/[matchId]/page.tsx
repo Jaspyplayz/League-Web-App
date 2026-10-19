@@ -146,9 +146,9 @@ async function Analysis({ params }: { params: Params }) {
         chances={chances}
         dd={dd}
         label={label}
+        recap={<MatchRecap region={region} matchId={matchId} puuid={me.puuid} />}
+        notes={notes}
       />
-      <MatchRecap region={region} matchId={matchId} puuid={me.puuid} />
-      {notes}
     </>
   );
 }

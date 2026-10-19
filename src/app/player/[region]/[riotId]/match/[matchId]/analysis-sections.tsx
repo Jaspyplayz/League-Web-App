@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { TurningPointMarker } from "@/components/diff-chart";
 import { REPO_URL } from "@/components/site-header";
 import type { MatchAnalysis } from "@/lib/analyzer";
@@ -8,6 +9,7 @@ import { championIconUrl, itemIconUrl, itemName, type DataDragon } from "@/lib/d
 import type { Region } from "@/lib/regions";
 import type { Match } from "@/lib/riot/types";
 import type { MatchWinChance } from "@/lib/win-chance";
+import { AnalysisTabs } from "./analysis-tabs";
 import { Deaths } from "./deaths";
 import { Ganks } from "./ganks";
 import { JungleMap, type MapPlayer } from "./jungle-map";
@@ -22,12 +24,13 @@ import { TeamGold } from "./team-gold";
 import { TurningPoints } from "./turning-points";
 import { WinChance } from "./win-chance";
 
-// Everything below the match header, once the match has been analyzed: the
-// matchup, @10 and @15 stats, the lead chart with turning points, the replay
-// (beta), your team's win chance, team gold with objectives, deaths, and the
-// scoreboard. In the same order as the mockup, plus the replay, the win
-// chance and, for junglers, the jungle map, early pathing and early ganks.
-// The replay adds the tempo timeline for junglers.
+// Everything below the match header, once the match has been analyzed, in
+// two tabs so the vital part comes first (Jasper's order, 2026-10-19):
+// - Summary: the scoreboard, you vs your opponent, the lead chart with
+//   turning points, your team's win chance, the recap and your notes.
+// - Deep dive: @10 and @15 stats, team gold with objectives, deaths, the
+//   replay (beta, with the tempo timeline for junglers) and, for junglers,
+//   the jungle map, early pathing and early ganks.
 export function AnalysisSections({
   region,
   match,
@@ -36,6 +39,8 @@ export function AnalysisSections({
   chances,
   dd,
   label,
+  recap,
+  notes,
 }: {
   region: Region;
   match: Match;
@@ -47,6 +52,9 @@ export function AnalysisSections({
   chances: ReplayChances | null;
   dd: DataDragon | null;
   label: (championName: string) => string;
+  // Drawn by the page, since they load their own data.
+  recap: ReactNode;
+  notes: ReactNode;
 }) {
   const { participants } = match.info;
   const byId = new Map(participants.map((p) => [p.participantId, p]));
@@ -63,8 +71,16 @@ export function AnalysisSections({
     ours: p.teamId === a.me.teamId,
   }));
 
-  return (
+  const summary = (
     <>
+      <Scoreboard
+        region={region}
+        dd={dd}
+        participants={participants}
+        meId={a.me.participantId}
+        opponentId={a.opponent?.participantId ?? null}
+      />
+
       <Matchup
         dd={dd}
         me={a.me}
@@ -72,9 +88,6 @@ export function AnalysisSections({
         at15={a.at15}
         finalGoldDiff={a.series?.gold.at(-1)?.diff ?? null}
       />
-
-      {a.at10 && <SnapshotTiles snapshot={a.at10} />}
-      {a.at15 && <SnapshotTiles snapshot={a.at15} />}
 
       {a.series && a.opponent && (
         <div className="flex flex-wrap items-start gap-5">
@@ -87,13 +100,23 @@ export function AnalysisSections({
         </div>
       )}
 
-      {a.jungleReplay && (
-        <JungleMap replay={a.jungleReplay} players={mapPlayers} myTeamId={a.me.teamId} />
-      )}
-      {a.pathing && <PathingGrid pathing={a.pathing} />}
-      {a.ganks && a.opponent && (
-        <Ganks ganks={a.ganks} enemyJungler={label(a.opponent.championName)} />
-      )}
+      {winChance && <WinChance {...winChance} />}
+
+      {recap}
+      {notes}
+    </>
+  );
+
+  const deepDive = (
+    <>
+      {a.at10 && <SnapshotTiles snapshot={a.at10} />}
+      {a.at15 && <SnapshotTiles snapshot={a.at15} />}
+
+      <div className="flex flex-wrap items-start gap-5">
+        <TeamGold points={a.teamGold} objectives={a.objectives} />
+        <Deaths deaths={a.deaths} name={name} />
+      </div>
+
       <Replay
         replay={a.replay}
         chances={chances}
@@ -105,22 +128,17 @@ export function AnalysisSections({
         tempoDocsHref={`${REPO_URL}/blob/main/docs/tempo.md`}
       />
 
-      {winChance && <WinChance {...winChance} />}
-
-      <div className="flex flex-wrap items-start gap-5">
-        <TeamGold points={a.teamGold} objectives={a.objectives} />
-        <Deaths deaths={a.deaths} name={name} />
-      </div>
-
-      <Scoreboard
-        region={region}
-        dd={dd}
-        participants={participants}
-        meId={a.me.participantId}
-        opponentId={a.opponent?.participantId ?? null}
-      />
+      {a.jungleReplay && (
+        <JungleMap replay={a.jungleReplay} players={mapPlayers} myTeamId={a.me.teamId} />
+      )}
+      {a.pathing && <PathingGrid pathing={a.pathing} />}
+      {a.ganks && a.opponent && (
+        <Ganks ganks={a.ganks} enemyJungler={label(a.opponent.championName)} />
+      )}
     </>
   );
+
+  return <AnalysisTabs summary={summary} deepDive={deepDive} />;
 }
 
 // Everyone in the replay's scoreboard, your team first and each team in role
