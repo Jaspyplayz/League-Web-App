@@ -161,7 +161,7 @@ export function ProfileIcon({
   name: string;
   size?: number;
 }) {
-  const frame = "rounded-[20px] border-2 border-ahead";
+  const frame = "hud-cut border-2 border-frame";
   return (
     <div className="relative w-fit shrink-0">
       {dd && iconId !== null ? (
@@ -177,7 +177,7 @@ export function ProfileIcon({
         </Placeholder>
       )}
       {level !== null && (
-        <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 rounded-full border border-line-strong bg-page px-2.5 font-mono text-xs text-ink-soft">
+        <span className="hud-cut-sm absolute -bottom-2.5 left-1/2 -translate-x-1/2 border border-frame bg-page px-2.5 font-mono text-xs text-ink-soft">
           {level}
         </span>
       )}

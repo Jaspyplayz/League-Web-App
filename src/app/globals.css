@@ -16,11 +16,14 @@
  * row gets an outline so you can find it either way.
  */
 @theme {
-  --color-page: #0b0e13;
-  --color-surface: #12161d;
-  --color-surface-hover: #171c24;
-  --color-line: #1e2430;
-  --color-line-strong: #262c37;
+  /* "Clean HUD": steel-blue darks like League's in-game interface. */
+  --color-page: #0a0f14;
+  --color-surface: #101820;
+  --color-surface-hover: #16212c;
+  --color-line: #1f2d3a;
+  --color-line-strong: #2a3a4a;
+  /* The steel outline around cards, like the frames in the game's HUD. */
+  --color-frame: #3a4f63;
 
   --color-ink: #e8ecf2;
   --color-ink-soft: #c3cad5;
@@ -61,11 +64,12 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --color-page: #f4f6f9;
+  --color-page: #eef2f5;
   --color-surface: #ffffff;
-  --color-surface-hover: #eef1f5;
-  --color-line: #e2e6ec;
-  --color-line-strong: #d3d9e2;
+  --color-surface-hover: #f3f6f8;
+  --color-line: #d3dce4;
+  --color-line-strong: #c3cfd9;
+  --color-frame: #8fa3b5;
 
   --color-ink: #141922;
   --color-ink-soft: #323b49;
@@ -79,6 +83,31 @@
   --color-ahead-soft: #1f55cc;
   --color-ahead-bright: #163f9e;
   --color-behind: #cf352e;
+}
+
+/*
+ * Cut corners, the "Clean HUD" look: the top-left and bottom-right corners
+ * are sliced off at 45 degrees, like the panels in League's in-game HUD.
+ * corner-shape: bevel draws the border along the cut, so nothing inside the
+ * card gets clipped (tooltips and focus rings still show). Browsers without
+ * corner-shape yet (Safari and Firefox in 2026) get slightly rounded
+ * corners instead, which still looks fine.
+ */
+@utility hud-cut {
+  border-radius: 4px;
+  @supports (corner-shape: bevel) {
+    border-radius: 14px 0;
+    corner-shape: bevel;
+  }
+}
+
+/* The same cut, smaller, for buttons, icons and other small pieces. */
+@utility hud-cut-sm {
+  border-radius: 3px;
+  @supports (corner-shape: bevel) {
+    border-radius: 8px 0;
+    corner-shape: bevel;
+  }
 }
 
 /*

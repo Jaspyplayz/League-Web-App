@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { FilterableMatchList } from "@/components/filterable-match-list";
 import { MatchDetails } from "@/components/match-details";
 import { MatchRow } from "@/components/match-row";
@@ -47,6 +47,7 @@ type Props = {
   queue: QueueFilter;
   beforeParam: string | string[] | undefined;
   playerPath: string;
+  ranks?: ReactNode; // the rank cards, shown at the top of the side column
 };
 
 export async function RecentMatches({
@@ -56,6 +57,7 @@ export async function RecentMatches({
   queue,
   beforeParam,
   playerPath,
+  ranks,
 }: Props) {
   // React's lint rule warns that reading the clock makes a component give
   // different output each render. This is a Server Component, which renders
@@ -105,7 +107,8 @@ export async function RecentMatches({
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      <aside className="flex flex-col gap-4 lg:w-72 lg:shrink-0">
+      <aside className="flex flex-col gap-4 lg:w-80 lg:shrink-0">
+        {ranks}
         {/* "Last 10 games" only makes sense for the latest ones. */}
         {before === null && record.games > 0 && (
           <RecentSummary record={record} roles={roleCounts(matches)} />

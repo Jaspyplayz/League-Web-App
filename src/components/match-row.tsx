@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ExpandableRow } from "@/components/expandable-row";
 import { ChampionIcon, ItemSlots, SummonerSpellIcon } from "@/components/game-icons";
 import { GameScore } from "@/components/game-score";
+import { SegmentBar } from "@/components/ui/segment-bar";
 import type { PlayerScore } from "@/lib/analyzer/score";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import {
@@ -35,17 +36,18 @@ export function MatchRow({
   badges?: string[]; // highlights like "Double kill", from matchBadges()
   details?: ReactNode;
 }) {
-  const result = m.remake ? "Remake" : m.win ? "Win" : "Loss";
+  // VICTORY and DEFEAT, like the game's own end screen.
+  const result = m.remake ? "Remake" : m.win ? "Victory" : "Defeat";
   const resultColor = m.remake ? "text-faint" : m.win ? "text-ahead" : "text-behind";
-  // A colored edge on the left shows the result at a glance, like op.gg's
-  // blue and red rows: blue for a win, red for a loss.
-  const edge = m.remake ? "border-l-line-strong" : m.win ? "border-l-ahead" : "border-l-behind";
-  const box = `rounded-[14px] border border-l-4 border-line-strong ${edge} bg-surface px-[18px] py-3.5`;
+  // The champion portrait is framed in the result's color, so the list reads
+  // at a glance: blue for a win, red for a loss.
+  const portraitFrame = m.remake ? "border-line-strong" : m.win ? "border-ahead" : "border-behind";
+  const box = "hud-cut border border-line-strong bg-surface px-[18px] py-3.5";
 
   const content = (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[18px] gap-y-3.5">
       <div className="flex w-[92px] shrink-0 flex-col text-xs whitespace-nowrap text-faint">
-        <span className={`font-display text-xl font-bold tracking-wider uppercase ${resultColor}`}>
+        <span className={`font-mono text-xs font-medium tracking-[0.14em] uppercase ${resultColor}`}>
           {result}
         </span>
         <span>{m.queue}</span>
@@ -56,7 +58,12 @@ export function MatchRow({
 
       <div className="flex min-w-0 flex-1 basis-[130px] items-center gap-3">
         <div className="flex shrink-0 gap-1">
-          <ChampionIcon dd={dd} name={m.championName} size={48} />
+          <ChampionIcon
+            dd={dd}
+            name={m.championName}
+            size={48}
+            className={`hud-cut-sm border-2 ${portraitFrame}`}
+          />
           <div className="flex flex-col gap-1">
             <SummonerSpellIcon dd={dd} spellId={m.spells[0]} size={22} />
             <SummonerSpellIcon dd={dd} spellId={m.spells[1]} size={22} />
@@ -78,7 +85,7 @@ export function MatchRow({
             {badges.map((badge) => (
               <li
                 key={badge}
-                className="rounded-full border border-ahead-soft px-1.5 text-[10px] whitespace-nowrap text-ahead-soft"
+                className="hud-cut-sm border border-ahead-soft px-1.5 text-[10px] whitespace-nowrap text-ahead-soft"
               >
                 {badge}
               </li>
@@ -93,8 +100,16 @@ export function MatchRow({
       </div>
 
       {score && (
-        <div className="w-[72px] shrink-0">
+        <div className="flex w-[72px] shrink-0 flex-col gap-1">
           <GameScore score={score} size="lg" />
+          {/* The 0 to 100 score as ten blocks, like a health bar. */}
+          <SegmentBar
+            filled={score.score / 100}
+            segments={10}
+            on={m.win ? "bg-ahead" : "bg-behind"}
+            className="h-1.5 w-full gap-[2px]"
+            label={`Score ${score.score} out of 100`}
+          />
           <p className="text-xs text-faint">Score</p>
         </div>
       )}
