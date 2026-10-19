@@ -38,7 +38,8 @@ test("search a player and see their profile", async ({ page }) => {
   await expect(profile.or(expired)).toBeVisible();
   test.skip(await expired.isVisible(), "Skipped: the Riot development key has expired.");
 
-  await expect(profile.getByText("Ranked Solo/Duo")).toBeVisible();
+  // The rank cards sit in the side column, next to the match list.
+  await expect(page.getByRole("heading", { name: "Ranked Solo/Duo" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible();
 });
 
