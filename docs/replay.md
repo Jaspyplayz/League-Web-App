@@ -83,22 +83,26 @@ Between those spots, a champion moves in a straight line. The map is about 14,90
 
 ### How close it gets
 
-The only positions known for certain are Riot's snapshots, so the check leaves out one snapshot at a time, works out that moment from everything else, and measures how far the estimate is from Riot's spot. It adds each kind of spot in turn. On one ranked game so far (28 minutes, 280 snapshots left out):
+The only positions known for certain are Riot's snapshots, so the check leaves out one snapshot at a time, works out that moment from everything else, and measures how far the estimate is from Riot's spot. It adds each kind of spot in turn. On the same 137 games as the item check (1,370 players, 40,500 snapshots left out), in map units, with the map about 14,900 across and a lane about 800 wide:
 
 | Built from | Median miss | 90% of misses within | Within 2,000 |
 |---|---|---|---|
-| Snapshots only | 3,511 | 7,080 | 25.4% |
-| + deaths | 3,138 | 7,389 | 32.9% |
-| + the fountain at shop visits | 3,511 | 8,089 | 30.4% |
-| + walking straight out of the fountain | 2,434 | 7,384 | 42.9% |
-| + kills they took part in | 1,947 | 6,145 | 50.4% |
-| + epic monsters | 1,841 | 5,614 | 51.8% |
-| + leaving out what they couldn't reach | 1,827 | 5,614 | 52.1% |
+| Snapshots only | 3,639 | 7,780 | 27.6% |
+| + deaths | 2,970 | 7,448 | 39.1% |
+| + the fountain at shop visits | 3,204 | 7,810 | 37.9% |
+| + walking straight out of the fountain | 1,846 | 7,033 | 52.6% |
+| + kills they took part in | 1,485 | 5,496 | 60.8% |
+| + epic monsters | 1,433 | 5,269 | 62.1% |
+| + leaving out what they couldn't reach | 1,437 | 5,294 | 62.0% |
 
 - Shop visits only helped once champions walked straight back out. Spread over the time until the next snapshot, the walk left them near the fountain while Riot had them back in lane.
-- Walking speeds from 300 to 500 units a second came within 250 units of each other. The replay uses 400.
-- Junglers are the hardest to place (median miss 2,772) and top laners the easiest (1,362).
-- Of 149 shop events, 4 were followed by a snapshot too far from the fountain to have walked to: three were Ornn's, which is why his purchases don't count.
+- Walking speeds from 350 to 500 units a second came within 170 units of each other, and 300 was 260 further off. The replay uses 400, 50 units behind the best (450).
+- Leaving out kills and monsters a champion couldn't have reached made no difference over 137 games. It helped a little on the first game the check ran on, and it's kept because it stops the odd champion crossing the map for a kill they weren't near.
+- By role, the median miss was 1,229 for mid laners, 1,309 for top, 1,310 for bottom, 1,454 for supports and 2,014 for junglers, who move between camps with nothing logged on the way.
+- 5,169 of the 5,286 snapshots taken while a champion was dead (by the death timer) had them exactly where they died. The other 117 were back sooner (see the death timer row above).
+- Killers were a median of 568 units from the kill's spot in snapshots within 3 seconds of it, helpers 767, and players who took an epic monster 680 from its pit, which is why those spots count.
+- Of 22,866 shop visits by living champions, 318 (1.4%) were followed by a snapshot too far from the fountain to have walked to. They were spread over many champions (Yone had the most, 15), so only Ornn's purchases, which he can make anywhere, are skipped.
+- All ten paths come to a median of 27 KB per game, 44 KB at most.
 
 With one snapshot left out, the estimate spans two minutes, while the replay's never spans more than one, so the replay is closer than this.
 
