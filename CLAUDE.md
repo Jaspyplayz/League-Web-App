@@ -17,6 +17,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Game score (the trained 0 to 100 rating): [docs/game-score.md](docs/game-score.md)
 - Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
 - AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
+- Habits (level 6 first, first scuttles, early ganks and first back on Insights, with how often games with them were won): [docs/habits.md](docs/habits.md)
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Replay (beta: the whole game second by second, with every player's items and spot on the map, every play graded by the win chance, and the checks behind them): [docs/replay.md](docs/replay.md)
 - MCP server (Claude and other AI apps can look players up and read the analyzer's results at `/api/mcp`): [docs/mcp.md](docs/mcp.md)
@@ -41,6 +42,7 @@ src/lib/riot/     Server-only Riot client (rate limits, retries) and one functio
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
                   trends.ts rolls games up into the Insights page, compare.ts
                   sets them against one rank's games or one chosen player's,
+                  habits.ts reads early-game habits (habit-trends.ts splits wins by them),
                   score.ts is the trained 0 to 100 game score (score-model.json),
                   win-chance.ts each team's chance to win at every minute,
                   tempo.ts the jungle tempo timeline (tempo-study.ts checks it)
