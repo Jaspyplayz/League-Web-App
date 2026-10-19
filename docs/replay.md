@@ -1,13 +1,13 @@
 # Replay (beta)
 
-The replay plays a whole game back second by second. Drag along its timeline or press play, and the map shows where every champion was at that moment, and the scoreboard beside it every player's level, kills, deaths, assists, CS, gold and items, with each team's kills, gold, towers and epic monsters. The timeline also shows your team's chance to win at every second, and under the scoreboard every play of the game is graded by how much it moved that chance. It's on the match page of every game, after the jungle sections and before the win chance graph, marked **Beta**. When you played jungle, it also has the [tempo strip](tempo.md).
+The replay plays a whole game back second by second. Drag along its timeline or press play, and the map shows where every champion was at that moment, and the scoreboard beside it every player's level, kills, deaths, assists, CS, gold and items, with each team's kills, gold, towers and epic monsters. The timeline also shows your team's chance to win at every second, and under the scoreboard every play of the game is graded by how much it moved that chance. It's on the Deep dive tab of every game's match page, marked **Beta**. When you played jungle, it also has the [tempo strip](tempo.md).
 
-The code is in [`src/lib/analyzer/replay.ts`](../src/lib/analyzer/replay.ts) (the map and scoreboard at any second), [`src/lib/analyzer/items.ts`](../src/lib/analyzer/items.ts) (each player's items), [`src/lib/analyzer/positions.ts`](../src/lib/analyzer/positions.ts) (each champion's spot on the map) and [`src/lib/analyzer/plays.ts`](../src/lib/analyzer/plays.ts) (the chance to win at every second, and the plays). The panel is `match/[matchId]/replay.tsx`, with the map in `replay-map.tsx`, the scoreboard in `replay-scoreboard.tsx` and the plays in `replay-plays.tsx`.
+The code is in [`src/lib/analyzer/replay.ts`](../src/lib/analyzer/replay.ts) (the map and scoreboard at any second), [`src/lib/analyzer/items.ts`](../src/lib/analyzer/items.ts) (each player's items), [`src/lib/analyzer/positions.ts`](../src/lib/analyzer/positions.ts) (each champion's spot on the map) and [`src/lib/analyzer/plays.ts`](../src/lib/analyzer/plays.ts) (the chance to win at every second, and the plays). The panel is `match/[matchId]/replay.tsx`, with the map in `replay-map.tsx` (Summoner's Rift itself in `map-background.tsx`), the scoreboard in `replay-scoreboard.tsx` and the plays in `replay-plays.tsx`.
 
 ## What it shows
 
 - **The timeline**: the whole game. On top, your team's chance to win at every second (blue above even, red below), then a dot for every play (blue when it raised your team's chance, red when it lowered it, grey when it barely moved it, bigger the more it moved), a letter for every epic monster (D dragon, E Elder, G grubs, H Herald, B Baron, A Atakhan) and a tick for every kill (blue for your team's, red for the enemy's). Press or drag anywhere on it, or press play to watch at 10, 30 or 60 times game speed. The arrow buttons jump to the previous or next play. From the keyboard it works like a slider: the arrow keys move 5 seconds, Page Up and Page Down a minute.
-- **The map**: all ten champions, in blue for your team and red for the enemy's. Your ring is thicker and your opponent's dashed, like the scoreboard's outlines. A dead champion stays faded where they died, with the time until they're back, and a cross marks each kill for 10 seconds. It sits beside the scoreboard when both fit, and above it otherwise.
+- **The map**: Riot's own minimap picture of Summoner's Rift, with all ten champions on it, in blue for your team and red for the enemy's. Your ring is thicker and your opponent's dashed, like the scoreboard's outlines. A dead champion stays faded where they died, with the time until they're back, and a cross marks each kill for 10 seconds. It sits beside the scoreboard when both fit, and above it otherwise.
 - **The moment you're on**: the game clock, your team's chance to win, how far ahead or behind your team was in gold, and the kill score.
 - **Both teams**: your team first, each in role order, with the winning team in blue and the losing team in red, like the scoreboard at the bottom of the page. Your row has a solid outline and your opponent's a dashed one. A dead player's picture is faded, with how long until they're back. On phones each team is a list instead of a table, so nothing has to scroll sideways while you drag the timeline.
 - **Plays**: every fight, epic monster, tower and inhibitor, with a grade: how much it changed your team's chance to win. Pick one to jump the replay to it and see each kill and objective in it, the chance before and after, and, for junglers, who had tempo just before. **Yours** shows only the plays you took part in, and the line above the list counts your grades. See [how the plays are graded](#how-the-plays-are-graded).
@@ -77,9 +77,17 @@ Riot's timeline has every champion's position once a minute. Between two snapsho
 2. **Deaths**: the spot Riot logs with the kill. The champion stays there, faded, until they're back. That's also where Riot's snapshots put a dead champion: in the check below, every snapshot taken while someone was dead had them exactly at the spot they died.
 3. **The fountain**, when they come back after a death, and whenever they buy, sell or undo in the shop, which only works at the fountain (or while dead, which doesn't count). Recalling takes them there at once, so it's a jump: they stay where they were until the moment they're at the fountain. Ornn can buy items anywhere, so his purchases don't count.
 4. **Kills they got or helped with**, at the kill's spot, and **epic monsters they took**, at the monster's pit, since Riot doesn't log where a monster died. Atakhan is left out, because he can spawn in either of two pits. An assist can come from a heal or shield far away, and some ultimates cross the map, so a kill or monster is left out when they couldn't have got there in time from the spot before it, or from there to the spot after it: at 500 units a second, plus 1,500 for a dash, a Flash or an ability's range.
-5. **Leaving the fountain**, they walk straight to the next spot at 400 units a second, about a champion's speed with boots, and wait there. Players head straight back out after shopping, so spreading the walk over the whole time until the next snapshot would leave them dawdling near the fountain.
+5. **Leaving the fountain**, they walk to the next spot at 400 units a second, about a champion's speed with boots, and wait there. Players head straight back out after shopping, so spreading the walk over the whole time until the next snapshot would leave them dawdling near the fountain.
 
-Between those spots, a champion moves in a straight line. The map is about 14,900 units across, and a lane about 800 wide.
+Between those spots, a champion takes the shortest walk around the Rift's walls, at a steady pace. The map is about 14,900 units across, and a lane about 800 wide.
+
+### The Rift's walls
+
+Riot doesn't publish where Summoner's Rift's walls are, but its snapshots never put a champion inside one. So `npm run rift-map` ([`scripts/rift-map.ts`](../scripts/rift-map.ts)) counts where every snapshot and kill fell, in squares of 100 by 100 map units, across the games saved for the tempo study and the item check: 736,862 positions in 1,987 games from patches 16.1 to 16.20, most of them 16.20. A square where at least 3 positions fell is ground, and the rest is wall. Then two clean-ups: a patch of wall smaller than 6 squares with ground all around is just somewhere nobody happened to stand, and a patch of ground that small, cut off from the rest, is champions caught inside a wall mid-dash, or Kayn walking through one. That leaves 14,607 of the 22,500 squares as ground. The walls, and their outline for drawing, are saved in [`rift-map.json`](../src/lib/analyzer/rift-map.json), and the code is in [`rift.ts`](../src/lib/analyzer/rift.ts).
+
+The map on the page is Riot's minimap picture of the Rift, from Data Dragon like the champion pictures, with the learned walls drawn underneath in the same colors. The drawing shows while the picture loads, or on its own when Data Dragon can't be reached. With the picture moved and scaled until its walls lined up best with the learned ones, the two match closely all over the map. The learned walls sit a little inside the picture's, since a champion's position is its middle, which stops short of the wall.
+
+`walkingRoute` finds the way around: the shortest path over the squares, pulled tight so it only turns at corners. A champion walks it at a steady pace between two spots. When it's too long to walk in the time at 500 units a second, they must have gone over the wall, with a dash, a Flash or a jump, so they go straight. Walking out of the fountain, the time to the next spot counts the way around too.
 
 ### How close it gets
 
@@ -94,15 +102,17 @@ The only positions known for certain are Riot's snapshots, so the check leaves o
 | + kills they took part in | 1,485 | 5,496 | 60.8% |
 | + epic monsters | 1,433 | 5,269 | 62.1% |
 | + leaving out what they couldn't reach | 1,437 | 5,294 | 62.0% |
+| + walking around walls | 1,439 | 5,305 | 62.0% |
 
 - Shop visits only helped once champions walked straight back out. Spread over the time until the next snapshot, the walk left them near the fountain while Riot had them back in lane.
 - Walking speeds from 350 to 500 units a second came within 170 units of each other, and 300 was 260 further off. The replay uses 400, 50 units behind the best (450).
 - Leaving out kills and monsters a champion couldn't have reached made no difference over 137 games. It helped a little on the first game the check ran on, and it's kept because it stops the odd champion crossing the map for a kill they weren't near.
-- By role, the median miss was 1,229 for mid laners, 1,309 for top, 1,310 for bottom, 1,454 for supports and 2,014 for junglers, who move between camps with nothing logged on the way.
+- Walking around walls made no difference to how close it gets: the median miss went from 1,437 to 1,439. A champion's real path between two spots isn't the shortest one either. It's there so champions stop walking through walls on the map.
+- By role, the median miss was 1,239 for mid laners, 1,280 for top, 1,297 for bottom, 1,441 for supports and 2,058 for junglers, who move between camps with nothing logged on the way. Walking around walls took junglers' from 2,014 to 2,058, since the shortest way hugs the walls while junglers cut through their camps.
 - 5,169 of the 5,286 snapshots taken while a champion was dead (by the death timer) had them exactly where they died. The other 117 were back sooner (see the death timer row above).
 - Killers were a median of 568 units from the kill's spot in snapshots within 3 seconds of it, helpers 767, and players who took an epic monster 680 from its pit, which is why those spots count.
 - Of 22,866 shop visits by living champions, 318 (1.4%) were followed by a snapshot too far from the fountain to have walked to. They were spread over many champions (Yone had the most, 15), so only Ornn's purchases, which he can make anywhere, are skipped.
-- All ten paths come to a median of 27 KB per game, 44 KB at most.
+- All ten paths come to a median of 45 KB per game, 74 KB at most. Each turn around a wall adds a point, so that's up from 27 KB before champions walked around walls.
 
 With one snapshot left out, the estimate spans two minutes, while the replay's never spans more than one, so the replay is closer than this.
 
@@ -134,7 +144,8 @@ On Jasper's 28-minute Qiyana game, a win, his 16 plays came out as 3 Great, 6 Go
 - Gold and CS between snapshots are estimates, so they can be off by a few hundred gold or a few CS in the middle of a minute. The chance to win between minute marks is an estimate for the same reason.
 - An item that changes with no event and isn't in the final items can't be seen.
 - A dead player can come back a little sooner than "back in" says (see the death timer row above).
-- Between snapshots, positions are estimates. Riot doesn't log walls, teleports or detours, so a champion can walk through a wall, or across the map after a teleport. In a fight, champions on the same spot overlap.
+- Between snapshots, positions are estimates. Riot doesn't log teleports or detours, so a champion can walk across the map after a teleport, and takes the shortest way around a wall even when they went another way. When the way around is too long for the time, they cross the wall, as with a dash or a Flash. In a fight, champions on the same spot overlap.
+- The walls champions walk around are learned from this season's games, so after a change to the map they're out of date until `npm run rift-map` runs on games from the new patch.
 - Plays are grouped by time only, so two things 15 seconds apart on opposite sides of the map make one play.
 - A play's grade uses the base kill gold, so shutdowns and first blood count for less than they paid, and kills on players who keep dying for more.
 
@@ -144,6 +155,7 @@ On Jasper's 28-minute Qiyana game, a win, his 16 plays came out as 3 Great, 6 Go
 npm run tempo-games -- --items --players 3 --games 5   # downloads games into .cache/item-check (needs RIOT_API_KEY)
 npm run check-items                                    # the item check; makes no Riot calls
 npm run check-positions                                # the position check, on the same games
+npm run rift-map                                       # the Rift's walls, from every game saved for the checks
 ```
 
 On Windows PowerShell, use `npm.cmd` when passing options after `--`.
@@ -151,5 +163,7 @@ On Windows PowerShell, use `npm.cmd` when passing options after `--`.
 The downloader is the tempo study's (docs/tempo.md), on the Oceania server by default. With `--items` it keeps each game's whole timeline and every player's champion, role and final items, without names or PUUIDs. Git ignores the folder and nothing goes in the database.
 
 The item check's report starts with how many players' items matched, then lists every kind of miss with the item events behind a couple of examples, which is where a new rule comes from. It's in [`src/lib/analyzer/item-check.ts`](../src/lib/analyzer/item-check.ts) and [`scripts/check-items.ts`](../scripts/check-items.ts). Run it again after a patch that adds items that transform or arrive for free, and add a rule to `items.ts` (with a test) for anything new it finds.
+
+`rift-map` needs at least 1,000 saved games. It also saves its counts in `.cache/rift-counts.json`, and uses them when no games are saved, so the walls can be redrawn without downloading again.
 
 The position check's report has the table above, the same by role, and the numbers behind the rules: where dead champions are, shop visits away from the fountain, and how far killers, helpers and monster takers were from the spot. It's in [`src/lib/analyzer/position-check.ts`](../src/lib/analyzer/position-check.ts) and [`scripts/check-positions.ts`](../scripts/check-positions.ts).

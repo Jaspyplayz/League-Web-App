@@ -43,8 +43,9 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   win-chance.ts each team's chance to win at every minute,
                   tempo.ts the jungle tempo timeline (tempo-study.ts checks it)
                   and replay.ts the replay, with items.ts and positions.ts
-                  (item-check.ts and position-check.ts check them) and
-                  plays.ts (the chance to win at every second, plays graded by it)
+                  (item-check.ts and position-check.ts check them), rift.ts
+                  (the Rift's walls, learned from games, which champions walk
+                  around) and plays.ts (the chance to win at every second, plays graded by it)
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
@@ -74,7 +75,7 @@ docs/             Design and research docs
 | `npm run train-score` | Retrain the game score on saved games and update `score-model.json` ([docs/game-score.md](docs/game-score.md)) |
 | `npm run train-win-chance` | Train the win chance model on saved games and write `win-chance-model.json` ([docs/win-chance.md](docs/win-chance.md)) |
 | `npm run tempo-games` / `study-tempo` | Download games for the tempo study into the git-ignored `.cache/tempo-study`, then print its report ([docs/tempo.md](docs/tempo.md)) |
-| `npm run tempo-games -- --items` / `check-items` / `check-positions` | Download games into `.cache/item-check`, then check the replay's rebuilt items against Riot's, or its map positions against Riot's snapshots ([docs/replay.md](docs/replay.md#running-the-checks)) |
+| `npm run tempo-games -- --items` / `check-items` / `check-positions` / `rift-map` | Download games into `.cache/item-check`, then check the replay's rebuilt items against Riot's, or its map positions against Riot's snapshots, or learn the Rift's walls from them ([docs/replay.md](docs/replay.md#running-the-checks)) |
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass.
 
