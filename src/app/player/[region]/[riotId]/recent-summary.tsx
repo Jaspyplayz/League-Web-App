@@ -1,9 +1,10 @@
 import { winRate, type RecentRecord } from "@/lib/match-summary";
 import { panelClass } from "@/components/ui/panel";
 
-// The "Last 20 games" box beside the match list, like the summary at the top
+// The "Last 10 games" box above the match list, like the summary at the top
 // of op.gg's and DeepLoL's match history: a win rate ring, the overall
-// numbers, and bars for how often each role was played.
+// numbers, and bars for how often each role was played, side by side. It
+// covers every game in the list, so "Show 10 more games" makes it "Last 20".
 export function RecentSummary({
   record,
   roles,
@@ -14,14 +15,19 @@ export function RecentSummary({
   const mostPlayed = Math.max(1, ...roles.map((r) => r.games));
 
   return (
-    <section className={`${panelClass} flex flex-col gap-4 p-4`}>
-      <h2 className="font-mono text-xs tracking-widest text-faint uppercase">
-        Last {record.games} games
-      </h2>
-
+    <section
+      aria-labelledby="recent-summary-heading"
+      className={`${panelClass} flex flex-wrap items-center gap-x-8 gap-y-4 px-5 py-4`}
+    >
       <div className="flex items-center gap-4">
         <WinRateRing wins={record.wins} losses={record.losses} />
         <div className="flex flex-col gap-0.5">
+          <h2
+            id="recent-summary-heading"
+            className="font-mono text-xs tracking-widest text-faint uppercase"
+          >
+            Last {record.games} games
+          </h2>
           <p className="text-2xl font-semibold">
             <span className="text-ahead">{record.wins}W</span>{" "}
             <span className="text-behind">{record.losses}L</span>
@@ -30,19 +36,17 @@ export function RecentSummary({
         </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 text-sm">
+      <dl className="flex gap-6 text-sm">
         <Stat label="CS per min" value={record.csPerMin.toFixed(1)} />
-        <Stat
-          label="Kill participation"
-          value={`${Math.round(record.killParticipation * 100)}%`}
-        />
+        <Stat label="Kill participation" value={`${Math.round(record.killParticipation * 100)}%`} />
       </dl>
 
-      {/* Only shown when the games had roles; ARAM-only lists have none. */}
+      {/* Only shown when the games had roles; ARAM-only lists have none.
+          ml-auto pushes it to the right end on wide screens. */}
       {roles.some((r) => r.games > 0) && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5 sm:ml-auto">
           <h3 className="text-sm text-faint">Roles</h3>
-          <ul className="flex h-24 items-end gap-3">
+          <ul className="flex h-16 w-48 items-end gap-2">
             {roles.map(({ role, games }) => (
               <li
                 key={role}
