@@ -8,6 +8,7 @@ import { RiotApiError, riotGet } from "./client";
 import type {
   Account,
   ActiveGame,
+  ChampionMastery,
   LeagueEntry,
   LeagueList,
   Match,
@@ -147,4 +148,12 @@ export async function getActiveGame(region: Region, puuid: string): Promise<Acti
 // shown at status.riotgames.com.
 export function getPlatformStatus(region: Region) {
   return riotGet<PlatformStatus>(REGIONS[region].platform, "/lol/status/v4/platform-data");
+}
+
+// The player's most played champions by mastery points, highest first.
+export function getTopMasteries(region: Region, puuid: string, count = 5) {
+  return riotGet<ChampionMastery[]>(
+    REGIONS[region].platform,
+    `/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=${count}`,
+  );
 }

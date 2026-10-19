@@ -33,6 +33,7 @@ import type { Match } from "@/lib/riot/types";
 import { QueueTabs } from "./queue-tabs";
 import { RecentSummary } from "./recent-summary";
 import { SeasonChampions } from "./season-champions";
+import { MasteryCard } from "./mastery-card";
 
 // `profile` is the player's saved snapshot, whose match IDs are the All tab.
 // `queue` is the game-mode tab picked above the list. `beforeParam` is the
@@ -122,6 +123,10 @@ export async function RecentMatches({
             dd={dd}
             recent={topChampions(matches, 4)}
           />
+        </Suspense>
+        {/* Loads on its own and hides itself if Riot can't be reached. */}
+        <Suspense fallback={null}>
+          <MasteryCard region={region} puuid={puuid} dd={dd} />
         </Suspense>
       </aside>
 
