@@ -155,3 +155,22 @@ export type Timeline = {
     frames: TimelineFrame[];
   };
 };
+
+// spectator-v5: the game a player is in right now. Riot sends both teams'
+// champions, runes and spells too, but Turnpoint never reads them: showing
+// enemy info during a game is the live scouting Riot's policy rules out.
+export type ActiveGame = {
+  gameQueueConfigId: number;
+  gameStartTime: number; // ms since 1970; 0 while players are still loading in
+};
+
+// lol-status-v4: one server's current incidents and maintenance.
+export type PlatformStatus = {
+  maintenances: StatusEntry[];
+  incidents: StatusEntry[];
+};
+
+export type StatusEntry = {
+  maintenance_status: "scheduled" | "in_progress" | "complete" | null;
+  titles: { locale: string; content: string }[];
+};

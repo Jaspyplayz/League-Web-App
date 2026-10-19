@@ -5,7 +5,16 @@ import { accountRegional, REGIONS, type Region } from "@/lib/regions";
 import type { RiotId } from "@/lib/riot-id";
 import type { ApexTier, Division, Tier } from "@/lib/tiers";
 import { RiotApiError, riotGet } from "./client";
-import type { Account, LeagueEntry, LeagueList, Match, Summoner, Timeline } from "./types";
+import type {
+  Account,
+  ActiveGame,
+  LeagueEntry,
+  LeagueList,
+  Match,
+  PlatformStatus,
+  Summoner,
+  Timeline,
+} from "./types";
 
 // One function per Riot endpoint the app uses. Each picks the right host:
 // account and match data live on regional clusters ("americas"), player data
@@ -118,4 +127,24 @@ export function getTimeline(region: Region, matchId: string) {
     REGIONS[region].regional,
     `/lol/match/v5/matches/${encodeURIComponent(matchId)}/timeline`,
   );
+}
+
+// The game this player is in right now, or null when they aren't in one
+// (Riot answers 404 for that, which is an answer rather than a failure).
+export async function getActiveGame(region: Region, puuid: string): Promise<ActiveGame | null> {
+  try {
+    return await riotGet<ActiveGame>(
+      REGIONS[region].platform,
+      `/lol/spectator/v5/active-games/by-summoner/${puuid}`,
+    );
+  } catch (error) {
+    if (error instanceof RiotApiError && error.kind === "not-found") return null;
+    throw error;
+  }
+}
+
+// Riot's own list of problems and maintenance on one server, the same one
+// shown at status.riotgames.com.
+export function getPlatformStatus(region: Region) {
+  return riotGet<PlatformStatus>(REGIONS[region].platform, "/lol/status/v4/platform-data");
 }

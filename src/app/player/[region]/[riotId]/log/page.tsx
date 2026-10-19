@@ -67,7 +67,7 @@ async function Log({ params }: { params: Params }) {
   await connection();
 
   const account = await settle(getAccount(region, id));
-  if (!account.ok) return <RiotErrorNotice error={account.error} />;
+  if (!account.ok) return <RiotErrorNotice error={account.error} region={region} />;
   if (!account.value) notFound();
   const { puuid, gameName, tagLine } = account.value;
   const playerPath = `/player/${region}/${toSlug(account.value)}`;
@@ -94,7 +94,7 @@ async function Log({ params }: { params: Params }) {
     return (
       <>
         {header}
-        <RiotErrorNotice error={ids.error} />
+        <RiotErrorNotice error={ids.error} region={region} />
       </>
     );
   }

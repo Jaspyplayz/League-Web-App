@@ -143,7 +143,7 @@ export async function RecentMatches({
         {matches.length === 0 ? (
           // Show whatever loaded; an error only matters if nothing did.
           result.error ? (
-            <RiotErrorNotice error={result.error} />
+            <RiotErrorNotice error={result.error} region={region} />
           ) : (
             <p className="text-muted">{emptyMessage(queue, before)}</p>
           )
