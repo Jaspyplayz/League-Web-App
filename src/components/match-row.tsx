@@ -42,12 +42,19 @@ export function MatchRow({
   // The champion portrait is framed in the result's color, so the list reads
   // at a glance: blue for a win, red for a loss.
   const portraitFrame = m.remake ? "border-line-strong" : m.win ? "border-ahead" : "border-behind";
-  const box = "hud-cut border border-line-strong bg-surface px-[18px] py-3.5";
+  // The whole row is tinted and outlined in the result's color too, so wins
+  // and losses stand apart when scanning the list.
+  const tint = m.remake
+    ? "border-line-strong bg-surface"
+    : m.win
+      ? "border-ahead/50 bg-ahead/10"
+      : "border-behind/50 bg-behind/10";
+  const box = `hud-cut border ${tint} px-[18px] py-3.5`;
 
   const content = (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[18px] gap-y-3.5">
       <div className="flex w-[92px] shrink-0 flex-col text-xs whitespace-nowrap text-faint">
-        <span className={`font-mono text-xs font-medium tracking-[0.14em] uppercase ${resultColor}`}>
+        <span className={`font-mono text-sm font-semibold tracking-[0.14em] uppercase ${resultColor}`}>
           {result}
         </span>
         <span>{m.queue}</span>

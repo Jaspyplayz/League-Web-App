@@ -53,14 +53,32 @@ export function userFromClaims(claims: Claims): SignedInUser | null {
   if (typeof claims.sub !== "string" || claims.sub === "") return null;
 
   const meta = claims.user_metadata ?? {};
-  const name = [meta.full_name, meta.name, meta.user_name, claims.email].find(
-    (value): value is string => typeof value === "string" && value.trim() !== "",
-  );
+  const name = [meta.full_name, meta.name, meta.user_name, claims.email]
+    .filter((value): value is string => typeof value === "string")
+    .map(withoutEmail)
+    .find((value) => value !== "");
   const provider = String(claims.app_metadata?.provider ?? "");
 
   return {
     id: claims.sub,
-    name: name?.trim() ?? "Player",
+    name: name ?? "Player",
     provider: isProvider(provider) ? provider : null,
   };
+}
+
+// The header shows this name to everyone looking at the screen, so it never
+// includes an email address. Some profiles put one in the name, like
+// "Jaspyplayz (jasper@example.com)": that part is dropped. When the email is
+// all there is, only the part before the @ is kept.
+const EMAIL = /\S+@\S+\.\S+/;
+
+export function withoutEmail(name: string): string {
+  const trimmed = name.trim();
+  if (!EMAIL.test(trimmed)) return trimmed;
+  const rest = trimmed
+    .replace(/\(\s*\S+@\S+\s*\)/g, "")
+    .replace(EMAIL, "")
+    .replace(/[\s,;:<>|-]+$/, "")
+    .trim();
+  return rest !== "" ? rest : trimmed.split("@")[0].replace(/^[(<\s]+/, "");
 }
