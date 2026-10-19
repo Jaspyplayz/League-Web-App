@@ -8,16 +8,17 @@
 //     selling, undoing), which happen at their team's fountain.
 //   - a kill they got or helped with, near its spot, and an epic monster
 //     they took, at its pit.
-// A champion's path joins those points with straight lines, with two
-// exceptions. A trip to the fountain (recalling, or coming back after a
+// A champion's path joins those points by the shortest walk around the
+// Rift's walls (rift.ts), at a steady pace from one point to the next, with
+// two exceptions. A trip to the fountain (recalling, or coming back after a
 // death) is a jump: they stay where they were until the moment they're
-// there. And leaving the fountain, they walk straight to where they're seen
-// next and wait there, instead of taking the whole time to get there. So
-// positions are exact at the snapshots, deaths and fountain visits, and
-// estimates in between. position-check.ts measures how far off
-// (docs/replay.md).
+// there. And leaving the fountain, they walk to where they're seen next and
+// wait there, instead of taking the whole time to get there. So positions
+// are exact at the snapshots, deaths and fountain visits, and estimates in
+// between. position-check.ts measures how far off (docs/replay.md).
 
 import type { MapPosition } from "@/lib/riot/types";
+import { RIFT_WALLS, walkingRoute, type Walls } from "./rift";
 import type { DeathSpan } from "./tempo";
 import type { TrimmedTimeline } from "./trim";
 
@@ -41,6 +42,8 @@ export type PathOptions = {
   // How fast they walk out of the fountain, in map units per ms. Null to
   // spread the walk over the whole time until they're seen next.
   walkOut: number | null;
+  // The walls they walk around, or null to walk in straight lines.
+  walls: Walls | null;
 };
 
 // What the replay uses.
@@ -51,6 +54,7 @@ export const REPLAY_PATHS: PathOptions = {
   monsters: true,
   reachable: true,
   walkOut: 0.4,
+  walls: RIFT_WALLS,
 };
 
 type Player = { participantId: number; teamId: number; championName: string };
@@ -84,9 +88,9 @@ export const MONSTER_PITS: Record<string, MapPosition> = {
 // fountain.
 const BUYS_ANYWHERE = new Set(["ornn"]);
 
-// How fast and how far a champion can get, for `reachable`: a little over
-// a champion's walking speed with boots, plus room for a dash, a Flash and
-// an ability's range.
+// How fast and how far a champion can get, for `reachable` and for walking
+// around walls: a little over a champion's walking speed with boots, plus
+// room for a dash, a Flash and an ability's range.
 const TOP_SPEED = 0.5; // map units per ms
 const REACH = 1500; // map units
 
@@ -101,11 +105,15 @@ export function positionPath(
 ): PathPoint[] {
   const points = pathPoints(timeline, player, deaths, options, leaveOut);
   const kept = options.reachable ? points.filter((p, i) => canReach(points, i)) : points;
-  const walked = options.walkOut ? walkingOut(kept, options.walkOut) : kept;
+  const { walls } = options;
+  const length = (from: MapPosition, to: MapPosition) =>
+    walls ? walkingRoute(walls, from, to).length : distance(from, to);
+  const walked = options.walkOut ? walkingOut(kept, options.walkOut, length) : kept;
   // The page only needs the spots, not where each came from.
-  return withoutRepeats(walked).map(({ at, x, y, jump }) =>
+  const path: PathPoint[] = withoutRepeats(walked).map(({ at, x, y, jump }) =>
     jump ? { at, x, y, jump } : { at, x, y },
   );
+  return walls ? aroundWalls(path, walls) : path;
 }
 
 // Where a player was at moment t (ms), on their path. Every path starts at
@@ -204,15 +212,43 @@ export function couldReach(from: MapPosition, to: MapPosition, ms: number): bool
 // After each time at the fountain (the start of the game, a shop visit,
 // coming back after a death), they walk at `speed` to the next point and wait
 // there, rather than spreading the walk over the whole time until it. Riot's
-// snapshots show players back in lane soon after they shop.
-function walkingOut(points: Point[], speed: number): Point[] {
+// snapshots show players back in lane soon after they shop. `length` is how
+// far the walk is.
+function walkingOut(
+  points: Point[],
+  speed: number,
+  length: (from: MapPosition, to: MapPosition) => number,
+): Point[] {
   return points.flatMap((point, i) => {
     const next = points[i + 1];
     const atFountain = point.at === 0 || point.source === "shop" || point.source === "respawn";
     if (!atFountain || !next || next.jump) return [point];
-    const arrival = Math.round(point.at + distance(point, next) / speed);
+    const arrival = Math.round(point.at + length(point, next) / speed);
     if (arrival <= point.at || arrival >= next.at) return [point];
     return [point, { ...next, at: arrival }];
+  });
+}
+
+// Between two points, they walk around the walls in the way rather than
+// through them: each corner of the route goes in the path, timed so they
+// keep a steady pace all the way. When the way around is too far to walk in
+// the time, they must have gone over the wall (a dash, a Flash or a jump),
+// so that stretch stays straight.
+function aroundWalls(path: PathPoint[], walls: Walls): PathPoint[] {
+  return path.flatMap((point, i) => {
+    const next = path[i + 1];
+    if (!next || next.jump || next.at <= point.at) return [point];
+    const { corners, length } = walkingRoute(walls, point, next);
+    const ms = next.at - point.at;
+    if (corners.length === 0 || length > TOP_SPEED * ms) return [point];
+    let along = 0;
+    let previous: MapPosition = point;
+    const turns = corners.map((corner) => {
+      along += distance(previous, corner);
+      previous = corner;
+      return { at: point.at + Math.round((ms * along) / length), x: corner.x, y: corner.y };
+    });
+    return [point, ...turns];
   });
 }
 

@@ -2,6 +2,7 @@
 // these contain just the fields the analyzer reads.
 
 import type { Match, Participant } from "@/lib/riot/types";
+import { RIFT_CELL, RIFT_CELLS, type Walls } from "./rift";
 import type { GameTrend } from "./trends";
 import type { PlayerFrame, TrimmedEvent, TrimmedFrame } from "./trim";
 
@@ -119,6 +120,27 @@ export const SPOTS = {
   botLane: { x: 10000, y: 1200 },
   jungle: { x: 4000, y: 8000 },
 };
+
+// A rectangle on the map, in map units.
+export type Block = { x: [number, number]; y: [number, number] };
+
+// The cells of the Rift's grid (rift.ts) inside a rectangle.
+export function cellsIn({ x, y }: Block): number[] {
+  const cells: number[] = [];
+  for (let row = y[0] / RIFT_CELL; row < y[1] / RIFT_CELL; row++) {
+    for (let column = x[0] / RIFT_CELL; column < x[1] / RIFT_CELL; column++) {
+      cells.push(row * RIFT_CELLS + column);
+    }
+  }
+  return cells;
+}
+
+// An open map with walls in the given rectangles.
+export function mapWith(...blocks: Block[]): Walls {
+  const walls: Walls = new Uint8Array(RIFT_CELLS * RIFT_CELLS).fill(1);
+  for (const block of blocks) for (const cell of cellsIn(block)) walls[cell] = 0;
+  return walls;
+}
 
 // The GameTrend stats added after the first ones, all left out, for tests
 // that build game summaries by hand.

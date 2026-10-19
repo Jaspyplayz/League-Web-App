@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { positionAt, positionPath, REPLAY_PATHS, type PathPoint } from "./positions";
+import type { MapPosition } from "@/lib/riot/types";
+import {
+  distance,
+  positionAt,
+  positionPath,
+  REPLAY_PATHS,
+  type PathOptions,
+  type PathPoint,
+} from "./positions";
+import { walkingRoute } from "./rift";
 import { deathSpans } from "./tempo";
-import { clock, frames, kill } from "./test-fixtures";
+import { clock, frames, kill, mapWith, type Block } from "./test-fixtures";
 import type { TrimmedEvent } from "./trim";
 
 const FOUNTAIN = { x: 500, y: 500 };
@@ -30,7 +39,11 @@ const dragon = (at: string, killerId: number, assists: number[] = []): TrimmedEv
   assistingParticipantIds: assists,
 });
 
-function path(events: TrimmedEvent[], player = MID, sources = REPLAY_PATHS, leaveOut?: number) {
+// The replay's way, in straight lines, so the spots below don't depend on
+// this season's walls. The last tests put walls in.
+const STRAIGHT: PathOptions = { ...REPLAY_PATHS, walls: null };
+
+function path(events: TrimmedEvent[], player = MID, sources = STRAIGHT, leaveOut?: number) {
   const timeline = { frames: snapshots, events };
   return positionPath(timeline, player, deathSpans(timeline), sources, leaveOut);
 }
@@ -88,7 +101,7 @@ describe("positionPath and positionAt", () => {
   });
 
   it("can spread the walk out of the fountain over the time until they're seen next", () => {
-    const route = path([purchase("6:30")], MID, { ...REPLAY_PATHS, walkOut: null });
+    const route = path([purchase("6:30")], MID, { ...STRAIGHT, walkOut: null });
     expect(where(route, "6:45")).toEqual({ x: 3750, y: 750 });
   });
 
@@ -120,11 +133,49 @@ describe("positionPath and positionAt", () => {
     ];
     // Walking out of the fountain towards the 6:00 snapshot instead.
     expect(where(path(events), "5:08")).toEqual({ x: 1658, y: 816 });
-    const everything = { ...REPLAY_PATHS, reachable: false };
+    const everything = { ...STRAIGHT, reachable: false };
     expect(where(path(events, MID, everything), "5:08")).toEqual({ x: 13000, y: 13000 });
   });
 
   it("can leave out a snapshot, for the check", () => {
-    expect(where(path([], MID, REPLAY_PATHS, 2), "2:00")).toEqual({ x: 2000, y: 1000 });
+    expect(where(path([], MID, STRAIGHT, 2), "2:00")).toEqual({ x: 2000, y: 1000 });
+  });
+});
+
+describe("walking around walls", () => {
+  // A wall between the 2:00 spot (2000, 2000) and the 3:00 spot (3000, 1000),
+  // from the bottom edge of the map up to y = 3,000.
+  const WALL = { x: [2400, 2600], y: [0, 3000] } satisfies Block;
+  const inWall = ({ x, y }: MapPosition) => x >= 2400 && x < 2600 && y < 3000;
+
+  it("goes around a wall in the way, at a steady pace", () => {
+    const route = path([], MID, { ...STRAIGHT, walls: mapWith(WALL) });
+    // In a straight line, they'd walk through it.
+    expect(inWall(where(path([]), "2:30"))).toBe(true);
+    for (let s = 120; s <= 180; s++) expect(inWall(where(route, s * 1000))).toBe(false);
+    expect(where(route, "3:00")).toEqual({ x: 3000, y: 1000 });
+    // The same speed on every stretch of the way around.
+    const minute = route.filter((p) => p.at >= clock("2:00") && p.at <= clock("3:00"));
+    expect(minute.length).toBeGreaterThan(2);
+    const speeds = minute.slice(1).map((p, i) => distance(minute[i], p) / (p.at - minute[i].at));
+    for (const speed of speeds) expect(speed).toBeCloseTo(speeds[0], 4);
+  });
+
+  it("goes over a wall when the way around is too far to walk in the time, like a Flash", () => {
+    // Up to y = 8,000, with a kill on the other side 20 seconds after the
+    // 2:00 snapshot: the way around is about 12,900 long.
+    const walls = mapWith({ x: [2400, 2600], y: [0, 8000] });
+    const route = path([kill("2:20", 3, 8, [], { x: 3000, y: 1500 })], MID, { ...STRAIGHT, walls });
+    expect(where(route, "2:10")).toEqual({ x: 2500, y: 1750 });
+  });
+
+  it("walks out of the fountain for as long as the way around takes", () => {
+    // A wall between the fountain and the 7:00 spot (7000, 1000).
+    const walls = mapWith({ x: [4400, 4600], y: [0, 5000] });
+    const route = path([purchase("6:30")], MID, { ...STRAIGHT, walls });
+    const { length } = walkingRoute(walls, FOUNTAIN, { x: 7000, y: 1000 });
+    const arrival = clock("6:30") + Math.round(length / 0.4);
+    expect(where(route, arrival - 1000)).not.toEqual({ x: 7000, y: 1000 });
+    expect(where(route, arrival)).toEqual({ x: 7000, y: 1000 });
   });
 });
