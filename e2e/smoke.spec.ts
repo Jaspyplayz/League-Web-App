@@ -53,6 +53,11 @@ test("open the sample analysis", async ({ page }) => {
     FIRST_LOAD,
   );
   await expect(page.getByText("Biggest swings")).toBeVisible();
+  // The replay lives on the Deep dive tab, hidden until it's opened.
+  const replay = page.getByRole("heading", { name: "Replay", exact: true });
+  await expect(replay).toBeHidden();
+  await page.getByRole("tab", { name: "Deep dive" }).click();
+  await expect(replay).toBeVisible();
 });
 
 // The theme is applied by a script in <head>, so check it survives a reload:
