@@ -151,7 +151,7 @@ export function getPlatformStatus(region: Region) {
 }
 
 // The player's most played champions by mastery points, highest first.
-export function getTopMasteries(region: Region, puuid: string, count = 5) {
+export function getTopMasteries(region: Region, puuid: string, count = 4) {
   return riotGet<ChampionMastery[]>(
     REGIONS[region].platform,
     `/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=${count}`,

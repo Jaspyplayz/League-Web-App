@@ -181,4 +181,8 @@ export type ChampionMastery = {
   championLevel: number;
   championPoints: number;
   lastPlayTime: number; // ms since 1970
+  // Marks (the little pips) earned toward the next level, and how many it
+  // takes. Riot only sends these for levels that need marks.
+  tokensEarned?: number;
+  markRequiredForNextLevel?: number;
 };

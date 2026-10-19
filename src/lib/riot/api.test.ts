@@ -47,11 +47,11 @@ describe("getPlatformStatus", () => {
 });
 
 describe("getTopMasteries", () => {
-  it("asks for the player's top five champions", async () => {
+  it("asks for the player's top four champions", async () => {
     fetchMock.mockResolvedValueOnce(new Response("[]"));
     await getTopMasteries("na", "abc");
     expect(String(fetchMock.mock.calls[0][0])).toBe(
-      "https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/abc/top?count=5",
+      "https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/abc/top?count=4",
     );
   });
 });
