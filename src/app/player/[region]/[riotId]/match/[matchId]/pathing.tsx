@@ -1,32 +1,21 @@
-import { PanelHeading } from "@/components/ui/panel-heading";
+import { SubHeading } from "@/components/ui/panel-heading";
 import { listNames, plural } from "@/lib/analyzer/format";
 import { LANES, type LaneTone } from "@/lib/analyzer/jungle-replay";
 import { PATHING_FROM_MINUTE, PATHING_TO_MINUTE, type Pathing } from "@/lib/analyzer/pathing";
 import { LegendSwatch } from "./legend-swatch";
-import { panelClass } from "@/components/ui/panel";
 
-// Early pathing for junglers: a grid with one row per lane and one column per
-// minute from 3:00 to 14:00. Each cell is tinted by how that lane was doing,
-// and a dot marks the lane you were playing near. It shows where you spent
-// your early game next to where the leads were, without grading it.
+// Early pathing for junglers, the left half of the "Early jungle" panel: a
+// grid with one row per lane and one column per minute from 3:00 to 14:00.
+// Each cell is tinted by how that lane was doing, and a dot marks the lane
+// you were playing near. It shows where you spent your early game next to
+// where the leads were, without grading it.
 export function PathingGrid({ pathing }: { pathing: Pathing }) {
   const { minutes } = pathing;
   if (minutes.length === 0) return null;
 
   return (
-    <section
-      aria-labelledby="pathing-heading"
-      className={`${panelClass} flex flex-col gap-[18px] p-6`}
-    >
-      <div className="flex flex-col gap-1.5">
-        <PanelHeading id="pathing-heading">Early pathing</PanelHeading>
-        <p className="text-[15px] text-ink-soft">{summary(pathing)}</p>
-        <p className="text-sm text-muted">
-          Which lane you were playing near each minute, against how each lane was doing (gold + XP).
-          Jungle and river count toward the lane on the same side of the map.
-        </p>
-      </div>
-
+    <div className="flex min-w-0 flex-col gap-3">
+      <SubHeading>Early pathing</SubHeading>
       {/* On phones the grid keeps a readable size and scrolls sideways.
           "relative" keeps the screen-reader-only labels inside the scrolling
           box; otherwise they'd stretch the whole page sideways. */}
@@ -86,9 +75,14 @@ export function PathingGrid({ pathing }: { pathing: Pathing }) {
           You were near this lane
         </span>
       </div>
-    </section>
+    </div>
   );
 }
+
+// What the grid shows, behind "How to read this".
+export const PATHING_HELP =
+  "The grid shows which lane you were playing near each minute, against how each lane was " +
+  "doing (gold + XP). Jungle and river count toward the lane on the same side of the map.";
 
 const CELL_COLOR: Record<LaneTone, string> = {
   ahead: "bg-ahead/35",
@@ -97,7 +91,12 @@ const CELL_COLOR: Record<LaneTone, string> = {
 };
 
 // "From 3:00 to 14:00 you spent 7 minutes near lanes that were ahead,
-// 3 minutes near lanes that were behind and 1 minute near even lanes."
+// 3 minutes near lanes that were behind and 1 minute near even lanes." Null
+// without any minutes to describe.
+export function pathingSummary(pathing: Pathing): string | null {
+  return pathing.minutes.length > 0 ? summary(pathing) : null;
+}
+
 function summary({ minutes, nearAhead, nearBehind, nearEven }: Pathing): string {
   const last = minutes.at(-1)!.minute;
   const parts: string[] = [];
