@@ -417,3 +417,21 @@ export const matchRecaps = pgTable(
     index("match_recaps_created_by_idx").on(t.createdBy, t.createdAt),
   ],
 ).enableRLS();
+
+// Riot's rate limit, shared by every copy of the app (see
+// src/lib/riot/rate-limit-store.ts). Vercel runs several copies at once, and
+// each one only knows its own requests, so the count has to live somewhere
+// they all can see. One row per Riot host ("na1", "americas").
+export const riotRateLimits = pgTable("riot_rate_limits", {
+  host: text("host").primaryKey(),
+  // A WindowCount[] (src/lib/riot/rate-limit.ts): for each of Riot's limits,
+  // when the current window began (milliseconds) and how many requests it
+  // has used.
+  windows: jsonb("windows")
+    .$type<{ start: number; count: number }[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  // Set when Riot answers "too many requests": nobody calls this host
+  // before then.
+  cooldownUntil: timestamptz("cooldown_until"),
+}).enableRLS();
