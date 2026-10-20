@@ -173,7 +173,7 @@ open a match
 
 ## Proposed build order for the analyzer
 
-1. Save 3 to 5 real match + timeline JSON files as test fixtures (one per role, plus a remake). Four real games now live in [src/lib/analyzer/fixtures/](../src/lib/analyzer/fixtures/README.md), checked by `golden.test.ts`.
+1. Save 3 to 5 real match + timeline JSON files as test fixtures (one per role, plus a remake). Four real games now live in [src/lib/analyzer/fixtures/](../src/lib/analyzer/fixtures/README.md), checked by `golden.test.ts`; the three long enough to analyze are all seen from a jungler, so the other roles still need a real game each.
 2. Write the pure analyzer functions with Vitest tests: lane opponent, diff series, @10/@15, death labels, turning points.
 3. Timeline fetching, trimming and storage.
 4. Match detail UI: the chart, snapshot and turning points.

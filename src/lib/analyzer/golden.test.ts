@@ -39,8 +39,8 @@ function goldLead(snapshot: Snapshot | null): number | null {
   return snapshot ? snapshot.you.gold - snapshot.opponent.gold : null;
 }
 
-// The turning points as the match page shows them: the stretch of game clock
-// each one covers, and who gained gold in it.
+// Each turning point as the stretch of game clock it covers, and who gained
+// gold in it.
 function windows(analysis: MatchAnalysis) {
   return analysis.turningPoints.map((p) => ({
     from: formatClock(p.startMs),
@@ -138,4 +138,52 @@ describe("remake", () => {
   it("is too short to analyze", () => {
     expect(isAnalyzable(remakeGame.match as Match)).toBe(false);
   });
+});
+
+describe("anonymized", () => {
+  // The repo is public, so no fixture may point at a real player or game.
+  // These are the fields fixtures/README.md says were replaced, read from the
+  // files as they are, including ones the site's Match type leaves out.
+  type SavedIds = {
+    metadata: { matchId: string; participants: string[] };
+    info: {
+      gameId: number;
+      gameName: string;
+      gameCreation: number;
+      participants: {
+        participantId: number;
+        puuid: string;
+        riotIdGameName: string;
+        riotIdTagline: string;
+        summonerName: string;
+        summonerId: string;
+        profileIcon: number;
+        summonerLevel: number;
+      }[];
+    };
+  };
+  const fixtures = { stomp: stompGame, comeback: comebackGame, close: closeGame, remake: remakeGame };
+
+  for (const [name, game] of Object.entries(fixtures)) {
+    it(`leaves no real names or IDs in ${name}.json`, () => {
+      const { metadata, info } = game.match as SavedIds;
+      expect(metadata.matchId).toMatch(/^GOLDEN_[A-Z]+$/);
+      expect(info.gameId).toBe(0);
+      expect(info.gameName).toBe("");
+      expect(info.gameCreation).toBe(Date.UTC(2026, 0, 1));
+      expect(metadata.participants).toEqual(
+        info.participants.map((p) => `golden-player-${p.participantId}`),
+      );
+      for (const p of info.participants) {
+        expect(p.puuid).toBe(`golden-player-${p.participantId}`);
+        expect(p.riotIdGameName).toBe(`Player ${p.participantId}`);
+        expect(p.riotIdTagline).toBe("GOLD");
+        expect([p.summonerName, p.summonerId]).toEqual(["", ""]);
+        expect([p.profileIcon, p.summonerLevel]).toEqual([0, 0]);
+      }
+      // A real PUUID is 78 letters, digits, - and _. Nothing that long is
+      // left anywhere in the file, timeline included.
+      expect(JSON.stringify(game)).not.toMatch(/[\w-]{78}/);
+    });
+  }
 });
