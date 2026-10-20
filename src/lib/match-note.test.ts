@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanNote, MAX_NOTE_LENGTH } from "./match-note";
+import { cleanNote, MAX_NOTE_LENGTH, withNoteLine } from "./match-note";
 
 describe("cleanNote", () => {
   it("trims the note and keeps line breaks", () => {
@@ -29,5 +29,19 @@ describe("cleanNote", () => {
 
   it.each([null, undefined, 42, {}])("rejects %j", (value) => {
     expect(cleanNote(value)).toEqual({ ok: false });
+  });
+});
+
+describe("withNoteLine", () => {
+  it("adds the line on a line of its own", () => {
+    expect(withNoteLine("", "12:31 Won a fight 3 for 1: ")).toBe("12:31 Won a fight 3 for 1: ");
+    expect(withNoteLine("Ward river\n\n", "4:50 Your team took Dragon: ")).toBe(
+      "Ward river\n4:50 Your team took Dragon: ",
+    );
+  });
+
+  it("leaves the note alone when the line wouldn't fit", () => {
+    const full = "a".repeat(MAX_NOTE_LENGTH - 5);
+    expect(withNoteLine(full, "12:31 Won a fight: ")).toBe(full);
   });
 });

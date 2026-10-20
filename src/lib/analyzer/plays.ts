@@ -171,6 +171,12 @@ function chanceReader(
 
 export type Grade = "Great" | "Good" | "Even" | "Inaccuracy" | "Mistake";
 
+// Where the replay jumps to for a play: the first whole second of it, so the
+// clock, scoreboard and win chance all count its first event.
+export function playStart(play: Pick<Play, "from">): number {
+  return Math.ceil(play.from / 1000) * 1000;
+}
+
 // How much a play moved your team's chance, in points, to one decimal: 7.6
 // when it went from 52.0% to 59.6%.
 export function playSwing(play: Pick<Play, "before" | "after">): number {

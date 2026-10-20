@@ -5,6 +5,7 @@ import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
 import type { PhaseRating } from "@/lib/analyzer/phase-score";
 import type { ReplayChances } from "@/lib/analyzer/plays";
+import { reviewMoments } from "@/lib/analyzer/review";
 import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
 import {
   championIconUrl,
@@ -16,6 +17,7 @@ import {
 import { scoreGame } from "@/lib/game-score";
 import type { Region } from "@/lib/regions";
 import type { Match } from "@/lib/riot/types";
+import { supabaseConfig } from "@/lib/supabase/config";
 import type { MatchWinChance } from "@/lib/win-chance";
 import { AnalysisTabs } from "./analysis-tabs";
 import { Deaths } from "./deaths";
@@ -25,6 +27,7 @@ import { Matchup } from "./match-header";
 import { PathingGrid } from "./pathing";
 import { PhaseRatings } from "./phase-ratings";
 import { Replay } from "./replay";
+import { Review } from "./review";
 import type { ItemInfo, ReplayPerson } from "./replay-scoreboard";
 import { Scoreboard } from "./scoreboard";
 import { SnapshotTiles } from "./snapshot-tiles";
@@ -34,9 +37,9 @@ import { WinChance } from "./win-chance";
 
 // Everything below the match header, once the match has been analyzed, in
 // two tabs so the vital part comes first (Jasper's order, 2026-10-19):
-// - Summary: the scoreboard, you vs your opponent, your early, mid, late and
-//   overall ratings, the lead chart with turning points, your team's win
-//   chance, the recap and your notes.
+// - Summary: the scoreboard, the 60-second review, you vs your opponent,
+//   your early, mid, late and overall ratings, the lead chart with turning
+//   points, your team's win chance, the recap and your notes.
 // - Deep dive: @10 and @15 stats, team gold with objectives, deaths, the
 //   replay (beta, with the tempo timeline for junglers) and, for junglers,
 //   early pathing and early ganks.
@@ -72,6 +75,9 @@ export function AnalysisSections({
   const { participants } = match.info;
   const byId = new Map(participants.map((p) => [p.participantId, p]));
   const name = (id: number) => label(byId.get(id)?.championName ?? "Someone");
+  const names = Object.fromEntries(
+    participants.map((p) => [p.participantId, label(p.championName)]),
+  );
   const markers: TurningPointMarker[] = a.turningPoints.map((p) => ({
     minute: p.timestamp / 60_000,
     label: `${formatClock(p.timestamp)} ${p.title}`,
@@ -87,6 +93,15 @@ export function AnalysisSections({
         meId={a.me.participantId}
         opponentId={a.opponent?.participantId ?? null}
       />
+
+      {/* "Add to notes" only when there's a notes box, which needs sign-in
+          to be set up. */}
+      {chances && (
+        <Review
+          moments={reviewMoments(chances, a.replay, a.me.participantId, names, a.tempo)}
+          notes={supabaseConfig() !== null}
+        />
+      )}
 
       <Matchup
         dd={dd}

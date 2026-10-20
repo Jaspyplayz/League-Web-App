@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { saveMatchNoteAction } from "@/app/account/actions";
-import { MAX_NOTE_LENGTH, type SaveNoteResult } from "@/lib/match-note";
+import { MAX_NOTE_LENGTH, withNoteLine, type SaveNoteResult } from "@/lib/match-note";
+import { useReviewLinks } from "./review-links";
 
 type Props = { region: string; matchId: string; savedText: string };
 
@@ -15,6 +16,16 @@ export function NotesForm({ region, matchId, savedText }: Props) {
   const [result, setResult] = useState<SaveNoteResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const unchanged = text.trim() === saved.trim();
+
+  // "Add to notes" in the 60-second review adds a line to the box. Checking
+  // against the last request seen while drawing, rather than in an effect,
+  // is React's way to react to a changed prop or context.
+  const noteRequest = useReviewLinks()?.noteRequest ?? null;
+  const [seenRequest, setSeenRequest] = useState(noteRequest);
+  if (noteRequest !== seenRequest) {
+    setSeenRequest(noteRequest);
+    if (noteRequest) setText((current) => withNoteLine(current, noteRequest.line));
+  }
 
   function save(event: React.FormEvent) {
     event.preventDefault();

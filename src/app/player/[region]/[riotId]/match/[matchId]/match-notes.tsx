@@ -27,7 +27,7 @@ async function Notes({ region, matchId }: Props) {
 
   return (
     <Panel className="flex flex-col gap-3 p-6">
-      <PanelHeading>Your notes</PanelHeading>
+      <PanelHeading id="notes-heading">Your notes</PanelHeading>
       {user ? (
         <NotesForm
           region={region}
