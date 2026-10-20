@@ -3,10 +3,12 @@
 // The replay (beta): the whole game on one timeline you can drag or play,
 // with the map and scoreboard at that second under it, so you can see where
 // every champion was and each player's level, kills, CS, gold and items at
-// any moment. Above them, your team's chance to win at that second, and
-// under them every play of the game, graded by how much it changed that
+// any moment. Above them, your team's chance to win at that second; under the
+// timeline, a play bar with the controls and the play the replay is on; and
+// beside the map every play of the game, graded by how much it changed that
 // chance (replay-plays.tsx). For junglers it adds the tempo strip and why
-// each moment got its call (tempo.tsx). How the numbers are worked out is in
+// each moment got its call (tempo.tsx). What the colors and marks mean sits
+// behind "How to read this", so the replay itself comes first. How the numbers are worked out is in
 // src/lib/analyzer/replay.ts, positions.ts, plays.ts and docs/replay.md.
 //
 // It's a Client Component so moving through the game doesn't reload the
@@ -28,7 +30,15 @@ import {
 import type { TempoTimeline } from "@/lib/analyzer/tempo";
 import { LegendSwatch } from "./legend-swatch";
 import { ReplayMap } from "./replay-map";
-import { ChanceRow, PlayMarks, ReplayPlays } from "./replay-plays";
+import {
+  ChanceRow,
+  GradeNote,
+  PlayDetails,
+  playAt,
+  PlayMarks,
+  PlayNow,
+  ReplayPlays,
+} from "./replay-plays";
 import { ReplayScoreboard, type ItemInfo, type ReplayPerson } from "./replay-scoreboard";
 import { useReviewLinks } from "./review-links";
 import { StepButton } from "./step-button";
@@ -85,6 +95,7 @@ export function Replay({
   const [t, setT] = useState(() => (runs ? openingMoment(runs, end) : (kills[0]?.timestamp ?? 0)));
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(30);
+  const [help, setHelp] = useState(false);
   const track = useRef<HTMLDivElement>(null);
 
   // While playing, move the clock forward and stop at the end.
@@ -134,6 +145,7 @@ export function Replay({
   const chance = chances
     ? chances.perSecond[Math.min(chances.perSecond.length - 1, Math.ceil(t / 1000))] / 1000
     : null;
+  const current = plays ? playAt(plays, t) : undefined;
   const previousStop = stops.findLast((s) => s < t);
   const nextStop = stops.find((s) => s > t);
 
@@ -196,36 +208,99 @@ export function Replay({
       : "") +
     (chance !== null ? `, ${percent(chance)} chance to win` : "");
 
+  const scoreboard = (
+    <ReplayScoreboard
+      board={board}
+      t={t}
+      people={people}
+      items={items}
+      roleSlot={replay.players.some((p) => p.items?.some((change) => change.roleItem > 0))}
+      myTeamId={myTeamId}
+      winningTeamId={winningTeamId}
+    />
+  );
+  const map = (
+    <ReplayMap board={board} t={t} people={people} kills={kills} myTeamId={myTeamId} mapUrl={mapUrl} />
+  );
+
   return (
     <section aria-labelledby="replay-heading" className={`${panelClass} flex flex-col gap-[18px] p-6`}>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <PanelHeading id="replay-heading">Replay</PanelHeading>
           <span className="rounded-full border border-line-strong px-2.5 py-0.5 font-mono text-label uppercase tracking-[0.12em] text-faint">
             Beta
           </span>
         </div>
-        <p className="text-sm text-muted">
+        <button
+          type="button"
+          aria-expanded={help}
+          aria-controls="replay-help"
+          onClick={() => setHelp((open) => !open)}
+          className="flex min-h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-note text-muted hover:text-ink"
+        >
+          How to read this
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className={help ? "rotate-180" : ""}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+
+      {/* What the replay shows and what its colors and marks mean: everything
+          that used to sit above the timeline, kept one click away. */}
+      <div
+        id="replay-help"
+        hidden={!help}
+        className="flex flex-col gap-3 rounded-[12px] border border-line p-4 text-note text-muted"
+      >
+        <p className="text-sm">
           The whole game, second by second. Drag along the timeline or press play, and the map
           shows where every champion was at that moment, and the scoreboard their level, kills, CS,
           gold and items.
           {chances
-            ? " The line on top is your team's chance to win, and the plays under the scoreboard are graded by how much each one moved it."
+            ? " The line on top is your team's chance to win, and the bar under the timeline shows the play the replay is on, graded by how much it moved that chance."
             : ""}
           {tempo ? " The tempo strip shows which jungler had the time advantage." : ""}
         </p>
-      </div>
-
-      <div className="flex flex-wrap gap-x-[18px] gap-y-2 text-note text-muted">
-        {chances && (
-          <>
-            <LegendSwatch className="bg-ahead/40">Your team favored</LegendSwatch>
-            <LegendSwatch className="bg-behind/40">Enemy team favored</LegendSwatch>
-          </>
-        )}
-        <LegendSwatch className="bg-ahead">Kill by your team</LegendSwatch>
-        <LegendSwatch className="bg-behind">Kill by the enemy team</LegendSwatch>
-        {tempo && <TempoLegend them={them} />}
+        <div className="flex flex-wrap gap-x-[18px] gap-y-2">
+          {chances && (
+            <>
+              <LegendSwatch className="bg-ahead/40">Your team favored</LegendSwatch>
+              <LegendSwatch className="bg-behind/40">Enemy team favored</LegendSwatch>
+            </>
+          )}
+          <LegendSwatch className="bg-ahead">Kill by your team</LegendSwatch>
+          <LegendSwatch className="bg-behind">Kill by the enemy team</LegendSwatch>
+          {tempo && <TempoLegend them={them} />}
+        </div>
+        <p>
+          {chances
+            ? "Each dot under the win chance line is a play: blue when it raised your team's chance, red when it lowered it, grey when it barely moved it, bigger the more it moved, and square when it took an objective. "
+            : ""}
+          Letters mark the epic monsters each team took (D dragon, E Elder, G grubs, H Herald, B
+          Baron, A Atakhan), in blue for your team and red for the enemy&apos;s, and ticks mark the
+          kills. {runs ? tempoNote(runs, them) : ""}
+        </p>
+        {chances && <GradeNote />}
+        <p>
+          Riot logs kills, deaths, level-ups and items to the second, but positions, gold and CS
+          only once a minute, so between those snapshots they&apos;re estimates.{" "}
+          <a href={docsHref} className="text-ahead-soft hover:text-ahead-bright">
+            How the replay is worked out
+          </a>
+          .
+        </p>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -306,119 +381,117 @@ export function Replay({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
-            <StepButton
-              label={`Previous ${stopName}`}
-              disabled={previousStop === undefined}
-              onClick={() => moveTo(previousStop ?? 0)}
-            >
-              <path d="M15 6l-6 6 6 6" />
-            </StepButton>
-            <StepButton label={playing ? "Pause" : "Play"} onClick={play}>
-              {playing ? <path d="M9 6v12M15 6v12" /> : <path d="M8 5l11 7-11 7z" />}
-            </StepButton>
-            <StepButton
-              label={`Next ${stopName}`}
-              disabled={nextStop === undefined}
-              onClick={() => moveTo(nextStop ?? end)}
-            >
-              <path d="M9 6l6 6-6 6" />
-            </StepButton>
-            <span className="ml-2 whitespace-nowrap font-mono text-sm text-muted">
-              {formatClock(t)} / {formatClock(end)}
-            </span>
-            {chance !== null && (
-              <span className="ml-3 whitespace-nowrap text-sm text-muted">
-                Your team&apos;s chance to win{" "}
-                <span
-                  className={`font-mono font-semibold ${
-                    chance > 0.5 ? "text-ahead-soft" : chance < 0.5 ? "text-behind" : "text-ink"
-                  }`}
-                >
-                  {percent(chance)}
-                </span>
-              </span>
-            )}
-          </div>
-          <div
-            role="group"
-            aria-label="Playback speed"
-            className="inline-flex overflow-hidden rounded-lg border border-line-strong text-note"
-          >
-            {SPEEDS.map((x) => (
-              <button
-                key={x}
-                type="button"
-                aria-pressed={speed === x}
-                onClick={() => setSpeed(x)}
-                className={`px-3 py-1.5 font-mono ${
-                  speed === x ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
-                }`}
-              >
-                {x}×
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-      <p className="text-note text-faint">
-        {chances
-          ? "Each dot under the win chance line is a play: blue when it raised your team's chance, red when it lowered it, grey when it barely moved it, bigger the more it moved, and square when it took an objective. "
-          : ""}
-        Letters mark the epic monsters each team took (D dragon, E Elder, G grubs, H Herald, B
-        Baron, A Atakhan), in blue for your team and red for the enemy&apos;s, and ticks mark the
-        kills. {runs ? tempoNote(runs, them) : ""}
-      </p>
 
-      {/* The map beside the scoreboard when both fit, above it otherwise. */}
-      <div className="flex flex-wrap items-start gap-6">
-        <ReplayMap
-          board={board}
-          t={t}
-          people={people}
-          kills={kills}
-          myTeamId={myTeamId}
-          mapUrl={mapUrl}
-        />
-        <div className="min-w-0 flex-[1_1_560px]">
-          <ReplayScoreboard
-            board={board}
-            t={t}
-            people={people}
-            items={items}
-            roleSlot={replay.players.some((p) => p.items?.some((change) => change.roleItem > 0))}
-            myTeamId={myTeamId}
-            winningTeamId={winningTeamId}
-          />
+        {/* The play bar: the controls, the play the replay is on and your
+            team's chance to win, with what happened in the play under it. */}
+        <div className="flex flex-col rounded-[12px] border border-line-strong bg-surface-hover">
+          <div className="flex flex-wrap items-center gap-x-[18px] gap-y-3 px-3.5 py-3">
+            <div className="flex items-center gap-1.5">
+              <StepButton
+                label={`Previous ${stopName}`}
+                disabled={previousStop === undefined}
+                onClick={() => moveTo(previousStop ?? 0)}
+              >
+                <path d="M15 6l-6 6 6 6" />
+              </StepButton>
+              <button
+                type="button"
+                aria-label={playing ? "Pause" : "Play"}
+                title={playing ? "Pause" : "Play"}
+                onClick={play}
+                className="flex size-12 items-center justify-center rounded-full bg-ahead text-page transition-colors hover:bg-ahead-soft"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  {playing ? (
+                    <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
+                  ) : (
+                    <path d="M8 5l11 7-11 7z" />
+                  )}
+                </svg>
+              </button>
+              <StepButton
+                label={`Next ${stopName}`}
+                disabled={nextStop === undefined}
+                onClick={() => moveTo(nextStop ?? end)}
+              >
+                <path d="M9 6l6 6-6 6" />
+              </StepButton>
+              <span className="ml-1.5 whitespace-nowrap font-mono text-sm text-ink-soft">
+                {formatClock(t)} <span className="text-faint">/ {formatClock(end)}</span>
+              </span>
+            </div>
+            {plays && <PlayNow plays={plays} play={current} replay={replay} names={names} />}
+            <div className="ml-auto flex items-center gap-3.5">
+              {chance !== null && (
+                <div className="flex flex-col items-end">
+                  <span className="font-mono text-label uppercase tracking-[0.12em] text-faint">
+                    <span className="sr-only">Your team&apos;s </span>Win chance
+                  </span>
+                  <span
+                    className={`font-mono text-[22px] font-medium leading-tight ${
+                      chance > 0.5 ? "text-ahead-soft" : chance < 0.5 ? "text-behind" : "text-ink"
+                    }`}
+                  >
+                    {percent(chance)}
+                  </span>
+                </div>
+              )}
+              <div
+                role="group"
+                aria-label="Playback speed"
+                className="inline-flex overflow-hidden rounded-lg border border-line-strong text-note"
+              >
+                {SPEEDS.map((x) => (
+                  <button
+                    key={x}
+                    type="button"
+                    aria-pressed={speed === x}
+                    onClick={() => setSpeed(x)}
+                    className={`px-2.5 py-1.5 font-mono ${
+                      speed === x ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {x}×
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {current && (
+            <PlayDetails play={current} replay={replay} names={names} tempo={tempo} them={them} />
+          )}
         </div>
       </div>
+
+      {chances ? (
+        <>
+          {/* The map with the plays beside it when both fit, above them
+              otherwise, and the scoreboard across the whole width. */}
+          <div className="flex flex-wrap items-start gap-6">
+            {map}
+            <ReplayPlays
+              chances={chances}
+              replay={replay}
+              names={names}
+              t={t}
+              onPick={moveTo}
+              request={replayRequest}
+            />
+          </div>
+          {scoreboard}
+        </>
+      ) : (
+        // Without plays, the map beside the scoreboard when both fit, above
+        // it otherwise.
+        <div className="flex flex-wrap items-start gap-6">
+          {map}
+          <div className="min-w-0 flex-[1_1_560px]">{scoreboard}</div>
+        </div>
+      )}
 
       {tempo && (
         <TempoReadout tempo={tempo} t={t} names={names} myTeamId={myTeamId} docsHref={tempoDocsHref} />
       )}
-
-      {chances && (
-        <ReplayPlays
-          chances={chances}
-          replay={replay}
-          names={names}
-          t={t}
-          onPick={moveTo}
-          request={replayRequest}
-          tempo={tempo}
-          them={them}
-        />
-      )}
-
-      <p className="text-note text-faint">
-        Riot logs kills, deaths, level-ups and items to the second, but positions, gold and CS only
-        once a minute, so between those snapshots they&apos;re estimates.{" "}
-        <a href={docsHref} className="text-ahead-soft hover:text-ahead-bright">
-          How the replay is worked out
-        </a>
-        .
-      </p>
     </section>
   );
 }
