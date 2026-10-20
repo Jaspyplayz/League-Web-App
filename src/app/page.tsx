@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { DiffChart, type TurningPointMarker } from "@/components/diff-chart";
-import { SavedPlayers } from "@/components/saved-players";
 import { SearchForm } from "@/components/search-form";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Panel } from "@/components/ui/panel";
@@ -71,7 +70,6 @@ export default function Home() {
               See a sample analysis
             </Link>
           </div>
-          <SavedPlayers />
         </div>
 
         <Panel className="flex min-w-0 flex-[1_1_440px] flex-col gap-4 p-6">

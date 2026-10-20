@@ -92,7 +92,7 @@ export function hasPlayer(list: SavedPlayer[], player: SavedPlayer): boolean {
 }
 
 // The star button: pins the player, or unpins them if they're already pinned.
-// New pins go at the end, so the pinned row keeps the order you built it in.
+// New pins go at the end, so the Pinned list keeps the order you built it in.
 // Once the list is full, nothing more is pinned until you unpin someone;
 // quietly dropping an older pin would be a surprise.
 export function togglePinnedPlayer(list: SavedPlayer[], player: SavedPlayer): SavedPlayer[] {
