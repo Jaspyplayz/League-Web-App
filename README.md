@@ -113,6 +113,7 @@ Everything runs on free tiers.
 ```mermaid
 flowchart LR
     U[Browser] -->|search Riot ID| N
+    AI[Claude and other<br/>AI apps] -->|MCP, /api/mcp| N
 
     subgraph V[Vercel]
         N[Next.js app<br/>server components<br/>and server actions]
@@ -127,6 +128,7 @@ flowchart LR
     N <-->|Google and<br/>Discord sign-in| AU[Supabase Auth]
     T[Training scripts<br/>npm run train-*] -->|saved games| DB
     T -->|model weights<br/>JSON| A
+    N -->|AI recaps| CL[Claude API]
     N -.->|errors| S[Sentry]
     N -.->|champion and<br/>item images| DD[Data Dragon CDN]
 ```
@@ -140,7 +142,7 @@ flowchart LR
 - **Analysis is recomputed, not stored.** The analyzer runs on the stored match every time, so improving it never means refetching anything from Riot.
 - **Models ship as JSON.** Training runs offline from a script; the site only loads the learned weights, so a prediction is a few multiplications.
 
-The data model and the reasoning behind each choice are in [docs/SCOPE.md](docs/SCOPE.md).
+**[ARCHITECTURE.md](ARCHITECTURE.md)** walks through what happens when you open a match, the caching rules, how Turnpoint stays inside Riot's rate limit, and its known limits. The data model and the reasoning behind each choice are in [docs/SCOPE.md](docs/SCOPE.md).
 
 ## Project structure
 
