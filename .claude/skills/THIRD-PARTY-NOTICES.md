@@ -1,6 +1,6 @@
 # Third-party skills
 
-Eight skills in this folder come from other people's open-source repos. Jasper installed them on his computer with `npx skills add`, and they were copied here unchanged so that project threads in the Claude app, subagents such as the [reviewer](../agents/reviewer.md), and Claude Code on any computer can load them. Each folder still matches the `computedHash` recorded for it in the `skills-lock.json` on Jasper's computer. `explain-back` is Turnpoint's own.
+Eight skills in this folder come from other people's open-source repos. Jasper installed them on his computer with `npx skills add`, and they were copied here unchanged so that project threads in the Claude app, subagents such as the [reviewer](../agents/reviewer.md), and Claude Code on any computer can load them. Each folder still matches the `computedHash` recorded for it in the `skills-lock.json` on Jasper's computer, except that the Supabase skill's line endings were changed from Windows ones (CRLF) back to the LF its source repo uses, which makes it identical to the source file for file. `explain-back` is Turnpoint's own.
 
 | Skill | Source | License |
 |---|---|---|
