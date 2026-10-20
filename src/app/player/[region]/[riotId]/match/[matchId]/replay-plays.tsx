@@ -1,12 +1,13 @@
 // The replay's plays: every fight, epic monster and building of the game,
 // graded by how much it changed your team's chance to win (worked out in
-// src/lib/analyzer/plays.ts). Picking one moves the replay to it and shows
-// what happened. Also the two timeline rows that go with it: the win chance
-// line and a mark for each play.
+// src/lib/analyzer/plays.ts). The list sits beside the map, and the play the
+// replay is on shows in the play bar under the timeline, with what happened.
+// Also the two timeline rows that go with it: the win chance line and a mark
+// for each play.
 //
 // It's drawn inside the replay, a Client Component.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatClock, listNames } from "@/lib/analyzer/format";
 import {
   formatSwing,
@@ -101,6 +102,107 @@ export function PlayMarks({ plays, left }: { plays: Play[]; left: (ms: number) =
   );
 }
 
+// The play the replay is on or just past, or undefined before the first one.
+// The play bar shows it and the plays list highlights it.
+export function playAt(plays: Play[], t: number): Play | undefined {
+  return plays.findLast((play) => playStart(play) <= t);
+}
+
+// The middle of the replay's play bar: which play the replay is on, what it
+// was and its grade.
+export function PlayNow({
+  plays,
+  play,
+  replay,
+  names,
+}: {
+  plays: Play[];
+  // From playAt; undefined before the first play.
+  play: Play | undefined;
+  replay: ReplayData;
+  names: Record<number, string>;
+}) {
+  const swing = play ? playSwing(play) : 0;
+  const grade = gradeOf(swing);
+  return (
+    <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5 sm:border-l sm:border-line-strong sm:pl-[18px]">
+      <span className="font-mono text-label uppercase tracking-[0.12em] text-faint">
+        {play
+          ? `Play ${plays.indexOf(play) + 1} of ${plays.length}`
+          : `${plays.length} ${plays.length === 1 ? "play" : "plays"}`}
+      </span>
+      {play ? (
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-semibold text-ink">{playTitle(play, replay, names)}</span>
+          {play.mine && <YouTag />}
+          <span
+            className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-note font-semibold ${GRADE_CHIP[grade]}`}
+          >
+            {grade} {formatSwing(swing)}
+          </span>
+        </span>
+      ) : (
+        <span className="text-sm text-muted">
+          {plays.length > 0 ? `The first one is at ${formatClock(plays[0].from)}.` : "No plays this game."}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// What happened in the play, under the play bar: who killed whom and what was
+// taken, how far it moved your team's chance, and for junglers who was up
+// tempo just before it.
+export function PlayDetails({
+  play,
+  replay,
+  names,
+  tempo,
+  them,
+}: {
+  play: Play;
+  replay: ReplayData;
+  names: Record<number, string>;
+  // Null unless you played jungle.
+  tempo: TempoTimeline | null;
+  // The enemy jungler's champion.
+  them: string;
+}) {
+  const tone = tempo && stretchAt(tempo.stretches, play.from - 1)?.tone;
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-line-strong px-3.5 py-3 text-sm text-muted">
+      <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+        {playLines(play, replay, names).map((line, i) => (
+          <li key={i}>{line}</li>
+        ))}
+      </ul>
+      <p className="text-ink-soft">
+        Your team&apos;s chance to win went from {percent(play.before)} to {percent(play.after)}.
+        {tone === "ahead"
+          ? " You were up tempo just before it."
+          : tone === "behind"
+            ? ` ${them} was up tempo just before it.`
+            : tone
+              ? " Tempo was even just before it."
+              : ""}
+      </p>
+    </div>
+  );
+}
+
+// What the grades mean, for the replay's "How to read this".
+export function GradeNote() {
+  return (
+    <p>
+      Plays are every fight, epic monster and building, graded by how much each changed your
+      team&apos;s chance to win: Great from +4 points, Good from +1, Inaccuracy from −1 and Mistake
+      from −4. A grade shows what a play did to the game, not whether it was the right call.
+    </p>
+  );
+}
+
+// Every play of the game beside the map. Picking one moves the replay to it,
+// and the play bar above shows what happened.
 export function ReplayPlays({
   chances,
   replay,
@@ -108,8 +210,6 @@ export function ReplayPlays({
   t,
   onPick,
   request,
-  tempo,
-  them,
 }: {
   chances: ReplayChances;
   replay: ReplayData;
@@ -118,29 +218,32 @@ export function ReplayPlays({
   t: number;
   // Moves the replay's clock to a moment (ms).
   onPick: (ms: number) => void;
-  // The latest "Watch in replay" from the 60-second review, whose play opens
-  // here.
+  // The latest "Watch in replay" from the 60-second review. If its play is
+  // hidden by "Yours", the list goes back to all plays so it shows.
   request: ReplayRequest | null;
-  // Null unless you played jungle.
-  tempo: TempoTimeline | null;
-  // The enemy jungler's champion.
-  them: string;
 }) {
   const [yoursOnly, setYoursOnly] = useState(false);
-  const [open, setOpen] = useState<number | null>(null);
   const { plays } = chances;
   const [seenRequest, setSeenRequest] = useState(request);
   if (request !== seenRequest) {
     setSeenRequest(request);
-    const index = request ? plays.findIndex((play) => playStart(play) === request.ms) : -1;
-    if (index >= 0) {
-      setOpen(index);
-      if (!plays[index].mine) setYoursOnly(false);
-    }
+    const play = request ? plays.find((p) => playStart(p) === request.ms) : undefined;
+    if (play && !play.mine) setYoursOnly(false);
   }
   const shown = plays.filter((play) => !yoursOnly || play.mine);
-  // The play the replay is on or just past.
-  const current = shown.findLast((play) => playStart(play) <= t);
+  const current = playAt(plays, t);
+
+  // Keep the current play in sight as the replay moves, scrolling only the
+  // list, never the page.
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const box = list.current;
+    const row = box?.querySelector<HTMLElement>("[aria-current]");
+    if (!box || !row) return;
+    if (row.offsetTop < box.scrollTop) box.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > box.scrollTop + box.clientHeight)
+      box.scrollTop = row.offsetTop + row.offsetHeight - box.clientHeight;
+  }, [current, yoursOnly]);
 
   const counts = GRADES.flatMap((grade) => {
     const n = plays.filter((play) => play.mine && gradeOf(playSwing(play)) === grade).length;
@@ -149,74 +252,59 @@ export function ReplayPlays({
   const yours = plays.filter((play) => play.mine).length;
 
   return (
-    <section aria-labelledby="plays-heading" className="flex flex-col gap-4 border-t border-line pt-5">
-      <div className="flex flex-col gap-1.5">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <section aria-labelledby="plays-heading" className="flex min-w-0 flex-[1_1_340px] flex-col gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-col">
           <h3
             id="plays-heading"
             className="font-display text-[22px] font-bold uppercase leading-tight tracking-[0.01em]"
           >
             Plays
           </h3>
-          <div
-            role="group"
-            aria-label="Which plays"
-            className="inline-flex overflow-hidden rounded-lg border border-line-strong text-note"
-          >
-            {[false, true].map((mineOnly) => (
-              <button
-                key={String(mineOnly)}
-                type="button"
-                aria-pressed={yoursOnly === mineOnly}
-                onClick={() => setYoursOnly(mineOnly)}
-                className={`px-3 py-1.5 ${
-                  yoursOnly === mineOnly ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
-                }`}
-              >
-                {mineOnly ? "Yours" : "All"}
-              </button>
-            ))}
-          </div>
+          <p className="text-sm text-ink-soft">
+            {yours === 0
+              ? "You weren't in any of them."
+              : `Your ${yours === 1 ? "play" : `${yours} plays`}: ${listNames(counts)}.`}
+          </p>
         </div>
-        <p className="text-sm text-muted">
-          Every fight, epic monster and building, graded by how much it changed your team&apos;s
-          chance to win: Great from +4 points, Good from +1, Inaccuracy from −1 and Mistake from −4.
-          It shows what a play did to the game, not whether it was the right call.
-        </p>
-        <p className="text-sm text-ink-soft">
-          {yours === 0
-            ? "You weren't in any of them."
-            : `Your ${yours === 1 ? "play" : `${yours} plays`}: ${listNames(counts)}.`}
-        </p>
+        <div
+          role="group"
+          aria-label="Which plays"
+          className="inline-flex overflow-hidden rounded-lg border border-line-strong text-note"
+        >
+          {[false, true].map((mineOnly) => (
+            <button
+              key={String(mineOnly)}
+              type="button"
+              aria-pressed={yoursOnly === mineOnly}
+              onClick={() => setYoursOnly(mineOnly)}
+              className={`px-3 py-1.5 ${
+                yoursOnly === mineOnly ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
+              }`}
+            >
+              {mineOnly ? "Yours" : "All"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {shown.length === 0 ? (
         <p className="text-sm text-muted">No plays to show.</p>
       ) : (
-        <ol className="flex max-h-[28rem] flex-col gap-1 overflow-y-auto pr-1">
+        <ol ref={list} className="relative flex max-h-[30rem] flex-col gap-1 overflow-y-auto pr-1">
           {shown.map((play) => {
-            const index = plays.indexOf(play);
             const swing = playSwing(play);
             const grade = gradeOf(swing);
-            const isOpen = open === index;
-            const tone =
-              tempo && stretchAt(tempo.stretches, play.from - 1)?.tone;
+            const isCurrent = play === current;
             return (
-              <li
-                key={play.from}
-                className={`rounded-[10px] border ${
-                  play === current ? "border-line-strong" : "border-transparent"
-                } ${isOpen ? "bg-surface-hover" : ""}`}
-              >
+              <li key={play.from}>
                 <button
                   type="button"
-                  aria-expanded={isOpen}
-                  aria-controls={`play-${index}`}
-                  onClick={() => {
-                    setOpen(isOpen ? null : index);
-                    onPick(playStart(play));
-                  }}
-                  className="grid min-h-11 w-full grid-cols-[2.75rem_1.125rem_minmax(0,1fr)] items-start gap-2 rounded-[10px] px-2.5 py-2 text-left"
+                  aria-current={isCurrent ? "true" : undefined}
+                  onClick={() => onPick(playStart(play))}
+                  className={`grid min-h-11 w-full grid-cols-[2.75rem_1.125rem_minmax(0,1fr)] items-start gap-2 rounded-[10px] border px-2.5 py-2 text-left hover:bg-surface-hover ${
+                    isCurrent ? "border-line-strong bg-surface-hover" : "border-transparent"
+                  }`}
                 >
                   <span className="pt-0.5 font-mono text-note text-faint">{formatClock(play.from)}</span>
                   <span className="pt-0.5">
@@ -227,11 +315,7 @@ export function ReplayPlays({
                   <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                     <span className="text-sm text-ink">
                       {playTitle(play, replay, names)}
-                      {play.mine && (
-                        <span className="ml-1.5 inline-block rounded-[4px] border border-ahead px-1 align-[1px] font-mono text-[10px] uppercase leading-normal tracking-[0.08em] text-ahead-soft">
-                          You
-                        </span>
-                      )}
+                      {play.mine && <YouTag className="ml-1.5" />}
                     </span>
                     <span
                       className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-note font-semibold ${GRADE_CHIP[grade]}`}
@@ -240,34 +324,23 @@ export function ReplayPlays({
                     </span>
                   </span>
                 </button>
-                {isOpen && (
-                  <div id={`play-${index}`} className="flex flex-col gap-1.5 pb-3 pl-[4.25rem] pr-3 text-sm text-muted">
-                    <ul className="flex flex-col gap-1">
-                      {playLines(play, replay, names).map((line, i) => (
-                        <li key={i}>{line}</li>
-                      ))}
-                    </ul>
-                    <p className="text-ink-soft">
-                      Your team&apos;s chance to win went from {percent(play.before)} to{" "}
-                      {percent(play.after)}.
-                    </p>
-                    {tone && (
-                      <p>
-                        {tone === "ahead"
-                          ? "You were up tempo just before it."
-                          : tone === "behind"
-                            ? `${them} was up tempo just before it.`
-                            : "Tempo was even just before it."}
-                      </p>
-                    )}
-                  </div>
-                )}
               </li>
             );
           })}
         </ol>
       )}
     </section>
+  );
+}
+
+// Marks the plays you were in.
+function YouTag({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-block rounded-[4px] border border-ahead px-1 align-[1px] font-mono text-[10px] uppercase leading-normal tracking-[0.08em] text-ahead-soft ${className}`}
+    >
+      You
+    </span>
   );
 }
 
