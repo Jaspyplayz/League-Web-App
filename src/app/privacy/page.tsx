@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // same pull request.
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="October 16, 2026">
+    <LegalPage title="Privacy policy" updated="October 20, 2026">
       <p>
         Turnpoint is a free League of Legends stats site built by one student. This page
         explains what data it handles and why. The short version: accounts are optional, and
@@ -91,6 +91,17 @@ export default function PrivacyPage() {
         account details, Riot IDs or notes are sent. Anyone looking at that game sees the saved
         recap. Turnpoint also notes which account asked for each recap, only to limit how many
         one account can request a day.
+      </p>
+
+      <h2>Ask</h2>
+      <p>
+        If you ask a question on a player&apos;s Ask tab, Turnpoint sends your question, that
+        player&apos;s Riot ID and their game stats (the same ones shown on their match pages) to
+        Anthropic, which runs the Claude AI model, so it can write the answer. No account
+        details or notes are sent. Turnpoint saves your question, the answer and which games it read with
+        your account, so you can see them again; only you see them. It also counts your
+        questions, to limit how many one account can ask a day. Deleting your account deletes
+        your questions.
       </p>
 
       <h2>Stored in your browser</h2>

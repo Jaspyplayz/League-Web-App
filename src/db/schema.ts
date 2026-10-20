@@ -418,6 +418,37 @@ export const matchRecaps = pgTable(
   ],
 ).enableRLS();
 
+// Questions asked on a player's Ask tab and Claude's answers (see
+// src/lib/ask.ts). Private: only the account that asked sees them.
+export const askQuestions = pgTable(
+  "ask_questions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Deleting the account in Supabase Auth deletes its questions.
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    // The player the question was about.
+    puuid: text("puuid").notNull(),
+    question: text("question").notNull(),
+    // Null when Claude couldn't answer. The row is kept anyway, so the try
+    // still counts toward the day's questions and the month's budget.
+    answer: text("answer"),
+    // The games Claude read to answer, as AskGame[] (src/lib/ask-rules.ts),
+    // for the links under the answer.
+    games: jsonb("games").$type<{ matchId: string; label: string }[]>().notNull(),
+    // Which Claude model answered, and what it cost in millionths of a
+    // dollar, so the monthly budget (src/lib/ask-rules.ts) can add it up.
+    model: text("model").notNull(),
+    costMicros: integer("cost_micros").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("ask_questions_user_idx").on(t.userId, t.createdAt),
+    index("ask_questions_created_at_idx").on(t.createdAt),
+  ],
+).enableRLS();
+
 // Riot's rate limit, shared by every copy of the app (see
 // src/lib/riot/rate-limit-store.ts). Vercel runs several copies at once, and
 // each one only knows its own requests, so the count has to live somewhere
