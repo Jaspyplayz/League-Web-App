@@ -67,7 +67,17 @@ export async function recentGames(
 ): Promise<Answer<object>> {
   const account = await findAccount(region, riotId);
   if ("message" in account) return account;
+  return recentGamesFor(region, account, count, { origin });
+}
 
+// The same as recentGames, for a player already looked up. The Ask tab
+// (src/lib/ask.ts) uses it, so each question looks the Riot ID up only once.
+export async function recentGamesFor(
+  region: Region,
+  account: Account,
+  count: number,
+  { origin }: Links,
+): Promise<Answer<object>> {
   // The profile's saved list covers the latest 10 games at no Riot cost;
   // more than that needs one call for the longer list.
   const profile = await loadProfile(region, account);
@@ -94,14 +104,20 @@ export async function analyzeGame(
   { origin }: Links,
 ): Promise<Answer<object>> {
   // Checked before any Riot call, so a made-up ID costs nothing.
-  if (!isMatchIdFor(region, matchId)) {
-    return {
-      message: `${matchId} isn't a match ID from ${REGIONS[region].label}. Use one from recent_games.`,
-    };
-  }
+  if (!isMatchIdFor(region, matchId)) return wrongRegion(region, matchId);
   const account = await findAccount(region, riotId);
   if ("message" in account) return account;
+  return analyzeGameFor(region, account, matchId, { origin });
+}
 
+// The same as analyzeGame, for a player already looked up (see recentGamesFor).
+export async function analyzeGameFor(
+  region: Region,
+  account: Account,
+  matchId: string,
+  { origin }: Links,
+): Promise<Answer<object>> {
+  if (!isMatchIdFor(region, matchId)) return wrongRegion(region, matchId);
   const match = await loadMatch(region, matchId);
   if (!match.info.participants.some((p) => p.puuid === account.puuid)) {
     return { message: `${account.gameName}#${account.tagLine} didn't play in ${matchId}.` };
@@ -114,6 +130,12 @@ export async function analyzeGame(
     matchId,
     url: `${origin}${playerPath(region, account)}/match/${matchId}`,
     ...facts,
+  };
+}
+
+function wrongRegion(region: Region, matchId: string) {
+  return {
+    message: `${matchId} isn't a match ID from ${REGIONS[region].label}. Use one from recent_games.`,
   };
 }
 

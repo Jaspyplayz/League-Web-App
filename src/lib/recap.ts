@@ -3,9 +3,9 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { RecapFacts } from "@/lib/analyzer/recap-facts";
 
-// Writes a short recap of one game with Claude. This is the only file that
-// talks to the language model, so switching to another provider means
-// changing just this file.
+// Writes a short recap of one game with Claude. This file and src/lib/ask.ts
+// (the Ask tab) are the only ones that talk to the language model, so
+// switching recaps to another provider means changing just this file.
 //
 // Claude Haiku is the smallest, cheapest Claude model: a recap is about 5,000
 // tokens in and a few hundred out, well under a tenth of a cent. Each recap is

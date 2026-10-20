@@ -16,7 +16,7 @@ The browser never sends any facts: the action only says which game and which pla
 - **The model only writes words.** The numbers come from tested code, which keeps the recap accurate and each request small.
 - **Cost.** About 5,000 tokens in and a few hundred out, which is well under a tenth of a cent per game on Haiku. Recaps are written only when someone clicks, and saved forever.
 - **Abuse.** Only signed-in accounts can write recaps, at most 20 per account per day (`RECAPS_PER_DAY`). Set a monthly spend limit in the Anthropic console as a second guard.
-- **Swappable.** `src/lib/recap.ts` is the only file that talks to the model, so trying another provider means changing one file.
+- **Swappable.** `src/lib/recap.ts` is the only recap file that talks to the model, so trying another provider for recaps means changing one file. (The Ask tab has its own, `src/lib/ask.ts`; see [ask.md](ask.md).)
 
 ## Setup
 

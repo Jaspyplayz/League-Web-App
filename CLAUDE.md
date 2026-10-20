@@ -22,12 +22,13 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Habits (level 6 first, first scuttles, early ganks and first back on Insights, with how often games with them were won): [docs/habits.md](docs/habits.md)
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Replay (beta: the whole game second by second, with every player's items and spot on the map, every play graded by the win chance, and the checks behind them): [docs/replay.md](docs/replay.md)
+- Ask (signed-in players ask Claude about a player's games; Claude reads them with the MCP tools, 10 questions a day, $20 a month for the site): [docs/ask.md](docs/ask.md)
 - MCP server (Claude and other AI apps can look players up and read the analyzer's results at `/api/mcp`): [docs/mcp.md](docs/mcp.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 
 ## Stack
 
-Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Drizzle ORM, Riot Games API, Claude API (Haiku, for recaps), Sentry, Vitest, GitHub Actions, Vercel. Node 22, pinned in `.nvmrc` and `package.json` `engines`.
+Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Drizzle ORM, Riot Games API, Claude API (Haiku for recaps, Sonnet for Ask), Sentry, Vitest, GitHub Actions, Vercel. Node 22, pinned in `.nvmrc` and `package.json` `engines`.
 
 ## Layout
 
@@ -61,7 +62,8 @@ src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and 
                   each save also adds changed ranks to rank_history for the LP graph
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
-src/lib/recap.ts  The only Claude API call (AI match recaps); recap-store.ts saves them
+src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
+src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves answers, ask-rules.ts the caps
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
 scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, train-phase-score, tempo study, item check)

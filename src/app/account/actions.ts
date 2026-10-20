@@ -1,6 +1,9 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { askEnabled } from "@/lib/ask";
+import { cleanQuestion } from "@/lib/ask-rules";
+import { ask, type AskOutcome } from "@/lib/ask-store";
 import { getCurrentUser } from "@/lib/auth";
 import { isDayKey } from "@/lib/daily-log";
 import { writeDayNote } from "@/lib/day-note-store";
@@ -10,6 +13,9 @@ import { forgetMyPlayer, readMyPlayer, saveMyPlayer } from "@/lib/my-player";
 import { recapsEnabled } from "@/lib/recap";
 import { createRecap, type CreateRecapResult } from "@/lib/recap-store";
 import { isMatchIdFor, isRegion } from "@/lib/regions";
+import { getAccount } from "@/lib/riot/api";
+import { RiotApiError } from "@/lib/riot/client";
+import { fromSlug } from "@/lib/riot-id";
 
 // The "This is me" button on a profile. Clicking it on your own profile
 // marks it; clicking it again (or on someone else's) changes or clears that.
@@ -88,4 +94,32 @@ export async function writeRecapAction(
   const user = await getCurrentUser();
   if (!user) return { status: "failed", message: "You're signed out. Sign in again to write one." };
   return createRecap(region, matchId, puuid, user.id);
+}
+
+// The Ask button on a player's Ask tab. Signed-in accounts only, so the
+// per-account daily cap in ask() can't be dodged by signing out. The player
+// comes from the page's address ("Name-TAG"), looked up again here.
+export async function askAction(
+  region: string,
+  riotId: string,
+  question: string,
+): Promise<AskOutcome> {
+  const id = typeof riotId === "string" ? fromSlug(riotId) : null;
+  if (!isRegion(region) || !id) return { status: "failed", message: "Couldn't ask on this page." };
+  const cleaned = cleanQuestion(typeof question === "string" ? question : "");
+  if (!cleaned.ok) return { status: "failed", message: cleaned.message };
+  if (!askEnabled()) return { status: "failed", message: "Ask isn't available right now." };
+  const user = await getCurrentUser();
+  if (!user) return { status: "failed", message: "You're signed out. Sign in again to ask." };
+
+  try {
+    const account = await getAccount(region, id);
+    if (!account) return { status: "failed", message: "Couldn't find this player." };
+    return await ask(region, account, cleaned.text, user.id);
+  } catch (error) {
+    if (error instanceof RiotApiError) {
+      return { status: "failed", message: "Riot isn't answering right now. Try again in a moment." };
+    }
+    throw error;
+  }
 }

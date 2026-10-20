@@ -1,19 +1,20 @@
 import Link from "next/link";
 
-// "Matches | Champions | Insights | Log" tabs under a player's name. Each tab is its own page,
+// "Matches | Champions | Insights | Log | Ask" tabs under a player's name. Each tab is its own page,
 // so they're plain links; `current` says which one is open.
 export function ProfileTabs({
   playerPath,
   current,
 }: {
   playerPath: string; // e.g. "/player/na/Name-TAG"
-  current: "matches" | "champions" | "insights" | "log";
+  current: "matches" | "champions" | "insights" | "log" | "ask";
 }) {
   const tabs = [
     { key: "matches", label: "Matches", href: playerPath },
     { key: "champions", label: "Champions", href: `${playerPath}/champions` },
     { key: "insights", label: "Insights", href: `${playerPath}/insights` },
     { key: "log", label: "Log", href: `${playerPath}/log` },
+    { key: "ask", label: "Ask", href: `${playerPath}/ask` },
   ] as const;
 
   return (
