@@ -29,8 +29,9 @@ Every tier runs the same automatic checks; the extra steps in the lower rows are
 9. **Triage.** The builder fixes findings it can reproduce, rejects the rest with a reason, and brings real disagreements to Jasper (see below).
 10. **Explain back, then merge.** Jasper writes "My read" on the PR and merges; Vercel deploys.
 11. **Close out in the same PR.** Docs and decision records change with the code, and `Closes #N` closes the issue.
+12. **After the merge.** A scheduled task on Jasper's PC pulls `main` every 30 minutes, but only when that folder is on `main` with nothing uncommitted, so it never touches a branch in progress. A local git hook then rebuilds the notes in his private Obsidian vault from the merged PRs. The thread that drove the PR adds a dated, facts-only entry to his Dev Log there (what changed, what's next); the "why" and "what I learned" lines are his to write.
 
-Tiny changes skip the issue, the plan, the reviewer and "My read": the thread reads the code, makes the change and opens the PR, and Jasper skims the diff and the preview before merging.
+Tiny changes skip the issue, the plan, the reviewer and "My read": the thread reads the code, makes the change and opens the PR, and Jasper skims the diff and the preview before merging. Step 12 still happens.
 
 The PR template ([`.github/pull_request_template.md`](../.github/pull_request_template.md)) has a section for each of these: the tier, the walkthrough, the criteria with their evidence, the review, the docs touched and "My read".
 
