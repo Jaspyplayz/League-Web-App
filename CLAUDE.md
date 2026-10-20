@@ -27,6 +27,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Ask (signed-in players ask Claude about a player's games; Claude reads them with the MCP tools, 10 questions a day, $20 a month for the site): [docs/ask.md](docs/ask.md)
 - MCP server (Claude and other AI apps can look players up and read the analyzer's results at `/api/mcp`): [docs/mcp.md](docs/mcp.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
+- How a change gets made (review tiers, the reviewer agent, "My read"): [docs/workflow.md](docs/workflow.md)
 
 ## Stack
 
@@ -73,7 +74,8 @@ src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/p
 scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, train-phase-score, tempo study, item check)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
-.claude/          Claude Code settings; hooks/ runs lint and typecheck before Claude commits
+.claude/          Claude Code settings; hooks/ runs lint and typecheck before Claude commits,
+                  agents/reviewer.md reviews a finished branch, skills/explain-back quizzes Jasper
 ```
 
 ## Commands
@@ -127,6 +129,9 @@ Dark "scouting report" style, with a light theme picked on `/settings` (saved in
 - **Small PRs**, one topic each, on a branch. Never push to `main`.
 - **Jasper merges every PR himself** after reading it. Claude never merges, and waits for CI and the Vercel check to pass.
 - **Every PR description has a plain-language walkthrough**: what changed, why, and how to try it, written for someone new to the codebase.
+- **Review tiers.** Pick tiny, normal or risky when a thread starts and name it in the PR; normal and risky PRs get the reviewer agent (`.claude/agents/reviewer.md`) before Jasper reads them. The steps are in [docs/workflow.md](docs/workflow.md). Until a second model is set up, risky PRs say "no second review yet".
+- **When sources disagree,** trust the code and live settings, then repo docs and decision records, then GitHub issues and PRs, then the vault, project memory and the shared notes, and name the one that is out of date.
+- **Leave "My read" to Jasper.** He writes it before merging normal and risky PRs and runs `/explain-back` on risky ones; never fill it in.
 - At most two branches in progress at once, touching different files.
 - **Merge conflicts:** merge `main` into the branch (don't rebase shared branches). For `package-lock.json`, take `main`'s version and re-run `npm install`.
 - `next dev` may re-add a block to `AGENTS.md`; committing it is fine.

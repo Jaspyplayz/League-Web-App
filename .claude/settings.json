@@ -1,4 +1,13 @@
 {
+  "permissions": {
+    "deny": [
+      "Read(.env.local)",
+      "Bash(git push --force*)",
+      "Bash(git push * --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * -f*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
