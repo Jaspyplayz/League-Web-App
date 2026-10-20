@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
-import { addUpDeaths } from "@/lib/analyzer/death-recap";
+import { addUpDeaths, deathsInGames } from "@/lib/analyzer/death-recap";
 import { compareHabits } from "@/lib/analyzer/habit-trends";
 import { analyzeSessions, toSessionGames } from "@/lib/analyzer/sessions";
 import { checkWeaknesses, computeTrends } from "@/lib/analyzer/trends";
@@ -222,10 +222,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const sessions = analyzeSessions(
     toSessionGames(matches, puuid, (match, id) => scoreGame(match).get(id)?.score ?? null),
   );
-  // Your deaths in the same games as the rest of the page, so the champion
-  // filter applies.
-  const shown = new Set(games.map((g) => g.matchId));
-  const deathRecap = addUpDeaths(loaded.value.deaths.filter((d) => shown.has(d.matchId)));
+  const deathRecap = addUpDeaths(deathsInGames(loaded.value.deaths, games));
   const playerComparison = theirs
     ? compareWithBenchmarks(games, theirs.games, classOf, MIN_PLAYER_GAMES)
     : null;

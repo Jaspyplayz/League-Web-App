@@ -39,7 +39,7 @@ export async function DeathRecapSection({
   return (
     <section aria-labelledby="death-recap-heading" className="flex flex-col gap-3.5">
       <PanelHeading id="death-recap-heading">What keeps killing you</PanelHeading>
-      {recap.deaths < MIN_RECAP_DEATHS ? (
+      {recap.championDeaths < MIN_RECAP_DEATHS ? (
         <p className={`px-5 py-4 text-[15px] text-muted ${panelClass}`}>
           <FillingIn recap={recap} />
         </p>
@@ -55,8 +55,8 @@ export async function DeathRecapSection({
                   recap.respect.spellName,
                 )}
               </strong>
-              . It hit you in {recap.respect.deaths} of your {plural(recap.respect.of, "death")} to{" "}
-              {name(recap.respect.championName)}.
+              . It hit you in {recap.respect.deaths} of the {plural(recap.respect.of, "death")}{" "}
+              {name(recap.respect.championName)} was in.
             </p>
           )}
           <div className="grid gap-6 md:grid-cols-[3fr_2fr]">
@@ -105,11 +105,12 @@ export async function DeathRecapSection({
           </div>
         </div>
       )}
-      {recap.deaths >= MIN_RECAP_DEATHS && (
+      {recap.championDeaths >= MIN_RECAP_DEATHS && (
         <p className="text-[13px] text-faint">
-          From Riot&apos;s death recaps: the damage you took in the last seconds before each
-          death. Crowd control isn&apos;t in them. The numbers after each ability are the deaths
-          it hit you in, out of your deaths to that champion.
+          From Riot&apos;s death recaps: the damage you took in the last seconds before each death.
+          Crowd control isn&apos;t in them. A champion was in a death when they did any damage in
+          it, not only when they got the kill. The numbers after each ability are the deaths it hit
+          you in, out of the deaths that champion was in.
           {recap.undetailed > 0 &&
             ` ${plural(recap.undetailed, "death")} from games saved before Turnpoint kept death recaps ${recap.undetailed === 1 ? "is" : "are"} left out.`}
         </p>
@@ -123,14 +124,13 @@ function FillingIn({ recap }: { recap: DeathRecap }) {
   if (recap.deaths === 0 && recap.undetailed === 0) {
     return <>You didn&apos;t die in any of these games.</>;
   }
-  const have =
-    recap.deaths === 0
-      ? "None of these deaths has a death recap yet."
-      : `${plural(recap.deaths, "death")} with a death recap so far, and this needs ${MIN_RECAP_DEATHS}.`;
+  const have = `${plural(recap.championDeaths, "death")} with an enemy champion in the death recap so far, and this needs ${MIN_RECAP_DEATHS}.`;
+  // Every death has a recap, so you just haven't died to champions much.
+  if (recap.undetailed === 0) return <>{have}</>;
   return (
     <>
-      {have} Turnpoint only started keeping Riot&apos;s death recaps recently, so this fills in as
-      you play new games.
+      {recap.deaths === 0 ? "None of these deaths has a death recap yet." : have} Turnpoint only
+      started keeping Riot&apos;s death recaps recently, so this fills in as you play new games.
     </>
   );
 }

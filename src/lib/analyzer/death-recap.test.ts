@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   abilityOf,
   addUpDeaths,
+  deathsInGames,
   findGameDeaths,
   MIN_RECAP_DEATHS,
   type GameDeaths,
@@ -99,10 +100,33 @@ describe("findGameDeaths", () => {
     ]);
   });
 
+  it("gives a pet's damage to its champion, and leaves minions out", () => {
+    const g = game([
+      death("5:00", 8, [
+        hit(8, 64, { magic: 200 }, { type: "MINION", spellName: "AnnieTibbersBasicAttack" }),
+        hit(0, 64, { physical: 40 }, { type: "MINION", spellName: "ChaosMinionBasicAttack" }),
+      ]),
+    ]);
+    expect(g.detailed![0].hits).toMatchObject([{ championName: "Syndra", ability: "other" }]);
+  });
+
+  it("calls a game with any death saved without a recap an old one", () => {
+    const g = game([death("5:00", 8, [hit(8, 0, { magic: 300 })]), death("9:00", 8, undefined)]);
+    expect(g.detailed).toBeNull();
+  });
+
   it("ignores damage from players on your own team", () => {
     // Can't happen in a normal game, but the data comes from outside.
     const g = game([death("5:00", 8, [hit(2, 0, { physical: 99 }), hit(8, 1, { magic: 10 })])]);
     expect(g.detailed![0].hits.map((h) => h.championName)).toEqual(["Syndra"]);
+  });
+});
+
+describe("deathsInGames", () => {
+  it("keeps only the games the page shows, so the champion filter applies", () => {
+    const deaths = [game([], "NA1_1"), game([], "NA1_2"), game([], "NA1_3")];
+    const shown = deathsInGames(deaths, [{ matchId: "NA1_3" }, { matchId: "NA1_1" }]);
+    expect(shown.map((d) => d.matchId)).toEqual(["NA1_1", "NA1_3"]);
   });
 });
 
@@ -166,31 +190,96 @@ describe("addUpDeaths", () => {
   });
 
   it("would rather name an ability than basic attacks or passives", () => {
+    const aa = hit(9, 64, { physical: 300 }, { basic: true });
+    const w = hit(9, 1, { magic: 50 });
     const recap = addUpDeaths([
       game([
-        death("4:00", 9, [
-          hit(9, 64, { physical: 300 }, { basic: true }),
-          hit(9, 1, { magic: 50 }),
-        ]),
-        death("8:00", 9, [
-          hit(9, 64, { physical: 300 }, { basic: true }),
-          hit(9, 1, { magic: 50 }),
-        ]),
-        death("9:00", 9, [hit(9, 64, { physical: 300 }, { basic: true })]),
+        death("4:00", 9, [aa, w]),
+        death("8:00", 9, [aa, w]),
+        death("9:00", 9, [aa, w]),
+        death("11:00", 9, [aa]),
       ]),
     ]);
-    expect(recap.respect).toMatchObject({ championName: "Kaisa", ability: "W", deaths: 2, of: 3 });
+    expect(recap.respect).toMatchObject({ championName: "Kaisa", ability: "W", deaths: 3, of: 4 });
   });
 
-  it("names nobody to respect when no ability was in two deaths", () => {
+  it("names nobody to respect from only two deaths", () => {
     const recap = addUpDeaths([
       game([
         death("4:00", 8, [hit(8, 0, { magic: 300 })]),
-        death("8:00", 9, [hit(9, 1, { magic: 300 })]),
+        death("8:00", 8, [hit(8, 0, { magic: 300 })]),
         death("9:00", 6, [hit(6, 2, { physical: 300 })]),
       ]),
     ]);
     expect(recap.respect).toBeNull();
+  });
+
+  it("looks past the three enemies on the card for the ability to respect", () => {
+    // Darius, Lee Sin and Syndra are in 5 deaths each, no ability in more
+    // than 2; Kai'Sa is in only 4, but Kai'Sa's Q is in all of them.
+    const events = [
+      death("1:00", 6, [
+        hit(6, 0, { physical: 100 }),
+        hit(7, 0, { physical: 100 }),
+        hit(8, 0, { magic: 100 }),
+      ]),
+      death("2:00", 6, [
+        hit(6, 0, { physical: 100 }),
+        hit(7, 0, { physical: 100 }),
+        hit(8, 0, { magic: 100 }),
+      ]),
+      death("3:00", 6, [
+        hit(6, 1, { physical: 100 }),
+        hit(7, 1, { physical: 100 }),
+        hit(8, 1, { magic: 100 }),
+      ]),
+      death("4:00", 6, [
+        hit(6, 1, { physical: 100 }),
+        hit(7, 1, { physical: 100 }),
+        hit(8, 1, { magic: 100 }),
+      ]),
+      death("5:00", 6, [
+        hit(6, 2, { physical: 100 }),
+        hit(7, 2, { physical: 100 }),
+        hit(8, 2, { magic: 100 }),
+      ]),
+      ...["6:00", "7:00", "8:00", "9:00"].map((at) => death(at, 9, [hit(9, 0, { physical: 10 })])),
+    ];
+    const recap = addUpDeaths([game(events)]);
+    expect(recap.threats.map((t) => t.championName)).toEqual(["Darius", "LeeSin", "Syndra"]);
+    expect(recap.respect).toMatchObject({ championName: "Kaisa", ability: "Q", deaths: 4, of: 4 });
+  });
+
+  it("between abilities in as many deaths, respects the one in more of its champion's", () => {
+    const recap = addUpDeaths([
+      game([
+        // Syndra's Q is in 3 of 5 deaths she was in; Lee Sin's R in 3 of 3.
+        death("1:00", 8, [hit(8, 0, { magic: 900 }), hit(7, 3, { physical: 100 })]),
+        death("2:00", 8, [hit(8, 0, { magic: 900 }), hit(7, 3, { physical: 100 })]),
+        death("3:00", 8, [hit(8, 0, { magic: 900 }), hit(7, 3, { physical: 100 })]),
+        death("4:00", 8, [hit(8, 1, { magic: 900 })]),
+        death("5:00", 8, [hit(8, 1, { magic: 900 })]),
+      ]),
+    ]);
+    expect(recap.respect).toMatchObject({ championName: "LeeSin", ability: "R", of: 3 });
+  });
+
+  it("puts the enemy who did more damage first when two were in as many deaths", () => {
+    const recap = addUpDeaths([
+      game([
+        death("1:00", 8, [hit(7, 0, { physical: 100 }), hit(8, 0, { magic: 500 })]),
+        death("2:00", 8, [hit(7, 0, { physical: 100 }), hit(8, 0, { magic: 500 })]),
+      ]),
+    ]);
+    expect(recap.threats.map((t) => t.championName)).toEqual(["Syndra", "LeeSin"]);
+  });
+
+  it("counts only deaths with an enemy champion in them toward the minimum", () => {
+    const recap = addUpDeaths([
+      game([death("1:00", 0, [tower(500)]), death("2:00", 0, []), death("3:00", 8, [hit(8, 0)])]),
+    ]);
+    expect(recap.deaths).toBe(3);
+    expect(recap.championDeaths).toBe(0);
   });
 
   it("keeps at most three enemies", () => {

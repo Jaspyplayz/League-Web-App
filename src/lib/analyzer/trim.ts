@@ -52,8 +52,9 @@ export type ChampionKill = {
   victimId: number;
   assistingParticipantIds: number[];
   position: MapPosition | null;
-  // Riot's death recap: the damage the victim took in the last seconds
-  // before dying, one entry per source and spell. Always there (maybe empty)
+  // Riot's death recap: the damage players and towers did to the victim in
+  // the last seconds before dying, one entry per source and spell (see
+  // deathDamage below for what's left out). Always there (maybe empty)
   // in timelines saved since death recaps were added; missing in older ones,
   // which is how death-recap.ts tells the two apart.
   victimDamageReceived?: DeathDamage[];
@@ -275,7 +276,10 @@ function ids(value: unknown): number[] {
 }
 
 // Riot leaves the list out when it's empty, so a missing one becomes [].
-// Damage is rounded to whole numbers, which is all the page shows.
+// Damage is rounded to whole numbers, which is all the page shows. Only lines
+// from a player (champions and their pets) or a tower are kept, and only ones
+// that did damage: minion and monster lines are most of a recap and nothing
+// reads them, so leaving them out keeps saved timelines small.
 function deathDamage(value: unknown): DeathDamage[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -289,7 +293,12 @@ function deathDamage(value: unknown): DeathDamage[] {
       physicalDamage: Math.round(num(d.physicalDamage)),
       magicDamage: Math.round(num(d.magicDamage)),
       trueDamage: Math.round(num(d.trueDamage)),
-    }));
+    }))
+    .filter(
+      (d) =>
+        (d.participantId > 0 || d.type === "TOWER") &&
+        d.physicalDamage + d.magicDamage + d.trueDamage > 0,
+    );
 }
 
 function position(value: unknown): MapPosition | null {

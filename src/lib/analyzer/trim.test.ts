@@ -141,7 +141,7 @@ describe("trimTimeline", () => {
     ]);
   });
 
-  it("keeps the damage each victim took before dying, without Riot's names", () => {
+  it("keeps the damage players and towers did before each death, without Riot's names", () => {
     const withDamage = trimTimeline({
       ...timeline,
       info: {
@@ -181,6 +181,29 @@ describe("trimTimeline", () => {
                     trueDamage: 0,
                     type: "MINION",
                   },
+                  {
+                    basic: true,
+                    magicDamage: 0,
+                    name: "Turret",
+                    participantId: 0,
+                    physicalDamage: 180,
+                    spellName: "TurretBasicAttack",
+                    spellSlot: 64,
+                    trueDamage: 0,
+                    type: "TOWER",
+                  },
+                  // A slow that did no damage: nothing to add up.
+                  {
+                    basic: false,
+                    magicDamage: 0,
+                    name: "Elise",
+                    participantId: 7,
+                    physicalDamage: 0,
+                    spellName: "EliseSpiderW",
+                    spellSlot: 1,
+                    trueDamage: 0,
+                    type: "OTHER",
+                  },
                   // Not an object: dropped, since Riot's data is checked
                   // rather than trusted.
                   "junk",
@@ -191,7 +214,13 @@ describe("trimTimeline", () => {
         ],
       },
     });
-    expect(withDamage.events[0]).toMatchObject({
+    expect(withDamage.events[0]).toEqual({
+      type: "CHAMPION_KILL",
+      timestamp: 45_000,
+      killerId: 7,
+      victimId: 2,
+      assistingParticipantIds: [],
+      position: null,
       victimDamageReceived: [
         {
           participantId: 7,
@@ -203,13 +232,14 @@ describe("trimTimeline", () => {
           magicDamage: 313,
           trueDamage: 0,
         },
+        // The minion line is left out: nothing reads it.
         {
           participantId: 0,
-          type: "MINION",
-          basic: false,
+          type: "TOWER",
+          basic: true,
           spellSlot: 64,
-          spellName: "ChaosMinionBasicAttack",
-          physicalDamage: 21,
+          spellName: "TurretBasicAttack",
+          physicalDamage: 180,
           magicDamage: 0,
           trueDamage: 0,
         },

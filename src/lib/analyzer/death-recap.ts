@@ -6,8 +6,8 @@
 //
 // Riot's timeline gives each death's recap as victimDamageReceived: the
 // damage the victim took in the last seconds, one line per source and spell.
-// Turnpoint only started keeping it in October 2026, so older saved games
-// don't have it (see trim.ts).
+// Turnpoint only keeps it in timelines downloaded since death recaps were
+// added, so older saved games don't have it (see trim.ts).
 
 import type { Match } from "@/lib/riot/types";
 import { findPlayer } from "./index";
@@ -83,12 +83,15 @@ export function findGameDeaths(
 }
 
 // The enemy champions' lines of one death recap, with two lines for the same
-// ability (Riot sometimes splits one) added together.
+// ability (Riot sometimes splits one) added together. Any line with an enemy's
+// participantId counts, whatever its type, so a pet's damage (Annie's Tibbers,
+// Zyra's plants) goes to its champion; towers, minions and monsters have
+// participantId 0.
 function hitsIn(damage: DeathDamage[], enemies: Map<number, string>): Hit[] {
   const hits = new Map<string, Hit>();
   for (const d of damage) {
     const championName = enemies.get(d.participantId);
-    if (!championName || d.type !== "OTHER") continue;
+    if (!championName) continue;
     if (d.physicalDamage + d.magicDamage + d.trueDamage <= 0) continue;
     const ability = abilityOf(d);
     const key = `${championName}:${abilityKey(ability, d.spellName)}`;
@@ -112,9 +115,12 @@ const abilityKey = (ability: Ability, spellName: string) =>
 
 const total = (d: DamageSplit) => d.physical + d.magic + d.true;
 
-// Below this many deaths with a recap, the card says it's still filling in
-// rather than calling one or two deaths a pattern.
+// Below this many deaths with an enemy champion in the recap, the card says
+// it's still filling in rather than calling one or two deaths a pattern.
 export const MIN_RECAP_DEATHS = 3;
+// "Respect" needs an ability in at least this many deaths, so it isn't
+// advice from one or two.
+export const MIN_RESPECT_DEATHS = 3;
 // The card shows this many enemy champions.
 const MAX_THREATS = 3;
 
@@ -138,6 +144,9 @@ export type Threat = {
 
 export type DeathRecap = {
   deaths: number; // your deaths with a recap
+  // Of those, the ones an enemy champion did damage in. A death to a tower
+  // alone has a recap but nothing to learn about champions.
+  championDeaths: number;
   undetailed: number; // deaths in games saved before Turnpoint kept recaps
   // All the champion damage in those deaths, by type: what to build against.
   damage: DamageSplit;
@@ -145,7 +154,9 @@ export type DeathRecap = {
   // The enemy champions in the most of your deaths, at most three.
   threats: Threat[];
   // The one ability to respect: the Q, W, E or R that hit you in the most of
-  // your deaths to its champion, in at least two. Null when none did.
+  // your deaths with its champion in them, in at least MIN_RESPECT_DEATHS.
+  // Picked from every enemy champion, not only the three on the card.
+  // Null when none did.
   respect: {
     championName: string;
     ability: Ability;
@@ -154,6 +165,12 @@ export type DeathRecap = {
     of: number;
   } | null;
 };
+
+// Only the games the rest of Insights shows, so the champion filter applies.
+export function deathsInGames(deaths: GameDeaths[], games: { matchId: string }[]): GameDeaths[] {
+  const shown = new Set(games.map((g) => g.matchId));
+  return deaths.filter((d) => shown.has(d.matchId));
+}
 
 export function addUpDeaths(games: GameDeaths[]): DeathRecap {
   const details = games.flatMap((g) => g.detailed ?? []);
@@ -197,7 +214,7 @@ export function addUpDeaths(games: GameDeaths[]): DeathRecap {
   }
 
   const allDamage = total(damage);
-  const threats: Threat[] = [...byChampion.entries()]
+  const everyone: Threat[] = [...byChampion.entries()]
     .map(([championName, c]) => ({
       championName,
       deaths: c.deaths,
@@ -205,16 +222,16 @@ export function addUpDeaths(games: GameDeaths[]): DeathRecap {
       share: allDamage > 0 ? c.damage / allDamage : 0,
       abilities: [...c.abilities.values()].sort(mostDeaths),
     }))
-    .sort(mostDeaths)
-    .slice(0, MAX_THREATS);
+    .sort(mostDeaths);
 
   return {
     deaths: details.length,
+    championDeaths: details.filter((d) => d.hits.length > 0).length,
     undetailed,
     damage,
     towerDeaths: details.filter((d) => d.tower).length,
-    threats,
-    respect: pickRespect(threats),
+    threats: everyone.slice(0, MAX_THREATS),
+    respect: pickRespect(everyone),
   };
 }
 
@@ -228,7 +245,7 @@ function pickRespect(threats: Threat[]): DeathRecap["respect"] {
   let best: DeathRecap["respect"] = null;
   for (const threat of threats) {
     for (const a of threat.abilities) {
-      if (!SLOTS.includes(a.ability) || a.deaths < 2) continue;
+      if (!SLOTS.includes(a.ability) || a.deaths < MIN_RESPECT_DEATHS) continue;
       const better =
         !best ||
         a.deaths > best.deaths ||
