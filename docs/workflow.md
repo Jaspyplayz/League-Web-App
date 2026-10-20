@@ -48,7 +48,7 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 
 [`.claude/agents/reviewer.md`](../.claude/agents/reviewer.md) is a Claude Code subagent: a second Claude with a fresh context, read-only file tools, and a checklist built from this project's rules (acceptance criteria, inputs that break the analyzer, the Riot and privacy rules, missing tests, claims to players, security and cost, docs that go out of date).
 
-- **When:** once a normal or risky PR's checks pass, the thread asks the reviewer to review its branch against the issue. Jasper can ask for it too, in a project thread or in Claude Code on his computer: "use the reviewer agent on this branch".
+- **When:** once a normal or risky PR's checks pass, the thread asks the reviewer to review its branch against the issue. Jasper can ask for it too: in a project thread in the Claude app, "run the reviewer on #135"; in Claude Code on his computer, "use the reviewer agent on this branch".
 - **What it gets:** the acceptance criteria, the diff against `main` and the test output. It treats the PR description as claims to check, not evidence.
 - **What comes back:** at most 7 findings, each with a severity (blocker, should-fix, nit), a file and line, a concrete input that goes wrong and a confidence; or "No blockers" and what it checked.
 - **Afterwards:** it has Bash for `git diff` and `npm test`, so it ends with `git status` to show it changed nothing. The builder lists each finding in the PR's Review section as fixed (with the test that shows it) or rejected (with the evidence).
@@ -64,7 +64,7 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 
 "My read" is the last section of every normal and risky PR: three to five sentences in Jasper's own words, written before he merges. Claude never writes it, because writing it is how the code becomes his to explain in an interview.
 
-On risky PRs, Jasper first types `/explain-back` (or `/explain-back 135` for PR 135) in Claude Code. The skill ([`.claude/skills/explain-back/SKILL.md`](../.claude/skills/explain-back/SKILL.md)) asks him three questions about the PR, one at a time: what it does, one decision it made, and one input that would break it. Then it lists what he got right and what he missed, with a file and line for each miss. It only runs when he types it, so it costs nothing the rest of the time. If typing `/explain-back` does nothing in a project thread, remove its `disable-model-invocation` line so that asking for a quiz starts it.
+On risky PRs, Jasper first asks for a quiz: in a project thread in the Claude app, "quiz me on #135" (or `/explain-back 135`), and in Claude Code on his computer, `/explain-back 135`. The skill ([`.claude/skills/explain-back/SKILL.md`](../.claude/skills/explain-back/SKILL.md)) asks him three questions about the PR, one at a time: what it does, one decision it made, and one input that would break it. Then it lists what he got right and what he missed, with a file and line for each miss. Its description tells Claude to start it only when he asks, never on its own.
 
 ## Decision records
 
