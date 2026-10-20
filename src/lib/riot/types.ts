@@ -63,6 +63,9 @@ export type Participant = {
   damageDealtToObjectives?: number;
   visionScore: number;
   wardsPlaced: number;
+  // Optional so older test data still fits; Riot always sends them.
+  wardsKilled?: number;
+  detectorWardsPlaced?: number; // control wards
   item0: number;
   item1: number;
   item2: number;
@@ -93,6 +96,10 @@ export type Participant = {
     scuttleCrabKills?: number;
     // Scuttle crabs taken at their first spawn (3:30), 0 to 2.
     initialCrabCount?: number;
+    // CS in the first 10 minutes, split into lane minions and jungle
+    // monsters, for the Champions tab's laning column.
+    laneMinionsFirst10Minutes?: number;
+    jungleCsBefore10Minutes?: number;
   };
 };
 

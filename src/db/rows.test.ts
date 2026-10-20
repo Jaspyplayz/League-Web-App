@@ -32,6 +32,17 @@ describe("participantRows", () => {
       visionScore: 18,
       item0: 3089,
       item6: 3340,
+      totalDamageTaken: 18_000,
+      damageDealtToObjectives: 4_000,
+      gameEndedInEarlySurrender: false,
+      wardsPlaced: 9,
+      wardsKilled: 3,
+      detectorWardsPlaced: 2,
+      doubleKills: 1,
+      tripleKills: 0,
+      quadraKills: 0,
+      pentaKills: 0,
+      challenges: { laneMinionsFirst10Minutes: 70, jungleCsBefore10Minutes: 4.4 },
     };
     const rows = participantRows(match(players));
     expect(rows).toHaveLength(10);
@@ -52,7 +63,27 @@ describe("participantRows", () => {
       damageToChampions: 22_700,
       visionScore: 18,
       items: [3089, 0, 0, 0, 0, 0, 3340],
+      individualPosition: "MIDDLE",
+      damageTaken: 18_000,
+      objectiveDamage: 4_000,
+      earlySurrender: false,
+      wardsPlaced: 9,
+      wardsKilled: 3,
+      controlWards: 2,
+      doubleKills: 1,
+      tripleKills: 0,
+      quadraKills: 0,
+      pentaKills: 0,
+      // 70 lane minions + 4.4 jungle monsters, rounded.
+      csAt10: 74,
     });
+  });
+
+  it("leaves out the numbers Riot didn't send", () => {
+    const row = participantRows(match())[0];
+    expect(row.csAt10).toBeNull();
+    expect(row.wardsKilled).toBeNull();
+    expect(row.doubleKills).toBeNull();
   });
 });
 

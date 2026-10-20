@@ -8,7 +8,7 @@ import { kdaRatio } from "@/lib/match-summary";
 export const SEASON = { id: "2026", label: "Season 2026", start: Date.UTC(2026, 0, 8) };
 
 // Games shorter than this are remakes, which don't count, as elsewhere.
-const REMAKE_SECONDS = 5 * 60;
+export const REMAKE_SECONDS = 5 * 60;
 
 // One of the player's games, as stored in match_participants and matches.
 export type SeasonGame = {

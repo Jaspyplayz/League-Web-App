@@ -99,6 +99,20 @@
       "when": 1792438094541,
       "tag": "0013_benchmark_habits",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792461124344,
+      "tag": "0014_champion_stats",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792461125271,
+      "tag": "0015_backfill_champion_stats",
+      "breakpoints": true
     }
   ]
 }
