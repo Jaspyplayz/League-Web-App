@@ -8,10 +8,14 @@
 
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 // Files whose changes can break lint or typecheck. Docs-only commits skip the check.
 const CODE_FILE = /\.(ts|tsx|js|jsx|mjs|cjs|json)$/;
+
+// `git commit`, or `git -C <folder> commit`, which commits in another folder
+// such as a worktree. The folder may be in quotes.
+const COMMIT = /\bgit\s+(?:-C\s+("[^"]*"|'[^']*'|\S+)\s+)?commit\b/;
 
 function run(command, cwd) {
   return execSync(command, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -19,9 +23,21 @@ function run(command, cwd) {
 
 const input = JSON.parse(readFileSync(0, "utf8"));
 const command = input.tool_input?.command ?? "";
-if (!/\bgit\s+commit\b/.test(command)) process.exit(0);
+const commit = command.match(COMMIT);
+if (!commit) process.exit(0);
 
-const projectDir = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
+// Check the checkout the commit lands in. `cwd` is the folder Claude is working
+// in, which is a worktree's root inside a worktree; CLAUDE_PROJECT_DIR always
+// points at the main checkout, so it's only the fallback.
+const here = input.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+const folder = commit[1] ? resolve(here, commit[1].replace(/^["']|["']$/g, "")) : here;
+let projectDir;
+try {
+  projectDir = run("git rev-parse --show-toplevel", folder).trim();
+} catch {
+  // Not a git folder, so the commit will fail on its own.
+  process.exit(0);
+}
 
 // Without installed packages there is nothing to check with; let CI catch it.
 if (!existsSync(join(projectDir, "node_modules"))) process.exit(0);
