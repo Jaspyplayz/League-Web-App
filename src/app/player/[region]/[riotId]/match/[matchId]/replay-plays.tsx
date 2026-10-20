@@ -12,6 +12,7 @@ import {
   formatSwing,
   gradeOf,
   playLines,
+  playStart,
   playSwing,
   playTitle,
   type Grade,
@@ -20,10 +21,11 @@ import {
 } from "@/lib/analyzer/plays";
 import type { ReplayData } from "@/lib/analyzer/replay";
 import { stretchAt, type TempoTimeline } from "@/lib/analyzer/tempo";
+import type { ReplayRequest } from "./review-links";
 
 // The grade's pill: filled for Great and Mistake, outlined for Good and
 // Inaccuracy, grey for Even. Blue when the chance went up, red when down.
-const GRADE_CHIP: Record<Grade, string> = {
+export const GRADE_CHIP: Record<Grade, string> = {
   Great: "border-ahead bg-ahead text-page",
   Good: "border-ahead text-ahead-soft",
   Even: "border-line-strong text-muted",
@@ -41,12 +43,6 @@ const GRADE_MARK: Record<Grade, string> = {
 };
 
 const GRADES: Grade[] = ["Great", "Good", "Even", "Inaccuracy", "Mistake"];
-
-// Where the replay jumps to for a play: the first whole second of it, so the
-// clock, scoreboard and win chance all count its first event.
-export function playStart(play: Play): number {
-  return Math.ceil(play.from / 1000) * 1000;
-}
 
 // Your team's chance to win at the timeline's top: blue above even, red
 // below. One point per second, so kills show as steps.
@@ -111,6 +107,7 @@ export function ReplayPlays({
   names,
   t,
   onPick,
+  request,
   tempo,
   them,
 }: {
@@ -121,6 +118,9 @@ export function ReplayPlays({
   t: number;
   // Moves the replay's clock to a moment (ms).
   onPick: (ms: number) => void;
+  // The latest "Watch in replay" from the 60-second review, whose play opens
+  // here.
+  request: ReplayRequest | null;
   // Null unless you played jungle.
   tempo: TempoTimeline | null;
   // The enemy jungler's champion.
@@ -129,6 +129,15 @@ export function ReplayPlays({
   const [yoursOnly, setYoursOnly] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const { plays } = chances;
+  const [seenRequest, setSeenRequest] = useState(request);
+  if (request !== seenRequest) {
+    setSeenRequest(request);
+    const index = request ? plays.findIndex((play) => playStart(play) === request.ms) : -1;
+    if (index >= 0) {
+      setOpen(index);
+      if (!plays[index].mine) setYoursOnly(false);
+    }
+  }
   const shown = plays.filter((play) => !yoursOnly || play.mine);
   // The play the replay is on or just past.
   const current = shown.findLast((play) => playStart(play) <= t);

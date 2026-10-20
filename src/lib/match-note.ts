@@ -17,5 +17,13 @@ export function cleanNote(value: unknown): CleanedNote {
   return text.length <= MAX_NOTE_LENGTH ? { ok: true, text } : { ok: false };
 }
 
+// The note with a line added at the end, on a line of its own, for the 60-
+// second review's "Add to notes". Unchanged when the line wouldn't fit.
+export function withNoteLine(text: string, line: string): string {
+  const trimmed = text.trimEnd();
+  const next = trimmed === "" ? line : `${trimmed}\n${line}`;
+  return next.length <= MAX_NOTE_LENGTH ? next : text;
+}
+
 // What the save action tells the notes box.
 export type SaveNoteResult = { status: "saved" } | { status: "failed"; message: string };

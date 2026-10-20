@@ -17,7 +17,7 @@ import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import { formatClock, formatGap } from "@/lib/analyzer/format";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
-import type { ReplayChances } from "@/lib/analyzer/plays";
+import { playStart, type ReplayChances } from "@/lib/analyzer/plays";
 import {
   monsterMarks,
   scoreboardAt,
@@ -28,8 +28,9 @@ import {
 import type { TempoTimeline } from "@/lib/analyzer/tempo";
 import { LegendSwatch } from "./legend-swatch";
 import { ReplayMap } from "./replay-map";
-import { ChanceRow, PlayMarks, playStart, ReplayPlays } from "./replay-plays";
+import { ChanceRow, PlayMarks, ReplayPlays } from "./replay-plays";
 import { ReplayScoreboard, type ItemInfo, type ReplayPerson } from "./replay-scoreboard";
+import { useReviewLinks } from "./review-links";
 import { StepButton } from "./step-button";
 import {
   JunglerMarks,
@@ -98,6 +99,19 @@ export function Replay({
     }, TICK_MS);
     return () => clearInterval(timer);
   }, [playing, speed, end]);
+
+  // "Watch in replay" in the 60-second review moves the clock to its moment.
+  // Checked while drawing against the last request seen, React's way to
+  // react to a changed prop or context without an effect.
+  const replayRequest = useReviewLinks()?.replayRequest ?? null;
+  const [seenRequest, setSeenRequest] = useState(replayRequest);
+  if (replayRequest !== seenRequest) {
+    setSeenRequest(replayRequest);
+    if (replayRequest) {
+      setPlaying(false);
+      setT(Math.min(end, Math.max(0, replayRequest.ms)));
+    }
+  }
 
   if (end === 0) return null;
   const board = scoreboardAt(replay, t);
@@ -391,6 +405,7 @@ export function Replay({
           names={names}
           t={t}
           onPick={moveTo}
+          request={replayRequest}
           tempo={tempo}
           them={them}
         />
