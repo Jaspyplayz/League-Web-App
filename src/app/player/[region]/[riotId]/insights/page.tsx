@@ -12,6 +12,7 @@ import {
   championsPlayed,
   pickTier,
   readFilters,
+  readView,
   type InsightsFilters,
 } from "@/lib/insights-filters";
 import { championClass, championName, getDataDragon, type DataDragon } from "@/lib/ddragon";
@@ -29,6 +30,7 @@ import { CompareWithPlayer } from "./compare-with-player";
 import { FocusPanel } from "./focus";
 import { HabitsSection } from "./habits";
 import { InsightsFilterBar } from "./insights-filters";
+import { InsightsTabs } from "./insights-tabs";
 import { SessionBlocks } from "./session-blocks";
 import { TierComparison } from "./tier-comparison";
 import { LaningChart } from "./laning-chart";
@@ -38,8 +40,9 @@ import { Weaknesses } from "./weaknesses";
 // The insights page: trends across a player's last 20, 50 or 100 games.
 // URL: /player/na/Name-TAG/insights, plus ?games=50&champion=Ahri to filter
 // and ?tier=diamond to pick the rank to compare with (see
-// src/lib/insights-filters.ts), and ?vs=Name%23TAG&vsRegion=kr when comparing
-// with another player.
+// src/lib/insights-filters.ts), ?vs=Name%23TAG&vsRegion=kr when comparing
+// with another player, and ?view=others or ?view=habits for the tab that's
+// open (Overview when there's none).
 //
 // Every game needs its match and timeline, each one Riot call the first
 // time. A new player's 100 games would be 200 calls, twice the dev key's
@@ -98,6 +101,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
 
   const query = await searchParams;
   const filters = readFilters(query);
+  const view = readView(query.view);
   const [loaded, dd, tiers] = await Promise.all([
     settle(loadTrendGames(region, puuid, { count: filters.games, budget: TIMELINES_PER_VIEW })),
     getDataDragon().catch(() => null),
@@ -171,6 +175,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
     ...(filters.champion && { champion: filters.champion }),
     ...(typeof query.tier === "string" && tier && { tier: tier.toLowerCase() }),
     ...(choice && { vs: choice.input, vsRegion: choice.region }),
+    ...(view !== "overview" && { view }),
   };
   const without = (...names: string[]) =>
     Object.fromEntries(Object.entries(current).filter(([name]) => !names.includes(name)));
@@ -223,42 +228,58 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       {header}
       {waiting > 0 && progress}
       {filterBar}
-      <FocusPanel
-        player={player}
-        games={focusGames}
-        current={trends.weaknesses.map((w) => w.id)}
-        playerPath={playerPath}
-      />
-      <Weaknesses weaknesses={trends.weaknesses} games={games.length} player={player} />
-      <LaningChart
-        games={trends.games}
-        laning={trends.laning}
-        label={label}
-        matchPath={(matchId) => `${playerPath}/match/${matchId}`}
-      />
-      <LeadsAndDeficits conversion={trends.conversion} />
-      <div className="flex flex-wrap items-start gap-5">
-        <EarlyDeaths earlyDeaths={trends.earlyDeaths} games={games.length} />
-        <CsPhases csPerMin={trends.csPerMin} />
-      </div>
-      {tier && (
-        <TierComparison
-          tier={tier}
-          tiers={tiers}
-          comparison={comparison}
-          keep={without("tier")}
-          dd={dd}
-        />
+      <InsightsTabs insightsPath={`${playerPath}/insights`} current={view} keep={without("view")} />
+      {/* Overview: your own games' trends. */}
+      {view === "overview" && (
+        <>
+          <FocusPanel
+            player={player}
+            games={focusGames}
+            current={trends.weaknesses.map((w) => w.id)}
+            playerPath={playerPath}
+          />
+          <Weaknesses weaknesses={trends.weaknesses} games={games.length} player={player} />
+          <LaningChart
+            games={trends.games}
+            laning={trends.laning}
+            label={label}
+            matchPath={(matchId) => `${playerPath}/match/${matchId}`}
+          />
+          <LeadsAndDeficits conversion={trends.conversion} />
+          <div className="flex flex-wrap items-start gap-5">
+            <EarlyDeaths earlyDeaths={trends.earlyDeaths} games={games.length} />
+            <CsPhases csPerMin={trends.csPerMin} />
+          </div>
+        </>
       )}
-      {habits && <HabitsSection report={habits} tier={tier} />}
-      <SessionBlocks report={sessions} champion={filters.champion} />
-      <CompareWithPlayer
-        chosen={chosen}
-        comparison={playerComparison}
-        clearHref={`${playerPath}/insights?${new URLSearchParams(without("vs", "vsRegion"))}`}
-        keep={without("vs", "vsRegion")}
-        dd={dd}
-      />
+      {/* You vs others: your games next to a rank's, or one player's. */}
+      {view === "others" && (
+        <>
+          {tier && (
+            <TierComparison
+              tier={tier}
+              tiers={tiers}
+              comparison={comparison}
+              keep={without("tier")}
+              dd={dd}
+            />
+          )}
+          <CompareWithPlayer
+            chosen={chosen}
+            comparison={playerComparison}
+            clearHref={`${playerPath}/insights?${new URLSearchParams(without("vs", "vsRegion"))}`}
+            keep={without("vs", "vsRegion")}
+            dd={dd}
+          />
+        </>
+      )}
+      {/* Habits and sessions: what you tend to do, and when you play. */}
+      {view === "habits" && (
+        <>
+          {habits && <HabitsSection report={habits} tier={tier} />}
+          <SessionBlocks report={sessions} champion={filters.champion} />
+        </>
+      )}
       <Footnote
         games={games.length}
         filters={filters}

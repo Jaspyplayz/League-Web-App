@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameTrend } from "@/lib/analyzer/trends";
-import { championsPlayed, pickTier, readFilters } from "./insights-filters";
+import { championsPlayed, pickTier, readFilters, readView } from "./insights-filters";
 
 describe("readFilters", () => {
   it("reads the game window and champion", () => {
@@ -37,5 +37,18 @@ describe("pickTier", () => {
 
   it("is null before any benchmarks are collected", () => {
     expect(pickTier("gold", [])).toBeNull();
+  });
+});
+
+describe("readView", () => {
+  it("reads the tab in the URL", () => {
+    expect(readView("others")).toBe("others");
+    expect(readView("habits")).toBe("habits");
+  });
+
+  it("falls back to Overview", () => {
+    expect(readView(undefined)).toBe("overview");
+    expect(readView("deep")).toBe("overview");
+    expect(readView(["habits", "others"])).toBe("overview");
   });
 });
