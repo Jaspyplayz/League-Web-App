@@ -16,6 +16,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Analyzer research: [docs/match-analyzer.md](docs/match-analyzer.md)
 - Database tables and setup: [docs/database.md](docs/database.md)
 - Game score (the trained 0 to 100 rating): [docs/game-score.md](docs/game-score.md)
+- Phase ratings (early, mid and late game, 0 to 100, on the match page): [docs/phase-ratings.md](docs/phase-ratings.md)
 - Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
 - AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
 - Habits (level 6 first, first scuttles, early ganks and first back on Insights, with how often games with them were won): [docs/habits.md](docs/habits.md)
@@ -45,6 +46,7 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   sets them against one rank's games or one chosen player's,
                   habits.ts reads early-game habits (habit-trends.ts splits wins by them),
                   score.ts is the trained 0 to 100 game score (score-model.json),
+                  phase-score.ts the early, mid and late ratings (phase-score-model.json),
                   win-chance.ts each team's chance to win at every minute,
                   tempo.ts the jungle tempo timeline (tempo-study.ts checks it)
                   and replay.ts the replay, with items.ts and positions.ts
@@ -59,7 +61,7 @@ src/lib/season-store.ts Season champion stats; loads the season's games 10 per p
 src/lib/recap.ts  The only Claude API call (AI match recaps); recap-store.ts saves them
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
-scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, tempo study, item check)
+scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, train-phase-score, tempo study, item check)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
 .claude/          Claude Code settings; hooks/ runs lint and typecheck before Claude commits
@@ -78,6 +80,7 @@ docs/             Design and research docs
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
 | `npm run train-score` | Retrain the game score on saved games and update `score-model.json` ([docs/game-score.md](docs/game-score.md)) |
+| `npm run train-phase-score` | Train the early, mid and late ratings on the tempo study's games and the site's, and write `phase-score-model.json` ([docs/phase-ratings.md](docs/phase-ratings.md)) |
 | `npm run train-win-chance` | Train the win chance model on saved games and write `win-chance-model.json` ([docs/win-chance.md](docs/win-chance.md)) |
 | `npm run tempo-games` / `study-tempo` | Download games for the tempo study into the git-ignored `.cache/tempo-study`, then print its report ([docs/tempo.md](docs/tempo.md)) |
 | `npm run tempo-games -- --items` / `check-items` / `check-positions` / `rift-map` | Download games into `.cache/item-check`, then check the replay's rebuilt items against Riot's, or its map positions against Riot's snapshots, or learn the Rift's walls from them ([docs/replay.md](docs/replay.md#running-the-checks)) |

@@ -13,6 +13,7 @@ import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match, Participant } from "@/lib/riot/types";
 import { fromSlug, toSlug, type RiotId } from "@/lib/riot-id";
+import { ratePhases } from "@/lib/phase-score";
 import { matchWinChance } from "@/lib/win-chance";
 import { AnalysisSections } from "./analysis-sections";
 import { MatchHeader } from "./match-header";
@@ -144,6 +145,7 @@ async function Analysis({ params }: { params: Params }) {
         analysis={analysis}
         winChance={winChance}
         chances={chances}
+        phases={ratePhases(match, timeline.value, me.participantId)}
         dd={dd}
         label={label}
         recap={<MatchRecap region={region} matchId={matchId} puuid={me.puuid} />}

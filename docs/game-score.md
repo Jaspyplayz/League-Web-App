@@ -2,6 +2,8 @@
 
 Every player in a Summoner's Rift game gets a score from 0 to 100, plus **MVP** for the best player on the winning team and **ACE** for the best on the losing team. It's Turnpoint's own take on op.gg's OP Score. You'll find it on each match row and in the Overview tab of the match panel. Hovering a score shows what helped it and what held it back.
 
+On the match page, it's also the **Overall** tile next to your early, mid and late game ratings, which are trained the same way on each phase of the game (see [phase-ratings.md](phase-ratings.md)).
+
 The code is in [`src/lib/analyzer/score.ts`](../src/lib/analyzer/score.ts), the trained model is [`src/lib/analyzer/score-model.json`](../src/lib/analyzer/score-model.json), and [`scripts/train-score.ts`](../scripts/train-score.ts) retrains it.
 
 ## How it works

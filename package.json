@@ -19,6 +19,7 @@
     "benchmarks": "tsx --conditions=react-server scripts/collect-benchmarks.ts",
     "train-score": "tsx --conditions=react-server scripts/train-score.ts",
     "train-win-chance": "tsx --conditions=react-server scripts/train-win-chance.ts",
+    "train-phase-score": "tsx --conditions=react-server scripts/train-phase-score.ts",
     "tempo-games": "tsx --conditions=react-server scripts/collect-tempo-games.ts",
     "study-tempo": "tsx --conditions=react-server scripts/study-tempo.ts",
     "check-items": "tsx --conditions=react-server scripts/check-items.ts",

@@ -3,6 +3,7 @@ import type { TurningPointMarker } from "@/components/diff-chart";
 import { REPO_URL } from "@/components/site-header";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
+import type { PhaseRating } from "@/lib/analyzer/phase-score";
 import type { ReplayChances } from "@/lib/analyzer/plays";
 import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
 import {
@@ -12,6 +13,7 @@ import {
   riftMapUrl,
   type DataDragon,
 } from "@/lib/ddragon";
+import { scoreGame } from "@/lib/game-score";
 import type { Region } from "@/lib/regions";
 import type { Match } from "@/lib/riot/types";
 import type { MatchWinChance } from "@/lib/win-chance";
@@ -21,6 +23,7 @@ import { Ganks } from "./ganks";
 import { LeadChart } from "./lead-chart";
 import { Matchup } from "./match-header";
 import { PathingGrid } from "./pathing";
+import { PhaseRatings } from "./phase-ratings";
 import { Replay } from "./replay";
 import type { ItemInfo, ReplayPerson } from "./replay-scoreboard";
 import { Scoreboard } from "./scoreboard";
@@ -31,8 +34,9 @@ import { WinChance } from "./win-chance";
 
 // Everything below the match header, once the match has been analyzed, in
 // two tabs so the vital part comes first (Jasper's order, 2026-10-19):
-// - Summary: the scoreboard, you vs your opponent, the lead chart with
-//   turning points, your team's win chance, the recap and your notes.
+// - Summary: the scoreboard, you vs your opponent, your early, mid, late and
+//   overall ratings, the lead chart with turning points, your team's win
+//   chance, the recap and your notes.
 // - Deep dive: @10 and @15 stats, team gold with objectives, deaths, the
 //   replay (beta, with the tempo timeline for junglers) and, for junglers,
 //   early pathing and early ganks.
@@ -42,6 +46,7 @@ export function AnalysisSections({
   analysis: a,
   winChance,
   chances,
+  phases,
   dd,
   label,
   recap,
@@ -55,6 +60,9 @@ export function AnalysisSections({
   // The replay's win chance at every second and its graded plays, null with
   // winChance.
   chances: ReplayChances | null;
+  // Your early, mid and late ratings, for the phases the game lasted long
+  // enough for. Empty when the game can't be rated.
+  phases: PhaseRating[];
   dd: DataDragon | null;
   label: (championName: string) => string;
   // Drawn by the page, since they load their own data.
@@ -87,6 +95,10 @@ export function AnalysisSections({
         at15={a.at15}
         finalGoldDiff={a.series?.gold.at(-1)?.diff ?? null}
       />
+
+      {phases.length > 0 && (
+        <PhaseRatings phases={phases} overall={scoreGame(match).get(a.me.participantId) ?? null} />
+      )}
 
       {a.series && a.opponent && (
         <div className="flex flex-wrap items-start gap-5">

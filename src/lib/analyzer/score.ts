@@ -67,6 +67,11 @@ type Stats = {
   share: (stat: (q: ScorePlayer) => number) => number;
 };
 
+// One stat a model looks at. `higherIsBetter` is the one thing we tell the
+// model up front; `good` and `bad` explain a score. The phase ratings
+// (phase-score.ts) use the same training with their own list.
+export type Feature = { key: string; higherIsBetter: boolean; good: string; bad: string };
+
 // What the model looks at, in order. `higherIsBetter` is the one thing we
 // tell it up front: more kills never makes you worse, more deaths never makes
 // you better. It learns how much each stat matters. The labels explain a
@@ -180,13 +185,18 @@ export type RoleModel = {
   cuts: number[];
 };
 
-export type ScoreModel = {
+// Weights shared by every role, plus each role's normal numbers, cut points
+// and (with enough games) its own weights.
+export type RoleModels = { shared: Weights; roles: Record<Role, RoleModel> };
+
+export type ScoreModel = RoleModels & {
   trainedAt: string;
   games: number;
   features: string[];
-  shared: Weights;
-  roles: Record<Role, RoleModel>;
 };
+
+// A rating turned into a score, with what helped and hurt it most.
+export type Rating = { score: number; strengths: string[]; weakness: string | null };
 
 export type PlayerScore = {
   participantId: number;
@@ -242,27 +252,11 @@ export function gameScores(game: ScoreGame, model: ScoreModel): PlayerScore[] | 
   if (!isScorable(game)) return null;
   if (model.features.join() !== featureKeys().join()) return null;
 
-  const scored = game.players.map((p) => {
-    const roleModel = model.roles[roleOf(p)!];
-    const weights = roleModel.own ?? model.shared;
-    const z = standardize(scoreFeatures(game, p), roleModel);
-    // How much each stat pushed the rating up (positive) or down (negative).
-    const pushes = z.map((value, i) => value * weights.weights[i]);
-    const rating = weights.bias + sum(pushes);
-
-    const ranked = pushes.map((push, i) => ({ push, i })).sort((a, b) => b.push - a.push);
-    const worst = ranked[ranked.length - 1];
-    return {
-      participantId: p.participantId,
-      win: p.win,
-      score: Math.round(percentile(rating, roleModel.cuts)),
-      strengths: ranked
-        .filter((r) => r.push > 0)
-        .slice(0, 2)
-        .map((r) => SCORE_FEATURES[r.i].good),
-      weakness: worst && worst.push < 0 ? SCORE_FEATURES[worst.i].bad : null,
-    };
-  });
+  const scored = game.players.map((p) => ({
+    participantId: p.participantId,
+    win: p.win,
+    ...rate(scoreFeatures(game, p), roleOf(p)!, model, SCORE_FEATURES),
+  }));
 
   return scored.map(({ win, ...rest }) => {
     const team = scored.filter((s) => s.win === win);
@@ -273,20 +267,58 @@ export function gameScores(game: ScoreGame, model: ScoreModel): PlayerScore[] | 
   });
 }
 
+// One player's rating from their stats: compared with their role's normal
+// numbers, weighted, then placed among the role's cut points.
+export function rate(
+  values: number[],
+  role: Role,
+  model: RoleModels,
+  features: readonly Feature[],
+): Rating {
+  const roleModel = model.roles[role];
+  const weights = roleModel.own ?? model.shared;
+  const z = standardize(values, roleModel);
+  // How much each stat pushed the rating up (positive) or down (negative).
+  const pushes = z.map((value, i) => value * weights.weights[i]);
+  const rating = weights.bias + sum(pushes);
+
+  const ranked = pushes.map((push, i) => ({ push, i })).sort((a, b) => b.push - a.push);
+  const worst = ranked[ranked.length - 1];
+  return {
+    score: Math.round(percentile(rating, roleModel.cuts)),
+    strengths: ranked
+      .filter((r) => r.push > 0)
+      .slice(0, 2)
+      .map((r) => features[r.i].good),
+    weakness: worst && worst.push < 0 ? features[worst.i].bad : null,
+  };
+}
+
 // Training: learns each role's normal numbers, then the weights, then the
 // cut points that turn ratings into scores. `games` is how many games the
 // examples came from, kept for the record.
 export function trainScoreModel(examples: Example[], games: number, trainedAt: Date): ScoreModel {
+  return {
+    trainedAt: trainedAt.toISOString(),
+    games,
+    features: featureKeys(),
+    ...trainRoleModels(examples, SCORE_FEATURES),
+  };
+}
+
+// The same training for any list of stats (the phase ratings have their own).
+export function trainRoleModels(examples: Example[], features: readonly Feature[]): RoleModels {
+  const width = features.length;
   const norms = new Map(
-    ROLES.map((role) => [role, normsOf(examples.filter((e) => e.role === role))]),
+    ROLES.map((role) => [role, normsOf(examples.filter((e) => e.role === role), width)]),
   );
   const rows = examples.map((e) => ({ ...e, z: standardize(e.features, norms.get(e.role)!) }));
-  const shared = trainWeights(rows);
+  const shared = trainWeights(rows, features);
 
   const roles = Object.fromEntries(
     ROLES.map((role) => {
       const own = rows.filter((r) => r.role === role);
-      const ownWeights = own.length >= MIN_ROLE_SAMPLES ? trainWeights(own) : null;
+      const ownWeights = own.length >= MIN_ROLE_SAMPLES ? trainWeights(own, features) : null;
       const w = ownWeights ?? shared;
       const ratings = own.map((r) => w.bias + dot(w.weights, r.z));
       const roleModel: RoleModel = {
@@ -299,7 +331,7 @@ export function trainScoreModel(examples: Example[], games: number, trainedAt: D
     }),
   ) as Record<Role, RoleModel>;
 
-  return { trainedAt: trainedAt.toISOString(), games, features: featureKeys(), shared, roles };
+  return { shared, roles };
 }
 
 // The rating's place among the cut points, 0 to 100. A rating halfway
@@ -316,8 +348,12 @@ export function percentile(rating: number, cuts: number[]): number {
 
 type Row = { matchId: string; z: number[]; win: boolean };
 
-function trainWeights(rows: Row[]): Weights {
-  return { ...fitLogistic(rows), samples: rows.length, accuracy: crossValidate(rows) };
+function trainWeights(rows: Row[], features: readonly Feature[]): Weights {
+  return {
+    ...fitLogistic(rows, { features }),
+    samples: rows.length,
+    accuracy: crossValidate(rows, 5, features),
+  };
 }
 
 // How often weights trained without a game pick the right result in it.
@@ -325,14 +361,21 @@ function trainWeights(rows: Row[]): Weights {
 // weights trained on the other four. Players from the same game always stay
 // in the same group, since teammates share a result and would make it look
 // too easy.
-export function crossValidate(rows: Row[], folds = 5): number {
+export function crossValidate(
+  rows: Row[],
+  folds = 5,
+  features: readonly Feature[] = SCORE_FEATURES,
+): number {
   const ids = [...new Set(rows.map((r) => r.matchId))];
   const fold = new Map(ids.map((id, i) => [id, i % folds]));
   let correct = 0;
   for (let k = 0; k < folds; k++) {
     const test = rows.filter((r) => fold.get(r.matchId) === k);
     if (test.length === 0) continue;
-    const model = fitLogistic(rows.filter((r) => fold.get(r.matchId) !== k));
+    const model = fitLogistic(
+      rows.filter((r) => fold.get(r.matchId) !== k),
+      { features },
+    );
     for (const r of test) {
       const winning = model.bias + dot(model.weights, r.z) > 0;
       if (winning === r.win) correct++;
@@ -348,9 +391,14 @@ export function crossValidate(rows: Row[], folds = 5): number {
 // any one weight from growing huge when there are only a few hundred games.
 export function fitLogistic(
   rows: Row[],
-  { steps = 2000, rate = 0.5, l2 = 0.01 } = {},
+  {
+    steps = 2000,
+    rate = 0.5,
+    l2 = 0.01,
+    features = SCORE_FEATURES,
+  }: { steps?: number; rate?: number; l2?: number; features?: readonly Feature[] } = {},
 ): { weights: number[]; bias: number } {
-  const width = SCORE_FEATURES.length;
+  const width = features.length;
   const weights: number[] = new Array(width).fill(0);
   let bias = 0;
   const n = rows.length;
@@ -366,7 +414,7 @@ export function fitLogistic(
     }
     for (let i = 0; i < width; i++) {
       const next = weights[i] - rate * (grad[i] / n + l2 * weights[i]);
-      weights[i] = SCORE_FEATURES[i].higherIsBetter ? Math.max(0, next) : Math.min(0, next);
+      weights[i] = features[i].higherIsBetter ? Math.max(0, next) : Math.min(0, next);
     }
     bias -= rate * (gradBias / n);
   }
@@ -381,8 +429,8 @@ function featureKeys(): string[] {
   return SCORE_FEATURES.map((f) => f.key);
 }
 
-function normsOf(examples: Example[]) {
-  const mean = SCORE_FEATURES.map((_, i) => average(examples.map((e) => e.features[i])));
+function normsOf(examples: Example[], width: number) {
+  const mean = Array.from({ length: width }, (_, i) => average(examples.map((e) => e.features[i])));
   const std = mean.map((m, i) => {
     const spread = Math.sqrt(average(examples.map((e) => (e.features[i] - m) ** 2)));
     // A stat that never varies (or a role with no games yet) would divide by zero.
