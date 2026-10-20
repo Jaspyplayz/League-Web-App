@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // in plain Node, so swap it for an empty module.
 vi.mock("server-only", () => ({}));
 
+// The shared count lives in Postgres. Here it's a stand-in that lets every
+// request through unless a test says otherwise.
+const waitTimeFor = vi.fn<(host: string) => Promise<number>>();
+const saveCooldown = vi.fn<(host: string, until: Date) => Promise<void>>();
+vi.mock("./rate-limit-store", () => ({ waitTimeFor, saveCooldown }));
+
 const { RiotApiError, riotGet, resetCooldowns, settle } = await import("./client");
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -13,6 +19,8 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   vi.useFakeTimers();
   resetCooldowns();
+  waitTimeFor.mockReset().mockResolvedValue(0);
+  saveCooldown.mockReset().mockResolvedValue();
 });
 
 afterEach(() => {
@@ -99,6 +107,41 @@ describe("riotGet", () => {
     vi.advanceTimersByTime(30_000);
     fetchMock.mockResolvedValueOnce(respond(200, "back"));
     await expect(call("americas")).resolves.toBe("back");
+  });
+
+  it("on a 429, tells the other servers when to try again", async () => {
+    fetchMock.mockResolvedValueOnce(respond(429, {}, { "Retry-After": "30" }));
+    const before = Date.now();
+    await expect(call("americas")).rejects.toMatchObject({ kind: "rate-limited" });
+    expect(saveCooldown).toHaveBeenCalledWith("americas", new Date(before + 30_000));
+  });
+
+  it("takes a turn before every attempt, retries included", async () => {
+    fetchMock.mockResolvedValueOnce(respond(503)).mockResolvedValueOnce(respond(200, "ok"));
+    await expect(call("na1")).resolves.toBe("ok");
+    expect(waitTimeFor.mock.calls).toEqual([["na1"], ["na1"]]);
+  });
+
+  it("waits out a short wait, then calls Riot", async () => {
+    waitTimeFor.mockResolvedValueOnce(600).mockResolvedValueOnce(0);
+    fetchMock.mockResolvedValueOnce(respond(200, "ok"));
+    await expect(call()).resolves.toBe("ok");
+    expect(waitTimeFor).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails as rate-limited without calling Riot when the wait is long", async () => {
+    waitTimeFor.mockResolvedValue(45_000);
+    await expect(call("americas")).rejects.toMatchObject({
+      kind: "rate-limited",
+      retryAfter: 45,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // The next request on this server doesn't even ask the database.
+    waitTimeFor.mockClear();
+    await expect(call("americas")).rejects.toMatchObject({ kind: "rate-limited" });
+    expect(waitTimeFor).not.toHaveBeenCalled();
   });
 });
 

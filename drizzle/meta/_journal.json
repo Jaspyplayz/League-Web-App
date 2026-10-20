@@ -120,6 +120,13 @@
       "when": 1792462237125,
       "tag": "0016_refill_champion_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792463279550,
+      "tag": "0017_riot_rate_limits",
+      "breakpoints": true
     }
   ]
 }

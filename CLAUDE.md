@@ -42,7 +42,8 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   api/mcp/ is the MCP server, with its tools in src/lib/mcp/
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
-src/lib/riot/     Server-only Riot client (rate limits, retries) and one function per endpoint
+src/lib/riot/     Server-only Riot client (retries; rate-limit.ts counts requests, shared
+                  across servers in Postgres by rate-limit-store.ts) and one function per endpoint
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
                   trends.ts rolls games up into the Insights page, compare.ts
                   sets them against one rank's games or one chosen player's,

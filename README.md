@@ -137,7 +137,7 @@ flowchart LR
 
 - **The API key never reaches the browser.** All Riot calls happen on the server, in server components and server actions.
 - **Cache forever what never changes.** A finished match and its timeline are permanent, so they're stored once in Postgres. Only things that do change (rank, the latest match list) expire, after a day or when you press Update.
-- **One client for every Riot call, and a budget per page.** A development or personal API key allows 100 requests every 2 minutes, and loading one new player can take 20+ calls. The client backs off for as long as Riot asks after a `429`, and slower pages like Insights fetch a few timelines per load, filling in the rest over a few automatic reloads.
+- **One client for every Riot call, and a budget per page.** A development or personal API key allows 100 requests every 2 minutes, and loading one new player can take 20+ calls. The client counts requests in Postgres before calling, so every server on Vercel shares one count, and backs off for as long as Riot asks after a `429`, and slower pages like Insights fetch a few timelines per load, filling in the rest over a few automatic reloads.
 - **The analyzer is pure functions.** Match JSON in, results out: no network, no database. That makes it easy to unit-test.
 - **Analysis is recomputed, not stored.** The analyzer runs on the stored match every time, so improving it never means refetching anything from Riot.
 - **Models ship as JSON.** Training runs offline from a script; the site only loads the learned weights, so a prediction is a few multiplications.
