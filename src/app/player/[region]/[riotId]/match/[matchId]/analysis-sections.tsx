@@ -16,16 +16,15 @@ import { supabaseConfig } from "@/lib/supabase/config";
 import type { MatchWinChance } from "@/lib/win-chance";
 import { AnalysisTabs } from "./analysis-tabs";
 import { Deaths } from "./deaths";
+import { EarlyJungle } from "./early-jungle";
 import { GameTimeline } from "./game-timeline";
-import { Ganks } from "./ganks";
 import { Matchup } from "./match-header";
-import { PathingGrid } from "./pathing";
 import { PhaseRatings } from "./phase-ratings";
 import { Replay } from "./replay";
 import { Review } from "./review";
 import type { ItemInfo, ReplayPerson } from "./replay-scoreboard";
 import { Scoreboard } from "./scoreboard";
-import { SnapshotTiles } from "./snapshot-tiles";
+import { SnapshotTable } from "./snapshot-table";
 import { TeamGold } from "./team-gold";
 
 // Everything below the match header, once the match has been analyzed, in
@@ -35,9 +34,11 @@ import { TeamGold } from "./team-gold";
 //   game went", the lead and win chance charts on one time axis with the
 //   turning points and biggest swings beside them; then the recap and your
 //   notes side by side (the "shared timeline" layout, 2026-10-20).
-// - Deep dive: @10 and @15 stats, team gold with objectives, deaths, the
-//   replay (beta, with the tempo timeline for junglers) and, for junglers,
-//   early pathing and early ganks.
+// - Deep dive: the replay first (beta, with the tempo timeline for
+//   junglers), then one table of you vs your opponent at 10 and 15 minutes,
+//   team gold with objectives beside your deaths and, for junglers, one
+//   "Early jungle" panel with early pathing and both junglers' ganks
+//   ("tighter, replay first", 2026-10-20).
 export function AnalysisSections({
   region,
   match,
@@ -139,14 +140,6 @@ export function AnalysisSections({
 
   const deepDive = (
     <>
-      {a.at10 && <SnapshotTiles snapshot={a.at10} />}
-      {a.at15 && <SnapshotTiles snapshot={a.at15} />}
-
-      <div className="flex flex-wrap items-start gap-5">
-        <TeamGold points={a.teamGold} objectives={a.objectives} />
-        <Deaths deaths={a.deaths} name={name} />
-      </div>
-
       <Replay
         replay={a.replay}
         chances={chances}
@@ -159,10 +152,23 @@ export function AnalysisSections({
         tempoDocsHref={`${REPO_URL}/blob/main/docs/tempo.md`}
       />
 
-      {a.pathing && <PathingGrid pathing={a.pathing} />}
-      {a.ganks && a.opponent && (
-        <Ganks ganks={a.ganks} enemyJungler={label(a.opponent.championName)} />
+      {a.opponent && (
+        <SnapshotTable
+          snapshots={[a.at10, a.at15].filter((s) => s !== null)}
+          opponentName={label(a.opponent.championName)}
+        />
       )}
+
+      <div className="flex flex-wrap items-start gap-5">
+        <TeamGold points={a.teamGold} objectives={a.objectives} />
+        <Deaths deaths={a.deaths} name={name} />
+      </div>
+
+      <EarlyJungle
+        pathing={a.pathing}
+        ganks={a.ganks}
+        enemyJungler={a.opponent ? label(a.opponent.championName) : null}
+      />
     </>
   );
 
