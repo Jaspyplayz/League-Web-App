@@ -20,6 +20,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Win chance (each team's chance to win at every minute): [docs/win-chance.md](docs/win-chance.md)
 - AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
 - Habits (level 6 first, first scuttles, early ganks and first back on Insights, with how often games with them were won): [docs/habits.md](docs/habits.md)
+- Session blocks (win rate and game score by how many games you played in a row, on Insights): [docs/sessions.md](docs/sessions.md)
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Replay (beta: the whole game second by second, with every player's items and spot on the map, every play graded by the win chance, and the checks behind them): [docs/replay.md](docs/replay.md)
 - Ask (signed-in players ask Claude about a player's games; Claude reads them with the MCP tools, 10 questions a day, $20 a month for the site): [docs/ask.md](docs/ask.md)
@@ -49,6 +50,7 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   trends.ts rolls games up into the Insights page, compare.ts
                   sets them against one rank's games or one chosen player's,
                   habits.ts reads early-game habits (habit-trends.ts splits wins by them),
+                  sessions.ts groups games played back to back into blocks,
                   score.ts is the trained 0 to 100 game score (score-model.json),
                   phase-score.ts the early, mid and late ratings (phase-score-model.json),
                   win-chance.ts each team's chance to win at every minute,

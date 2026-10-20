@@ -5,6 +5,7 @@ import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
 import { compareHabits } from "@/lib/analyzer/habit-trends";
+import { analyzeSessions, toSessionGames } from "@/lib/analyzer/sessions";
 import { checkWeaknesses, computeTrends } from "@/lib/analyzer/trends";
 import { loadBenchmarks, loadBenchmarkTiers } from "@/lib/benchmark-store";
 import {
@@ -14,6 +15,7 @@ import {
   type InsightsFilters,
 } from "@/lib/insights-filters";
 import { championClass, championName, getDataDragon, type DataDragon } from "@/lib/ddragon";
+import { scoreGame } from "@/lib/game-score";
 import { playerKey } from "@/lib/focus";
 import { isRegion } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
@@ -27,6 +29,7 @@ import { CompareWithPlayer } from "./compare-with-player";
 import { FocusPanel } from "./focus";
 import { HabitsSection } from "./habits";
 import { InsightsFilterBar } from "./insights-filters";
+import { SessionBlocks } from "./session-blocks";
 import { TierComparison } from "./tier-comparison";
 import { LaningChart } from "./laning-chart";
 import { CsPhases, EarlyDeaths, LeadsAndDeficits } from "./trend-sections";
@@ -206,6 +209,12 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const benchmarks = tier ? await loadBenchmarks(tier) : [];
   const comparison = compareWithBenchmarks(games, benchmarks, classOf);
   const habits = compareHabits(games, benchmarks);
+  // Session blocks use every game that loaded, ARAM and other champions
+  // included: they're about when you played, so leaving games out would
+  // break blocks apart. Only matches are needed, no timelines.
+  const sessions = analyzeSessions(
+    toSessionGames(matches, puuid, (match, id) => scoreGame(match).get(id)?.score ?? null),
+  );
   const playerComparison = theirs
     ? compareWithBenchmarks(games, theirs.games, classOf, MIN_PLAYER_GAMES)
     : null;
@@ -242,6 +251,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
         />
       )}
       {habits && <HabitsSection report={habits} tier={tier} />}
+      <SessionBlocks report={sessions} champion={filters.champion} />
       <CompareWithPlayer
         chosen={chosen}
         comparison={playerComparison}
