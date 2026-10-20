@@ -1,6 +1,6 @@
 "use client";
 
-// The 60-second review, on the Summary tab under the scoreboard: the plays
+// The 60-second review, near the top of the Summary tab: the plays
 // you were in that moved your team's chance to win the most (picked in
 // src/lib/analyzer/review.ts), each with a question to think over. "Watch in
 // replay" opens the Deep dive tab with the replay at that moment, and "Add

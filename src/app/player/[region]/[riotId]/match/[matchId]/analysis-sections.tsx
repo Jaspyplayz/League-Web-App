@@ -1,19 +1,14 @@
 import type { ReactNode } from "react";
 import type { TurningPointMarker } from "@/components/diff-chart";
 import { REPO_URL } from "@/components/site-header";
+import { panelClass } from "@/components/ui/panel";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
 import type { PhaseRating } from "@/lib/analyzer/phase-score";
 import type { ReplayChances } from "@/lib/analyzer/plays";
 import { reviewMoments } from "@/lib/analyzer/review";
 import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
-import {
-  championIconUrl,
-  itemIconUrl,
-  itemName,
-  riftMapUrl,
-  type DataDragon,
-} from "@/lib/ddragon";
+import { championIconUrl, itemIconUrl, itemName, riftMapUrl, type DataDragon } from "@/lib/ddragon";
 import { scoreGame } from "@/lib/game-score";
 import type { Region } from "@/lib/regions";
 import type { Match } from "@/lib/riot/types";
@@ -21,8 +16,8 @@ import { supabaseConfig } from "@/lib/supabase/config";
 import type { MatchWinChance } from "@/lib/win-chance";
 import { AnalysisTabs } from "./analysis-tabs";
 import { Deaths } from "./deaths";
+import { GameTimeline } from "./game-timeline";
 import { Ganks } from "./ganks";
-import { LeadChart } from "./lead-chart";
 import { Matchup } from "./match-header";
 import { PathingGrid } from "./pathing";
 import { PhaseRatings } from "./phase-ratings";
@@ -32,14 +27,14 @@ import type { ItemInfo, ReplayPerson } from "./replay-scoreboard";
 import { Scoreboard } from "./scoreboard";
 import { SnapshotTiles } from "./snapshot-tiles";
 import { TeamGold } from "./team-gold";
-import { TurningPoints } from "./turning-points";
-import { WinChance } from "./win-chance";
 
 // Everything below the match header, once the match has been analyzed, in
 // two tabs so the vital part comes first (Jasper's order, 2026-10-19):
-// - Summary: the scoreboard, the 60-second review, you vs your opponent,
-//   your early, mid, late and overall ratings, the lead chart with turning
-//   points, your team's win chance, the recap and your notes.
+// - Summary: the scoreboard; one strip with you vs your opponent and your
+//   early, mid, late and overall ratings; the 60-second review; "How the
+//   game went", the lead and win chance charts on one time axis with the
+//   turning points and biggest swings beside them; then the recap and your
+//   notes side by side (the "shared timeline" layout, 2026-10-20).
 // - Deep dive: @10 and @15 stats, team gold with objectives, deaths, the
 //   replay (beta, with the tempo timeline for junglers) and, for junglers,
 //   early pathing and early ganks.
@@ -94,6 +89,25 @@ export function AnalysisSections({
         opponentId={a.opponent?.participantId ?? null}
       />
 
+      <section
+        aria-label="You vs your opponent and game by phase"
+        className={`${panelClass} grid ${phases.length > 0 ? "lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" : ""}`}
+      >
+        <Matchup
+          dd={dd}
+          me={a.me}
+          opponent={a.opponent}
+          at15={a.at15}
+          finalGoldDiff={a.series?.gold.at(-1)?.diff ?? null}
+        />
+        {phases.length > 0 && (
+          <PhaseRatings
+            phases={phases}
+            overall={scoreGame(match).get(a.me.participantId) ?? null}
+          />
+        )}
+      </section>
+
       {/* "Add to notes" only when there's a notes box, which needs sign-in
           to be set up. */}
       {chances && (
@@ -103,33 +117,23 @@ export function AnalysisSections({
         />
       )}
 
-      <Matchup
-        dd={dd}
-        me={a.me}
-        opponent={a.opponent}
-        at15={a.at15}
-        finalGoldDiff={a.series?.gold.at(-1)?.diff ?? null}
+      <GameTimeline
+        lead={
+          a.series && a.opponent
+            ? { series: a.series, markers, opponentName: label(a.opponent.championName) }
+            : null
+        }
+        turningPoints={a.turningPoints}
+        winChance={winChance}
       />
 
-      {phases.length > 0 && (
-        <PhaseRatings phases={phases} overall={scoreGame(match).get(a.me.participantId) ?? null} />
-      )}
-
-      {a.series && a.opponent && (
-        <div className="flex flex-wrap items-start gap-5">
-          <LeadChart
-            series={a.series}
-            markers={markers}
-            opponentName={label(a.opponent.championName)}
-          />
-          <TurningPoints points={a.turningPoints} />
-        </div>
-      )}
-
-      {winChance && <WinChance {...winChance} />}
-
-      {recap}
-      {notes}
+      {/* Side by side when both show. Either can be missing (no recap
+          without the API key, no notes without sign-in), and the other then
+          takes the full width. */}
+      <div className="flex flex-wrap gap-5 empty:hidden *:min-w-0 *:flex-[1_1_340px]">
+        {recap}
+        {notes}
+      </div>
     </>
   );
 

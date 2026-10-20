@@ -5,7 +5,6 @@ import { playedPosition } from "@/lib/analyzer/matchup";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import { formatDuration, gameDurationSeconds, queueName, timeAgo } from "@/lib/match-summary";
 import type { Match, Participant } from "@/lib/riot/types";
-import { panelClass } from "@/components/ui/panel";
 
 const POSITION_NAMES: Record<string, string> = {
   TOP: "Top",
@@ -63,7 +62,11 @@ export function MatchHeader({ match, me, now }: { match: Match; me: Participant;
   );
 }
 
-// "You vs your opponent" panel with a verdict in the middle.
+// "You vs your opponent": both players and a verdict. It fills the left of
+// the strip it shares with "Game by phase", so it stacks: verdict on top,
+// then you, then your opponent. When it has the strip to itself (a game too
+// short to rate), there's room to put you and your opponent side by side
+// with the verdict between, which a container query checks.
 export function Matchup({
   dd,
   me,
@@ -78,19 +81,18 @@ export function Matchup({
   finalGoldDiff: number | null;
 }) {
   return (
-    <section
-      aria-label="Matchup"
-      className={`${panelClass} flex flex-wrap items-center gap-x-8 gap-y-5 p-6`}
-    >
-      <PlayerSide dd={dd} player={me} side="you" />
-      <Verdict at15={at15} finalGoldDiff={finalGoldDiff} hasOpponent={opponent !== null} />
-      {opponent ? (
-        <PlayerSide dd={dd} player={opponent} side="opponent" />
-      ) : (
-        <p className="flex-[1_1_260px] text-right text-muted">
-          No single enemy played your role this game, so there&apos;s no head-to-head comparison.
-        </p>
-      )}
+    <section aria-label="Matchup" className="@container min-w-0 p-6">
+      <div className="flex flex-col gap-5 @2xl:flex-row @2xl:items-center @2xl:justify-between @2xl:gap-8">
+        <PlayerSide dd={dd} player={me} side="you" />
+        <Verdict at15={at15} finalGoldDiff={finalGoldDiff} hasOpponent={opponent !== null} />
+        {opponent ? (
+          <PlayerSide dd={dd} player={opponent} side="opponent" />
+        ) : (
+          <p className="text-muted @2xl:flex-[1_1_260px] @2xl:text-right">
+            No single enemy played your role this game, so there&apos;s no head-to-head comparison.
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -121,8 +123,9 @@ function Verdict({
     even: "border-line-strong bg-page text-muted",
   }[tone];
 
+  // Stacked, the verdict leads; side by side, it sits in the middle.
   return (
-    <div className="flex flex-[0_1_auto] flex-col items-center gap-2 text-center max-sm:basis-full">
+    <div className="order-first flex flex-wrap items-center gap-x-3 gap-y-2 @2xl:order-none @2xl:flex-col @2xl:text-center">
       <span
         className={`rounded-full border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.12em] ${pill}`}
       >
@@ -148,49 +151,33 @@ function PlayerSide({
   const position = POSITION_NAMES[playedPosition(p)];
   const riotName = p.riotIdGameName ?? "";
 
-  const text = (
-    <div className={isYou ? "" : "text-right"}>
-      <p
-        className={`font-mono text-[11px] uppercase tracking-[0.12em] ${isYou ? "text-ahead-soft" : "text-behind"}`}
-      >
-        {isYou ? "You" : "Your opponent"}
-      </p>
-      <p className="text-lg font-semibold">
-        {championName(dd, p.championName)}{" "}
-        <span className="text-[15px] font-normal text-faint">
-          {[riotName, position].filter(Boolean).join(" · ")}
-        </span>
-      </p>
-      <p className="font-mono text-[15px] text-ink-soft">
-        {p.kills} / {p.deaths} / {p.assists} · {p.totalMinionsKilled + p.neutralMinionsKilled} CS
-      </p>
-    </div>
-  );
-
+  // Side by side, your opponent is mirrored on the right, portrait outside.
   return (
-    <div className={`flex flex-[1_1_260px] items-center gap-4 ${isYou ? "" : "justify-end"}`}>
-      {isYou && <Portrait dd={dd} name={p.championName} tone="ahead" />}
-      {text}
-      {!isYou && <Portrait dd={dd} name={p.championName} tone="behind" />}
+    <div
+      className={`flex min-w-0 items-center gap-4 @2xl:flex-[1_1_260px] ${isYou ? "" : "@2xl:flex-row-reverse @2xl:text-right"}`}
+    >
+      <ChampionIcon
+        dd={dd}
+        name={p.championName}
+        size={56}
+        className={`flex-none rounded-2xl border-2 ${isYou ? "border-ahead" : "border-behind"}`}
+      />
+      <div className="min-w-0">
+        <p
+          className={`font-mono text-[11px] uppercase tracking-[0.12em] ${isYou ? "text-ahead-soft" : "text-behind"}`}
+        >
+          {isYou ? "You" : "Your opponent"}
+        </p>
+        <p className="text-lg font-semibold">
+          {championName(dd, p.championName)}{" "}
+          <span className="text-[15px] font-normal text-faint">
+            {[riotName, position].filter(Boolean).join(" · ")}
+          </span>
+        </p>
+        <p className="font-mono text-[15px] text-ink-soft">
+          {p.kills} / {p.deaths} / {p.assists} · {p.totalMinionsKilled + p.neutralMinionsKilled} CS
+        </p>
+      </div>
     </div>
-  );
-}
-
-function Portrait({
-  dd,
-  name,
-  tone,
-}: {
-  dd: DataDragon | null;
-  name: string;
-  tone: "ahead" | "behind";
-}) {
-  return (
-    <ChampionIcon
-      dd={dd}
-      name={name}
-      size={64}
-      className={`rounded-2xl border-2 ${tone === "ahead" ? "border-ahead" : "border-behind"}`}
-    />
   );
 }
