@@ -35,47 +35,7 @@ Next.js 16 (App Router) + TypeScript, Tailwind CSS 4, Supabase Postgres via Driz
 
 ## Layout
 
-```
-src/app/          Routes. player/[region]/[riotId]/ is the player page;
-                  .../match/[matchId]/ under it is the match analysis page
-                  and .../insights/ the trends across the last 20 to 100 games,
-                  .../log/ the Log tab (one card per day, src/lib/daily-log.ts),
-                  .../champions/ the season's stats per champion and enemy
-                  champion (src/lib/champion-stats.ts);
-                  settings/ holds preferences saved in the browser (theme);
-                  api/mcp/ is the MCP server, with its tools in src/lib/mcp/
-src/components/   React components; ui/ holds small shared pieces
-src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
-src/lib/riot/     Server-only Riot client (retries; rate-limit.ts counts requests, shared
-                  across servers in Postgres by rate-limit-store.ts) and one function per endpoint
-src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
-                  trends.ts rolls games up into the Insights page, compare.ts
-                  sets them against one rank's games or one chosen player's,
-                  habits.ts reads early-game habits (habit-trends.ts splits wins by them),
-                  sessions.ts groups games played back to back into blocks,
-                  score.ts is the trained 0 to 100 game score (score-model.json),
-                  phase-score.ts the early, mid and late ratings (phase-score-model.json),
-                  win-chance.ts each team's chance to win at every minute,
-                  tempo.ts the jungle tempo timeline (tempo-study.ts checks it)
-                  and replay.ts the replay, with items.ts and positions.ts
-                  (item-check.ts and position-check.ts check them), rift.ts
-                  (the Rift's walls, learned from games, which champions walk
-                  around) and plays.ts (the chance to win at every second, plays graded by it);
-                  review.ts picks the 60-second review's moments from those plays
-src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
-src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
-                  each save also adds changed ranks to rank_history for the LP graph
-src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
-src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
-src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
-src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves answers, ask-rules.ts the caps
-src/db/           Drizzle schema, connection, and cache freshness rules
-src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
-scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, train-phase-score, tempo study, item check)
-drizzle/          Generated SQL migrations (never edit by hand)
-docs/             Design and research docs
-.claude/          Claude Code settings, hooks/ (lint and typecheck before commits), agents/reviewer.md, skills/explain-back
-```
+Routes live in `src/app/`, React components in `src/components/` and helpers in `src/lib/`, most with a `.test.ts` next to them (the pure match analyzer is `src/lib/analyzer/`, the server-only Riot client `src/lib/riot/`). The Drizzle schema is in `src/db/`, generated migrations in `drizzle/`, command-line jobs in `scripts/` and docs in `docs/`. The file-by-file map is in [ARCHITECTURE.md](ARCHITECTURE.md#where-the-code-lives).
 
 ## Commands
 
@@ -84,8 +44,8 @@ docs/             Design and research docs
 | `npm run dev` | Dev server at http://localhost:3000 |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | Next.js type generation + `tsc` |
-| `npm test` | Vitest unit tests |
-| `npm run test:e2e` | Playwright smoke test (`e2e/`); runs on each Vercel preview ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test)) |
+| `npm test` | Vitest unit tests, including golden tests on four real games (`src/lib/analyzer/golden.test.ts`) |
+| `npm run test:e2e` | Playwright smoke test and accessibility scan (`e2e/`); runs on each Vercel preview ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test)) |
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
@@ -95,7 +55,7 @@ docs/             Design and research docs
 | `npm run tempo-games` / `study-tempo` | Download games for the tempo study into the git-ignored `.cache/tempo-study`, then print its report ([docs/tempo.md](docs/tempo.md)) |
 | `npm run tempo-games -- --items` / `check-items` / `check-positions` / `rift-map` | Download games into `.cache/item-check`, then check the replay's rebuilt items against Riot's, or its map positions against Riot's snapshots, or learn the Rift's walls from them ([docs/replay.md](docs/replay.md#running-the-checks)) |
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR, and [dependency review](.github/workflows/dependency-review.yml) checks new packages for known vulnerabilities. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass.
 
 ## Environment
 
@@ -111,14 +71,13 @@ Production values live in Vercel's environment variables, which Jasper sets hims
 
 ## Design
 
-Dark "scouting report" style, with a light theme picked on `/settings` (saved in localStorage, applied before paint by `src/lib/theme.ts`). Tokens live in `src/app/globals.css`, once for dark and once under `data-theme="light"`, so any new color needs both: **blue = you / ahead / win, red = opponent / behind / loss** (blue and red, never green and red, so color-blind players can tell them apart). Reuse the tokens (`bg-surface`, `text-muted`, `text-ahead`...) instead of raw colors. Views of both teams (scoreboards, Team analysis) color the winning team blue and the losing team red, with your row outlined; that includes the kill score and the build and runes picker. Where two numbers sit side by side, write the gap in words with `ui/gap.tsx` ("614 behind"). Cards use `ui/panel.tsx` (`Panel`, or `panelClass` for a list or paragraph); text sizes stick to Tailwind's plus `text-label`, `text-note` and `text-body`. Approved mockups: https://claude.ai/artifact/2yuQ2qLhDpjqX5SMLubpDr (only viewable from Jasper's account).
+Dark "scouting report" style with a light theme. **Blue = you / ahead / win, red = opponent / behind / loss**, never green and red. The full rules (tokens for both themes, panels, text sizes, the approved mockups) are in [.claude/rules/design.md](.claude/rules/design.md), which loads when Claude opens a page, a component or `globals.css`.
 
 ## Code rules
 
 - **Riot calls and database access stay on the server.** Modules that touch the API key or `DATABASE_URL` import `"server-only"`.
 - Every Riot request goes through the rate-limited client in `src/lib/riot/client.ts`.
-- Finished matches and timelines are cached forever; a player's profile (rank, match list) expires after a day or on "Update" (see `src/db/freshness.ts`).
-- Keep the analyzer as pure functions (match JSON in, results out) with Vitest tests.
+- Rules for one area live in `.claude/rules/` and load when Claude opens a file there: [design](.claude/rules/design.md), [analyzer](.claude/rules/analyzer.md), [database](.claude/rules/database.md) and [Riot client](.claude/rules/riot.md).
 - Write comments that explain *why* in plain language, matching the existing code.
 - `/privacy` and `/terms` are what Riot reviews for production keys and Riot sign-in. A change that stores new data (accounts, analytics, cookies) updates `src/app/privacy/page.tsx` in the same PR.
 
@@ -131,10 +90,11 @@ Dark "scouting report" style, with a light theme picked on `/settings` (saved in
 - **Review tiers.** Pick tiny, normal or risky when a thread starts and name it in the PR; normal and risky PRs get the reviewer agent (`.claude/agents/reviewer.md`) before Jasper reads them. The steps are in [docs/workflow.md](docs/workflow.md). Until a second model is set up, risky PRs say "no second review yet".
 - **When sources disagree,** trust the code and live settings, then repo docs and decision records, then GitHub issues and PRs, then Jasper's Obsidian vault, project memory and the shared notes, and name the one that is out of date.
 - **Leave "My read" to Jasper.** He writes it before merging normal and risky PRs and runs `/explain-back` on risky ones; never fill it in.
+- **Skills** in `.claude/skills/` are general advice, most copied unchanged from other repos ([notices](.claude/skills/THIRD-PARTY-NOTICES.md)); where one disagrees with this file or `docs/workflow.md`, the repo wins. Use `doubt-driven-development` only on risky changes.
 - At most two branches in progress at once, touching different files.
 - **Merge conflicts:** merge `main` into the branch (don't rebase shared branches). For `package-lock.json`, take `main`'s version and re-run `npm install`.
 - `next dev` may re-add a block to `AGENTS.md`; committing it is fine.
 
 ## Keeping this file current
 
-Update this file in the same PR whenever a change makes it wrong: a new command, env var, folder, convention or major decision. Keep it under about 100 lines; link to `docs/` for detail instead of copying it here. Jasper can also ask Claude to "update CLAUDE.md" with a new rule.
+Update this file, and the folder map in [ARCHITECTURE.md](ARCHITECTURE.md#where-the-code-lives), in the same PR whenever a change makes them wrong: a new command, env var, folder, convention or major decision. Keep it under about 100 lines; link to `docs/` for detail instead of copying it here, and put rules that matter in only one folder in `.claude/rules/`. Jasper can also ask Claude to "update CLAUDE.md" with a new rule.

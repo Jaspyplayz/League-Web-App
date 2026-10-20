@@ -7,8 +7,8 @@
 // This only checks Claude's commits; commits you type yourself are not affected.
 
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { commitFolder, hasPackages } from "./commit-folder.mjs";
 
 // Files whose changes can break lint or typecheck. Docs-only commits skip the check.
 const CODE_FILE = /\.(ts|tsx|js|jsx|mjs|cjs|json)$/;
@@ -19,12 +19,23 @@ function run(command, cwd) {
 
 const input = JSON.parse(readFileSync(0, "utf8"));
 const command = input.tool_input?.command ?? "";
-if (!/\bgit\s+commit\b/.test(command)) process.exit(0);
+// Check the checkout the commit lands in. `cwd` is the folder Claude is working
+// in, which is a worktree's root inside a worktree; CLAUDE_PROJECT_DIR always
+// points at the main checkout, so it's only the fallback.
+const here = input.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+const folder = commitFolder(command, here);
+if (!folder) process.exit(0);
 
-const projectDir = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
+let projectDir;
+try {
+  projectDir = run("git rev-parse --show-toplevel", folder).trim();
+} catch {
+  // Not a git folder, so the commit will fail on its own.
+  process.exit(0);
+}
 
 // Without installed packages there is nothing to check with; let CI catch it.
-if (!existsSync(join(projectDir, "node_modules"))) process.exit(0);
+if (!hasPackages(projectDir)) process.exit(0);
 
 // Staged files, plus unstaged ones in case the commit uses -a.
 const changed = run("git diff --cached --name-only && git diff --name-only", projectDir)

@@ -22,6 +22,12 @@
             "if": "Bash(git commit *)",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-before-commit.mjs\"",
             "timeout": 300
+          },
+          {
+            "type": "command",
+            "if": "Bash(git -C * commit *)",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-before-commit.mjs\"",
+            "timeout": 300
           }
         ]
       }

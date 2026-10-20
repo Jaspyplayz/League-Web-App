@@ -1,0 +1,25 @@
+name: Dependency review
+
+# When a PR adds or upgrades a package (in package-lock.json, or an action in
+# these workflow files), this checks the new versions against GitHub's list of
+# known vulnerabilities and fails the PR if one is found. It's free on public
+# repos. It runs on every PR, not only ones that touch the lockfile, so it can
+# become a required check later: a required check that never starts would
+# block the PR. Without dependency changes it passes in seconds.
+# Docs: https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/manage-your-dependency-security/configure-dependency-review-action
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v4
+        with:
+          # By default it only fails on packages the site runs with. Dev
+          # packages, such as the test and lint tools, run on Jasper's computer
+          # and in CI, so a vulnerable one should fail the PR too.
+          fail-on-scopes: runtime, development

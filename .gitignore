@@ -156,6 +156,8 @@ next-env.d.ts
 
 # Claude Code personal settings (notifications, status line)
 .claude/settings.local.json
+# Worktrees Claude Code makes for subagents that work on their own copy
+.claude/worktrees/
 
 # Playwright
 /test-results/

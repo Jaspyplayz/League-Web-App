@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Subagents' copies of the repo. The commit hook lints each one in its own folder.
+    ".claude/worktrees/**",
   ]),
 ]);
 
