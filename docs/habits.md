@@ -19,7 +19,7 @@ The trip to the shop is found the same way as in the [tempo timeline](tempo.md):
 
 ## On Insights
 
-The section is [`insights/habits.tsx`](../src/app/player/%5Bregion%5D/%5BriotId%5D/insights/habits.tsx), fed by `compareHabits` in [`src/lib/analyzer/habit-trends.ts`](../src/lib/analyzer/habit-trends.ts). It's about the role you played most in the games on the page (pick a champion to narrow it), and compares you with that rank's games in the same role, picked in **You vs [rank]**.
+The section is [`insights/habits.tsx`](../src/app/player/%5Bregion%5D/%5BriotId%5D/insights/habits.tsx), fed by `compareHabits` in [`src/lib/analyzer/habit-trends.ts`](../src/lib/analyzer/habit-trends.ts). It's about the role you played most in the games on the page (pick a champion to narrow it), and compares you with that rank's games in the same role, picked in **You vs [rank]** (on the You vs others tab; the Habits and sessions tab keeps that choice).
 
 Each habit becomes a yes or no for every game:
 

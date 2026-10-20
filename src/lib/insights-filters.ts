@@ -43,3 +43,18 @@ export function pickTier(requested: string | string[] | undefined, available: Ti
   const match = available.find((t) => t === asked);
   return match ?? available.at(-1) ?? null;
 }
+
+// The three tabs under the filters (?view=). Each one is its own URL, so a
+// reload, a shared link or the progress bar's auto-refresh keeps the tab
+// you're on.
+export const INSIGHTS_VIEWS = [
+  { id: "overview", label: "Overview" },
+  { id: "others", label: "You vs others" },
+  { id: "habits", label: "Habits and sessions" },
+] as const;
+export type InsightsView = (typeof INSIGHTS_VIEWS)[number]["id"];
+
+// Anything unexpected falls back to Overview, the first tab.
+export function readView(requested: string | string[] | undefined): InsightsView {
+  return INSIGHTS_VIEWS.find((v) => v.id === requested)?.id ?? INSIGHTS_VIEWS[0].id;
+}
