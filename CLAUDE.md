@@ -21,6 +21,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - AI match recaps (Claude writes a few sentences from the analyzer's numbers): [docs/match-recap.md](docs/match-recap.md)
 - Habits (level 6 first, first scuttles, early ganks and first back on Insights, with how often games with them were won): [docs/habits.md](docs/habits.md)
 - Session blocks (win rate and game score by how many games you played in a row, on Insights): [docs/sessions.md](docs/sessions.md)
+- Death recaps added up ("What keeps killing you" on Insights: the champions and abilities in most of your deaths, and the damage type): [docs/death-recaps.md](docs/death-recaps.md)
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Replay (beta: the whole game second by second, with every player's items and spot on the map, every play graded by the win chance, and the checks behind them): [docs/replay.md](docs/replay.md)
 - 60-second review (the three plays you were in that moved the win chance most, on the match page's Summary tab, each a question to think over and a jump into the replay): [docs/review.md](docs/review.md)

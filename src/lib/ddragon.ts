@@ -38,6 +38,8 @@ export type DataDragon = {
 type ChampionFile = {
   data: Record<string, { id: string; key?: string; name: string; tags?: string[] }>;
 };
+// One champion's own file, champion/Elise.json, which also has its abilities.
+type ChampionDetailFile = { data: Record<string, { spells: { name: string }[] }> };
 type ItemFile = { data: Record<string, { name: string }> };
 type SummonerFile = { data: Record<string, { id: string; key: string; name: string }> };
 type RunesFile = {
@@ -148,6 +150,35 @@ export function itemIconUrl(dd: DataDragon, itemId: number): string {
 
 export function summonerSpell(dd: DataDragon, spellId: number): SummonerSpell | null {
   return dd.spells[spellId] ?? null;
+}
+
+// Death recaps name summoner spells by text id ("SummonerDot"), in any case,
+// rather than by number.
+export function summonerSpellNamed(dd: DataDragon, spellName: string): SummonerSpell | null {
+  const wanted = spellName.toLowerCase();
+  return Object.values(dd.spells).find((s) => s.id.toLowerCase() === wanted) ?? null;
+}
+
+// A champion's Q, W, E and R names, in that order ("Neurotoxin / Venomous
+// Bite" for Elise's Q), for "What keeps killing you" on Insights. They're in
+// each champion's own file, not champion.json, so only the few champions a
+// page shows are fetched. Null if Data Dragon doesn't answer.
+export async function getChampionSpells(
+  dd: DataDragon,
+  championName: string,
+): Promise<string[] | null> {
+  const id = dd.champions[championName.toLowerCase()]?.id ?? championName;
+  return championSpells(dd.version, id).catch(() => null);
+}
+
+async function championSpells(version: string, id: string): Promise<string[]> {
+  "use cache";
+  cacheLife("days");
+
+  const file = await getJson<ChampionDetailFile>(
+    `${BASE}/cdn/${version}/data/en_US/champion/${id}.json`,
+  );
+  return file.data[id]?.spells.map((s) => s.name) ?? [];
 }
 
 export function summonerSpellIconUrl(dd: DataDragon, spell: SummonerSpell): string {
