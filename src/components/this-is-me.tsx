@@ -10,7 +10,7 @@ type Props = { region: string; puuid: string; gameName: string; tagLine: string 
 
 const button = "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors";
 const off = "border-line-strong text-faint hover:border-ahead hover:text-ink";
-const on = "border-ahead bg-ahead/15 text-ahead";
+const on = "border-ahead bg-ahead/15 text-ahead-soft";
 
 // The "This is me" button next to a player's name. Marking a profile as yours
 // adds a My profile link to the header. It depends on who's signed in, which
