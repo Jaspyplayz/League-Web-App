@@ -1,8 +1,7 @@
 ---
 name: explain-back
-description: Quiz Jasper on a pull request before he merges it
+description: Quiz Jasper on a pull request before he merges it. Use only when he types /explain-back or asks to be quizzed on a PR; never start it on your own.
 argument-hint: "[PR number]"
-disable-model-invocation: true
 ---
 
 The PR to quiz on: $ARGUMENTS (if that's empty, run `git fetch origin main` and
