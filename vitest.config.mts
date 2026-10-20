@@ -5,5 +5,7 @@ export default defineConfig({
   // the way Next.js does.
   resolve: { tsconfigPaths: true },
   // e2e/ holds the Playwright browser test, which runs with `npm run test:e2e`.
-  test: { exclude: [...configDefaults.exclude, "e2e/**"] },
+  // .claude/worktrees/ holds subagents' copies of the repo, whose tests would
+  // otherwise run a second time, half-finished.
+  test: { exclude: [...configDefaults.exclude, "e2e/**", ".claude/worktrees/**"] },
 });
