@@ -10,9 +10,9 @@ The thread picks a tier when it starts and names it in the PR, so tiny changes s
 
 | Tier | What counts | Before code | After code | Jasper's part |
 |---|---|---|---|---|
-| Tiny | Copy, styling inside one component, docs, Dependabot bumps | Nothing | Commit hook, CI, smoke test | Skim the diff and the preview, merge |
-| Normal | A feature or fix inside one area, such as a new Insights card | An issue with 3 to 5 acceptance criteria; Claude reads the code and posts a short plan | Tiny's checks, plus the [reviewer agent](../.claude/agents/reviewer.md) and a screenshot or test name per criterion | "My read" on the PR before merging |
-| Risky | `src/db/`, `drizzle/`, sign-in, the Riot client and rate limiter, `src/app/api/`, anything that spends Claude API money, model retraining, a new judgment shown to players (a grade, a cause, a rating), Riot policy questions | Normal's issue, plus a decision record draft; Jasper approves the plan | Normal's checks, plus a second model's review and Jasper's own test of the preview | `/explain-back`, then "My read" |
+| Tiny | Copy, styling inside one component, docs, Dependabot's weekly minor and patch bumps | Nothing | Commit hook, CI, smoke test | Skim the diff and the preview, merge |
+| Normal | A feature or fix inside one area, such as a new Insights card; a Dependabot major version bump; a change in `.github/` or `.claude/` that adds or tightens a check | An issue with 3 to 5 acceptance criteria; Claude reads the code and posts a short plan | Tiny's checks, plus the [reviewer agent](../.claude/agents/reviewer.md) and a screenshot or test name per criterion | "My read" on the PR before merging |
+| Risky | `src/db/`, `drizzle/`, sign-in, the Riot client and rate limiter, `src/app/api/`, anything that spends Claude API money, model retraining, a new judgment shown to players (a grade, a cause, a rating), Riot policy questions, anything that removes or loosens a check (a CI step, the commit hook, a deny rule) | Normal's issue, plus a draft [decision record](#decision-records); Jasper approves the plan | Normal's checks, plus a second model's review and Jasper's own test of the preview | `/explain-back`, then "My read" |
 
 Every tier runs the same automatic checks; the extra steps in the lower rows are where Jasper's time goes. Until a second model is set up, risky PRs say "no second review yet" in their Review section.
 
@@ -66,6 +66,12 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 
 On risky PRs, Jasper first types `/explain-back` (or `/explain-back 135` for PR 135) in Claude Code. The skill ([`.claude/skills/explain-back/SKILL.md`](../.claude/skills/explain-back/SKILL.md)) asks him three questions about the PR, one at a time: what it does, one decision it made, and one input that would break it. Then it lists what he got right and what he missed, with a file and line for each miss. It only runs when he types it, so it costs nothing the rest of the time. If typing `/explain-back` does nothing in a project thread, remove its `disable-model-invocation` line so that asking for a quiz starts it.
 
+## Decision records
+
+A decision record is a one-page note on a big choice and why it was made, the answer to "why did you build it this way?". Each one is a file in `docs/adr/`, named `NNNN-title.md`, with these sections: Context, Options considered, Decision, Consequences (good and bad), and "In my words", two or three sentences Jasper writes without Claude. Once merged, a record isn't edited; a new one replaces it and the old one says "superseded by NNNN".
+
+Numbers 0001 to 0004 are saved for the four records [#16](https://github.com/Jaspyplayz/League-Web-App/issues/16) asks Jasper to write, so the first record a risky PR drafts is 0005.
+
 ## Three meanings of done
 
 - **Merged:** CI is green and it deployed.
@@ -79,5 +85,5 @@ The next three normal PRs go through the whole loop, then a 15-minute retro: did
 ## Guard rails
 
 - **GitHub** is the lock. The "Protect Main Branch" ruleset requires a pull request before anything reaches `main` (0 approvals, since GitHub won't let you approve your own PR), requires the `check` and `Vercel` checks to pass, and blocks force pushes and deleting `main`.
-- **Claude Code's deny rules** in [`.claude/settings.json`](../.claude/settings.json) stop Claude from reading `.env.local`, where the real keys live on Jasper's computer, and from force pushing. The docs say a Bash rule matches the command as Claude writes it and "isn't a security boundary", so these catch mistakes rather than lock anything ([permissions](https://code.claude.com/docs/en/permissions)).
-- **The commit hook** in the same file runs lint and typecheck before Claude commits, so CI rarely goes red.
+- **Claude Code's deny rules** in [`.claude/settings.json`](../.claude/settings.json) stop Claude's file tools, and commands like `cat` and `sed`, from reading `.env.local`, where the real keys live on Jasper's computer. They also refuse force pushes (`--force`, `--force-with-lease`, `-f` or a `+branch`, written as `git push` or `git -C <folder> push`). A Bash rule matches the command as Claude writes it, so the docs say it "isn't a security boundary" ([permissions](https://code.claude.com/docs/en/permissions)): a search like `grep -r` over the whole folder, a script that opens the file, or a combined flag like `-uf` gets past these. They catch mistakes; GitHub is the lock.
+- **The commit hook** in the same file runs lint and typecheck when Claude runs `git commit`, so CI rarely goes red.

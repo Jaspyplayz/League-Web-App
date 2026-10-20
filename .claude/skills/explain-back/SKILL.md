@@ -5,8 +5,8 @@ argument-hint: "[PR number]"
 disable-model-invocation: true
 ---
 
-The PR to quiz on: $ARGUMENTS (if that's empty, use the current branch's diff
-against main).
+The PR to quiz on: $ARGUMENTS (if that's empty, run `git fetch origin main` and
+use `git diff origin/main...HEAD`, since a local main can be far behind).
 
 Read the PR's diff and its issue. Ask Jasper three questions, one at a time:
 what the change does in one sentence, one decision it made and the alternative,

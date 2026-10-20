@@ -14,9 +14,8 @@ If you weren't given the acceptance criteria, say so in your first line and chec
 PR description's claims instead.
 
 Start by running `git fetch origin main`, `git diff origin/main...HEAD` and `npm test`.
-Read CLAUDE.md, any `.claude/rules/` file that covers the changed paths, and the docs
-the diff touches. If `npm test` can't run here, say so and use the test output you
-were given.
+Read CLAUDE.md and the docs the diff touches. If `npm test` can't run here, say so
+and use the test output you were given.
 
 Check in this order:
 1. Each acceptance criterion: met, not met, or untestable, with file:line evidence.
