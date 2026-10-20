@@ -76,7 +76,7 @@ Dark "scouting report" style with a light theme. **Blue = you / ahead / win, red
 ## Code rules
 
 - **Riot calls and database access stay on the server.** Modules that touch the API key or `DATABASE_URL` import `"server-only"`.
-- Every Riot request goes through the rate-limited client in `src/lib/riot/client.ts`, and game data comes only from Riot's API and Data Dragon (no scraping, no CommunityDragon).
+- Every Riot request goes through the rate-limited client in `src/lib/riot/client.ts`.
 - Rules for one area live in `.claude/rules/` and load when Claude opens a file there: [design](.claude/rules/design.md), [analyzer](.claude/rules/analyzer.md), [database](.claude/rules/database.md) and [Riot client](.claude/rules/riot.md).
 - Write comments that explain *why* in plain language, matching the existing code.
 - `/privacy` and `/terms` are what Riot reviews for production keys and Riot sign-in. A change that stores new data (accounts, analytics, cookies) updates `src/app/privacy/page.tsx` in the same PR.
@@ -97,4 +97,4 @@ Dark "scouting report" style with a light theme. **Blue = you / ahead / win, red
 
 ## Keeping this file current
 
-Update this file in the same PR whenever a change makes it wrong: a new command, env var, folder, convention or major decision. Keep it under about 100 lines; link to `docs/` for detail instead of copying it here, and put rules that matter in only one folder in `.claude/rules/`. Jasper can also ask Claude to "update CLAUDE.md" with a new rule.
+Update this file, and the folder map in [ARCHITECTURE.md](ARCHITECTURE.md#where-the-code-lives), in the same PR whenever a change makes them wrong: a new command, env var, folder, convention or major decision. Keep it under about 100 lines; link to `docs/` for detail instead of copying it here, and put rules that matter in only one folder in `.claude/rules/`. Jasper can also ask Claude to "update CLAUDE.md" with a new rule.
