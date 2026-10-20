@@ -1,17 +1,22 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { searchPlayer } from "@/app/actions";
 import { isRegion, REGIONS } from "@/lib/regions";
 import { parseRiotId } from "@/lib/riot-id";
 import { ArrowRightIcon } from "./icons";
-import { noteSearch } from "./saved-players";
+import { noteSearch, SavedPlayersMenu } from "./saved-players";
 import { panelClass } from "@/components/ui/panel";
 
 const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
 
 export function SearchForm() {
   const [state, action, pending] = useActionState(searchPlayer, { error: null });
+  // What's typed in the Riot ID box, to narrow the saved players menu, and
+  // whether that menu is showing: from clicking into the form until you
+  // click or tab out of it, press Escape, or pick a player.
+  const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Runs in the browser just before the form is sent, so the profile page can
   // tell this player came from a search and add them to Recent.
@@ -23,7 +28,21 @@ export function SearchForm() {
   }
 
   return (
-    <form action={action} onSubmit={rememberSearch} role="search" aria-label="Player lookup" className="flex max-w-[600px] flex-col gap-2">
+    <form
+      action={action}
+      onSubmit={rememberSearch}
+      role="search"
+      aria-label="Player lookup"
+      onFocus={() => setMenuOpen(true)}
+      onBlur={(event) => {
+        // Focus moving between fields of this form keeps the menu open.
+        if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setMenuOpen(false);
+      }}
+      className="relative flex max-w-[600px] flex-col gap-2"
+    >
       <div className={`${panelClass} flex flex-wrap gap-2 p-2 focus-within:border-ahead`}>
         <div className="flex min-w-0 flex-[1_1_260px] flex-col px-3 py-1.5 max-sm:basis-full">
           <label htmlFor="riotId" className={fieldLabel}>
@@ -35,6 +54,12 @@ export function SearchForm() {
             required
             placeholder="GameName#TAG"
             autoComplete="off"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setMenuOpen(true);
+            }}
+            onClick={() => setMenuOpen(true)}
             aria-invalid={state.error ? true : undefined}
             aria-describedby={state.error ? "search-error" : undefined}
             className="min-w-0 bg-transparent py-0.5 text-lg text-ink outline-none placeholder:text-placeholder focus-visible:outline-none"
@@ -66,6 +91,7 @@ export function SearchForm() {
           <ArrowRightIcon />
         </button>
       </div>
+      {menuOpen && !pending && <SavedPlayersMenu query={query} onPick={() => setMenuOpen(false)} />}
       {state.error && (
         <p id="search-error" role="alert" className="px-1 text-sm text-behind">
           {state.error}

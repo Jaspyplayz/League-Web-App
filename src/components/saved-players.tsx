@@ -19,6 +19,7 @@ import {
 } from "@/lib/saved-players";
 import { toSlug } from "@/lib/riot-id";
 import { StarIcon } from "./icons";
+import { panelClass } from "./ui/panel";
 
 // The recent and pinned player lists are kept in this browser's localStorage
 // (see src/lib/saved-players.ts). These components run in the browser
@@ -132,7 +133,7 @@ export function PinButton(player: SavedPlayer) {
       aria-label={isPinned ? `Unpin ${riotId}` : `Pin ${riotId}`}
       title={
         full
-          ? `You can pin up to ${MAX_PINNED_PLAYERS} players. Unpin one on the home page first.`
+          ? `You can pin up to ${MAX_PINNED_PLAYERS} players. Unpin one in the list under the search box first.`
           : isPinned
             ? "Unpin this player"
             : "Pin this player to the home page"
@@ -148,93 +149,142 @@ export function PinButton(player: SavedPlayer) {
   );
 }
 
-const chip =
-  "flex items-center rounded-full border border-line-strong font-mono text-ink-soft transition-colors hover:border-ahead";
-
-// Two rows under the search box: players you pinned, then the ones you
-// searched for last. A pinned player isn't repeated under Recent. Each row is hidden
-// while it's empty.
-export function SavedPlayers() {
-  const pinned = useSavedPlayers(PINNED_PLAYERS_KEY);
-  const recent = useSavedPlayers(RECENT_PLAYERS_KEY).filter((p) => !hasPlayer(pinned, p));
+// The list that drops down under the search box when you click into it, like
+// op.gg's: players you pinned, then the ones you searched for last, newest
+// first. A pinned player isn't repeated under Recent. Typing narrows both
+// lists to the players whose Riot ID contains what you typed, and the menu
+// hides itself when nothing matches. `onPick` closes the menu once you've
+// picked a player.
+export function SavedPlayersMenu({ query, onPick }: { query: string; onPick: () => void }) {
+  const pinnedAll = useSavedPlayers(PINNED_PLAYERS_KEY);
+  const recentAll = useSavedPlayers(RECENT_PLAYERS_KEY).filter((p) => !hasPlayer(pinnedAll, p));
+  const typed = query.trim().toLowerCase();
+  const matches = (p: SavedPlayer) => riotId(p).toLowerCase().includes(typed);
+  const pinned = pinnedAll.filter(matches);
+  const recent = recentAll.filter(matches);
   if (pinned.length === 0 && recent.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      // Clicking inside the menu keeps the cursor in the search box, so the
+      // menu doesn't close under the mouse before the click lands.
+      onMouseDown={(event) => event.preventDefault()}
+      className={`${panelClass} absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-1 py-2 shadow-lg`}
+    >
+      {recent.length > 0 && (
+        <MenuSection
+          id="recent-players-label"
+          label="Recent"
+          action={
+            // Only offered before you type, so it can't look like it clears
+            // just the players that match.
+            typed === "" && (
+              <button
+                type="button"
+                onClick={() => update(RECENT_PLAYERS_KEY, () => [])}
+                className="hover:text-ink hover:underline"
+              >
+                Clear
+              </button>
+            )
+          }
+        >
+          {recent.map((p) => (
+            <MenuRow
+              key={key(p)}
+              player={p}
+              // Picking a recent player moves them back to the top.
+              onPick={() => {
+                update(RECENT_PLAYERS_KEY, (list) => addRecentPlayer(list, p));
+                onPick();
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => update(RECENT_PLAYERS_KEY, (list) => removePlayer(list, p))}
+                aria-label={`Remove ${riotId(p)} from recent players`}
+                title="Remove"
+                className="flex size-9 items-center justify-center text-lg text-faint hover:text-ink"
+              >
+                ×
+              </button>
+            </MenuRow>
+          ))}
+        </MenuSection>
+      )}
       {pinned.length > 0 && (
-        <PlayerRow id="pinned-players-label" label="Pinned">
+        <MenuSection id="pinned-players-label" label="Pinned">
           {pinned.map((p) => (
-            <li key={key(p)} className={chip}>
-              <PlayerLink player={p} />
+            <MenuRow key={key(p)} player={p} onPick={onPick}>
               <button
                 type="button"
                 onClick={() => update(PINNED_PLAYERS_KEY, (list) => removePlayer(list, p))}
                 aria-label={`Unpin ${riotId(p)}`}
                 title="Unpin"
-                className="rounded-full px-2.5 py-2 text-ahead hover:text-ink"
+                className="flex size-9 items-center justify-center text-ahead hover:text-ink"
               >
                 <StarIcon size={14} filled />
               </button>
-            </li>
+            </MenuRow>
           ))}
-        </PlayerRow>
-      )}
-      {recent.length > 0 && (
-        <PlayerRow id="recent-players-label" label="Recent">
-          {recent.map((p) => (
-            <li key={key(p)} className={chip}>
-              <PlayerLink player={p} />
-              <button
-                type="button"
-                onClick={() => update(RECENT_PLAYERS_KEY, (list) => removePlayer(list, p))}
-                aria-label={`Remove ${riotId(p)} from recent players`}
-                className="rounded-full px-2.5 py-2 text-faint hover:text-ink"
-              >
-                ×
-              </button>
-            </li>
-          ))}
-          <li>
-            <button
-              type="button"
-              onClick={() => update(RECENT_PLAYERS_KEY, () => [])}
-              className="px-1.5 py-2 underline-offset-2 hover:text-ink hover:underline"
-            >
-              Clear
-            </button>
-          </li>
-        </PlayerRow>
+        </MenuSection>
       )}
     </div>
   );
 }
 
-function PlayerRow({
+function MenuSection({
   id,
   label,
+  action,
   children,
 }: {
   id: string;
   label: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-2.5 text-sm text-faint">
-      <span id={id} className="w-14 flex-none py-2">
-        {label}
-      </span>
-      <ul aria-labelledby={id} className="flex min-w-0 flex-1 flex-wrap gap-2">
+    <div className="flex flex-col">
+      <div className="flex items-center justify-between px-4 py-1.5 font-mono text-[11px] tracking-[0.12em] text-faint uppercase">
+        <span id={id}>{label}</span>
+        {action}
+      </div>
+      <ul aria-labelledby={id} className="flex flex-col">
         {children}
       </ul>
     </div>
   );
 }
 
-function PlayerLink({ player: p }: { player: SavedPlayer }) {
+// One player: their region and Riot ID, linking to their profile, with a
+// small button on the right (remove or unpin).
+function MenuRow({
+  player: p,
+  onPick,
+  children,
+}: {
+  player: SavedPlayer;
+  onPick: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <Link href={`/player/${p.region}/${toSlug(p)}`} className="py-2 pl-3.5 pr-1 hover:text-ink">
-      <span className="text-faint">{p.region.toUpperCase()}</span> {riotId(p)}
-    </Link>
+    <li className="flex items-center pr-2 hover:bg-surface-hover">
+      <Link
+        href={`/player/${p.region}/${toSlug(p)}`}
+        onClick={onPick}
+        className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-ink-soft hover:text-ink"
+      >
+        <span className="hud-cut-sm w-10 flex-none border border-frame py-0.5 text-center font-mono text-[11px] text-faint">
+          {p.region.toUpperCase()}
+        </span>
+        <span className="truncate">
+          {p.gameName}
+          <span className="text-faint">#{p.tagLine}</span>
+        </span>
+      </Link>
+      {children}
+    </li>
   );
 }
 
