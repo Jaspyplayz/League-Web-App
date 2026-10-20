@@ -1,6 +1,6 @@
 # 60-second review
 
-Reviewing a 30-minute game takes too long, and most players don't know what to look for, so most never do it. The 60-second review makes it short: right under the scoreboard on a game's Summary tab, the three plays you were in that moved your team's chance to win the most, each with a question to think over and a button that opens the replay at that second.
+Reviewing a 30-minute game takes too long, and most players don't know what to look for, so most never do it. The 60-second review makes it short: near the top of a game's Summary tab (under the scoreboard and the strip with your matchup and phase ratings), the three plays you were in that moved your team's chance to win the most, each with a question to think over and a button that opens the replay at that second.
 
 The moments are picked in [`src/lib/analyzer/review.ts`](../src/lib/analyzer/review.ts) from the replay's [graded plays](replay.md#how-the-plays-are-graded). The panel is `match/[matchId]/review.tsx`, and its buttons reach the replay and the notes box through `review-links.tsx`, which the tabs (`analysis-tabs.tsx`) hold.
 

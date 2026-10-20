@@ -39,10 +39,16 @@ export type DiffChart = {
 // win chance always runs from 0% to 100%). Otherwise the range fits the data.
 export type ChartRange = { min: number; max: number; step: number };
 
+// The minutes the chart spans, for charts stacked on one time axis (the
+// match page's lead and win chance): both get the same domain, so the same
+// minute sits at the same x on each. Otherwise it's the data's first to last.
+export type MinuteDomain = { first: number; last: number };
+
 export function buildDiffChart(
   points: DiffPoint[],
   box: ChartBox = DEFAULT_BOX,
   range?: ChartRange,
+  domain?: MinuteDomain,
 ): DiffChart {
   if (points.length < 2) throw new Error("A diff chart needs at least two points.");
 
@@ -51,8 +57,8 @@ export function buildDiffChart(
   // Round the range outward to whole ticks and always include zero.
   const maxDiff = range?.max ?? Math.max(step, Math.ceil(Math.max(...diffs) / step) * step);
   const minDiff = range?.min ?? Math.min(-step, Math.floor(Math.min(...diffs) / step) * step);
-  const firstMinute = points[0].minute;
-  const lastMinute = points[points.length - 1].minute;
+  const firstMinute = domain?.first ?? points[0].minute;
+  const lastMinute = domain?.last ?? points[points.length - 1].minute;
 
   const plotLeft = box.left;
   const plotRight = box.width - box.right;
@@ -70,7 +76,8 @@ export function buildDiffChart(
     pts.map((p, i) => `${i === 0 ? "M" : "L"}${fmt(x(p.minute))},${fmt(y(p.diff))}`).join(" ");
   const toArea = (clamp: (d: number) => number) =>
     `${toPath(withCrossings.map((p) => ({ minute: p.minute, diff: clamp(p.diff) })))} ` +
-    `L${fmt(x(lastMinute))},${fmt(zeroY)} L${fmt(x(firstMinute))},${fmt(zeroY)} Z`;
+    `L${fmt(x(points[points.length - 1].minute))},${fmt(zeroY)} ` +
+    `L${fmt(x(points[0].minute))},${fmt(zeroY)} Z`;
 
   const yTicks: number[] = [];
   for (let v = maxDiff; v >= minDiff; v -= step) yTicks.push(v);

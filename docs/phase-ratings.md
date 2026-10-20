@@ -1,6 +1,6 @@
 # Phase ratings
 
-Each game on the match page gets four 0 to 100 numbers in the **Game by phase** panel of the Summary tab: one each for your early, mid and late game, plus an overall rating, which is your [game score](game-score.md) (the number on the match row). Each tile says what helped or held back that phase the most.
+Each game on the match page gets four 0 to 100 numbers in the **Game by phase** half of the Summary tab's top strip, beside "you vs your opponent": one each for your early, mid and late game, plus an overall rating, which is your [game score](game-score.md) (the number on the match row). Each tile says what helped or held back that phase the most.
 
 Like the game score, these are performance numbers: how your stats in that part of the game compare with other players in your role. They don't grade your decisions.
 

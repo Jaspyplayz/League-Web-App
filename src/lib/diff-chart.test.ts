@@ -45,6 +45,22 @@ describe("buildDiffChart", () => {
     expect(chart.xTicks).toEqual([0, 10, 20, 30]);
   });
 
+  it("spans a shared domain instead of the data's own minutes when given one", () => {
+    const chart = buildDiffChart(
+      [
+        { minute: 0, diff: 0 },
+        { minute: 25, diff: 100 },
+      ],
+      box,
+      undefined,
+      { first: 0, last: 50 },
+    );
+    expect(chart.x(25)).toBe(50);
+    expect(chart.xTicks).toEqual([0, 10, 20, 30, 40, 50]);
+    // The filled area still closes under the last point, not at the edge.
+    expect(chart.aheadArea).toContain(`L50,${chart.zeroY} L0,${chart.zeroY} Z`);
+  });
+
   it("still shows both sides when a player was never behind", () => {
     const chart = buildDiffChart(
       [

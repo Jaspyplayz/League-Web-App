@@ -4,6 +4,7 @@ import {
   formatDiff,
   type ChartRange,
   type DiffPoint,
+  type MinuteDomain,
 } from "@/lib/diff-chart";
 
 export type TurningPointMarker = {
@@ -11,6 +12,10 @@ export type TurningPointMarker = {
   label: string;
   // "behind" (red) when the moment cost you the lead, "ahead" (blue) when it won it.
   tone: "ahead" | "behind";
+  // What the circle says. Numbers by default (1, 2, 3); the win chance's
+  // swings use letters (A, B, C) so they can't be mixed up with the turning
+  // points when both charts sit together.
+  symbol?: string;
 };
 
 type Props = {
@@ -22,6 +27,13 @@ type Props = {
   // and labelling "+1.5k".
   range?: ChartRange;
   formatTick?: (value: number) => string;
+  // For charts stacked on one time axis: the same minutes for each, a shorter
+  // picture, the minute labels only under the bottom one, and lines at every
+  // 10 minutes so the eye can follow a moment from one chart to the other.
+  domain?: MinuteDomain;
+  height?: number;
+  minuteLabels?: boolean;
+  minuteLines?: boolean;
 };
 
 const TONE_COLOR = { ahead: "var(--color-ahead)", behind: "var(--color-behind)" };
@@ -35,9 +47,19 @@ export function DiffChart({
   description,
   range,
   formatTick = formatDiff,
+  domain,
+  height: boxHeight = DEFAULT_BOX.height,
+  minuteLabels = true,
+  minuteLines = false,
 }: Props) {
-  const chart = buildDiffChart(points, DEFAULT_BOX, range);
-  const { width, height, left, right } = DEFAULT_BOX;
+  const box = {
+    ...DEFAULT_BOX,
+    height: boxHeight,
+    // Without minute labels underneath, the space kept for them isn't needed.
+    bottom: minuteLabels ? DEFAULT_BOX.bottom : 24,
+  };
+  const chart = buildDiffChart(points, box, range, domain);
+  const { width, height, left, right, top, bottom } = box;
   const diffAt = (minute: number) =>
     points.reduce((best, p) =>
       Math.abs(p.minute - minute) < Math.abs(best.minute - minute) ? p : best,
@@ -58,6 +80,13 @@ export function DiffChart({
             <line key={v} x1={left} x2={width - right} y1={chart.y(v)} y2={chart.y(v)} />
           ))}
       </g>
+      {minuteLines && (
+        <g stroke="var(--color-line)" strokeWidth="1.5">
+          {chart.xTicks.map((m) => (
+            <line key={m} x1={chart.x(m)} x2={chart.x(m)} y1={top} y2={height - bottom} />
+          ))}
+        </g>
+      )}
       <g fontSize="22" fill="var(--color-faint)" textAnchor="end">
         {chart.yTicks.map((v) => (
           <text key={v} x={left - 12} y={chart.y(v) + 7}>
@@ -101,29 +130,31 @@ export function DiffChart({
               y={chart.y(diffAt(m.minute)) + 6.5}
               fill={TONE_COLOR[m.tone]}
             >
-              {i + 1}
+              {m.symbol ?? i + 1}
             </text>
           </g>
         ))}
       </g>
 
-      <g fontSize="22" fill="var(--color-faint)" textAnchor="middle">
-        {chart.xTicks.map((m, i) => {
-          const isLast = i === chart.xTicks.length - 1;
-          // Keep the last label ("30 min") inside the picture at the right edge.
-          const nearEdge = chart.x(m) > width - right - 30;
-          return (
-            <text
-              key={m}
-              x={isLast && nearEdge ? width : chart.x(m)}
-              y={height - 4}
-              textAnchor={isLast && nearEdge ? "end" : undefined}
-            >
-              {isLast ? `${m} min` : m}
-            </text>
-          );
-        })}
-      </g>
+      {minuteLabels && (
+        <g fontSize="22" fill="var(--color-faint)" textAnchor="middle">
+          {chart.xTicks.map((m, i) => {
+            const isLast = i === chart.xTicks.length - 1;
+            // Keep the last label ("30 min") inside the picture at the right edge.
+            const nearEdge = chart.x(m) > width - right - 30;
+            return (
+              <text
+                key={m}
+                x={isLast && nearEdge ? width : chart.x(m)}
+                y={height - 4}
+                textAnchor={isLast && nearEdge ? "end" : undefined}
+              >
+                {isLast ? `${m} min` : m}
+              </text>
+            );
+          })}
+        </g>
+      )}
     </svg>
   );
 }

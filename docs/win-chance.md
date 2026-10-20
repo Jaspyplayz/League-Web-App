@@ -1,6 +1,6 @@
 # Win chance
 
-The win chance is each team's chance of winning at every minute of a finished Summoner's Rift game, like the win probability line on sports broadcasts. The match page's **Win chance** panel draws your team's chance as a line, and **Biggest swings** lists the minutes that moved it most, with what each team took in that minute ("The enemy team took Baron and 2 kills, 68% → 38%"). The replay reads it at every second and grades each play by it (see [In the replay](#in-the-replay)).
+The win chance is each team's chance of winning at every minute of a finished Summoner's Rift game, like the win probability line on sports broadcasts. The match page's **How the game went** panel draws your team's chance as a line under the lead chart, on the same time axis, and **Biggest swings** (lettered A, B, C on the chart) lists the minutes that moved it most, with what each team took in that minute ("The enemy team took Baron and 2 kills, 68% → 38%"). The replay reads it at every second and grades each play by it (see [In the replay](#in-the-replay)).
 
 The code is in [`src/lib/analyzer/win-chance.ts`](../src/lib/analyzer/win-chance.ts), the trained model is [`src/lib/analyzer/win-chance-model.json`](../src/lib/analyzer/win-chance-model.json), and [`scripts/train-win-chance.ts`](../scripts/train-win-chance.ts) trains it. The panel is `match/[matchId]/win-chance.tsx`, fed by `matchWinChance` in [`src/lib/win-chance.ts`](../src/lib/win-chance.ts).
 
