@@ -11,6 +11,7 @@ Context and rules for Claude Code sessions working in this repo, on Jasper's com
 It's a portfolio project for Jasper (a second-year UofT student, new to TypeScript and React) to help land a software internship. Code and PRs should be easy for him to read and explain in an interview.
 
 - Live site: https://league-web-app.vercel.app (Vercel auto-deploys `main`; every PR gets a preview)
+- How the pieces fit together, with diagrams: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Scope and data model: [docs/SCOPE.md](docs/SCOPE.md)
 - Analyzer research: [docs/match-analyzer.md](docs/match-analyzer.md)
 - Database tables and setup: [docs/database.md](docs/database.md)
