@@ -9,9 +9,9 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `players` | searched player (by PUUID), with their latest match IDs | the whole profile after 24 h, or on "Update" (2 min cooldown) |
 | `ranked_entries` | player × ranked queue | with the player's profile |
 | `rank_history` | player × ranked queue × change, a dated copy of the rank | never; a row is added whenever a profile save finds the rank, LP or games played changed ([`src/lib/rank-history.ts`](../src/lib/rank-history.ts)), for the LP graph |
-| `player_seasons` | player × season, every match ID they played that season | with the player's profile; the games fill into `matches` 10 per profile visit |
+| `player_seasons` | player × season, every match ID they played that season | with the player's profile; the games fill into `matches` 10 per profile or Champions tab visit |
 | `matches` | game, with the full match-v5 JSON in `raw` | never |
-| `match_participants` | player × game (the scoreboard) | never (filled from `matches.raw`) |
+| `match_participants` | player × game (the scoreboard, plus the wards, multikills and CS at 10 the Champions tab adds up) | never (filled from `matches.raw`; migration 0015 filled the 0014 columns for older games) |
 | `match_timelines` | game, trimmed timeline | never, fetched only when the match is opened |
 | `match_insights` | player × game, analyzer output | never; recomputed locally when `version` changes |
 | `benchmark_games` | Sampled player (Iron to Challenger) × game, summary only, with the player's tier | filled by `npm run benchmarks`; keeps each player's last 20, deletes games older than 60 days |

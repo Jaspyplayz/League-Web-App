@@ -19,9 +19,15 @@ export const QUEUE_FILTERS = [
 
 export type QueueFilter = (typeof QUEUE_FILTERS)[number];
 
-// Anything unexpected in the URL falls back to All.
-export function readQueueFilter(value: string | string[] | undefined): QueueFilter {
-  return QUEUE_FILTERS.find((f) => f.id === value) ?? QUEUE_FILTERS[0];
+// Anything unexpected in the URL falls back to the page's default tab: All,
+// unless the page picks another.
+export function readQueueFilter(
+  value: string | string[] | undefined,
+  fallback: QueueFilter["id"] = "all",
+): QueueFilter {
+  return (
+    QUEUE_FILTERS.find((f) => f.id === value) ?? QUEUE_FILTERS.find((f) => f.id === fallback)!
+  );
 }
 
 // The queue IDs a filter covers, for looking games up in the database.

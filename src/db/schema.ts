@@ -150,6 +150,23 @@ export const matchParticipants = pgTable(
     visionScore: integer("vision_score").notNull(),
     // item0 to item6 in slot order; 0 means an empty slot.
     items: integer("items").array().notNull(),
+    // The rest are for the profile's Champions tab, which adds up a whole
+    // season of games: reading each game's full JSON for that is too slow.
+    // Null in rows saved before migration 0014 whose game lacked the field.
+    individualPosition: text("individual_position"),
+    damageTaken: integer("damage_taken"),
+    objectiveDamage: integer("objective_damage"),
+    earlySurrender: boolean("early_surrender"),
+    wardsPlaced: smallint("wards_placed"),
+    wardsKilled: smallint("wards_killed"),
+    controlWards: smallint("control_wards"), // control wards placed
+    doubleKills: smallint("double_kills"),
+    tripleKills: smallint("triple_kills"),
+    quadraKills: smallint("quadra_kills"),
+    pentaKills: smallint("penta_kills"),
+    // Lane minions plus jungle monsters killed in the first 10 minutes, from
+    // Riot's "challenges" stats, for the laning column.
+    csAt10: smallint("cs_at_10"),
   },
   (t) => [
     primaryKey({ columns: [t.matchId, t.puuid] }),

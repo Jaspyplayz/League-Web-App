@@ -12,6 +12,11 @@ describe("readQueueFilter", () => {
     expect(readQueueFilter("urf").id).toBe("all");
     expect(readQueueFilter(["solo", "flex"]).id).toBe("all");
   });
+
+  it("can fall back to another tab", () => {
+    expect(readQueueFilter(undefined, "solo").id).toBe("solo");
+    expect(readQueueFilter("aram", "solo").id).toBe("aram");
+  });
 });
 
 describe("queueIds", () => {

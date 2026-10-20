@@ -6,7 +6,7 @@ import type { GameTrend } from "../lib/analyzer/trends";
 import type { WinChanceGame } from "../lib/analyzer/win-chance";
 import { gameDurationSeconds } from "../lib/match-summary";
 import type { Region } from "../lib/regions";
-import type { Match } from "../lib/riot/types";
+import type { Match, Participant } from "../lib/riot/types";
 import type { Tier } from "../lib/tiers";
 import type { benchmarkGames, matches, matchParticipants, winChanceGames } from "./schema";
 
@@ -41,7 +41,29 @@ export function participantRows(match: Match): (typeof matchParticipants.$inferI
     damageToChampions: p.totalDamageDealtToChampions,
     visionScore: p.visionScore,
     items: [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6],
+    individualPosition: p.individualPosition,
+    damageTaken: p.totalDamageTaken,
+    objectiveDamage: p.damageDealtToObjectives ?? null,
+    earlySurrender: p.gameEndedInEarlySurrender ?? null,
+    wardsPlaced: p.wardsPlaced,
+    wardsKilled: p.wardsKilled ?? null,
+    controlWards: p.detectorWardsPlaced ?? null,
+    doubleKills: p.doubleKills ?? null,
+    tripleKills: p.tripleKills ?? null,
+    quadraKills: p.quadraKills ?? null,
+    pentaKills: p.pentaKills ?? null,
+    csAt10: csAt10(p),
   }));
+}
+
+// Null when Riot left the challenges out of the game (it does in some modes).
+function csAt10(p: Participant): number | null {
+  const lane = p.challenges?.laneMinionsFirst10Minutes;
+  const jungle = p.challenges?.jungleCsBefore10Minutes;
+  if (lane === undefined && jungle === undefined) return null;
+  // jungleCsBefore10Minutes can be a fraction (Riot counts some camps in
+  // parts), so round the total.
+  return Math.round((lane ?? 0) + (jungle ?? 0));
 }
 
 // Which stats a benchmark row has. Bump it when GameTrend gains a stat, and

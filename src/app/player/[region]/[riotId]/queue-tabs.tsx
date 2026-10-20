@@ -3,7 +3,16 @@ import { QUEUE_FILTERS, type QueueFilter } from "@/lib/queue-filters";
 
 // The game-mode tabs above the match list. Plain links that set ?queue=, so
 // the server renders the filtered list and the URL can be shared.
-export function QueueTabs({ playerPath, current }: { playerPath: string; current: QueueFilter }) {
+export function QueueTabs({
+  playerPath,
+  current,
+  defaultId = "all",
+}: {
+  playerPath: string; // the page the tabs link to, e.g. "/player/na/Name-TAG"
+  current: QueueFilter;
+  // The tab the page opens on, which needs no ?queue= in its link.
+  defaultId?: QueueFilter["id"];
+}) {
   return (
     <nav aria-label="Game mode" className="flex flex-wrap gap-1.5">
       {QUEUE_FILTERS.map((f) => {
@@ -11,7 +20,7 @@ export function QueueTabs({ playerPath, current }: { playerPath: string; current
         return (
           <Link
             key={f.id}
-            href={f.id === "all" ? playerPath : `${playerPath}?queue=${f.id}`}
+            href={f.id === defaultId ? playerPath : `${playerPath}?queue=${f.id}`}
             // Keep the page where it is, since the tabs sit below the header.
             scroll={false}
             aria-current={active ? "page" : undefined}

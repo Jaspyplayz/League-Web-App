@@ -78,7 +78,7 @@ export async function loadSeasonStats(
 // Every match ID this season, newest first. Read from the database while it
 // isn't older than the profile snapshot; otherwise asked from Riot again.
 // Null if there's no saved list and Riot can't be reached.
-async function seasonMatchIds(
+export async function seasonMatchIds(
   region: Region,
   puuid: string,
   profileUpdatedAt: Date,
