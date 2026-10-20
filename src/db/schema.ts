@@ -239,6 +239,39 @@ export const matchInsights = pgTable(
   ],
 ).enableRLS();
 
+// Personal records (src/lib/analyzer/records.ts): one player's early-game
+// numbers in one game, worked out from the saved match and timeline. A
+// season of these is a few hundred small rows, so the records can be found
+// without reading every timeline again (see src/lib/record-store.ts).
+export const recordGames = pgTable(
+  "record_games",
+  {
+    matchId: text("match_id")
+      .notNull()
+      .references(() => matches.matchId, { onDelete: "cascade" }),
+    puuid: text("puuid").notNull(),
+    championName: text("champion_name").notNull(),
+    // Riot's position name, or "" in games without roles (ARAM).
+    position: text("position").notNull(),
+    queueId: integer("queue_id").notNull(),
+    gameStartAt: timestamptz("game_start_at").notNull(),
+    win: boolean("win").notNull(),
+    // Null when the game can't tell, as in RecordGame.
+    csAt10: smallint("cs_at_10"),
+    goldAt15: integer("gold_at_15"),
+    level6S: smallint("level_6_s"),
+    earlyDeaths: smallint("early_deaths"),
+    earlyTakedowns: smallint("early_takedowns"),
+    // RECORDS_VERSION in record-store.ts. Bump it when a stat's rule
+    // changes, and older rows are worked out again from the saved timeline.
+    version: smallint("version").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.matchId, t.puuid] }),
+    index("record_games_puuid_idx").on(t.puuid, t.gameStartAt),
+  ],
+).enableRLS();
+
 // Benchmark games: one row per game from a sampled solo queue player of some
 // rank (Iron to Challenger, on KR, EUW or NA), collected by
 // `npm run benchmarks`. Insights compares your games with these. Only the

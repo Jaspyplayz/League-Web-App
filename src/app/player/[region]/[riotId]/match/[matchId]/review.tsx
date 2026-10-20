@@ -4,7 +4,8 @@
 // you were in that moved your team's chance to win the most (picked in
 // src/lib/analyzer/review.ts), each with a question to think over. "Watch in
 // replay" opens the Deep dive tab with the replay at that moment, and "Add
-// to notes" starts a line about it in your notes (review-links.tsx).
+// to notes" starts a line about it in your notes (review-links.tsx). Above
+// the moments, any personal records the game set (review-records.tsx).
 //
 // It's a Client Component for those two buttons. The moments arrive ready
 // from the server.
@@ -15,6 +16,7 @@ import { formatSwing, gradeOf } from "@/lib/analyzer/plays";
 import type { Moment } from "@/lib/analyzer/review";
 import { GRADE_CHIP } from "./replay-plays";
 import { useReviewLinks } from "./review-links";
+import { RecordLines } from "./review-records";
 
 export function Review({ moments, notes }: { moments: Moment[]; notes: boolean }) {
   const links = useReviewLinks();
@@ -29,6 +31,8 @@ export function Review({ moments, notes }: { moments: Moment[]; notes: boolean }
           to the game, not whether it was the right call.
         </p>
       </div>
+
+      <RecordLines />
 
       {moments.length === 0 ? (
         <p className="text-sm text-muted">

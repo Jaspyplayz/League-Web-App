@@ -5,9 +5,12 @@ import { Suspense } from "react";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { analyzeMatch, findPlayer, findPlayerByRiotId, isAnalyzable } from "@/lib/analyzer";
 import { replayChances } from "@/lib/analyzer/plays";
+import { recordSentence } from "@/lib/analyzer/records";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { loadMatch, loadTimeline } from "@/lib/match-store";
 import { savedSoloTier } from "@/lib/profile-store";
+import { gameRecords } from "@/lib/record-store";
+import { QUEUE_FILTERS } from "@/lib/queue-filters";
 import { isMatchIdFor, isRegion, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
@@ -19,6 +22,7 @@ import { AnalysisSections } from "./analysis-sections";
 import { MatchHeader } from "./match-header";
 import { MatchNotes } from "./match-notes";
 import { MatchRecap } from "./match-recap";
+import { ReviewRecordsProvider } from "./review-records";
 import { Scoreboard } from "./scoreboard";
 import { panelClass } from "@/components/ui/panel";
 
@@ -135,8 +139,19 @@ async function Analysis({ params }: { params: Params }) {
   const chances = winChance
     ? replayChances(timeline.value, analysis.replay, winChance.model, me.participantId)
     : null;
+  // Personal records this game set, for the 60-second review. Null without
+  // the database, and then the review just doesn't mention records.
+  const records = await gameRecords(match, timeline.value, me.puuid);
+  const playerPath = `/player/${region}/${toSlug(id)}`;
   return (
-    <>
+    <ReviewRecordsProvider
+      value={
+        records && {
+          lines: records.map((r) => recordSentence(r, label)),
+          href: `${playerPath}/champions?queue=${recordsQueue(match.info.queueId)}#records`,
+        }
+      }
+    >
       {back}
       {header}
       <AnalysisSections
@@ -151,8 +166,14 @@ async function Analysis({ params }: { params: Params }) {
         recap={<MatchRecap region={region} matchId={matchId} puuid={me.puuid} />}
         notes={notes}
       />
-    </>
+    </ReviewRecordsProvider>
   );
+}
+
+// The Champions tab's queue filter for this game's queue, so "All your
+// records" shows the records it was compared with.
+function recordsQueue(queueId: number): string {
+  return QUEUE_FILTERS.find((f) => "queue" in f.filter && f.filter.queue === queueId)?.id ?? "all";
 }
 
 // Finds the searched player in the match by the Riot ID in the URL. If they

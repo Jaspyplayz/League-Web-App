@@ -35,6 +35,10 @@ The questions ask what you knew or saw, never what you should have done. Riot's 
 - **Watch in replay** opens the Deep dive tab with the replay at the play's first second, with the play shown in the play bar under the timeline, so the map, scoreboard and timers show the moment.
 - **Add to notes** adds a line like "6:30 Lost a fight 0 for 2: " to your [private notes](../src/app/player/[region]/[riotId]/match/[matchId]/match-notes.tsx) on the game, ready to finish and save. It's hidden when sign-in isn't set up. Signed out, it takes you to the "Sign in" line where the notes box would be.
 
+## Personal records
+
+When the game set a [personal record](records.md) (say, your most CS at 10 in your jungle games this season), a line at the top of the review says so, with a link to all your records on the Champions tab. The page works the records out on the server and passes them down through a context in `review-records.tsx`, like the buttons' `review-links.tsx`.
+
 ## Not yet
 
-From the [breakthrough ideas](https://claude.ai/code/artifact/d4b1b36f-705f-4cde-9b94-753d74520ec7) write-up, these come later: checking your Focus goal for the game, and personal records ("your fastest first item on this champion this month").
+From the [breakthrough ideas](https://claude.ai/code/artifact/d4b1b36f-705f-4cde-9b94-753d74520ec7) write-up, this comes later: checking your Focus goal for the game.

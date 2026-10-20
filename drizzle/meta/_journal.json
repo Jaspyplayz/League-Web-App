@@ -134,6 +134,13 @@
       "when": 1792464052722,
       "tag": "0018_ask_questions",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792480207329,
+      "tag": "0019_record_games",
+      "breakpoints": true
     }
   ]
 }

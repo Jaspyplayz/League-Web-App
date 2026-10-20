@@ -14,7 +14,7 @@ flowchart LR
     subgraph V[Vercel]
         P[Pages<br/>server components<br/>and server actions]
         MCP["/api/mcp"]
-        S[Stores<br/>match-store, profile-store,<br/>season-store, recap-store]
+        S[Stores<br/>match-store, profile-store,<br/>season-store, recap-store,<br/>record-store]
         A[Analyzer and models<br/>pure functions]
         C[Riot client<br/>riot/client.ts]
         P --> S

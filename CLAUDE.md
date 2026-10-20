@@ -24,6 +24,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Replay (beta: the whole game second by second, with every player's items and spot on the map, every play graded by the win chance, and the checks behind them): [docs/replay.md](docs/replay.md)
 - 60-second review (the three plays you were in that moved the win chance most, on the match page's Summary tab, each a question to think over and a jump into the replay): [docs/review.md](docs/review.md)
+- Personal records (your season bests at CS at 10, gold lead at 15, level 6, and deaths and takedowns before 14:00, per role and champion; in the 60-second review and on the Champions tab): [docs/records.md](docs/records.md)
 - Ask (signed-in players ask Claude about a player's games; Claude reads them with the MCP tools, 10 questions a day, $20 a month for the site): [docs/ask.md](docs/ask.md)
 - MCP server (Claude and other AI apps can look players up and read the analyzer's results at `/api/mcp`): [docs/mcp.md](docs/mcp.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
@@ -60,7 +61,8 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   (item-check.ts and position-check.ts check them), rift.ts
                   (the Rift's walls, learned from games, which champions walk
                   around) and plays.ts (the chance to win at every second, plays graded by it);
-                  review.ts picks the 60-second review's moments from those plays
+                  review.ts picks the 60-second review's moments from those plays,
+                  records.ts the personal records (record-store.ts saves them)
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph

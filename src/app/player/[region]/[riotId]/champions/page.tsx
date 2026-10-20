@@ -7,6 +7,7 @@ import { panelClass } from "@/components/ui/panel";
 import { GAMES_PER_VIEW, loadChampionTab } from "@/lib/champion-store";
 import { getDataDragon } from "@/lib/ddragon";
 import { loadProfile } from "@/lib/profile-store";
+import { loadSeasonRecords } from "@/lib/record-store";
 import { queueIds, readQueueFilter } from "@/lib/queue-filters";
 import { isRegion } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
@@ -16,11 +17,13 @@ import { SEASON } from "@/lib/season";
 import { QueueTabs } from "../queue-tabs";
 import { ChampionTable } from "./champion-table";
 import { LoadMoreGames } from "./load-more-games";
+import { PersonalRecords } from "./personal-records";
 
 // The Champions tab: every champion the player played this season, with
 // their record, KDA, game score, laning, damage, wards, CS, gold and
 // multikills, like op.gg's champion stats. Each row opens to show how the
-// champion did against each enemy champion in the same role.
+// champion did against each enemy champion in the same role. Under the
+// table, the season's personal records (personal-records.tsx).
 // URL: /player/na/Name-TAG/champions, plus ?queue=flex for another game mode
 // (Ranked Solo/Duo by default, since that's the queue most players care about).
 //
@@ -87,8 +90,9 @@ async function Champions({ params, searchParams }: { params: Params; searchParam
     );
   }
 
-  const [stats, dd] = await Promise.all([
+  const [stats, records, dd] = await Promise.all([
     loadChampionTab(region, puuid, profile.value.updatedAt, queueIds(queue.filter)),
+    loadSeasonRecords(puuid, queueIds(queue.filter)),
     getDataDragon().catch(() => null),
   ]);
 
@@ -117,6 +121,7 @@ async function Champions({ params, searchParams }: { params: Params; searchParam
               No {queue.id === "all" ? "" : `${queue.label} `}games this season yet.
             </p>
           )}
+          {records && <PersonalRecords records={records} dd={dd} playerPath={playerPath} />}
         </>
       ) : (
         <p className={`${panelClass} p-5 text-faint`}>
