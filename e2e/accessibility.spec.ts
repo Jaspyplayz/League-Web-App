@@ -20,6 +20,10 @@ const STANDARD = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 // starts a cold server (see smoke.spec.ts).
 const FIRST_LOAD = { timeout: 30_000 };
 
+// Shown instead of a player's profile once the development Riot key has
+// expired, which isn't a broken PR (see smoke.spec.ts).
+const EXPIRED_KEY = "The site's Riot API key isn't working";
+
 function plural(count: number, word: string) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
@@ -44,6 +48,24 @@ async function scan(page: Page, pageName: string) {
   if (FAIL_ON_FINDINGS) expect(violations.map((v) => v.id)).toEqual([]);
 }
 
+// Switch the way a visitor does; the choice stays saved in this browser.
+async function switchToLightMode(page: Page) {
+  await page.goto("/settings");
+  await page.getByRole("radio", { name: /^Light/ }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+}
+
+// The profile the smoke test searches for. Skips the test when the Riot key
+// has expired, since the page then shows only the notice.
+async function openPlayerPage(page: Page) {
+  await page.goto("/player/kr/Hide%20on%20bush-KR1");
+  const profile = page.getByRole("region", { name: "Player summary" });
+  const expired = page.getByText(EXPIRED_KEY);
+  await expect(profile.or(expired)).toBeVisible(FIRST_LOAD);
+  test.skip(await expired.isVisible(), "Skipped: the Riot development key has expired.");
+  await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible();
+}
+
 test("scan the home page", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
@@ -64,6 +86,15 @@ test("scan the sample analysis, both tabs", async ({ page }) => {
   await scan(page, "Sample analysis, Deep dive tab");
 });
 
+test("scan a player page, in both themes", async ({ page }) => {
+  await openPlayerPage(page);
+  await scan(page, "Player page");
+
+  await switchToLightMode(page);
+  await openPlayerPage(page);
+  await scan(page, "Player page, light mode");
+});
+
 test("scan Settings and the not-found page", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Settings");
@@ -76,10 +107,7 @@ test("scan Settings and the not-found page", async ({ page }) => {
 
 // Light mode has its own colors, so its contrast is checked separately.
 test("scan light mode", async ({ page }) => {
-  // Switch the way a visitor does; the choice stays saved in this browser.
-  await page.goto("/settings");
-  await page.getByRole("radio", { name: /^Light/ }).check();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await switchToLightMode(page);
 
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
