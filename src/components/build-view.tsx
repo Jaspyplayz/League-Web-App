@@ -75,7 +75,7 @@ function SkillGrid({ skills }: { skills: number[] }) {
               {skills.map((slot, level) => (
                 <td
                   key={level}
-                  className={`size-5 rounded-[4px] text-center ${slot === row + 1 ? "bg-ahead/80 text-page" : "bg-line"}`}
+                  className={`size-5 rounded-[4px] text-center ${slot === row + 1 ? "bg-ahead text-page" : "bg-line"}`}
                 >
                   {slot === row + 1 ? level + 1 : ""}
                 </td>
