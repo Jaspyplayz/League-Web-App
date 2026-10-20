@@ -46,6 +46,57 @@ The **analyzer** (`src/lib/analyzer/`) sits beside these layers, not under them.
 
 Files that touch the Riot key or the database start with `import "server-only"`, so the build fails if a browser component ever imports one.
 
+## Where the code lives
+
+Each folder and the files worth knowing in it. `CLAUDE.md` gives agents the short version and links here.
+
+```
+src/app/          Routes. player/[region]/[riotId]/ is the player page;
+                  .../match/[matchId]/ under it is the match analysis page
+                  and .../insights/ the trends across the last 20 to 100 games,
+                  .../log/ the Log tab (one card per day, src/lib/daily-log.ts),
+                  .../champions/ the season's stats per champion and enemy
+                  champion (src/lib/champion-stats.ts);
+                  settings/ holds preferences saved in the browser (theme);
+                  api/mcp/ is the MCP server, with its tools in src/lib/mcp/
+src/components/   React components; ui/ holds small shared pieces
+src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
+src/lib/riot/     Server-only Riot client (retries; rate-limit.ts counts requests, shared
+                  across servers in Postgres by rate-limit-store.ts) and one function per endpoint
+src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
+                  trends.ts rolls games up into the Insights page, compare.ts
+                  sets them against one rank's games or one chosen player's,
+                  habits.ts reads early-game habits (habit-trends.ts splits wins by them),
+                  sessions.ts groups games played back to back into blocks,
+                  score.ts is the trained 0 to 100 game score (score-model.json),
+                  phase-score.ts the early, mid and late ratings (phase-score-model.json),
+                  win-chance.ts each team's chance to win at every minute,
+                  tempo.ts the jungle tempo timeline (tempo-study.ts checks it)
+                  and replay.ts the replay, with items.ts and positions.ts
+                  (item-check.ts and position-check.ts check them), rift.ts
+                  (the Rift's walls, learned from games, which champions walk
+                  around) and plays.ts (the chance to win at every second, plays graded by it);
+                  review.ts picks the 60-second review's moments from those plays;
+                  golden.test.ts checks the analyzer on four real games in fixtures/
+src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
+src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
+                  each save also adds changed ranks to rank_history for the LP graph
+src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
+src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
+src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
+src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves answers, ask-rules.ts the caps
+src/db/           Drizzle schema, connection, and cache freshness rules
+src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
+scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, train-phase-score, tempo study, item check)
+drizzle/          Generated SQL migrations (never edit by hand)
+docs/             Design and research docs
+e2e/              Playwright smoke test and accessibility scan, run against each Vercel preview
+.github/          CI, smoke test and dependency review workflows, Dependabot, PR and issue templates
+.claude/          Claude Code settings, hooks/ (lint and typecheck before commits), agents/reviewer.md,
+                  rules/ (rules for one area, loaded when Claude opens a file there),
+                  skills/ (explain-back, plus eight copied from other repos)
+```
+
 ## What happens when you open a match
 
 ```mermaid

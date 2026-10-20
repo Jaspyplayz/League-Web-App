@@ -90,7 +90,7 @@ npm run build
 
 ## The browser smoke test
 
-After Vercel deploys a pull request's preview, GitHub runs `e2e/smoke.spec.ts` against it (workflow `.github/workflows/smoke.yml`): it searches Hide on bush#KR1 and opens the sample analysis. When the Riot key has expired, the search half is skipped, not failed. To run it yourself against a preview:
+After Vercel deploys a pull request's preview, GitHub runs `e2e/smoke.spec.ts` against it (workflow `.github/workflows/smoke.yml`): it searches Hide on bush#KR1 and opens the sample analysis. When the Riot key has expired, the search half is skipped, not failed. The same run does an accessibility scan (`e2e/accessibility.spec.ts`) of those pages in both themes and lists what it finds on the run's summary page, without failing for now. To run them yourself against a preview:
 
 ```bash
 npx playwright install chromium
