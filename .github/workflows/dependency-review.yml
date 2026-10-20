@@ -18,3 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/dependency-review-action@v4
+        with:
+          # By default it only fails on packages the site runs with. Dev
+          # packages, such as the test and lint tools, run on Jasper's computer
+          # and in CI, so a vulnerable one should fail the PR too.
+          fail-on-scopes: runtime, development
