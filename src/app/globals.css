@@ -63,7 +63,9 @@
  *
  * Same meanings as dark: blue = you / ahead / win, red = opponent / behind /
  * loss. The blues and red are darker here so text in them stays readable on
- * white: at least 4.5:1 contrast on the page and cards, the WCAG AA bar.
+ * white: at least 4.5:1 contrast, the WCAG AA bar, on the page, on cards and
+ * on the blue and red tinted rows (bg-ahead/10, bg-behind/10) of the match
+ * list, which are the darkest backgrounds text sits on.
  */
 :root[data-theme="light"] {
   color-scheme: light;
@@ -78,15 +80,15 @@
   --color-ink: #141922;
   --color-ink-soft: #323b49;
   --color-muted: #4f5a69;
-  --color-faint: #5f6a7b;
+  --color-faint: #586372;
   --color-placeholder: #8a93a1;
 
   /* In dark mode "soft" and "bright" are lighter blues for text on black;
      on white they go darker instead, so links and highlights still stand out. */
-  --color-ahead: #2c62db;
+  --color-ahead: #2459d1;
   --color-ahead-soft: #1f55cc;
   --color-ahead-bright: #163f9e;
-  --color-behind: #cf352e;
+  --color-behind: #b62f28;
 }
 
 /*

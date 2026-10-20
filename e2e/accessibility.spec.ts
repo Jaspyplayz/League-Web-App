@@ -8,10 +8,11 @@ import { appendFileSync } from "node:fs";
 // ARIA. Whether a screen reader user can follow a match page still takes a
 // person trying it.
 //
-// Report only for now: what it finds is printed in the log and on the smoke
-// test's run summary on GitHub, and the test passes anyway. Once those are
-// fixed, set FAIL_ON_FINDINGS to true so a new problem fails the PR.
-const FAIL_ON_FINDINGS = false;
+// What it finds is printed in the log and on the smoke test's run summary on
+// GitHub, and fails the test, so a PR can't add a new problem. Set
+// FAIL_ON_FINDINGS to false to only report, for example while fixing a batch
+// of findings.
+const FAIL_ON_FINDINGS = true;
 
 // WCAG 2.1 levels A and AA, the standard most accessibility laws point to.
 const STANDARD = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
