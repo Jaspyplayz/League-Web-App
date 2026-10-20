@@ -16,6 +16,10 @@ import type { MapPosition, Timeline, TimelineEvent } from "@/lib/riot/types";
 // for the replay's items. Only the match page needs them, so it fetches a
 // timeline saved without them once more (see loadTimeline in match-store.ts),
 // rather than every page that reads timelines fetching them all again.
+// Each death's damage list (victimDamageReceived) came later still, for
+// "What keeps killing you" on Insights. It's optional too: a new version
+// would download every saved timeline again, all against the same Riot rate
+// limit, so the card fills in from timelines saved from then on instead.
 export const TRIM_VERSION = 2;
 
 // One player at one moment of the game.
@@ -48,6 +52,28 @@ export type ChampionKill = {
   victimId: number;
   assistingParticipantIds: number[];
   position: MapPosition | null;
+  // Riot's death recap: the damage the victim took in the last seconds
+  // before dying, one entry per source and spell. Always there (maybe empty)
+  // in timelines saved since death recaps were added; missing in older ones,
+  // which is how death-recap.ts tells the two apart.
+  victimDamageReceived?: DeathDamage[];
+};
+
+// One line of a death recap. Riot also sends `name` (the champion's or
+// minion's name), left out because participantId already says who it was.
+export type DeathDamage = {
+  // Who dealt it. 0 for towers, minions and monsters.
+  participantId: number;
+  // "OTHER" for champions, or "TOWER", "MINION", "MONSTER".
+  type: string;
+  basic: boolean; // a basic attack
+  // 0 to 3 are Q, W, E and R. Summoner spells, passives and items have
+  // other numbers, so spellName ("SummonerDot" for Ignite) tells those apart.
+  spellSlot: number;
+  spellName: string;
+  physicalDamage: number;
+  magicDamage: number;
+  trueDamage: number;
 };
 
 export type EliteMonsterKill = {
@@ -175,6 +201,7 @@ function trimEvent(e: TimelineEvent): TrimmedEvent | null {
         victimId: num(e.victimId),
         assistingParticipantIds: ids(e.assistingParticipantIds),
         position: position(e.position),
+        victimDamageReceived: deathDamage(e.victimDamageReceived),
       };
     case "ELITE_MONSTER_KILL":
       return {
@@ -245,6 +272,24 @@ function str(value: unknown): string {
 
 function ids(value: unknown): number[] {
   return Array.isArray(value) ? value.filter((v): v is number => typeof v === "number") : [];
+}
+
+// Riot leaves the list out when it's empty, so a missing one becomes [].
+// Damage is rounded to whole numbers, which is all the page shows.
+function deathDamage(value: unknown): DeathDamage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((d): d is Record<string, unknown> => typeof d === "object" && d !== null)
+    .map((d) => ({
+      participantId: num(d.participantId),
+      type: str(d.type),
+      basic: d.basic === true,
+      spellSlot: num(d.spellSlot),
+      spellName: str(d.spellName),
+      physicalDamage: Math.round(num(d.physicalDamage)),
+      magicDamage: Math.round(num(d.magicDamage)),
+      trueDamage: Math.round(num(d.trueDamage)),
+    }));
 }
 
 function position(value: unknown): MapPosition | null {
