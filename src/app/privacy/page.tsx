@@ -100,8 +100,10 @@ export default function PrivacyPage() {
         Anthropic, which runs the Claude AI model, so it can write the answer. No account
         details or notes are sent. Turnpoint saves your question, the answer and which games it read with
         your account, so you can see them again; only you see them. It also counts your
-        questions, to limit how many one account can ask a day. Deleting your account deletes
-        your questions.
+        questions and what they cost, to limit how many one account can ask a day and spend a
+        month. Deleting your account deletes your questions. Separately, Turnpoint keeps what
+        each question cost and when it was asked, with no account, question or answer
+        attached, to keep the whole site within its monthly budget.
       </p>
 
       <h2>Stored in your browser</h2>

@@ -1,6 +1,6 @@
 // The rules around the Ask tab that don't need the network: how long a
 // question can be, how many one account can ask, what an answer cost and
-// how much the whole site may spend a month. Kept apart from src/lib/ask.ts
+// how much one account and the whole site may spend a month. Kept apart from src/lib/ask.ts
 // (the Claude call) so they're easy to unit test.
 
 // Questions one account can ask in 24 hours. Jasper picked 10 (2026-10-20).
@@ -11,6 +11,20 @@ export const QUESTIONS_PER_DAY = 10;
 // Turnpoint's API credit can't run out. A question usually costs 5 to 20
 // cents, so this is a few hundred questions a month.
 export const MONTHLY_BUDGET_USD = 20;
+
+// The most one account can spend on Ask in a calendar month, in dollars, so
+// one person (or a few free accounts) can't use up the whole site's budget
+// and pause Ask for everyone. Jasper picked $5 (2026-10-21): a quarter of
+// the budget, which is 25 to 100 questions at the usual price.
+export const ACCOUNT_MONTHLY_BUDGET_USD = 5;
+
+// What a question counts as while Claude is still answering it, in
+// millionths of a dollar: 50 cents, well above the usual 5 to 20. The
+// question is saved with this before Claude is called, so questions sent at
+// the same moment each see the ones before them, and swapped for the real
+// cost once the answer is in. If the server is stopped mid-answer, the
+// estimate stays, which errs on the safe side.
+export const HOLD_MICROS = 500_000;
 
 export const MAX_QUESTION_LENGTH = 300;
 
@@ -74,14 +88,23 @@ export function monthStart(now: Date): Date {
 
 export type Allowance = { ok: true; left: number } | { ok: false; message: string };
 
-// Whether this account may ask another question right now. `askedToday` is
-// its questions in the last 24 hours; `spentThisMonth` the whole site's, in
-// millionths of a dollar.
-export function allowance(askedToday: number, spentThisMonth: number): Allowance {
-  if (spentThisMonth >= MONTHLY_BUDGET_USD * 1_000_000) {
+// What this account and the whole site have used so far: `askedToday` is
+// the account's questions in the last 24 hours; the two spends are this
+// calendar month's, in millionths of a dollar.
+export type UsedSoFar = { askedToday: number; accountSpent: number; siteSpent: number };
+
+// Whether this account may ask another question right now.
+export function allowance({ askedToday, accountSpent, siteSpent }: UsedSoFar): Allowance {
+  if (siteSpent >= MONTHLY_BUDGET_USD * 1_000_000) {
     return {
       ok: false,
       message: "Ask has used this month's budget and is paused until the 1st.",
+    };
+  }
+  if (accountSpent >= ACCOUNT_MONTHLY_BUDGET_USD * 1_000_000) {
+    return {
+      ok: false,
+      message: "You've used your Ask allowance for this month. It resets on the 1st.",
     };
   }
   if (askedToday >= QUESTIONS_PER_DAY) {

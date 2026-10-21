@@ -25,7 +25,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - Tempo timeline (beta: which jungler had the time advantage at every second, and the study that checks it): [docs/tempo.md](docs/tempo.md)
 - Replay (beta: the whole game second by second, with every player's items and spot on the map, every play graded by the win chance, and the checks behind them): [docs/replay.md](docs/replay.md)
 - 60-second review (the three plays you were in that moved the win chance most, on the match page's Summary tab, each a question to think over and a jump into the replay): [docs/review.md](docs/review.md)
-- Ask (signed-in players ask Claude about a player's games; Claude reads them with the MCP tools, 10 questions a day, $20 a month for the site): [docs/ask.md](docs/ask.md)
+- Ask (signed-in players ask Claude about a player's games; Claude reads them with the MCP tools, 10 questions a day, $5 a month per account and $20 for the site): [docs/ask.md](docs/ask.md)
 - MCP server (Claude and other AI apps can look players up and read the analyzer's results at `/api/mcp`): [docs/mcp.md](docs/mcp.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 - How a change gets made (review tiers, the reviewer agent, "My read"): [docs/workflow.md](docs/workflow.md)

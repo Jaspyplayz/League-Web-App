@@ -431,14 +431,16 @@ export const askQuestions = pgTable(
     // The player the question was about.
     puuid: text("puuid").notNull(),
     question: text("question").notNull(),
-    // Null when Claude couldn't answer. The row is kept anyway, so the try
-    // still counts toward the day's questions and the month's budget.
+    // Null while Claude is answering, and when it couldn't. The row is
+    // kept anyway, so the try still counts toward the day's questions and
+    // the account's monthly allowance.
     answer: text("answer"),
     // The games Claude read to answer, as AskGame[] (src/lib/ask-rules.ts),
     // for the links under the answer.
     games: jsonb("games").$type<{ matchId: string; label: string }[]>().notNull(),
     // Which Claude model answered, and what it cost in millionths of a
-    // dollar, so the monthly budget (src/lib/ask-rules.ts) can add it up.
+    // dollar, so the account's monthly allowance (src/lib/ask-rules.ts) can
+    // add it up. While Claude is answering it holds an estimate instead.
     model: text("model").notNull(),
     costMicros: integer("cost_micros").notNull(),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
@@ -447,6 +449,23 @@ export const askQuestions = pgTable(
     index("ask_questions_user_idx").on(t.userId, t.createdAt),
     index("ask_questions_created_at_idx").on(t.createdAt),
   ],
+).enableRLS();
+
+// What each Ask question cost, for the whole site's monthly budget
+// (src/lib/ask-rules.ts). It's kept apart from ask_questions because those
+// rows are deleted with their account, and the money an account already
+// spent shouldn't go back into the month's budget with them. So a row here
+// has no account, no question and no answer: only a cost and a date.
+export const askSpend = pgTable(
+  "ask_spend",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Millionths of a dollar, like ask_questions.cost_micros: an estimate
+    // while Claude is answering, then the real cost.
+    costMicros: integer("cost_micros").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("ask_spend_created_at_idx").on(t.createdAt)],
 ).enableRLS();
 
 // Riot's rate limit, shared by every copy of the app (see

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACCOUNT_MONTHLY_BUDGET_USD,
   allowance,
   cleanQuestion,
   costMicros,
@@ -57,15 +58,33 @@ describe("monthStart", () => {
 });
 
 describe("allowance", () => {
+  const none = { askedToday: 0, accountSpent: 0, siteSpent: 0 };
+  const dollars = (usd: number) => usd * 1_000_000;
+
   it("counts down the day's questions", () => {
-    expect(allowance(0, 0)).toEqual({ ok: true, left: QUESTIONS_PER_DAY });
-    expect(allowance(QUESTIONS_PER_DAY - 1, 0)).toEqual({ ok: true, left: 1 });
-    expect(allowance(QUESTIONS_PER_DAY, 0).ok).toBe(false);
+    expect(allowance(none)).toEqual({ ok: true, left: QUESTIONS_PER_DAY });
+    expect(allowance({ ...none, askedToday: QUESTIONS_PER_DAY - 1 })).toEqual({ ok: true, left: 1 });
+    expect(allowance({ ...none, askedToday: QUESTIONS_PER_DAY }).ok).toBe(false);
   });
 
   it("pauses everyone once the month's budget is spent", () => {
-    expect(allowance(0, MONTHLY_BUDGET_USD * 1_000_000).ok).toBe(false);
-    expect(allowance(0, MONTHLY_BUDGET_USD * 1_000_000 - 1).ok).toBe(true);
+    expect(allowance({ ...none, siteSpent: dollars(MONTHLY_BUDGET_USD) }).ok).toBe(false);
+    expect(allowance({ ...none, siteSpent: dollars(MONTHLY_BUDGET_USD) - 1 }).ok).toBe(true);
+  });
+
+  it("stops one account once it has spent its share of the month", () => {
+    const spent = allowance({ ...none, accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD) });
+    expect(spent).toEqual({
+      ok: false,
+      message: "You've used your Ask allowance for this month. It resets on the 1st.",
+    });
+    expect(allowance({ ...none, accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD) - 1 }).ok).toBe(
+      true,
+    );
+  });
+
+  it("leaves room for other accounts after one reaches its share", () => {
+    expect(ACCOUNT_MONTHLY_BUDGET_USD).toBeLessThan(MONTHLY_BUDGET_USD);
   });
 });
 

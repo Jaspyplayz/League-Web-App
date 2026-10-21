@@ -41,6 +41,8 @@ export function AskBox({ region, riotId, playerPath, history, left }: Props) {
           setRemaining(result.left);
           setText("");
         } else {
+          // A question Claude couldn't answer can still count toward today.
+          if (result.left !== undefined) setRemaining(result.left);
           setError(result.message);
         }
       } catch {

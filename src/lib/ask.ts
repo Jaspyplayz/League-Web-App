@@ -89,69 +89,88 @@ const TOOLS: BetaTool[] = [
 ];
 
 export type AskResult = {
-  // Null when Claude refused, ran out of room or rounds. The cost still counts.
+  // Null when Claude refused, ran out of room or rounds, or a round failed.
+  // The cost still counts.
   answer: string | null;
   games: AskGame[];
   model: string;
+  // What the rounds that finished cost, in millionths of a dollar.
   costMicros: number;
+  // Set when a round failed (Anthropic overloaded, a timeout, no network),
+  // for the caller to report. The rounds before it were still paid for, so
+  // their cost is in costMicros rather than lost with the error.
+  error?: unknown;
 };
 
-// Network and API errors are thrown, for the caller to report.
 export async function answerQuestion(
   region: Region,
   account: Account,
   question: string,
 ): Promise<AskResult> {
-  // One retry and a minute per round, so a whole question fits well inside
-  // the page's time limit (maxDuration in the Ask page).
+  // One retry and a minute per round. A question that runs past the page's
+  // time limit (maxDuration in the Ask page) is cut off; it was saved with
+  // an estimated cost before it started (src/lib/ask-store.ts), so it still
+  // counts.
   const client = new Anthropic({ maxRetries: 1, timeout: 60_000 });
   const messages: BetaMessageParam[] = [{ role: "user", content: question }];
   const tools = new ToolRunner(region, account);
   let model = ASK_MODEL;
   let cost = 0;
+  const result = (answer: string | null): AskResult => ({
+    answer,
+    games: tools.gamesRead(),
+    model,
+    costMicros: cost,
+  });
 
-  for (let round = 1; round <= MAX_ROUNDS; round++) {
-    const response = await client.beta.messages.create({
-      model: ASK_MODEL,
-      max_tokens: 8000,
-      // Saves the conversation so far in Anthropic's cache, so the next
-      // round only pays full price for what's new (about a tenth otherwise).
-      cache_control: { type: "ephemeral" },
-      // Medium effort: enough thinking to pick and compare games without
-      // spending tokens on a long think for simple questions.
-      output_config: { effort: "medium" },
-      system: SYSTEM,
-      tools: TOOLS,
-      // On the last round, no more tools: answer with what you've read.
-      tool_choice: { type: round === MAX_ROUNDS ? "none" : "auto" },
-      messages,
-      // If Claude declines (its safety checks can misfire on game talk like
-      // "kill" and "execute"), Anthropic retries on a fallback model it picks.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-    });
-    model = response.model;
-    cost += costMicros(response.model, response.usage);
+  try {
+    for (let round = 1; round <= MAX_ROUNDS; round++) {
+      const response = await client.beta.messages.create({
+        model: ASK_MODEL,
+        max_tokens: 8000,
+        // Saves the conversation so far in Anthropic's cache, so the next
+        // round only pays full price for what's new (about a tenth otherwise).
+        cache_control: { type: "ephemeral" },
+        // Medium effort: enough thinking to pick and compare games without
+        // spending tokens on a long think for simple questions.
+        output_config: { effort: "medium" },
+        system: SYSTEM,
+        tools: TOOLS,
+        // On the last round, no more tools: answer with what you've read.
+        tool_choice: { type: round === MAX_ROUNDS ? "none" : "auto" },
+        messages,
+        // If Claude declines (its safety checks can misfire on game talk like
+        // "kill" and "execute"), Anthropic retries on a fallback model it picks.
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+      });
+      model = response.model;
+      cost += costMicros(response.model, response.usage);
 
-    if (response.stop_reason === "tool_use") {
-      // The whole reply goes back, thinking included, as the API requires.
-      messages.push({ role: "assistant", content: response.content });
-      const calls = response.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
-      const results = await Promise.all(calls.map((call) => tools.run(call)));
-      // All results in one message, so Claude keeps calling tools in parallel.
-      messages.push({ role: "user", content: results });
-      continue;
+      if (response.stop_reason === "tool_use") {
+        // The whole reply goes back, thinking included, as the API requires.
+        messages.push({ role: "assistant", content: response.content });
+        const calls = response.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
+        const results = await Promise.all(calls.map((call) => tools.run(call)));
+        // All results in one message, so Claude keeps calling tools in parallel.
+        messages.push({ role: "user", content: results });
+        continue;
+      }
+
+      const text = response.content
+        .flatMap((b) => (b.type === "text" ? [b.text] : []))
+        .join("\n\n")
+        .trim();
+      const answered = response.stop_reason === "end_turn" && text !== "";
+      return result(answered ? text : null);
     }
-
-    const text = response.content
-      .flatMap((b) => (b.type === "text" ? [b.text] : []))
-      .join("\n\n")
-      .trim();
-    const answered = response.stop_reason === "end_turn" && text !== "";
-    return { answer: answered ? text : null, games: tools.gamesRead(), model, costMicros: cost };
+  } catch (error) {
+    // A round failed. Each round's cost was added as soon as Anthropic
+    // replied, so the rounds before it are still counted.
+    return { ...result(null), error };
   }
   // Unreachable: the last round can't call tools.
-  return { answer: null, games: tools.gamesRead(), model, costMicros: cost };
+  return result(null);
 }
 
 // Runs Claude's tool calls for one player and remembers which games it read.
