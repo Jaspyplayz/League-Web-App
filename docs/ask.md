@@ -20,7 +20,7 @@ An answer takes up to a few minutes. If the question were saved only at the end,
 Each round gets two tries. `sendRound` in `ask.ts` makes the second try itself, instead of leaving it to Anthropic's SDK, so it can see what happened to both. It waits half a second between them, or as long as Anthropic's `retry-after` header asks (it sends one when we're rate limited), up to 10 seconds.
 
 - A try Anthropic turned down before running it (any 4xx answer, like rate limited or a bad request, or 529 overloaded) isn't billed.
-- A try that timed out, lost its connection, was cut off partway, came back with no message in it, or got another 5xx (like 500 or 504) may still have been run, and Anthropic bills a request that was on its way to succeeding even if we stopped waiting. We can't tell, so that round adds the 50-cent estimate, once. A network outage that never reached Anthropic is charged the same way, which errs on the safe side.
+- A try that timed out, lost its connection, was cut off partway, came back empty or unreadable, or got another 5xx (like 500 or 504) may still have been run, and Anthropic bills a request that was on its way to succeeding even if we stopped waiting. We can't tell, so that round adds the 50-cent estimate, once. A network outage that never reached Anthropic is charged the same way, which errs on the safe side.
 
 If both tries of a round fail, `answerQuestion` stops and returns what the question cost so far, and that is what's charged. A question whose first round Anthropic turned down on both tries cost nothing, so it's deleted and doesn't count. If the server is stopped mid-answer (the page's 3-minute limit), the estimate saved at the start stays, even if the question had cost more by then.
 

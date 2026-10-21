@@ -229,7 +229,7 @@ describe("answerQuestion", () => {
     },
   );
 
-  it("adds the estimate when a try succeeds with no message in the reply", async () => {
+  it("adds the estimate when a try succeeds with an empty or unreadable reply", async () => {
     create.mockResolvedValueOnce(undefined).mockResolvedValueOnce("<html>ok</html>");
 
     const result = await ask();

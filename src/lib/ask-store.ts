@@ -129,10 +129,14 @@ export async function ask(
   const db = database();
   if (!db) return { status: "failed", message: "Ask isn't available right now." };
 
+  // Set once the question is saved, so a failure after that can still say
+  // how many questions are left.
+  let saved: Hold | undefined;
   try {
     const reserved = await reserve(db, userId, account.puuid, question);
     if (!reserved.ok) return { status: "failed", message: reserved.message, left: 0 };
     const { hold } = reserved;
+    saved = hold;
 
     const result = await answerQuestion(region, account, question);
     if (result.error !== undefined) Sentry.captureException(result.error);
@@ -151,6 +155,9 @@ export async function ask(
     }
 
     await settle(db, hold, result);
+    // From the numbers read before Claude was called, so a question sent at
+    // the same time from another tab isn't in it; a reload shows the exact
+    // count.
     const left = leftAfter(hold.used, result.costMicros);
     if (result.answer === null) {
       const message =
@@ -171,11 +178,16 @@ export async function ask(
       left,
     };
   } catch (error) {
-    // Most likely the database. If the question was already saved, its
-    // 50-cent estimate stays. That's usually more than the question cost,
-    // but not always (see costMicros in AskResult, src/lib/ask.ts).
+    // Most likely the database. If the question was already saved, it
+    // still counts, at its 50-cent estimate. That's usually more than the
+    // question cost, but not always (see costMicros in AskResult,
+    // src/lib/ask.ts).
     Sentry.captureException(error);
-    return { status: "failed", message: "Couldn't answer right now. Try again in a moment." };
+    return {
+      status: "failed",
+      message: "Couldn't answer right now. Try again in a moment.",
+      left: saved ? leftAfter(saved.used, HOLD_MICROS) : undefined,
+    };
   }
 }
 

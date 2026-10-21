@@ -13,8 +13,9 @@ export const QUESTIONS_PER_DAY = 10;
 export const MONTHLY_BUDGET_USD = 20;
 
 // The most one account can spend on Ask in a calendar month, in dollars, so
-// one person (or a few free accounts) can't use up the whole site's budget
-// and pause Ask for everyone. Jasper picked $5 (2026-10-21): a quarter of
+// one account can't use up the whole site's budget and pause Ask for
+// everyone on its own. Four could, which is why MONTHLY_BUDGET_USD stays the
+// real limit. Jasper picked $5 (2026-10-21): a quarter of
 // the budget, which is 25 to 100 questions at the usual price.
 export const ACCOUNT_MONTHLY_BUDGET_USD = 5;
 

@@ -12,7 +12,7 @@ type Props = {
   riotId: string; // the slug from the address, "Name-TAG"
   playerPath: string;
   history: AskedQuestion[];
-  left: number; // questions this account has left today
+  left: number; // questions this account can still ask today, 0 once any limit is reached
 };
 
 const EXAMPLES = [
@@ -41,7 +41,7 @@ export function AskBox({ region, riotId, playerPath, history, left }: Props) {
           setRemaining(result.left);
           setText("");
         } else {
-          // A question Claude couldn't answer can still count toward today.
+          // A question Claude couldn't answer can still count.
           if (result.left !== undefined) setRemaining(result.left);
           setError(result.message);
         }
@@ -97,7 +97,10 @@ export function AskBox({ region, riotId, playerPath, history, left }: Props) {
             )}
           </p>
           <p className="ml-auto text-sm text-faint">
-            {remaining} {remaining === 1 ? "question" : "questions"} left today
+            {/* At 0 the limit may be the month's, not the day's; a reload says which. */}
+            {remaining > 0
+              ? `${remaining} ${remaining === 1 ? "question" : "questions"} left today`
+              : "No questions left for now"}
           </p>
         </div>
       </form>

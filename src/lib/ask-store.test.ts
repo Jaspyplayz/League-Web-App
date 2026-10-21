@@ -283,6 +283,40 @@ describe("ask", () => {
     expect(outcome).toMatchObject({ status: "answered", left: 0 });
   });
 
+  it("tells the box none are left once an answer uses up the site's month", async () => {
+    used.siteSpent = MONTHLY_BUDGET_USD * 1_000_000 - 100_000;
+    claudeReturns({ answer: "You die early.", costMicros: 150_000 });
+
+    const outcome = await ask("na", account, "Why do I lose?", "user-1");
+
+    expect(outcome).toMatchObject({ status: "answered", left: 0 });
+  });
+
+  // 20 cents of the month left: the 15 cents this answer cost fits, though
+  // the 50-cent estimate wouldn't have.
+  it("counts what the answer cost, not the estimate, toward the box's count", async () => {
+    used.accountSpent = ACCOUNT_MONTHLY_BUDGET_USD * 1_000_000 - 200_000;
+    claudeReturns({ answer: "You die early.", costMicros: 150_000 });
+
+    const outcome = await ask("na", account, "Why do I lose?", "user-1");
+
+    expect(outcome).toMatchObject({ status: "answered", left: QUESTIONS_PER_DAY - 1 });
+  });
+
+  it("still counts the question when something fails after it was saved", async () => {
+    used.askedToday = 9;
+    vi.mocked(answerQuestion).mockRejectedValue(new Error("database blip"));
+
+    const outcome = await ask("na", account, "Why do I lose?", "user-1");
+
+    expect(questions).toMatchObject([{ costMicros: HOLD_MICROS }]);
+    expect(outcome).toEqual({
+      status: "failed",
+      message: "Couldn't answer right now. Try again in a moment.",
+      left: 0,
+    });
+  });
+
   it("tells the box a question Claude couldn't answer still counted", async () => {
     used.askedToday = 7;
     claudeReturns({ answer: null, costMicros: 50_000 });

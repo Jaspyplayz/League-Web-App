@@ -211,9 +211,9 @@ async function sendRound(
   for (let attempt = 1; ; attempt++) {
     try {
       const response = await client.beta.messages.create(request);
-      // A success with no message in it (an empty or garbled reply) can't be
-      // counted, but Anthropic may have run it, so it's a failed try that may
-      // have been billed.
+      // A success without token counts (an empty reply, or one that isn't
+      // JSON) can't be priced, but Anthropic may have run it, so it's a
+      // failed try that may have been billed.
       if (!response?.usage) throw new Error("Anthropic's reply had no message");
       return { ok: true, response, mayBeBilled };
     } catch (error) {
