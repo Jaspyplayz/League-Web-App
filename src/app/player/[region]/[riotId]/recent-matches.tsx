@@ -17,8 +17,14 @@ import {
   type MatchSummary,
 } from "@/lib/match-summary";
 import { loadMatches } from "@/lib/match-store";
-import { GAMES_STEP, hasMoreGames, matchListHref, readGameCount } from "@/lib/more-games";
-import { PROFILE_MATCH_COUNT, type Profile } from "@/lib/profile-store";
+import {
+  GAMES_STEP,
+  hasMoreGames,
+  isPlainProfilePage,
+  matchListHref,
+  readGameCount,
+} from "@/lib/more-games";
+import type { Profile } from "@/lib/profile-store";
 import type { QueueFilter } from "@/lib/queue-filters";
 import type { Region } from "@/lib/regions";
 import { getMatchIds } from "@/lib/riot/api";
@@ -60,8 +66,7 @@ export async function RecentMatches({
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const count = readGameCount(gamesParam);
-  // The plain profile page: the All tab with its first 10 games.
-  const plainPage = queue.id === "all" && count === PROFILE_MATCH_COUNT;
+  const plainPage = isPlainProfilePage(queue, count);
 
   const [ids, dd] = await Promise.all([
     // The All tab's first 10 games are the snapshot's, for free. The other

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasMoreGames, matchListHref, readGameCount } from "./more-games";
+import { hasMoreGames, isPlainProfilePage, matchListHref, readGameCount } from "./more-games";
 import { QUEUE_FILTERS, readQueueFilter } from "./queue-filters";
 
 describe("readGameCount", () => {
@@ -29,6 +29,20 @@ describe("hasMoreGames", () => {
 
   it("stops at 50 games", () => {
     expect(hasMoreGames(50, 50)).toBe(false);
+  });
+});
+
+describe("isPlainProfilePage", () => {
+  const all = QUEUE_FILTERS[0];
+  const solo = readQueueFilter("solo");
+
+  it("is the All tab with its first 10 games", () => {
+    expect(isPlainProfilePage(all, 10)).toBe(true);
+  });
+
+  it("isn't another tab or a longer list", () => {
+    expect(isPlainProfilePage(solo, 10)).toBe(false);
+    expect(isPlainProfilePage(all, 20)).toBe(false);
   });
 });
 

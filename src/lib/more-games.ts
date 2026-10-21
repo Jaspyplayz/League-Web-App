@@ -28,6 +28,16 @@ export function hasMoreGames(idsShown: number, count: number): boolean {
   return idsShown === count && count < MAX_GAMES;
 }
 
+// Whether this is the profile's plain URL, with no ?queue= or ?games= (the
+// All tab and its first 10 games, the link matchListHref writes for them).
+// Only that page loads more of the season's games (src/lib/season-store.ts),
+// so a crawler opening every tab and longer list of a profile can't load 10
+// games on each. Its 10 games are also the profile snapshot's
+// (PROFILE_MATCH_COUNT), so listing them needs no Riot call.
+export function isPlainProfilePage(queue: QueueFilter, count: number): boolean {
+  return queue.id === "all" && count === GAMES_STEP;
+}
+
 // The link for the match list showing `count` games. Keeps the game-mode tab.
 // `anchor` is the id to scroll to: the first new row, so the click lands where
 // the list left off instead of back at the top.

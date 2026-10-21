@@ -69,11 +69,14 @@ beforeEach(() => {
 });
 
 describe("loadSeasonStats", () => {
+  // What the plain profile page passes; every other view passes false.
+  const plainPage = { loadMore: true };
+
   it("uses the saved season list and loads a few missing games", async () => {
     savedList = { matchIds: ["NA1_3", "NA1_2", "NA1_1"], fetchedAt: profileUpdatedAt };
     savedGames = [saved("NA1_1", "LeeSin")];
 
-    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, true);
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
 
     expect(getMatchIds).not.toHaveBeenCalled();
     expect(loadMatches).toHaveBeenCalledWith("na", ["NA1_3", "NA1_2"], 10);
@@ -88,7 +91,9 @@ describe("loadSeasonStats", () => {
     savedList = { matchIds: ["NA1_3", "NA1_2", "NA1_1"], fetchedAt: profileUpdatedAt };
     savedGames = [saved("NA1_1", "LeeSin")];
 
-    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, false);
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, {
+      loadMore: false,
+    });
 
     // A tab or "Show 10 more games" URL shows the saved games only.
     expect(vi.mocked(loadMatches).mock.calls.flatMap(([, ids]) => ids)).toEqual([]);
@@ -101,7 +106,7 @@ describe("loadSeasonStats", () => {
     const fullPage = Array.from({ length: 100 }, (_, i) => `NA1_${i + 10}`);
     vi.mocked(getMatchIds).mockResolvedValueOnce(fullPage).mockResolvedValueOnce(["NA1_1"]);
 
-    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, true);
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
 
     expect(getMatchIds).toHaveBeenCalledTimes(2);
     expect(vi.mocked(getMatchIds).mock.calls[1][3]).toMatchObject({ start: 100 });
@@ -114,14 +119,14 @@ describe("loadSeasonStats", () => {
     savedGames = [saved("NA1_1")];
     vi.mocked(getMatchIds).mockRejectedValue(new RiotApiError("unavailable", "down"));
 
-    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, true);
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
 
     expect(stats).toMatchObject({ loaded: 1, total: 1 });
   });
 
   it("returns null without a database to remember games in", async () => {
     hasDatabase = false;
-    expect(await loadSeasonStats("na", "player-2", profileUpdatedAt, null, true)).toBeNull();
+    expect(await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage)).toBeNull();
     expect(getMatchIds).not.toHaveBeenCalled();
   });
 });
