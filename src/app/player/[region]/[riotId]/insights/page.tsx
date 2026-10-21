@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
+import { addUpDeaths, deathsInGames } from "@/lib/analyzer/death-recap";
 import { compareHabits } from "@/lib/analyzer/habit-trends";
 import { analyzeSessions, toSessionGames } from "@/lib/analyzer/sessions";
 import { checkWeaknesses, computeTrends } from "@/lib/analyzer/trends";
@@ -27,6 +28,7 @@ import { loadTrendGames } from "@/lib/trend-games";
 import { AnalysisProgress } from "./analysis-progress";
 import { loadChosenPlayer, readChoice } from "./chosen-player";
 import { CompareWithPlayer } from "./compare-with-player";
+import { DeathRecapSection } from "./death-recap";
 import { FocusPanel } from "./focus";
 import { HabitsSection } from "./habits";
 import { InsightsFilterBar } from "./insights-filters";
@@ -220,6 +222,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const sessions = analyzeSessions(
     toSessionGames(matches, puuid, (match, id) => scoreGame(match).get(id)?.score ?? null),
   );
+  const deathRecap = addUpDeaths(deathsInGames(loaded.value.deaths, games));
   const playerComparison = theirs
     ? compareWithBenchmarks(games, theirs.games, classOf, MIN_PLAYER_GAMES)
     : null;
@@ -250,6 +253,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
             <EarlyDeaths earlyDeaths={trends.earlyDeaths} games={games.length} />
             <CsPhases csPerMin={trends.csPerMin} />
           </div>
+          <DeathRecapSection recap={deathRecap} dd={dd} />
         </>
       )}
       {/* You vs others: your games next to a rank's, or one player's. */}

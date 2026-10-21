@@ -68,6 +68,7 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   sets them against one rank's games or one chosen player's,
                   habits.ts reads early-game habits (habit-trends.ts splits wins by them),
                   sessions.ts groups games played back to back into blocks,
+                  death-recap.ts adds up what hit you in each death,
                   score.ts is the trained 0 to 100 game score (score-model.json),
                   phase-score.ts the early, mid and late ratings (phase-score-model.json),
                   win-chance.ts each team's chance to win at every minute,

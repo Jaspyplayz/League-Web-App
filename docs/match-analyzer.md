@@ -52,7 +52,7 @@ This is the analyzer's real input. `info.frames[]` has one frame per minute (`fr
 
 | Event type | Use |
 |---|---|
-| `CHAMPION_KILL` | who killed whom, assists, where, bounty. The basis for "ganked" vs "solo killed" vs "teamfight". |
+| `CHAMPION_KILL` | who killed whom, assists, where, bounty. The basis for "ganked" vs "solo killed" vs "teamfight". `victimDamageReceived` is the death recap, added up on Insights ([death-recaps.md](death-recaps.md)). |
 | `ELITE_MONSTER_KILL` | dragons, Baron, Herald, void grubs (with team and timestamp) |
 | `BUILDING_KILL`, `TURRET_PLATE_DESTROYED` | towers, inhibitors, plates |
 | `ITEM_PURCHASED` | item timings, e.g. "first completed item at 14:30" |
@@ -83,6 +83,7 @@ Computed from the last 20 analyzed games.
 2. **Conversion rate.** Win rate when ahead at 15 vs when behind at 15. "You win 70% when ahead but only 20% when behind" tells a player whether their problem is laning or closing out games.
 3. **Early death profile.** Deaths before 14:00 per game, split by label. "48% of your early deaths are jungle ganks" is a concrete, fixable weakness.
 4. **CS per minute by phase.** 0 to 10, 10 to 20, 20+. Most players' CS drops sharply after laning; showing it is a classic coaching point.
+5. **What keeps killing you.** Each death's recap added up: the enemy abilities in the most of your deaths and the damage type, so you know what to respect and build against ([death-recaps.md](death-recaps.md)).
 
 Then a **"recurring weaknesses"** box: 2 or 3 rule-based callouts, generated when a stat crosses a threshold in a majority of games (e.g. "behind in CS at 10 in 14 of 20 games"). Rules live in code with clear thresholds, so they're testable.
 

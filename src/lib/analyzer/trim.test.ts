@@ -114,6 +114,8 @@ describe("trimTimeline", () => {
         victimId: 3,
         assistingParticipantIds: [7],
         position: { x: 7000, y: 7100 },
+        // Riot leaves the list out when it's empty; a new trim always has one.
+        victimDamageReceived: [],
       },
       { type: "ITEM_PURCHASED", timestamp: 50_000, participantId: 2, itemId: 1055 },
       { type: "ITEM_SOLD", timestamp: 51_000, participantId: 2, itemId: 1055 },
@@ -137,6 +139,112 @@ describe("trimTimeline", () => {
         laneType: "BOT_LANE",
       },
     ]);
+  });
+
+  it("keeps the damage players and towers did before each death, without Riot's names", () => {
+    const withDamage = trimTimeline({
+      ...timeline,
+      info: {
+        ...timeline.info,
+        frames: [
+          {
+            timestamp: 0,
+            participantFrames: allPlayers(),
+            events: [
+              {
+                type: "CHAMPION_KILL",
+                timestamp: 45_000,
+                killerId: 7,
+                victimId: 2,
+                assistingParticipantIds: [],
+                position: null,
+                victimDamageReceived: [
+                  {
+                    basic: false,
+                    magicDamage: 312.6,
+                    name: "Elise",
+                    participantId: 7,
+                    physicalDamage: 0,
+                    spellName: "EliseHumanE",
+                    spellSlot: 2,
+                    trueDamage: 0,
+                    type: "OTHER",
+                  },
+                  {
+                    basic: false,
+                    magicDamage: 0,
+                    name: "SRU_ChaosMinionRanged",
+                    participantId: 0,
+                    physicalDamage: 21,
+                    spellName: "ChaosMinionBasicAttack",
+                    spellSlot: 64,
+                    trueDamage: 0,
+                    type: "MINION",
+                  },
+                  {
+                    basic: true,
+                    magicDamage: 0,
+                    name: "Turret",
+                    participantId: 0,
+                    physicalDamage: 180,
+                    spellName: "TurretBasicAttack",
+                    spellSlot: 64,
+                    trueDamage: 0,
+                    type: "TOWER",
+                  },
+                  // A slow that did no damage: nothing to add up.
+                  {
+                    basic: false,
+                    magicDamage: 0,
+                    name: "Elise",
+                    participantId: 7,
+                    physicalDamage: 0,
+                    spellName: "EliseSpiderW",
+                    spellSlot: 1,
+                    trueDamage: 0,
+                    type: "OTHER",
+                  },
+                  // Not an object: dropped, since Riot's data is checked
+                  // rather than trusted.
+                  "junk",
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(withDamage.events[0]).toEqual({
+      type: "CHAMPION_KILL",
+      timestamp: 45_000,
+      killerId: 7,
+      victimId: 2,
+      assistingParticipantIds: [],
+      position: null,
+      victimDamageReceived: [
+        {
+          participantId: 7,
+          type: "OTHER",
+          basic: false,
+          spellSlot: 2,
+          spellName: "EliseHumanE",
+          physicalDamage: 0,
+          magicDamage: 313,
+          trueDamage: 0,
+        },
+        // The minion line is left out: nothing reads it.
+        {
+          participantId: 0,
+          type: "TOWER",
+          basic: true,
+          spellSlot: 64,
+          spellName: "TurretBasicAttack",
+          physicalDamage: 180,
+          magicDamage: 0,
+          trueDamage: 0,
+        },
+      ],
+    });
   });
 
   it("fills in zeros when a player is missing from a frame", () => {
