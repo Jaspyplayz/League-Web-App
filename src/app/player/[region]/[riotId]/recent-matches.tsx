@@ -60,12 +60,14 @@ export async function RecentMatches({
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const count = readGameCount(gamesParam);
+  // The plain profile page: the All tab with its first 10 games.
+  const plainPage = queue.id === "all" && count === PROFILE_MATCH_COUNT;
 
   const [ids, dd] = await Promise.all([
     // The All tab's first 10 games are the snapshot's, for free. The other
     // tabs, and longer lists after "Show 10 more games", ask Riot for the
     // IDs: one call per view.
-    queue.id === "all" && count === PROFILE_MATCH_COUNT
+    plainPage
       ? { ok: true as const, value: profile.matchIds }
       : settle(getMatchIds(region, puuid, count, queue.filter)),
     getDataDragon().catch(() => null),
@@ -96,6 +98,7 @@ export async function RecentMatches({
             puuid={puuid}
             profileUpdatedAt={profile.updatedAt}
             queue={queue}
+            loadMore={plainPage}
             dd={dd}
             recent={topChampions(matches, 4)}
           />
