@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as Sentry from "@sentry/nextjs";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { tables } from "@/db";
 import { answerQuestion, type AskResult } from "@/lib/ask";
-import { ACCOUNT_MONTHLY_BUDGET_USD, HOLD_MICROS, QUESTIONS_PER_DAY } from "@/lib/ask-rules";
+import {
+  ACCOUNT_MONTHLY_BUDGET_USD,
+  HOLD_MICROS,
+  MONTHLY_BUDGET_USD,
+  QUESTIONS_PER_DAY,
+} from "@/lib/ask-rules";
 import type { Account } from "@/lib/riot/types";
 import { ask } from "./ask-store";
 
@@ -12,13 +19,16 @@ vi.mock("@/lib/ask", () => ({ answerQuestion: vi.fn(), ASK_MODEL: "claude-sonnet
 
 // A pretend database. `used` is what the limit checks read; the two arrays
 // are the rows ask() has saved in ask_questions and ask_spend; `steps`
-// records the order things happen in.
+// records the order things happen in, and `reads` which table each limit
+// check read and the values its filter compared against.
 type Row = Record<string, unknown>;
 let used: { askedToday: number; accountSpent: number; siteSpent: number };
 let questions: Row[];
 let spend: Row[];
 let steps: string[];
+let reads: { table: string; params: unknown[] }[];
 
+const dialect = new PgDialect();
 const rowsOf = (table: unknown) => (table === tables.askSpend ? spend : questions);
 const fakeDb = {
   // A transaction runs its steps on the same pretend database.
@@ -28,7 +38,10 @@ const fakeDb = {
   },
   select: (fields: Row) => ({
     from: (table: unknown) => ({
-      where: async () => {
+      where: async (filter: SQL) => {
+        steps.push("check");
+        const name = table === tables.askSpend ? "ask_spend" : "ask_questions";
+        reads.push({ table: name, params: dialect.sqlToQuery(filter).params });
         if ("n" in fields) return [{ n: used.askedToday }];
         // Postgres returns sums as text.
         const spent = table === tables.askSpend ? used.siteSpent : used.accountSpent;
@@ -79,6 +92,7 @@ beforeEach(() => {
   questions = [];
   spend = [];
   steps = [];
+  reads = [];
   vi.mocked(answerQuestion).mockReset();
   vi.mocked(Sentry.captureException).mockReset();
 });
@@ -95,7 +109,9 @@ describe("ask", () => {
 
     const outcome = await ask("na", account, "Why do I lose?", "user-1");
 
-    expect(steps).toEqual(["lock", "save", "save", "claude"]);
+    // The lock comes before the limit checks, so a second question waits
+    // until this one is saved before it counts.
+    expect(steps).toEqual(["lock", "check", "check", "check", "save", "save", "claude"]);
     expect(questions).toMatchObject([{ answer: "You die early.", costMicros: 120_000 }]);
     expect(spend).toEqual([expect.objectContaining({ costMicros: 120_000 })]);
     // The budget's copy of the cost has no account or question in it.
@@ -115,6 +131,32 @@ describe("ask", () => {
       message: "You've used your Ask allowance for this month. It resets on the 1st.",
       left: 0,
     });
+  });
+
+  it("pauses everyone once ask_spend reaches the month's budget", async () => {
+    // No questions left in ask_questions, as if their accounts were deleted:
+    // their cost still counts.
+    used.siteSpent = MONTHLY_BUDGET_USD * 1_000_000;
+
+    const outcome = await ask("na", account, "Why do I lose?", "user-1");
+
+    expect(answerQuestion).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({
+      status: "failed",
+      message: "Ask has used this month's budget and is paused until the 1st.",
+    });
+  });
+
+  it("counts only this account's questions toward its day and its month", async () => {
+    claudeReturns({ answer: "You die early.", costMicros: 120_000 });
+
+    await ask("na", account, "Why do I lose?", "user-1");
+
+    const accountReads = reads.filter((r) => r.table === "ask_questions");
+    expect(accountReads).toHaveLength(2);
+    for (const read of accountReads) expect(read.params).toContain("user-1");
+    // The site's total is everyone's, so it isn't filtered by account.
+    expect(reads.filter((r) => r.table === "ask_spend")).toHaveLength(1);
   });
 
   it("charges what the finished rounds cost when a later round fails", async () => {

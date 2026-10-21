@@ -130,8 +130,10 @@ export async function ask(
     const result = await answerQuestion(region, account, question);
     if (result.error !== undefined) Sentry.captureException(result.error);
 
-    // Claude failed before its first reply, so nothing was spent: take the
-    // question back, and it doesn't count toward the day.
+    // Anthropic turned the first round down (overloaded, rate limited), so
+    // nothing was spent: take the question back, and it doesn't count
+    // toward the day. A timeout isn't free (see answerQuestion), so it
+    // never gets here.
     if (result.error !== undefined && result.costMicros === 0) {
       await release(db, hold);
       return {

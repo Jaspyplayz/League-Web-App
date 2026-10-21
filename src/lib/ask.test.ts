@@ -1,13 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { costMicros } from "@/lib/ask-rules";
+import { costMicros, HOLD_MICROS } from "@/lib/ask-rules";
 import { recentGamesFor } from "@/lib/mcp/tools";
 import type { Account } from "@/lib/riot/types";
 import { answerQuestion } from "./ask";
 
 // A pretend Anthropic client: each test says what each round returns.
-const { create } = vi.hoisted(() => ({ create: vi.fn() }));
+// APIError is the SDK's error for when Anthropic answered with an error
+// status; a timeout or a dropped connection has no status.
+const { create, APIError } = vi.hoisted(() => ({
+  create: vi.fn(),
+  APIError: class extends Error {
+    constructor(readonly status: number | undefined) {
+      super(`status ${status}`);
+    }
+  },
+}));
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
+    static APIError = APIError;
     beta = { messages: { create } };
   },
 }));
@@ -53,8 +63,8 @@ describe("answerQuestion", () => {
     expect(result.error).toBeUndefined();
   });
 
-  it("keeps what the finished rounds cost when a later round fails", async () => {
-    const overloaded = new Error("overloaded");
+  it("keeps what the finished rounds cost when Anthropic turns a later round down", async () => {
+    const overloaded = new APIError(529);
     create.mockResolvedValueOnce(askForGames).mockRejectedValueOnce(overloaded);
 
     const result = await answerQuestion("na", account, "Why do I lose?");
@@ -64,12 +74,28 @@ describe("answerQuestion", () => {
     expect(result.error).toBe(overloaded);
   });
 
-  it("costs nothing when the first round fails", async () => {
-    create.mockRejectedValueOnce(new Error("network"));
+  it("adds the estimate for a round that timed out, since it may have been billed", async () => {
+    create.mockResolvedValueOnce(askForGames).mockRejectedValueOnce(new APIError(undefined));
+
+    const result = await answerQuestion("na", account, "Why do I lose?");
+
+    expect(result.costMicros).toBe(costMicros("claude-sonnet-5-5", usage) + HOLD_MICROS);
+  });
+
+  it("costs nothing when Anthropic turns the first round down", async () => {
+    create.mockRejectedValueOnce(new APIError(529));
 
     const result = await answerQuestion("na", account, "Why do I lose?");
 
     expect(result).toMatchObject({ answer: null, costMicros: 0 });
-    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error).toBeInstanceOf(APIError);
+  });
+
+  it("counts a first round that never answered as the estimate", async () => {
+    create.mockRejectedValueOnce(new Error("socket hang up"));
+
+    const result = await answerQuestion("na", account, "Why do I lose?");
+
+    expect(result).toMatchObject({ answer: null, costMicros: HOLD_MICROS });
   });
 });

@@ -8,7 +8,7 @@ import type {
   BetaToolResultBlockParam,
   BetaToolUseBlock,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
-import { costMicros, gameLabel, type AskGame } from "@/lib/ask-rules";
+import { costMicros, gameLabel, HOLD_MICROS, type AskGame } from "@/lib/ask-rules";
 import { riotErrorMessage } from "@/lib/mcp/answers";
 import { analyzeGameFor, MAX_RECENT_GAMES, recentGamesFor } from "@/lib/mcp/tools";
 import type { Region } from "@/lib/regions";
@@ -98,7 +98,8 @@ export type AskResult = {
   costMicros: number;
   // Set when a round failed (Anthropic overloaded, a timeout, no network),
   // for the caller to report. The rounds before it were still paid for, so
-  // their cost is in costMicros rather than lost with the error.
+  // their cost is in costMicros rather than lost with the error, and so is
+  // an estimate for the failed round when it may have been billed too.
   error?: unknown;
 };
 
@@ -166,7 +167,13 @@ export async function answerQuestion(
     }
   } catch (error) {
     // A round failed. Each round's cost was added as soon as Anthropic
-    // replied, so the rounds before it are still counted.
+    // replied, so the rounds before it are still counted. If Anthropic
+    // answered with an error (overloaded, rate limited), the failed round
+    // wasn't run, so it costs nothing. If it timed out or the connection
+    // dropped, Anthropic may have run it anyway and billed it, so it counts
+    // as HOLD_MICROS, the same estimate as a question still being answered.
+    const turnedDown = error instanceof Anthropic.APIError && error.status !== undefined;
+    if (!turnedDown) cost += HOLD_MICROS;
     return { ...result(null), error };
   }
   // Unreachable: the last round can't call tools.
