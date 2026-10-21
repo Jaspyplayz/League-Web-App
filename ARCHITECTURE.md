@@ -58,7 +58,8 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   .../champions/ the season's stats per champion and enemy
                   champion (src/lib/champion-stats.ts);
                   settings/ holds preferences saved in the browser (theme);
-                  api/mcp/ is the MCP server, with its tools in src/lib/mcp/
+                  api/mcp/ is the MCP server, with its tools in src/lib/mcp/;
+                  robots.ts keeps crawlers off player pages and the API
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (retries; rate-limit.ts counts requests, shared
@@ -158,6 +159,7 @@ These are fine for a portfolio site's traffic, and are the next things to fix be
 - **Every Riot request costs a database round trip** for the shared count, a few milliseconds next to Riot's hundreds. At much higher traffic, Redis would be the usual home for a counter like this.
 - **The limits are written in the code** (`RIOT_LIMITS`), set for a development key. A production key allows more, so they need changing when the key does.
 - **`/api/mcp` has no request limit.** An AI app looking up many new players could spend the Riot allowance for everyone.
+- **Crawlers are only asked to stay out.** Each profile links to the 90 or so players in its games, and a new player costs 13 to 35 Riot calls and saves their games for good, so a crawler following those links could use up the allowance and fill the database. `src/app/robots.ts` asks crawlers to skip `/player/` and `/api/`, and only the plain profile page loads more of the season's games. Polite crawlers like Google's follow robots.txt; others don't, and Vercel's bot protection (a dashboard setting) would be the next step.
 - **One free database.** Supabase's free tier holds 500 MB and has no downloadable backups. Matches can be fetched again, but accounts, goals and notes can't.
 - **No uptime check.** Sentry reports errors, but nothing alerts when the site is down or the daily dev key has expired.
 

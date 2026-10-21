@@ -15,8 +15,13 @@ import { SEASON, seasonChampions, type SeasonChampion, type SeasonGame } from "@
 //
 // A season can be hundreds of games, each one Riot call the first time, and
 // the dev key allows 100 calls per 2 minutes. So the games fill in over time:
-// every profile visit loads up to GAMES_PER_VIEW more and saves them, and the
-// panel says how many are in so far. Saved games never cost a call again.
+// every visit to the plain profile page loads up to GAMES_PER_VIEW more and
+// saves them, and the panel says how many are in so far. Saved games never
+// cost a call again.
+//
+// Only the plain page loads more (the caller passes loadMore). Its game-mode
+// tabs and "Show 10 more games" lists are separate URLs, and a crawler that
+// opened all of them would load 10 games on each, dozens of URLs per player.
 //
 // Needs the database to remember games between visits; without one this
 // returns null and the profile shows its last 10 games' champions instead.
@@ -40,6 +45,8 @@ export async function loadSeasonStats(
   // refreshed along with it, so it costs Riot calls once a day at most.
   profileUpdatedAt: Date,
   queueIds: number[] | null,
+  // Whether this view may ask Riot for a few of the games not saved yet.
+  loadMore: boolean,
 ): Promise<SeasonStats | null> {
   if (!database()) return null;
 
@@ -50,7 +57,7 @@ export async function loadSeasonStats(
   // Load a few of the missing games. Like the match list, loadMatches saves
   // them after the page is sent, so they're counted here from memory.
   const saved = new Set(games.map((g) => g.matchId));
-  const missing = ids.filter((id) => !saved.has(id)).slice(0, GAMES_PER_VIEW);
+  const missing = loadMore ? ids.filter((id) => !saved.has(id)).slice(0, GAMES_PER_VIEW) : [];
   const { matches } = await loadMatches(region, missing, GAMES_PER_VIEW);
   for (const match of matches) {
     const me = match.info.participants.find((p) => p.puuid === puuid);

@@ -19,6 +19,7 @@ export async function SeasonChampions({
   puuid,
   profileUpdatedAt,
   queue,
+  loadMore,
   dd,
   recent,
 }: {
@@ -26,12 +27,20 @@ export async function SeasonChampions({
   puuid: string;
   profileUpdatedAt: Date;
   queue: QueueFilter;
+  // True only on the plain profile page; see src/lib/season-store.ts.
+  loadMore: boolean;
   dd: DataDragon | null;
   // The listed games' champions, shown instead when there's no database to
   // remember a season's worth of games.
   recent: ChampionStats[];
 }) {
-  const stats = await loadSeasonStats(region, puuid, profileUpdatedAt, queueIds(queue.filter));
+  const stats = await loadSeasonStats(
+    region,
+    puuid,
+    profileUpdatedAt,
+    queueIds(queue.filter),
+    loadMore,
+  );
   if (!stats) {
     return (
       <ChampionBox title="Champions" dd={dd} champions={recent}>
