@@ -18,7 +18,12 @@ export default defineConfig({
     extraHTTPHeaders: bypass
       ? { "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" }
       : undefined,
-    trace: "retain-on-failure",
+    // A trace records every request header, including the bypass secret
+    // above, and CI uploads failed runs' files where anyone signed in to
+    // GitHub can download them. So CI keeps only screenshots; the failing
+    // test also prints the page's text into the log (e2e/smoke.spec.ts).
+    trace: process.env.CI ? "off" : "retain-on-failure",
+    screenshot: process.env.CI ? "only-on-failure" : "off",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

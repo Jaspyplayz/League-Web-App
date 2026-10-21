@@ -13,7 +13,7 @@ const EXPIRED_KEY = "The site's Riot API key isn't working";
 const FIRST_LOAD = { timeout: 30_000 };
 
 // When a test fails, print what the page actually showed, so the CI log
-// explains the failure without downloading the trace.
+// explains the failure. CI keeps no trace (see playwright.config.ts).
 test.afterEach(async ({ page }, testInfo) => {
   if (testInfo.status === testInfo.expectedStatus) return;
   const text = await page
