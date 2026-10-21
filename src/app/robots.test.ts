@@ -32,7 +32,7 @@ describe("robots.txt", () => {
   });
 
   it("lets link preview bots open a pasted match link and its card, but not the API", () => {
-    for (const bot of ["Twitterbot", "LinkedInBot", "Slackbot"]) {
+    for (const bot of ["Discordbot", "Twitterbot", "LinkedInBot"]) {
       expect(allowed(bot, MATCH_PAGE)).toBe(true);
       expect(allowed(bot, `${MATCH_PAGE}/opengraph-image`)).toBe(true);
       expect(allowed(bot, "/api/mcp")).toBe(false);

@@ -9,16 +9,16 @@ import type { MetadataRoute } from "next";
 // privacy and terms pages stay open to search engines.
 //
 // Link preview bots get their own rule. When someone pastes a match link on
-// X, LinkedIn or Slack, that site's bot opens just that one page to draw the
-// preview card (see opengraph-image.tsx) and doesn't follow its links, so it
-// costs what one visitor does. A bot named in a group of its own follows
-// only that group, so these may open player pages but still not the API.
-// (Discord and iMessage don't read robots.txt, so their previews work
-// either way.)
+// Discord, X or LinkedIn, that site's bot opens just that one page to draw
+// the preview card (see opengraph-image.tsx) and doesn't follow its links,
+// so it costs what one visitor does. A bot named in a group of its own
+// follows only that group, so these may open player pages but still not
+// the API. (Slack and iMessage don't read robots.txt, so their previews
+// work either way.)
 //
 // robots.txt is only a request: polite crawlers follow it, others don't. See
 // "Known limits" in ARCHITECTURE.md.
-const PREVIEW_BOTS = ["Twitterbot", "LinkedInBot", "Slackbot"];
+const PREVIEW_BOTS = ["Discordbot", "Twitterbot", "LinkedInBot"];
 
 export default function robots(): MetadataRoute.Robots {
   return {

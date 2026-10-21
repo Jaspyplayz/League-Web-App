@@ -33,7 +33,8 @@ export function hasMoreGames(idsShown: number, count: number): boolean {
 // Only that page loads more of the season's games (src/lib/season-store.ts),
 // so a crawler opening every tab and longer list of a profile can't load 10
 // games on each. Its 10 games are also the profile snapshot's
-// (PROFILE_MATCH_COUNT), so listing them needs no Riot call.
+// (PROFILE_MATCH_COUNT, which is GAMES_STEP), so listing them needs no Riot
+// call.
 export function isPlainProfilePage(queue: QueueFilter, count: number): boolean {
   return queue.id === "all" && count === GAMES_STEP;
 }

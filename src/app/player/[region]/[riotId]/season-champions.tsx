@@ -55,7 +55,7 @@ export async function SeasonChampions({
       {stats.loaded < stats.total ? (
         <p className="text-xs text-faint">
           {stats.loaded} of {stats.total} season games loaded so far. More load each time{" "}
-          {loadMore ? "the profile is opened" : "the All tab is opened"}.
+          {loadMore ? "the profile is opened" : "the profile's first page is opened"}.
         </p>
       ) : (
         <p className="text-xs text-faint">All {stats.total} games this season.</p>

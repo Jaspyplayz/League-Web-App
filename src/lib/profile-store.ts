@@ -5,6 +5,7 @@ import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { tables } from "@/db";
 import { isFresh, secondsUntilUpdate, TTL_MS } from "@/db/freshness";
 import { database, readCache } from "@/lib/match-store";
+import { GAMES_STEP } from "@/lib/more-games";
 import { GRAPH_DAYS, ranksToRecord, type RankPoint } from "@/lib/rank-history";
 import type { Region } from "@/lib/regions";
 import { getMatchIds, getRankedEntries, getSummoner } from "@/lib/riot/api";
@@ -30,8 +31,10 @@ export type Profile = {
   updatedAt: Date;
 };
 
-// Each game listed costs one Riot call the first time anyone sees it.
-export const PROFILE_MATCH_COUNT = 10;
+// Each game listed costs one Riot call the first time anyone sees it. The
+// plain profile page lists exactly these, so it's the match list's first
+// page (see isPlainProfilePage in src/lib/more-games.ts).
+export const PROFILE_MATCH_COUNT = GAMES_STEP;
 
 // Throws a RiotApiError if there's no saved snapshot and Riot can't be reached.
 export async function loadProfile(region: Region, account: Account): Promise<Profile> {
