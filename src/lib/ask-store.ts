@@ -7,6 +7,7 @@ import { answerQuestion, ASK_MODEL, type AskResult } from "@/lib/ask";
 import {
   allowance,
   HOLD_MICROS,
+  leftAfter,
   monthStart,
   type Allowance,
   type AskGame,
@@ -106,9 +107,15 @@ export type AskOutcome =
   // so the box's count matches what was counted.
   | { status: "failed"; message: string; left?: number };
 
-// A question saved before Claude is called: its rows in both tables, and how
-// many questions the account had left before it.
-type Hold = { questionId: string; spendId: string; askedAt: Date; left: number };
+// A question saved before Claude is called: its rows in both tables, what
+// the account and site had used before it, and how many questions that left.
+type Hold = {
+  questionId: string;
+  spendId: string;
+  askedAt: Date;
+  used: UsedSoFar;
+  left: number;
+};
 
 // Asks Claude one question about one player and saves the answer. The
 // question is the only thing taken from the browser: the games are read
@@ -144,7 +151,7 @@ export async function ask(
     }
 
     await settle(db, hold, result);
-    const left = hold.left - 1;
+    const left = leftAfter(hold.used, result.costMicros);
     if (result.answer === null) {
       const message =
         result.error === undefined
@@ -165,7 +172,8 @@ export async function ask(
     };
   } catch (error) {
     // Most likely the database. If the question was already saved, its
-    // estimated cost stays, which errs on the safe side.
+    // 50-cent estimate stays. That's usually more than the question cost,
+    // but not always (see costMicros in AskResult, src/lib/ask.ts).
     Sentry.captureException(error);
     return { status: "failed", message: "Couldn't answer right now. Try again in a moment." };
   }
@@ -187,7 +195,8 @@ async function reserve(
 ): Promise<{ ok: true; hold: Hold } | { ok: false; message: string }> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('ask-budget'))`);
-    const allowed = allowance(await usedSoFar(tx, userId));
+    const used = await usedSoFar(tx, userId);
+    const allowed = allowance(used);
     if (!allowed.ok) return allowed;
 
     const [row] = await tx
@@ -208,7 +217,13 @@ async function reserve(
       .returning({ id: tables.askSpend.id });
     return {
       ok: true,
-      hold: { questionId: row.id, spendId: spend.id, askedAt: row.askedAt, left: allowed.left },
+      hold: {
+        questionId: row.id,
+        spendId: spend.id,
+        askedAt: row.askedAt,
+        used,
+        left: allowed.left,
+      },
     };
   });
 }

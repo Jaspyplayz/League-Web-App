@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // same pull request.
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="October 20, 2026">
+    <LegalPage title="Privacy policy" updated="October 21, 2026">
       <p>
         Turnpoint is a free League of Legends stats site built by one student. This page
         explains what data it handles and why. The short version: accounts are optional, and

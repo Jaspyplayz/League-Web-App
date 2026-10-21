@@ -23,10 +23,10 @@ export const ACCOUNT_MONTHLY_BUDGET_USD = 5;
 // question is saved with this before Claude is called, so questions sent at
 // the same moment each see the ones before them, and swapped for what it
 // cost once the answer is in. If the server is stopped mid-answer, the
-// estimate stays, which errs on the safe side. The same 50 cents is also
-// added to a question's cost for a round with a try that may have been
-// billed without a reply, like one that timed out (see sendRound in
-// src/lib/ask.ts), so a question can end up costing more than this.
+// estimate stays, which is usually more than the question cost by then.
+// The same 50 cents is also added to a question's cost for a round with a
+// try that may have been billed without a reply, like one that timed out
+// (see sendRound in src/lib/ask.ts), so a question can cost more than this.
 export const HOLD_MICROS = 500_000;
 
 export const MAX_QUESTION_LENGTH = 300;
@@ -117,6 +117,18 @@ export function allowance({ askedToday, accountSpent, siteSpent }: UsedSoFar): A
     };
   }
   return { ok: true, left: QUESTIONS_PER_DAY - askedToday };
+}
+
+// How many questions the account has left after one more that cost
+// `costMicros`, for the count under the box: 0 once that question used up
+// the day, the account's month or the site's month.
+export function leftAfter(used: UsedSoFar, costMicros: number): number {
+  const after = allowance({
+    askedToday: used.askedToday + 1,
+    accountSpent: used.accountSpent + costMicros,
+    siteSpent: used.siteSpent + costMicros,
+  });
+  return after.ok ? after.left : 0;
 }
 
 // The label under an answer for one game from recent_games:

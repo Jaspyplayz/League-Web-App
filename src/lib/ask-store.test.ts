@@ -22,14 +22,14 @@ vi.mock("@/lib/ask", () => ({ answerQuestion: vi.fn(), ASK_MODEL: "claude-sonnet
 // a different one, shows up.
 // `used` is what the limit checks read; the two arrays are the rows saved in
 // ask_questions and ask_spend; `steps` records the order things happen in;
-// `reads` which table each limit check read and the values its filter
-// compared against; `locks` the SQL each lock ran.
+// `reads` which table each limit check read, its filter's SQL and the values
+// that filter compared against; `locks` the SQL each lock ran.
 type Row = Record<string, unknown>;
 let used: { askedToday: number; accountSpent: number; siteSpent: number };
 let questions: Row[];
 let spend: Row[];
 let steps: string[];
-let reads: { table: string; counts: boolean; params: unknown[] }[];
+let reads: { table: string; counts: boolean; sql: string; params: unknown[] }[];
 let locks: string[];
 let transactions: number;
 
@@ -38,6 +38,7 @@ const tableName = (table: unknown) => (table === tables.askSpend ? "ask_spend" :
 const rowsOf = (table: unknown) => (table === tables.askSpend ? spend : questions);
 // The values a filter compares against, like the id in `where id = $1`.
 const paramsOf = (filter: SQL) => dialect.sqlToQuery(filter).params;
+const sqlOf = (filter: SQL) => dialect.sqlToQuery(filter).sql;
 
 function fake(prefix: string) {
   return {
@@ -45,13 +46,18 @@ function fake(prefix: string) {
       run(fake(`tx${++transactions}.`)),
     execute: async (query: SQL) => {
       steps.push(`${prefix}lock`);
-      locks.push(dialect.sqlToQuery(query).sql);
+      locks.push(sqlOf(query));
     },
     select: (fields: Row) => ({
       from: (table: unknown) => ({
         where: async (filter: SQL) => {
           steps.push(`${prefix}check`);
-          reads.push({ table: tableName(table), counts: "n" in fields, params: paramsOf(filter) });
+          reads.push({
+            table: tableName(table),
+            counts: "n" in fields,
+            sql: sqlOf(filter),
+            params: paramsOf(filter),
+          });
           if ("n" in fields) return [{ n: used.askedToday }];
           // Postgres returns sums as text.
           const spent = table === tables.askSpend ? used.siteSpent : used.accountSpent;
@@ -201,12 +207,26 @@ describe("ask", () => {
 
     const dayAgo = "2026-10-20T12:00:00.000Z";
     const monthStart = "2026-10-01T00:00:00.000Z";
+    // Every question since the cutoff counts, answered or not, including
+    // ones still being answered.
+    const sinceForAccount =
+      '("ask_questions"."user_id" = $1 and "ask_questions"."created_at" >= $2)';
     expect(reads).toEqual(
       expect.arrayContaining([
-        { table: "ask_questions", counts: true, params: ["user-1", dayAgo] },
-        { table: "ask_questions", counts: false, params: ["user-1", monthStart] },
+        { table: "ask_questions", counts: true, sql: sinceForAccount, params: ["user-1", dayAgo] },
+        {
+          table: "ask_questions",
+          counts: false,
+          sql: sinceForAccount,
+          params: ["user-1", monthStart],
+        },
         // The site's total is everyone's, so it isn't filtered by account.
-        { table: "ask_spend", counts: false, params: [monthStart] },
+        {
+          table: "ask_spend",
+          counts: false,
+          sql: '"ask_spend"."created_at" >= $1',
+          params: [monthStart],
+        },
       ]),
     );
     expect(reads).toHaveLength(3);
@@ -252,6 +272,15 @@ describe("ask", () => {
     expect(questions).toMatchObject([{ answer: null, costMicros: HOLD_MICROS }]);
     expect(spend).toMatchObject([{ costMicros: HOLD_MICROS }]);
     expect(outcome).toMatchObject({ status: "failed", left: QUESTIONS_PER_DAY - 1 });
+  });
+
+  it("tells the box none are left once an answer uses up the account's month", async () => {
+    used.accountSpent = ACCOUNT_MONTHLY_BUDGET_USD * 1_000_000 - 100_000;
+    claudeReturns({ answer: "You die early.", costMicros: 150_000 });
+
+    const outcome = await ask("na", account, "Why do I lose?", "user-1");
+
+    expect(outcome).toMatchObject({ status: "answered", left: 0 });
   });
 
   it("tells the box a question Claude couldn't answer still counted", async () => {

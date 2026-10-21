@@ -125,6 +125,8 @@ describe("answerQuestion", () => {
     await ask();
 
     expect(clientOptions).toEqual([{ maxRetries: 0, timeout: 60_000 }]);
+    // Options on a request would override the client's, so there are none.
+    expect(create.mock.calls.every((call) => call.length === 1)).toBe(true);
   });
 
   it("waits half a second before the second try", async () => {
@@ -216,11 +218,24 @@ describe("answerQuestion", () => {
   });
 
   // 500 and 504 can come after Anthropic started on the request.
-  it("adds the estimate for a server error that isn't 'overloaded'", async () => {
-    create.mockRejectedValueOnce(new APIError(504)).mockRejectedValueOnce(new APIError(529));
+  it.each([500, 504])(
+    "adds the estimate for a %i, a server error that isn't 'overloaded'",
+    async (status) => {
+      create.mockRejectedValueOnce(new APIError(status)).mockRejectedValueOnce(new APIError(529));
+
+      const result = await ask();
+
+      expect(result).toMatchObject({ answer: null, costMicros: HOLD_MICROS });
+    },
+  );
+
+  it("adds the estimate when a try succeeds with no message in the reply", async () => {
+    create.mockResolvedValueOnce(undefined).mockResolvedValueOnce("<html>ok</html>");
 
     const result = await ask();
 
+    expect(create).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ answer: null, costMicros: HOLD_MICROS });
+    expect(result.error).toBeInstanceOf(Error);
   });
 });

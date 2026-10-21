@@ -210,7 +210,12 @@ async function sendRound(
   let mayBeBilled = false;
   for (let attempt = 1; ; attempt++) {
     try {
-      return { ok: true, response: await client.beta.messages.create(request), mayBeBilled };
+      const response = await client.beta.messages.create(request);
+      // A success with no message in it (an empty or garbled reply) can't be
+      // counted, but Anthropic may have run it, so it's a failed try that may
+      // have been billed.
+      if (!response?.usage) throw new Error("Anthropic's reply had no message");
+      return { ok: true, response, mayBeBilled };
     } catch (error) {
       if (!turnedDown(error)) mayBeBilled = true;
       if (attempt === 2) return { ok: false, error, mayBeBilled };
@@ -230,9 +235,9 @@ function turnedDown(error: unknown): boolean {
   return (error.status >= 400 && error.status < 500) || error.status === 529;
 }
 
-// How long to wait before the second try. A rate limited answer says how
-// many seconds to wait in its "retry-after" header; trying sooner would be
-// turned down again.
+// How long to wait before the second try. Anthropic can say how many seconds
+// to wait in a "retry-after" header, which it sends when we're rate limited;
+// trying sooner would be turned down again.
 function pauseBeforeRetry(error: unknown): number {
   const headers = error instanceof Anthropic.APIError ? error.headers : undefined;
   const seconds = Number(headers?.get("retry-after") ?? NaN);

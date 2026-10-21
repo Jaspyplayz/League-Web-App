@@ -17,12 +17,12 @@ A player profile's **Ask** tab lets anyone signed in type a question about that 
 
 An answer takes up to a few minutes. If the question were saved only at the end, ten questions sent at the same moment would all pass the check while none of them was counted yet, and could spend far past the caps. So `reserve()` in `ask-store.ts` runs one short transaction: it takes a lock the whole site shares (`pg_advisory_xact_lock`), checks the limits, and saves the question with a 50-cent estimate (`HOLD_MICROS`). The next question waits for that lock, so its check sees the first one. The lock is let go before Claude is called. When the answer is in, `settle()` swaps the estimate for the cost.
 
-Each round gets two tries. `sendRound` in `ask.ts` makes the second try itself, instead of leaving it to Anthropic's SDK, so it can see what happened to both. It waits half a second between them, or as long as a rate limited answer asks (its `retry-after` header), up to 10 seconds.
+Each round gets two tries. `sendRound` in `ask.ts` makes the second try itself, instead of leaving it to Anthropic's SDK, so it can see what happened to both. It waits half a second between them, or as long as Anthropic's `retry-after` header asks (it sends one when we're rate limited), up to 10 seconds.
 
 - A try Anthropic turned down before running it (any 4xx answer, like rate limited or a bad request, or 529 overloaded) isn't billed.
-- A try that timed out, lost its connection, was cut off partway or got another 5xx (like 500 or 504) may still have been run, and Anthropic bills a request that was on its way to succeeding even if we stopped waiting. We can't tell, so that round adds the 50-cent estimate, once. A network outage that never reached Anthropic is charged the same way, which errs on the safe side.
+- A try that timed out, lost its connection, was cut off partway, came back with no message in it, or got another 5xx (like 500 or 504) may still have been run, and Anthropic bills a request that was on its way to succeeding even if we stopped waiting. We can't tell, so that round adds the 50-cent estimate, once. A network outage that never reached Anthropic is charged the same way, which errs on the safe side.
 
-If both tries of a round fail, `answerQuestion` stops and returns what the question cost so far, and that is what's charged. A question whose first round Anthropic turned down on both tries cost nothing, so it's deleted and doesn't count. If the server is stopped mid-answer (the page's 3-minute limit), the estimate saved at the start stays.
+If both tries of a round fail, `answerQuestion` stops and returns what the question cost so far, and that is what's charged. A question whose first round Anthropic turned down on both tries cost nothing, so it's deleted and doesn't count. If the server is stopped mid-answer (the page's 3-minute limit), the estimate saved at the start stays, even if the question had cost more by then.
 
 The reasons and the options considered are in [decision record 0005](adr/0005-ask-budget.md).
 
@@ -35,7 +35,7 @@ A question usually costs 5 to 20 cents: Sonnet is $2 per million tokens in and $
 - **Signed in only**, so the caps belong to an account. Making a second Google or Discord account is free, which is why the site-wide budget below is the real limit.
 - **10 questions per account per 24 hours** (`QUESTIONS_PER_DAY` in `src/lib/ask-rules.ts`). Questions Claude couldn't answer still count; ones Anthropic turned down before Claude's first reply don't (see above).
 - **$5 per account per calendar month** (`ACCOUNT_MONTHLY_BUDGET_USD`, picked 2026-10-21), so one account can't use up the whole budget and pause Ask for everyone.
-- **$20 a month for the whole site** (`MONTHLY_BUDGET_USD`). Each answer's cost is worked out from the token counts Anthropic reports (`costMicros`), plus the 50-cent estimate for a round with a try that timed out. It's saved twice: with the question, and in `ask_spend`, which has no account on it, so deleting an account doesn't hand its spending back to the month. When `ask_spend`'s total for the month reaches the budget, Ask pauses until the 1st.
+- **$20 a month for the whole site** (`MONTHLY_BUDGET_USD`). Each answer's cost is worked out from the token counts Anthropic reports (`costMicros`), plus the 50-cent estimate for each round with a try that may have been billed (see above). It's saved twice: with the question, and in `ask_spend`, which has no account on it, so deleting an account doesn't hand its spending back to the month. When `ask_spend`'s total for the month reaches the budget, Ask pauses until the 1st.
 - If Claude declines a question, Anthropic retries it on a fallback model (`fallbacks: "default"`). Unknown models are priced high, so the budget errs on the safe side.
 - Set a monthly spend limit in the Anthropic console as a second guard.
 
