@@ -28,19 +28,19 @@ Ask has three limits: 10 questions per account per 24 hours, a monthly amount pe
 
 ## Decision
 
-`reserve()` in `src/lib/ask-store.ts` runs one transaction: `pg_advisory_xact_lock(hashtext('ask-budget'))`, then the three limit checks, then it saves the question in `ask_questions` (answer null) and a row in `ask_spend`, both with a 50-cent estimate (`HOLD_MICROS`). Claude is called after the transaction ends. `settle()` then writes the answer and the real cost into both rows. `answerQuestion` returns the cost of the rounds that finished even when a later round fails, plus the 50-cent estimate when the failed round timed out (Anthropic may have run and billed it anyway). A question Anthropic turned down on its first round (overloaded, rate limited) cost nothing, so it's deleted and doesn't count. The site's monthly total is summed from `ask_spend`; the per-account total from `ask_questions`.
+`reserve()` in `src/lib/ask-store.ts` runs one transaction: `pg_advisory_xact_lock(hashtext('ask-budget'))`, then the three limit checks, then it saves the question in `ask_questions` (answer null) and a row in `ask_spend`, both with a 50-cent estimate (`HOLD_MICROS`). Claude is called after the transaction ends. `settle()` then writes the answer and the cost into both rows. Each round gets two tries, made by `sendRound` in `src/lib/ask.ts` rather than the SDK, so both can be checked. `answerQuestion` returns the cost of the rounds that finished even when a later round fails, plus the 50-cent estimate for any round with a try that timed out or lost its connection (Anthropic may have run and billed it anyway). A question whose first round Anthropic turned down on both tries (overloaded, rate limited) cost nothing, so it's deleted and doesn't count. The site's monthly total is summed from `ask_spend`; the per-account total from `ask_questions`.
 
 ## Consequences
 
 Good:
 - The daily cap, the per-account cap and the site budget hold however many questions arrive at once.
-- Failed questions are charged what they really cost.
+- Failed questions are charged what their finished rounds cost, plus an estimate for a round that may have been billed without an answer, instead of nothing.
 - Deleting an account no longer frees up budget, and no private text is kept to make that work.
-- One account can use at most a quarter of the month's budget. Four free accounts still could use all of it, which is why the site-wide $20 stays the real limit and the Anthropic console's spend limit stays as a backstop.
+- An account is stopped once it has spent a quarter of the month's budget (it can go over by about one question, since the check happens before a question's cost is known). Four free accounts still could use all of it, which is why the site-wide $20 stays the real limit and the Anthropic console's spend limit stays as a backstop.
 
 Bad:
 - Every Ask question waits its turn for one lock. At a few milliseconds each that is fine at this site's traffic, but it would need a rethink at thousands of questions a minute.
-- A question cut off by the page's 3-minute limit, or one whose round timed out, is charged the 50-cent estimate even if it really cost less. Questions still being answered count at 50 cents too, so near the end of the budget Ask can say it's paused while one of them is still running, a little early. Both err on the safe side.
+- A question cut off by the page's 3-minute limit, or one with a try that timed out, is charged the 50-cent estimate even if it really cost less. So is a network outage between Vercel and Anthropic, even though nothing reached Anthropic. Questions still being answered count at 50 cents too, so near the end of the budget Ask can say it's paused while one of them is still running, a little early. Both err on the safe side.
 - Questions asked on the live site between running the migrations and merging come from the old code, which doesn't write to `ask_spend`, so they're missing from the month's total. Merging soon after migrating keeps that gap small.
 - The cost is stored twice, and the two copies are only kept in step by `settle()`.
 - Recaps (`recap-store.ts`) still check after calling Claude. Haiku costs about a cent a recap, so that was left for later.

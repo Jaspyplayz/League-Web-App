@@ -3,10 +3,12 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import Anthropic from "@anthropic-ai/sdk";
 import type {
+  BetaMessage,
   BetaMessageParam,
   BetaTool,
   BetaToolResultBlockParam,
   BetaToolUseBlock,
+  MessageCreateParamsNonStreaming,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { costMicros, gameLabel, HOLD_MICROS, type AskGame } from "@/lib/ask-rules";
 import { riotErrorMessage } from "@/lib/mcp/answers";
@@ -94,12 +96,13 @@ export type AskResult = {
   answer: string | null;
   games: AskGame[];
   model: string;
-  // What the rounds that finished cost, in millionths of a dollar.
+  // What the question cost, in millionths of a dollar: the token counts
+  // Anthropic reported for each round, plus HOLD_MICROS for each round in
+  // which a try may have been billed without a reply (see sendRound).
   costMicros: number;
   // Set when a round failed (Anthropic overloaded, a timeout, no network),
   // for the caller to report. The rounds before it were still paid for, so
-  // their cost is in costMicros rather than lost with the error, and so is
-  // an estimate for the failed round when it may have been billed too.
+  // their cost is in costMicros rather than lost with the error.
   error?: unknown;
 };
 
@@ -108,11 +111,11 @@ export async function answerQuestion(
   account: Account,
   question: string,
 ): Promise<AskResult> {
-  // One retry and a minute per round. A question that runs past the page's
-  // time limit (maxDuration in the Ask page) is cut off; it was saved with
-  // an estimated cost before it started (src/lib/ask-store.ts), so it still
-  // counts.
-  const client = new Anthropic({ maxRetries: 1, timeout: 60_000 });
+  // A minute per try, and two tries per round (see sendRound). A question
+  // that runs past the page's time limit (maxDuration in the Ask page) is
+  // cut off; it was saved with an estimated cost before it started
+  // (src/lib/ask-store.ts), so it still counts.
+  const client = new Anthropic({ maxRetries: 0, timeout: 60_000 });
   const messages: BetaMessageParam[] = [{ role: "user", content: question }];
   const tools = new ToolRunner(region, account);
   let model = ASK_MODEL;
@@ -124,60 +127,89 @@ export async function answerQuestion(
     costMicros: cost,
   });
 
-  try {
-    for (let round = 1; round <= MAX_ROUNDS; round++) {
-      const response = await client.beta.messages.create({
-        model: ASK_MODEL,
-        max_tokens: 8000,
-        // Saves the conversation so far in Anthropic's cache, so the next
-        // round only pays full price for what's new (about a tenth otherwise).
-        cache_control: { type: "ephemeral" },
-        // Medium effort: enough thinking to pick and compare games without
-        // spending tokens on a long think for simple questions.
-        output_config: { effort: "medium" },
-        system: SYSTEM,
-        tools: TOOLS,
-        // On the last round, no more tools: answer with what you've read.
-        tool_choice: { type: round === MAX_ROUNDS ? "none" : "auto" },
-        messages,
-        // If Claude declines (its safety checks can misfire on game talk like
-        // "kill" and "execute"), Anthropic retries on a fallback model it picks.
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-      });
-      model = response.model;
-      cost += costMicros(response.model, response.usage);
+  for (let round = 1; round <= MAX_ROUNDS; round++) {
+    const sent = await sendRound(client, {
+      model: ASK_MODEL,
+      max_tokens: 8000,
+      // Saves the conversation so far in Anthropic's cache, so the next
+      // round only pays full price for what's new (about a tenth otherwise).
+      cache_control: { type: "ephemeral" },
+      // Medium effort: enough thinking to pick and compare games without
+      // spending tokens on a long think for simple questions.
+      output_config: { effort: "medium" },
+      system: SYSTEM,
+      tools: TOOLS,
+      // On the last round, no more tools: answer with what you've read.
+      tool_choice: { type: round === MAX_ROUNDS ? "none" : "auto" },
+      messages,
+      // If Claude declines (its safety checks can misfire on game talk like
+      // "kill" and "execute"), Anthropic retries on a fallback model it picks.
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+    });
+    if (sent.mayBeBilled) cost += HOLD_MICROS;
+    // Both tries failed. Each earlier round's cost was added as soon as
+    // Anthropic replied, so it's still counted.
+    if (!sent.ok) return { ...result(null), error: sent.error };
 
-      if (response.stop_reason === "tool_use") {
-        // The whole reply goes back, thinking included, as the API requires.
-        messages.push({ role: "assistant", content: response.content });
-        const calls = response.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
-        const results = await Promise.all(calls.map((call) => tools.run(call)));
-        // All results in one message, so Claude keeps calling tools in parallel.
-        messages.push({ role: "user", content: results });
-        continue;
-      }
+    const response = sent.response;
+    model = response.model;
+    cost += costMicros(response.model, response.usage);
 
-      const text = response.content
-        .flatMap((b) => (b.type === "text" ? [b.text] : []))
-        .join("\n\n")
-        .trim();
-      const answered = response.stop_reason === "end_turn" && text !== "";
-      return result(answered ? text : null);
+    if (response.stop_reason === "tool_use") {
+      // The whole reply goes back, thinking included, as the API requires.
+      messages.push({ role: "assistant", content: response.content });
+      const calls = response.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
+      const results = await Promise.all(calls.map((call) => tools.run(call)));
+      // All results in one message, so Claude keeps calling tools in parallel.
+      messages.push({ role: "user", content: results });
+      continue;
     }
-  } catch (error) {
-    // A round failed. Each round's cost was added as soon as Anthropic
-    // replied, so the rounds before it are still counted. If Anthropic
-    // answered with an error (overloaded, rate limited), the failed round
-    // wasn't run, so it costs nothing. If it timed out or the connection
-    // dropped, Anthropic may have run it anyway and billed it, so it counts
-    // as HOLD_MICROS, the same estimate as a question still being answered.
-    const turnedDown = error instanceof Anthropic.APIError && error.status !== undefined;
-    if (!turnedDown) cost += HOLD_MICROS;
-    return { ...result(null), error };
+
+    const text = response.content
+      .flatMap((b) => (b.type === "text" ? [b.text] : []))
+      .join("\n\n")
+      .trim();
+    const answered = response.stop_reason === "end_turn" && text !== "";
+    return result(answered ? text : null);
   }
   // Unreachable: the last round can't call tools.
   return result(null);
+}
+
+// How long to wait before a round's second try, like the SDK's own retry.
+const RETRY_PAUSE_MS = 500;
+
+type SentRound =
+  | { ok: true; response: BetaMessage; mayBeBilled: boolean }
+  | { ok: false; error: unknown; mayBeBilled: boolean };
+
+// Sends one round, and tries once more if the first try fails. The SDK can
+// retry on its own, but then only the last try's error is seen, so the
+// retry is done here instead, where every try can be checked.
+//
+// A try Anthropic answered with an error (overloaded, rate limited, a bad
+// request) wasn't run, and Anthropic doesn't bill those. A try that timed
+// out or lost its connection may have been run anyway, and Anthropic bills a
+// request that was on its way to succeeding even if we stopped waiting. We
+// can't tell which, so `mayBeBilled` says to count the round as HOLD_MICROS,
+// the same estimate as a question still being answered. That also charges
+// a network outage that never reached Anthropic, which errs on the safe side.
+async function sendRound(
+  client: Anthropic,
+  request: MessageCreateParamsNonStreaming,
+): Promise<SentRound> {
+  let mayBeBilled = false;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return { ok: true, response: await client.beta.messages.create(request), mayBeBilled };
+    } catch (error) {
+      const turnedDown = error instanceof Anthropic.APIError && error.status !== undefined;
+      if (!turnedDown) mayBeBilled = true;
+      if (attempt === 2) return { ok: false, error, mayBeBilled };
+      await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS));
+    }
+  }
 }
 
 // Runs Claude's tool calls for one player and remembers which games it read.

@@ -461,7 +461,7 @@ export const askSpend = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     // Millionths of a dollar, like ask_questions.cost_micros: an estimate
-    // while Claude is answering, then the real cost.
+    // while Claude is answering, then the cost (src/lib/ask.ts).
     costMicros: integer("cost_micros").notNull(),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },

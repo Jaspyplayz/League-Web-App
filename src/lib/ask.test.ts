@@ -63,27 +63,25 @@ describe("answerQuestion", () => {
     expect(result.error).toBeUndefined();
   });
 
+  // Each round gets two tries, half a second apart, so these tests take a
+  // second or so.
   it("keeps what the finished rounds cost when Anthropic turns a later round down", async () => {
     const overloaded = new APIError(529);
-    create.mockResolvedValueOnce(askForGames).mockRejectedValueOnce(overloaded);
+    create
+      .mockResolvedValueOnce(askForGames)
+      .mockRejectedValueOnce(overloaded)
+      .mockRejectedValueOnce(overloaded);
 
     const result = await answerQuestion("na", account, "Why do I lose?");
 
+    expect(create).toHaveBeenCalledTimes(3);
     expect(result.answer).toBeNull();
     expect(result.costMicros).toBe(costMicros("claude-sonnet-5-5", usage));
     expect(result.error).toBe(overloaded);
   });
 
-  it("adds the estimate for a round that timed out, since it may have been billed", async () => {
-    create.mockResolvedValueOnce(askForGames).mockRejectedValueOnce(new APIError(undefined));
-
-    const result = await answerQuestion("na", account, "Why do I lose?");
-
-    expect(result.costMicros).toBe(costMicros("claude-sonnet-5-5", usage) + HOLD_MICROS);
-  });
-
-  it("costs nothing when Anthropic turns the first round down", async () => {
-    create.mockRejectedValueOnce(new APIError(529));
+  it("costs nothing when Anthropic turns down both tries of the first round", async () => {
+    create.mockRejectedValueOnce(new APIError(529)).mockRejectedValueOnce(new APIError(429));
 
     const result = await answerQuestion("na", account, "Why do I lose?");
 
@@ -91,11 +89,40 @@ describe("answerQuestion", () => {
     expect(result.error).toBeInstanceOf(APIError);
   });
 
-  it("counts a first round that never answered as the estimate", async () => {
-    create.mockRejectedValueOnce(new Error("socket hang up"));
+  // A timeout or lost connection is an APIError with no status in the SDK.
+  it("adds the estimate for a round whose tries timed out, since they may have been billed", async () => {
+    const timeout = new APIError(undefined);
+    create
+      .mockResolvedValueOnce(askForGames)
+      .mockRejectedValueOnce(timeout)
+      .mockRejectedValueOnce(timeout);
+
+    const result = await answerQuestion("na", account, "Why do I lose?");
+
+    // Once per round, not once per try.
+    expect(result.costMicros).toBe(costMicros("claude-sonnet-5-5", usage) + HOLD_MICROS);
+  });
+
+  it("still adds the estimate when a timed-out try is followed by an overloaded one", async () => {
+    create.mockRejectedValueOnce(new APIError(undefined)).mockRejectedValueOnce(new APIError(529));
 
     const result = await answerQuestion("na", account, "Why do I lose?");
 
     expect(result).toMatchObject({ answer: null, costMicros: HOLD_MICROS });
+  });
+
+  it("adds the estimate when a try timed out before the retry answered", async () => {
+    create.mockRejectedValueOnce(new APIError(undefined)).mockResolvedValueOnce({
+      model: "claude-sonnet-5-5",
+      usage,
+      stop_reason: "end_turn",
+      content: [{ type: "text", text: "You die early in most losses." }],
+    });
+
+    const result = await answerQuestion("na", account, "Why do I lose?");
+
+    expect(result.answer).toBe("You die early in most losses.");
+    expect(result.costMicros).toBe(costMicros("claude-sonnet-5-5", usage) + HOLD_MICROS);
+    expect(result.error).toBeUndefined();
   });
 });

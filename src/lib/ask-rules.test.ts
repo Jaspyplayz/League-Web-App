@@ -5,6 +5,7 @@ import {
   cleanQuestion,
   costMicros,
   gameLabel,
+  HOLD_MICROS,
   MAX_QUESTION_LENGTH,
   MONTHLY_BUDGET_USD,
   monthStart,
@@ -85,6 +86,28 @@ describe("allowance", () => {
 
   it("leaves room for other accounts after one reaches its share", () => {
     expect(ACCOUNT_MONTHLY_BUDGET_USD).toBeLessThan(MONTHLY_BUDGET_USD);
+  });
+
+  it("names the limit that lasts longest when several are reached", () => {
+    const all = {
+      askedToday: QUESTIONS_PER_DAY,
+      accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD),
+      siteSpent: dollars(MONTHLY_BUDGET_USD),
+    };
+    expect(allowance(all)).toMatchObject({ message: expect.stringContaining("paused") });
+    // "Try again tomorrow" would be wrong: tomorrow the month is still used up.
+    expect(allowance({ ...all, siteSpent: 0 })).toMatchObject({
+      message: expect.stringContaining("this month"),
+    });
+  });
+});
+
+describe("HOLD_MICROS", () => {
+  // The estimate a question counts as until its real cost is in. It has to
+  // be at least what a question usually costs (5 to 20 cents), or questions
+  // sent at the same moment could still spend past the budget.
+  it("is at least the usual cost of a question", () => {
+    expect(HOLD_MICROS).toBeGreaterThanOrEqual(200_000);
   });
 });
 
