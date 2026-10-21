@@ -17,10 +17,10 @@ A player profile's **Ask** tab lets anyone signed in type a question about that 
 
 An answer takes up to a few minutes. If the question were saved only at the end, ten questions sent at the same moment would all pass the check while none of them was counted yet, and could spend far past the caps. So `reserve()` in `ask-store.ts` runs one short transaction: it takes a lock the whole site shares (`pg_advisory_xact_lock`), checks the limits, and saves the question with a 50-cent estimate (`HOLD_MICROS`). The next question waits for that lock, so its check sees the first one. The lock is let go before Claude is called. When the answer is in, `settle()` swaps the estimate for the cost.
 
-Each round gets two tries. `sendRound` in `ask.ts` makes the second try itself, instead of leaving it to Anthropic's SDK, so it can see what happened to both:
+Each round gets two tries. `sendRound` in `ask.ts` makes the second try itself, instead of leaving it to Anthropic's SDK, so it can see what happened to both. It waits half a second between them, or as long as a rate limited answer asks (its `retry-after` header), up to 10 seconds.
 
-- A try Anthropic answered with an error (overloaded, rate limited) wasn't run, and Anthropic doesn't bill those.
-- A try that timed out or lost its connection may still have been run, and Anthropic bills a request that was on its way to succeeding even if we stopped waiting. We can't tell, so that round adds the 50-cent estimate, once. A network outage that never reached Anthropic is charged the same way, which errs on the safe side.
+- A try Anthropic turned down before running it (any 4xx answer, like rate limited or a bad request, or 529 overloaded) isn't billed.
+- A try that timed out, lost its connection, was cut off partway or got another 5xx (like 500 or 504) may still have been run, and Anthropic bills a request that was on its way to succeeding even if we stopped waiting. We can't tell, so that round adds the 50-cent estimate, once. A network outage that never reached Anthropic is charged the same way, which errs on the safe side.
 
 If both tries of a round fail, `answerQuestion` stops and returns what the question cost so far, and that is what's charged. A question whose first round Anthropic turned down on both tries cost nothing, so it's deleted and doesn't count. If the server is stopped mid-answer (the page's 3-minute limit), the estimate saved at the start stays.
 

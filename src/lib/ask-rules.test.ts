@@ -103,10 +103,12 @@ describe("allowance", () => {
 });
 
 describe("HOLD_MICROS", () => {
-  // The estimate a question counts as until its real cost is in. It has to
-  // be at least what a question usually costs (5 to 20 cents), or questions
-  // sent at the same moment could still spend past the budget.
-  it("is at least the usual cost of a question", () => {
+  // The estimate a question counts as until its cost is in. Questions sent
+  // at the same moment are each checked against the ones before them at
+  // this estimate, so the further a question's cost can go past it, the
+  // further a burst of them can go past the caps. It has to be well above
+  // what a question usually costs (5 to 20 cents).
+  it("is well above the usual cost of a question", () => {
     expect(HOLD_MICROS).toBeGreaterThanOrEqual(200_000);
   });
 });

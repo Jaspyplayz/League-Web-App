@@ -11,14 +11,15 @@ import {
   QUESTIONS_PER_DAY,
 } from "@/lib/ask-rules";
 import type { Account } from "@/lib/riot/types";
-import { ask } from "./ask-store";
+import { ask, checkAllowance } from "./ask-store";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/ask", () => ({ answerQuestion: vi.fn(), ASK_MODEL: "claude-sonnet-5-5" }));
 
-// A pretend database. Inside a transaction it hands out a second copy whose
-// steps start with "tx.", so a step run outside the transaction shows up.
+// A pretend database. Each transaction gets its own copy whose steps start
+// with "tx1.", "tx2." and so on, so a step run outside a transaction, or in
+// a different one, shows up.
 // `used` is what the limit checks read; the two arrays are the rows saved in
 // ask_questions and ask_spend; `steps` records the order things happen in;
 // `reads` which table each limit check read and the values its filter
@@ -30,6 +31,7 @@ let spend: Row[];
 let steps: string[];
 let reads: { table: string; counts: boolean; params: unknown[] }[];
 let locks: string[];
+let transactions: number;
 
 const dialect = new PgDialect();
 const tableName = (table: unknown) => (table === tables.askSpend ? "ask_spend" : "ask_questions");
@@ -39,7 +41,8 @@ const paramsOf = (filter: SQL) => dialect.sqlToQuery(filter).params;
 
 function fake(prefix: string) {
   return {
-    transaction: async (run: (tx: object) => unknown): Promise<unknown> => run(fake("tx.")),
+    transaction: async (run: (tx: object) => unknown): Promise<unknown> =>
+      run(fake(`tx${++transactions}.`)),
     execute: async (query: SQL) => {
       steps.push(`${prefix}lock`);
       locks.push(dialect.sqlToQuery(query).sql);
@@ -110,6 +113,7 @@ beforeEach(() => {
   steps = [];
   reads = [];
   locks = [];
+  transactions = 0;
   vi.mocked(answerQuestion).mockReset();
   vi.mocked(Sentry.captureException).mockReset();
 });
@@ -125,21 +129,35 @@ describe("ask", () => {
       expect(questions).toMatchObject([{ answer: null, costMicros: HOLD_MICROS }]);
       expect(spend).toMatchObject([{ costMicros: HOLD_MICROS }]);
       steps.push("claude");
-      return { answer: "You die early.", games: [], model: "claude-sonnet-5-5", costMicros: 120_000 };
+      return {
+        answer: "You die early.",
+        games: [{ matchId: "NA1_1", label: "Lee Sin, win, Oct 18" }],
+        // Anthropic handed it to a fallback model.
+        model: "claude-opus-5-5",
+        costMicros: 120_000,
+      };
     });
 
     const outcome = await ask("na", account, "Why do I lose?", "user-1");
 
-    // The lock comes before the limit checks, in the same transaction, so
-    // a second question waits until this one is saved before it counts.
+    // The lock, the limit checks and the saves are one transaction, so a
+    // second question waits until this one is saved before it checks. The
+    // two updates after Claude are a second one.
     expect(steps).toEqual([
-      ...["tx.lock", "tx.check", "tx.check", "tx.check", "tx.save", "tx.save"],
+      ...["tx1.lock", "tx1.check", "tx1.check", "tx1.check", "tx1.save", "tx1.save"],
       "claude",
-      ...["tx.update", "tx.update"],
+      ...["tx2.update", "tx2.update"],
     ]);
     // One lock for the whole site, which waits its turn.
     expect(locks).toEqual(["select pg_advisory_xact_lock(hashtext('ask-budget'))"]);
-    expect(questions).toMatchObject([{ answer: "You die early.", costMicros: 120_000 }]);
+    expect(questions).toMatchObject([
+      {
+        answer: "You die early.",
+        games: [{ matchId: "NA1_1" }],
+        model: "claude-opus-5-5",
+        costMicros: 120_000,
+      },
+    ]);
     expect(spend).toEqual([expect.objectContaining({ costMicros: 120_000 })]);
     // The budget's copy of the cost has no account or question in it.
     expect(Object.keys(spend[0])).not.toContain("userId");
@@ -203,7 +221,11 @@ describe("ask", () => {
     expect(questions).toMatchObject([{ answer: null, costMicros: 30_000 }]);
     expect(spend).toMatchObject([{ costMicros: 30_000 }]);
     expect(Sentry.captureException).toHaveBeenCalledWith(overloaded);
-    expect(outcome).toMatchObject({ status: "failed", left: QUESTIONS_PER_DAY - 1 });
+    expect(outcome).toEqual({
+      status: "failed",
+      message: "Couldn't finish answering. Try again in a moment.",
+      left: QUESTIONS_PER_DAY - 1,
+    });
   });
 
   it("doesn't count a question Anthropic turned down on its first round", async () => {
@@ -213,6 +235,8 @@ describe("ask", () => {
 
     expect(questions).toEqual([]);
     expect(spend).toEqual([]);
+    // Both rows go in one transaction, so neither is left without the other.
+    expect(steps.slice(-3)).toEqual(["claude", "tx2.delete", "tx2.delete"]);
     expect(outcome).toEqual({
       status: "failed",
       message: "Couldn't answer right now. Try again in a moment.",
@@ -240,6 +264,24 @@ describe("ask", () => {
       status: "failed",
       message: "Couldn't answer that one. Try asking it another way.",
       left: QUESTIONS_PER_DAY - 8,
+    });
+  });
+});
+
+describe("checkAllowance", () => {
+  it("tells the Ask tab how many questions are left", async () => {
+    used.askedToday = 3;
+
+    expect(await checkAllowance("user-1")).toEqual({ ok: true, left: QUESTIONS_PER_DAY - 3 });
+    expect(reads.map((r) => r.params[0])).toContain("user-1");
+  });
+
+  it("tells the Ask tab once the account has spent its share", async () => {
+    used.accountSpent = ACCOUNT_MONTHLY_BUDGET_USD * 1_000_000;
+
+    expect(await checkAllowance("user-1")).toEqual({
+      ok: false,
+      message: "You've used your Ask allowance for this month. It resets on the 1st.",
     });
   });
 });

@@ -21,9 +21,12 @@ export const ACCOUNT_MONTHLY_BUDGET_USD = 5;
 // What a question counts as while Claude is still answering it, in
 // millionths of a dollar: 50 cents, well above the usual 5 to 20. The
 // question is saved with this before Claude is called, so questions sent at
-// the same moment each see the ones before them, and swapped for the real
+// the same moment each see the ones before them, and swapped for what it
 // cost once the answer is in. If the server is stopped mid-answer, the
-// estimate stays, which errs on the safe side.
+// estimate stays, which errs on the safe side. The same 50 cents is also
+// added to a question's cost for a round with a try that may have been
+// billed without a reply, like one that timed out (see sendRound in
+// src/lib/ask.ts), so a question can end up costing more than this.
 export const HOLD_MICROS = 500_000;
 
 export const MAX_QUESTION_LENGTH = 300;

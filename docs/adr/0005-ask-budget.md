@@ -28,15 +28,15 @@ Ask has three limits: 10 questions per account per 24 hours, a monthly amount pe
 
 ## Decision
 
-`reserve()` in `src/lib/ask-store.ts` runs one transaction: `pg_advisory_xact_lock(hashtext('ask-budget'))`, then the three limit checks, then it saves the question in `ask_questions` (answer null) and a row in `ask_spend`, both with a 50-cent estimate (`HOLD_MICROS`). Claude is called after the transaction ends. `settle()` then writes the answer and the cost into both rows. Each round gets two tries, made by `sendRound` in `src/lib/ask.ts` rather than the SDK, so both can be checked. `answerQuestion` returns the cost of the rounds that finished even when a later round fails, plus the 50-cent estimate for any round with a try that timed out or lost its connection (Anthropic may have run and billed it anyway). A question whose first round Anthropic turned down on both tries (overloaded, rate limited) cost nothing, so it's deleted and doesn't count. The site's monthly total is summed from `ask_spend`; the per-account total from `ask_questions`.
+`reserve()` in `src/lib/ask-store.ts` runs one transaction: `pg_advisory_xact_lock(hashtext('ask-budget'))`, then the three limit checks, then it saves the question in `ask_questions` (answer null) and a row in `ask_spend`, both with a 50-cent estimate (`HOLD_MICROS`). Claude is called after the transaction ends. `settle()` then writes the answer and the cost into both rows. Each round gets two tries, made by `sendRound` in `src/lib/ask.ts` rather than the SDK, so both can be checked. `answerQuestion` returns the cost of the rounds that finished even when a later round fails, plus the 50-cent estimate for any round with a try that timed out, lost its connection, was cut off or got a 5xx other than 529 (Anthropic may have run and billed it anyway). A question whose first round Anthropic turned down on both tries (a 4xx like rate limited, or 529 overloaded) cost nothing, so it's deleted and doesn't count. The site's monthly total is summed from `ask_spend`; the per-account total from `ask_questions`.
 
 ## Consequences
 
 Good:
-- The daily cap, the per-account cap and the site budget hold however many questions arrive at once.
+- The daily cap holds however many questions arrive at once. The per-account cap and the site budget hold as long as each question costs no more than the 50-cent estimate it was checked at, which is well above the usual 5 to 20 cents.
 - Failed questions are charged what their finished rounds cost, plus an estimate for a round that may have been billed without an answer, instead of nothing.
 - Deleting an account no longer frees up budget, and no private text is kept to make that work.
-- An account is stopped once it has spent a quarter of the month's budget (it can go over by about one question, since the check happens before a question's cost is known). Four free accounts still could use all of it, which is why the site-wide $20 stays the real limit and the Anthropic console's spend limit stays as a backstop.
+- An account is stopped once it has spent a quarter of the month's budget. It can go over by about one question, since the check happens before a question's cost is known, or by more if several questions sent at once each cost more than 50 cents (a round with a timed-out try adds 50 cents on top of its tokens). Four free accounts still could use all of it, which is why the site-wide $20 stays the real limit and the Anthropic console's spend limit stays as a backstop.
 
 Bad:
 - Every Ask question waits its turn for one lock. At a few milliseconds each that is fine at this site's traffic, but it would need a rethink at thousands of questions a minute.

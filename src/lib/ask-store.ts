@@ -24,8 +24,8 @@ import type { Account } from "@/lib/riot/types";
 // to a few minutes to answer, and if the question were only saved at the
 // end, several sent at the same moment would all pass the check while none
 // of them was counted yet. So: check the limits and save the question with
-// an estimated cost (reserve), call Claude, then swap in the real answer and
-// cost (settle).
+// an estimated cost (reserve), call Claude, then swap in the answer and what
+// it cost (settle).
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Past questions shown on the tab, newest first.
@@ -213,7 +213,8 @@ async function reserve(
   });
 }
 
-// Swaps the estimate for Claude's answer and what it really cost.
+// Swaps the estimate for Claude's answer and what it cost (see costMicros
+// in AskResult, src/lib/ask.ts).
 async function settle(db: Db, hold: Hold, result: AskResult): Promise<void> {
   await db.transaction(async (tx) => {
     await tx

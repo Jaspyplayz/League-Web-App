@@ -177,8 +177,13 @@ export async function answerQuestion(
   return result(null);
 }
 
-// How long to wait before a round's second try, like the SDK's own retry.
+// How long to wait before a round's second try: half a second, the SDK's
+// own first pause, unless Anthropic says how long (see pauseBeforeRetry).
 const RETRY_PAUSE_MS = 500;
+// The longest pause Anthropic can ask for that we'll wait out, so a question
+// still fits in the page's time limit. If it asks for longer, the second try
+// will likely be turned down too, which costs nothing.
+const MAX_RETRY_PAUSE_MS = 10_000;
 
 type SentRound =
   | { ok: true; response: BetaMessage; mayBeBilled: boolean }
@@ -186,15 +191,18 @@ type SentRound =
 
 // Sends one round, and tries once more if the first try fails. The SDK can
 // retry on its own, but then only the last try's error is seen, so the
-// retry is done here instead, where every try can be checked.
+// retry is done here instead, where every try can be checked. Unlike the
+// SDK, it retries every error, even one that will fail the same way again
+// (a bad request). Those are turned down straight away and aren't billed,
+// so that only costs the pause.
 //
-// A try Anthropic answered with an error (overloaded, rate limited, a bad
-// request) wasn't run, and Anthropic doesn't bill those. A try that timed
-// out or lost its connection may have been run anyway, and Anthropic bills a
-// request that was on its way to succeeding even if we stopped waiting. We
-// can't tell which, so `mayBeBilled` says to count the round as HOLD_MICROS,
-// the same estimate as a question still being answered. That also charges
-// a network outage that never reached Anthropic, which errs on the safe side.
+// A try Anthropic turned down (see turnedDown) wasn't run, and isn't billed.
+// A try that timed out, lost its connection or failed partway through may
+// have been run anyway, and Anthropic bills a request that was on its way to
+// succeeding even if we stopped waiting. We can't tell which, so
+// `mayBeBilled` says to count the round as HOLD_MICROS, the same estimate as
+// a question still being answered. That also charges a network outage that
+// never reached Anthropic, which errs on the safe side.
 async function sendRound(
   client: Anthropic,
   request: MessageCreateParamsNonStreaming,
@@ -204,12 +212,31 @@ async function sendRound(
     try {
       return { ok: true, response: await client.beta.messages.create(request), mayBeBilled };
     } catch (error) {
-      const turnedDown = error instanceof Anthropic.APIError && error.status !== undefined;
-      if (!turnedDown) mayBeBilled = true;
+      if (!turnedDown(error)) mayBeBilled = true;
       if (attempt === 2) return { ok: false, error, mayBeBilled };
-      await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS));
+      await new Promise((resolve) => setTimeout(resolve, pauseBeforeRetry(error)));
     }
   }
+}
+
+// Whether Anthropic refused a try before running it: a 4xx answer (a bad
+// request, rate limited) or 529 (overloaded). A timeout or a lost connection
+// is an APIError with no status, and a reply cut off partway isn't an
+// APIError at all. Any other 5xx, like 500 (an error on Anthropic's side) or
+// 504 (Anthropic ran out of time), may have come partway through the work,
+// so it's treated like our own timeout.
+function turnedDown(error: unknown): boolean {
+  if (!(error instanceof Anthropic.APIError) || error.status === undefined) return false;
+  return (error.status >= 400 && error.status < 500) || error.status === 529;
+}
+
+// How long to wait before the second try. A rate limited answer says how
+// many seconds to wait in its "retry-after" header; trying sooner would be
+// turned down again.
+function pauseBeforeRetry(error: unknown): number {
+  const headers = error instanceof Anthropic.APIError ? error.headers : undefined;
+  const seconds = Number(headers?.get("retry-after") ?? NaN);
+  return seconds > 0 ? Math.min(seconds * 1000, MAX_RETRY_PAUSE_MS) : RETRY_PAUSE_MS;
 }
 
 // Runs Claude's tool calls for one player and remembers which games it read.

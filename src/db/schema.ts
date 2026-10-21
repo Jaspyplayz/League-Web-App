@@ -433,7 +433,8 @@ export const askQuestions = pgTable(
     question: text("question").notNull(),
     // Null while Claude is answering, and when it couldn't. The row is
     // kept anyway, so the try still counts toward the day's questions and
-    // the account's monthly allowance.
+    // the account's monthly allowance, unless Anthropic turned down both
+    // tries of the first round (nothing was spent, see src/lib/ask-store.ts).
     answer: text("answer"),
     // The games Claude read to answer, as AskGame[] (src/lib/ask-rules.ts),
     // for the links under the answer.
