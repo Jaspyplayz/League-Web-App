@@ -29,6 +29,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - MCP server (Claude and other AI apps can look players up and read the analyzer's results at `/api/mcp`): [docs/mcp.md](docs/mcp.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 - How a change gets made (review tiers, the reviewer agent, "My read"): [docs/workflow.md](docs/workflow.md)
+- Current status and next steps: [docs/STATUS.md](docs/STATUS.md)
 
 ## Stack
 
@@ -60,15 +61,13 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, 
 
 ## Environment
 
-Copy `.env.example` to `.env.local` (git-ignored). Variables, names only:
+Copy `.env.example` to `.env.local` (git-ignored); production values live in Vercel's environment variables, which Jasper sets himself. Variables, names only:
 
 - `RIOT_API_KEY`: dev keys expire every 24 hours; regenerate at developer.riotgames.com
 - `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`
 - `DATABASE_URL` (transaction pooler, port 6543), `DATABASE_URL_DIRECT` (session pooler, port 5432, migrations only)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: sign-in; without them "Sign in" is hidden ([docs/sign-in.md](docs/sign-in.md))
 - `ANTHROPIC_API_KEY`: AI match recaps; without it "Write recap" is hidden ([docs/match-recap.md](docs/match-recap.md))
-
-Production values live in Vercel's environment variables, which Jasper sets himself.
 
 ## Design
 
@@ -98,4 +97,4 @@ Dark "scouting report" style with a light theme. **Blue = you / ahead / win, red
 
 ## Keeping this file current
 
-Update this file, and the folder map in [ARCHITECTURE.md](ARCHITECTURE.md#where-the-code-lives), in the same PR whenever a change makes them wrong: a new command, env var, folder, convention or major decision. Keep it under about 100 lines; link to `docs/` for detail instead of copying it here, and put rules that matter in only one folder in `.claude/rules/`. Jasper can also ask Claude to "update CLAUDE.md" with a new rule.
+Update this file, and the folder map in [ARCHITECTURE.md](ARCHITECTURE.md#where-the-code-lives), in the same PR whenever a change makes them wrong: a new command, env var, folder, convention or major decision. Keep it under about 100 lines; link to `docs/` for detail instead of copying it here, and put rules that matter in only one folder in `.claude/rules/`. Jasper can also ask Claude to "update CLAUDE.md" with a new rule. Update [docs/STATUS.md](docs/STATUS.md) whenever a PR finishes a focus item or changes what's next.
