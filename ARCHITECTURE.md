@@ -89,14 +89,14 @@ src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
 src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves each question before Claude answers, ask-rules.ts the caps
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
-scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, train-phase-score, tempo study, item check)
+scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, train-phase-score, tempo study, item check, shot for screenshots)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs
 e2e/              Playwright smoke test and accessibility scan, run against each Vercel preview
 .github/          CI, smoke test and dependency review workflows, Dependabot, PR and issue templates
 .claude/          Claude Code settings, hooks/ (lint and typecheck before commits), agents/reviewer.md,
                   rules/ (rules for one area, loaded when Claude opens a file there),
-                  skills/ (explain-back, plus eight copied from other repos)
+                  skills/ (explain-back and verify, plus eight copied from other repos)
 ```
 
 ## What happens when you open a match

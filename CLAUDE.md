@@ -48,6 +48,7 @@ Routes live in `src/app/`, React components in `src/components/` and helpers in 
 | `npm run typecheck` | Next.js type generation + `tsc` |
 | `npm test` | Vitest unit tests, including golden tests on four real games (`src/lib/analyzer/golden.test.ts`) |
 | `npm run test:e2e` | Playwright smoke test and accessibility scan (`e2e/`); runs on each Vercel preview ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test)) |
+| `npm run shot -- --pr <number> <path>` | Screenshot a page on a PR's preview (or `--base` the live site or a dev server) into `.cache/verify/`, for a PR's evidence. Agents use it through the `verify` skill ([.claude/skills/verify/SKILL.md](.claude/skills/verify/SKILL.md)) |
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
@@ -68,6 +69,7 @@ Copy `.env.example` to `.env.local` (git-ignored); production values live in Ver
 - `DATABASE_URL` (transaction pooler, port 6543), `DATABASE_URL_DIRECT` (session pooler, port 5432, migrations only)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: sign-in; without them "Sign in" is hidden ([docs/sign-in.md](docs/sign-in.md))
 - `ANTHROPIC_API_KEY`: AI match recaps; without it "Write recap" is hidden ([docs/match-recap.md](docs/match-recap.md))
+- `VERCEL_AUTOMATION_BYPASS_SECRET`: only in `.env.local` and GitHub's secrets; lets `npm run shot` and `npm run test:e2e` past a preview's Vercel login ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test))
 
 ## Design
 

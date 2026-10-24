@@ -99,6 +99,8 @@ BASE_URL=https://your-preview.vercel.app npm run test:e2e
 
 If Vercel's preview protection is on (Vercel project → Settings → Deployment Protection), the test needs a way in: create a "Protection Bypass for Automation" secret there and save it in GitHub (repository → Settings → Secrets and variables → Actions) as `VERCEL_AUTOMATION_BYPASS_SECRET`. The test sends that secret with every request, so CI never keeps Playwright traces (they record request headers); a failed run uploads screenshots instead. If the secret ever ends up somewhere public, make a new one in Vercel and replace the GitHub secret.
 
+For a pull request's screenshots, `npm run shot -- --pr <number> <path>` opens that PR's preview and saves the page to `.cache/verify/` (the [verify skill](../.claude/skills/verify/SKILL.md) has the options). It reads the same secret from `.env.local`, so put it there too, and sends it only to the preview itself. Without it, the run stops at Vercel's login and says so.
+
 The sample analysis is read from the database, so `DATABASE_URL` in Vercel (Settings → Environment Variables) must be set for **Preview** as well as Production. Without it the preview tries Riot instead and the test fails once the key expires. After changing a variable, push a commit or redeploy the preview so it picks up the change.
 
 ## Optional: collect rank benchmarks
