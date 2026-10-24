@@ -57,6 +57,7 @@ const match: Match = {
     platformId: "NA1",
     gameVersion: "16.20.712.3456",
     queueId: 420,
+    mapId: 11,
     gameStartTimestamp: 1_700_000_000_000,
     gameEndTimestamp: 1_700_001_800_000,
     gameDuration: 1800,

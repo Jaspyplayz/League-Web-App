@@ -16,8 +16,8 @@ import { matchWinChance } from "@/lib/win-chance";
 // Both AI features read this instead of the raw match: the recap
 // (src/lib/recap-store.ts) and the MCP server (src/lib/mcp/tools.ts).
 //
-// Returns null when the player isn't in the match or the game is too short
-// to analyze. Costs one Riot call if the timeline isn't saved yet.
+// Returns null when the player isn't in the match or the game isn't analyzed
+// (see whyNotAnalyzed). Costs one Riot call if the timeline isn't saved yet.
 export async function loadMatchFacts(
   region: Region,
   match: Match,
