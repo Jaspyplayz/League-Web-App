@@ -48,19 +48,30 @@ function loadEnv() {
   loadEnvConfig(existsSync(join(here, ".env.local")) ? here : main);
 }
 
+// This project's previews, such as league-web-nc4mwtu4z-jaspy-s-team.vercel.app.
+// Anyone can put a site on vercel.app, and the team name at the end is what
+// keeps the bypass secret from going to someone else's.
+const OUR_PREVIEWS = /^league-web-[a-z0-9-]+-jaspy-s-team\.vercel\.app$/;
+
 // Vercel reports each commit's preview to GitHub as a deployment, which is
-// also how the smoke test finds it (.github/workflows/smoke.yml).
+// also how the smoke test finds it (.github/workflows/smoke.yml). Only
+// Vercel's own entries are trusted.
 function previewUrl(pr: string): string {
   const sha = run("gh", ["pr", "view", pr, "--json", "headRefOid", "--jq", ".headRefOid"]);
   const statuses = run("gh", [
     "api",
     `repos/{owner}/{repo}/deployments?sha=${sha}&environment=Preview`,
     "--jq",
-    ".[0].statuses_url // empty",
+    '[.[] | select(.creator.login == "vercel[bot]")][0].statuses_url // empty',
   ]);
   const url =
     statuses &&
-    run("gh", ["api", statuses, "--jq", '[.[] | select(.state == "success")][0].environment_url // empty']);
+    run("gh", [
+      "api",
+      statuses,
+      "--jq",
+      '[.[] | select(.state == "success" and .creator.login == "vercel[bot]")][0].environment_url // empty',
+    ]);
   if (!url) {
     throw new Error(`PR #${pr}'s latest commit has no finished Vercel preview yet. Wait for the Vercel check.`);
   }
@@ -72,7 +83,7 @@ function previewUrl(pr: string): string {
 // every report to Sentry (issue #156).
 async function passPreviewLogin(context: BrowserContext, origin: string) {
   const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  if (!secret || !new URL(origin).hostname.endsWith(".vercel.app")) return;
+  if (!secret || !OUR_PREVIEWS.test(new URL(origin).hostname)) return;
   await context.route("**/*", async (route) => {
     const request = route.request();
     if (new URL(request.url()).origin !== origin) return route.continue();
@@ -141,7 +152,7 @@ async function shoot(context: BrowserContext, origin: string, path: string): Pro
 async function check(context: BrowserContext, origin: string): Promise<boolean> {
   console.log(`site: ${origin}`);
   const host = new URL(origin).hostname;
-  if (host.endsWith(".vercel.app")) {
+  if (OUR_PREVIEWS.test(host)) {
     const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? "set" : "not set";
     console.log(`bypass secret: ${secret}`);
   }
