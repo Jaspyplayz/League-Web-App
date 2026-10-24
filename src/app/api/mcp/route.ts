@@ -64,7 +64,7 @@ const handler = createMcpHandler(
       {
         title: "Analyze a game",
         description:
-          "Turnpoint's analysis of one game from one player's side: gold, CS and XP gaps against the lane opponent at 10 and 15 minutes, turning points, the biggest win chance swings, deaths, objectives, the 0 to 100 game score and, for junglers, ganks and pathing. Games under 15 minutes have no analysis.",
+          "Turnpoint's analysis of one game from one player's side: gold, CS and XP gaps against the lane opponent at 10 and 15 minutes, turning points, the biggest win chance swings, deaths, objectives, the 0 to 100 game score and, for junglers, ganks and pathing. Only Summoner's Rift games of 15 minutes or more are analyzed, so ARAM, Arena and remakes have none.",
         inputSchema: z.object({
           region: regionSchema,
           riotId: riotIdSchema,

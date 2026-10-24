@@ -34,6 +34,10 @@ export const ANALYZER_VERSION = 1;
 // analyze, so the page shows the scoreboard only.
 export const MIN_ANALYZED_SECONDS = 15 * 60;
 
+// Riot's number for Summoner's Rift. Lanes, junglers, the replay's walls and
+// the models are all built for it, so other maps (ARAM, Arena) aren't analyzed.
+const SUMMONERS_RIFT = 11;
+
 export type MatchAnalysis = {
   me: Participant;
   // Null when no single enemy played the same position.
@@ -64,7 +68,22 @@ export type MatchAnalysis = {
 };
 
 export function isAnalyzable(match: Match): boolean {
-  return gameDurationSeconds(match.info) >= MIN_ANALYZED_SECONDS;
+  return whyNotAnalyzed(match) === null;
+}
+
+// The sentence the match page, the match row and the AI tools show when a
+// game isn't analyzed, or null when it is. The map comes first: a short ARAM
+// game is skipped for being ARAM, not for being short.
+export function whyNotAnalyzed(match: Match): string | null {
+  const { info } = match;
+  if (info.mapId !== SUMMONERS_RIFT) return "Only Summoner's Rift games are analyzed.";
+  // Everything here pairs 10 players into 5 lanes. A custom game can have
+  // fewer on the Rift.
+  if (info.participants.length !== 10) return "Only 5v5 games are analyzed.";
+  if (gameDurationSeconds(info) < MIN_ANALYZED_SECONDS) {
+    return "This game ended before 15 minutes, which is too short to analyze.";
+  }
+  return null;
 }
 
 export function findPlayer(match: Match, puuid: string): Participant | null {

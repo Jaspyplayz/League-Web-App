@@ -5,7 +5,7 @@ import { MatchTabs } from "@/components/match-tabs";
 import { RunePage } from "@/components/rune-page";
 import { TeamAnalysis } from "@/components/team-analysis";
 import { StatBar } from "@/components/ui/stat-bar";
-import { findPlayer, isAnalyzable } from "@/lib/analyzer";
+import { findPlayer, isAnalyzable, whyNotAnalyzed } from "@/lib/analyzer";
 import { findOpponent } from "@/lib/analyzer/matchup";
 import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
 import type { PlayerScore } from "@/lib/analyzer/score";
@@ -95,6 +95,7 @@ function MatchOverview({
   const scores = scoreGame(match);
   // Damage bars are relative to the top damage dealer in the whole game.
   const maxDamage = Math.max(1, ...participants.map((p) => p.totalDamageDealtToChampions));
+  const skipped = whyNotAnalyzed(match);
 
   return (
     <div className="flex flex-col gap-4">
@@ -169,11 +170,7 @@ function MatchOverview({
         );
       })}
 
-      {!isAnalyzable(match) && (
-        <p className="text-[13px] text-faint">
-          This game ended before 15 minutes, too short for a full analysis.
-        </p>
-      )}
+      {skipped && <p className="text-[13px] text-faint">{skipped}</p>}
     </div>
   );
 }

@@ -1,6 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { analyzeMatch, findPlayerByRiotId, isAnalyzable } from "./index";
+import { analyzeMatch, findPlayerByRiotId, isAnalyzable, whyNotAnalyzed } from "./index";
 import { frames, kill, match, participants, SPOTS } from "./test-fixtures";
+
+// A 30-minute game on another map, such as ARAM's Howling Abyss (12).
+function onMap(mapId: number, players = participants()) {
+  const game = match(players);
+  game.info.mapId = mapId;
+  return game;
+}
+
+// 16 or 18 players with no lane positions, the way Riot sends Arena games
+// (newer Arena queues have 18). Arena is on the Rings of Wrath (map 30).
+function arenaPlayers(count: number) {
+  const ten = participants();
+  return Array.from({ length: count }, (_, i) => ({
+    ...ten[i % 10],
+    puuid: `player-${i + 1}`,
+    participantId: i + 1,
+    teamPosition: "",
+    individualPosition: "",
+  }));
+}
+function arena(players: number) {
+  return onMap(30, arenaPlayers(players));
+}
 
 describe("analyzeMatch", () => {
   // Ahri (blue mid, participant 3) loses 100 gold a minute to Syndra (8).
@@ -73,5 +96,49 @@ describe("isAnalyzable", () => {
   it("skips games under 15 minutes", () => {
     expect(isAnalyzable(match(participants(), 14 * 60 + 59))).toBe(false);
     expect(isAnalyzable(match(participants(), 15 * 60))).toBe(true);
+  });
+
+  it("skips ARAM games, which aren't on Summoner's Rift", () => {
+    expect(isAnalyzable(onMap(12))).toBe(false);
+  });
+
+  it("skips Arena games, which are on the Rings of Wrath", () => {
+    expect(isAnalyzable(arena(16))).toBe(false);
+    expect(isAnalyzable(arena(18))).toBe(false);
+  });
+
+  it("skips a Summoner's Rift game without 10 players, such as a custom game", () => {
+    expect(isAnalyzable(match(participants().slice(0, 8)))).toBe(false);
+  });
+});
+
+describe("whyNotAnalyzed", () => {
+  it("has no reason for a Summoner's Rift game of 15 minutes or more", () => {
+    expect(whyNotAnalyzed(match())).toBeNull();
+  });
+
+  it("says only Summoner's Rift games are analyzed for ARAM and Arena", () => {
+    expect(whyNotAnalyzed(onMap(12))).toBe("Only Summoner's Rift games are analyzed.");
+    expect(whyNotAnalyzed(arena(16))).toBe("Only Summoner's Rift games are analyzed.");
+  });
+
+  it("names the map, not the length, for a short ARAM game", () => {
+    const short = match(participants(), 10 * 60);
+    short.info.mapId = 12;
+    expect(whyNotAnalyzed(short)).toBe("Only Summoner's Rift games are analyzed.");
+  });
+
+  it("says a short Summoner's Rift game ended too early", () => {
+    expect(whyNotAnalyzed(match(participants(), 14 * 60 + 59))).toBe(
+      "This game ended before 15 minutes, which is too short to analyze.",
+    );
+  });
+
+  it("says a Summoner's Rift game without 10 players isn't 5v5", () => {
+    expect(whyNotAnalyzed(match(participants().slice(0, 8)))).toBe(
+      "Only 5v5 games are analyzed.",
+    );
+    // A second guard for Arena-sized games, should one ever say map 11.
+    expect(whyNotAnalyzed(match(arenaPlayers(16)))).toBe("Only 5v5 games are analyzed.");
   });
 });

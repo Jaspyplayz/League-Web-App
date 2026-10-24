@@ -50,7 +50,7 @@ export function MatchTabs({
   runePages: Record<number, ReactNode>; // keyed by participantId
   players: PickerPlayer[];
   defaultPlayerId: number; // the profile's own player
-  analysisHref: string | null; // null when the game is too short to analyze
+  analysisHref: string | null; // null when the game isn't analyzed (ARAM, Arena, under 15 minutes)
 }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [playerId, setPlayerId] = useState(defaultPlayerId);

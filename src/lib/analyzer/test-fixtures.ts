@@ -57,6 +57,7 @@ export function match(players: Participant[] = participants(), durationS = 1800)
       platformId: "NA1",
       gameVersion: "16.20.712.3456",
       queueId: 420,
+      mapId: 11,
       gameStartTimestamp: 1_700_000_000_000,
       gameEndTimestamp: 1_700_000_000_000 + durationS * 1000,
       gameDuration: durationS,
