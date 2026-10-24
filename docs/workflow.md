@@ -74,6 +74,7 @@ A skill is a Markdown file of instructions that Claude loads when a task matches
 | Skill | Used for |
 |---|---|
 | `explain-back` | Turnpoint's own: the quiz before merging (above) |
+| `verify` | Turnpoint's own: screenshots of a page on the PR's preview with `npm run shot`, one per acceptance criterion (step 7), plus a map of the main pages and their traps |
 | `code-review-and-quality` | Five things to check in a review: correctness, readability, architecture, security, performance. The reviewer starts with it |
 | `test-driven-development`, `debugging-and-error-recovery` | Writing the failing test first; finding the cause of a failure before fixing it |
 | `security-and-hardening` | Sign-in, API routes, user input and secrets |
@@ -82,7 +83,7 @@ A skill is a Markdown file of instructions that Claude loads when a task matches
 | `documentation-and-adrs` | Docs and [decision records](#decision-records) |
 | `doubt-driven-development` | An extra fresh-context check of each decision, for risky changes only, since it starts more agents |
 
-All but `explain-back` are copied unchanged from other people's open-source repos, with their MIT licenses in [THIRD-PARTY-NOTICES.md](../.claude/skills/THIRD-PARTY-NOTICES.md). They give general advice, so where one disagrees with `CLAUDE.md` or this page, the repo wins.
+All but `explain-back` and `verify` are copied unchanged from other people's open-source repos, with their MIT licenses in [THIRD-PARTY-NOTICES.md](../.claude/skills/THIRD-PARTY-NOTICES.md). They give general advice, so where one disagrees with `CLAUDE.md` or this page, the repo wins.
 
 Rules that matter in only one part of the code live in [`.claude/rules/`](../.claude/rules/) instead: design, the analyzer, the database and the Riot client. Each loads when Claude opens a file in its area, so they cost nothing the rest of the time.
 
