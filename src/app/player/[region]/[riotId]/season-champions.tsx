@@ -39,7 +39,7 @@ export async function SeasonChampions({
     puuid,
     profileUpdatedAt,
     queueIds(queue.filter),
-    loadMore,
+    { loadMore },
   );
   if (!stats) {
     return (
@@ -54,8 +54,8 @@ export async function SeasonChampions({
     <ChampionBox title={title} dd={dd} champions={stats.champions}>
       {stats.loaded < stats.total ? (
         <p className="text-xs text-faint">
-          {stats.loaded} of {stats.total} season games loaded so far. More load each time the
-          profile is opened.
+          {stats.loaded} of {stats.total} season games loaded so far. More load each time{" "}
+          {loadMore ? "the profile is opened" : "the profile's first page is opened"}.
         </p>
       ) : (
         <p className="text-xs text-faint">All {stats.total} games this season.</p>

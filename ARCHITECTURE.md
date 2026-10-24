@@ -84,7 +84,7 @@ src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back 
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
-src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
+src/lib/season-store.ts Season champion stats; loads 10 more season games per plain profile visit
 src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
 src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves each question before Claude answers, ask-rules.ts the caps
 src/db/           Drizzle schema, connection, and cache freshness rules
@@ -159,7 +159,7 @@ These are fine for a portfolio site's traffic, and are the next things to fix be
 - **Every Riot request costs a database round trip** for the shared count, a few milliseconds next to Riot's hundreds. At much higher traffic, Redis would be the usual home for a counter like this.
 - **The limits are written in the code** (`RIOT_LIMITS`), set for a development key. A production key allows more, so they need changing when the key does.
 - **`/api/mcp` has no request limit.** An AI app looking up many new players could spend the Riot allowance for everyone.
-- **Crawlers are only asked to stay out.** Each profile links to the 90 or so players in its games, and a new player costs 13 to 35 Riot calls and saves their games for good, so a crawler following those links could use up the allowance and fill the database. `src/app/robots.ts` asks crawlers to skip `/player/` and `/api/`, and only the plain profile page loads more of the season's games. Polite crawlers like Google's follow robots.txt; others don't, and Vercel's bot protection (a dashboard setting) would be the next step.
+- **Crawlers are only asked to stay out.** Each profile links to the 90 or so players in its games, and a new player costs about 15 to 35 Riot calls and saves their games for good, so a crawler following those links could use up the allowance and fill the database. `src/app/robots.ts` asks crawlers to skip `/player/` and `/api/` (link preview bots on Discord, X and LinkedIn may open player pages, since they only open the one pasted link). On a profile, only the plain page (no `?queue=` or `?games=`) loads more of the season's games; the Champions tab does too, on each of its game-mode links. Polite crawlers like Google's follow robots.txt; others don't. For one that ignores it, the biggest cost is the match list: `?games=50` on each game-mode tab loads up to 50 unsaved games per URL. Vercel's bot protection (a dashboard setting) would be the next step.
 - **One free database.** Supabase's free tier holds 500 MB and has no downloadable backups. Matches can be fetched again, but accounts, goals and notes can't.
 - **No uptime check.** Sentry reports errors, but nothing alerts when the site is down or the daily dev key has expired.
 

@@ -19,7 +19,8 @@ import { SEASON, seasonChampions, type SeasonChampion, type SeasonGame } from "@
 // saves them, and the panel says how many are in so far. Saved games never
 // cost a call again.
 //
-// Only the plain page loads more (the caller passes loadMore). Its game-mode
+// Only the plain page loads more (the caller passes { loadMore: true }; see
+// isPlainProfilePage in src/lib/more-games.ts). Its game-mode
 // tabs and "Show 10 more games" lists are separate URLs, and a crawler that
 // opened all of them would load 10 games on each, dozens of URLs per player.
 //
@@ -46,7 +47,7 @@ export async function loadSeasonStats(
   profileUpdatedAt: Date,
   queueIds: number[] | null,
   // Whether this view may ask Riot for a few of the games not saved yet.
-  loadMore: boolean,
+  { loadMore }: { loadMore: boolean },
 ): Promise<SeasonStats | null> {
   if (!database()) return null;
 
