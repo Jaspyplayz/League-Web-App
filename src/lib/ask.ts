@@ -77,7 +77,7 @@ const TOOLS: BetaTool[] = [
   {
     name: "analyze_game",
     description:
-      "Turnpoint's analysis of one of the player's games. Games under 15 minutes have none.",
+      "Turnpoint's analysis of one of the player's games. Only Summoner's Rift games of 15 minutes or more have one, so ARAM, Arena and remakes have none.",
     input_schema: {
       type: "object",
       properties: {

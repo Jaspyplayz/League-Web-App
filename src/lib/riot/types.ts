@@ -117,6 +117,9 @@ export type Match = {
     platformId: string; // "NA1"
     gameVersion: string; // "16.20.712.3456"
     queueId: number;
+    // Which map: 11 is Summoner's Rift (ranked, normals and Swiftplay), 12
+    // the Howling Abyss (ARAM) and 30 Arena's Rings of Wrath.
+    mapId: number;
     // When the game was made, a little before it started. Both in ms since 1970.
     gameCreation?: number;
     gameStartTimestamp: number;

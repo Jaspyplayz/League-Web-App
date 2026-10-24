@@ -1,5 +1,6 @@
 import "server-only";
 
+import { whyNotAnalyzed } from "@/lib/analyzer";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { loadMatchFacts } from "@/lib/match-facts";
 import { loadMatch, loadMatches } from "@/lib/match-store";
@@ -124,7 +125,7 @@ export async function analyzeGameFor(
   }
   const facts = await loadMatchFacts(region, match, account.puuid);
   if (!facts) {
-    return { message: "This game is shorter than 15 minutes, so there's no analysis for it." };
+    return { message: whyNotAnalyzed(match) ?? "There's no analysis for this game." };
   }
   return {
     matchId,

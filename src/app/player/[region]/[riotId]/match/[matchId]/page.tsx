@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
-import { analyzeMatch, findPlayer, findPlayerByRiotId, isAnalyzable } from "@/lib/analyzer";
+import { analyzeMatch, findPlayer, findPlayerByRiotId, whyNotAnalyzed } from "@/lib/analyzer";
 import { replayChances } from "@/lib/analyzer/plays";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { loadMatch, loadTimeline } from "@/lib/match-store";
@@ -95,14 +95,14 @@ async function Analysis({ params }: { params: Params }) {
   );
   const notes = <MatchNotes region={region} matchId={matchId} />;
 
-  if (!isAnalyzable(match)) {
+  const skipped = whyNotAnalyzed(match);
+  if (skipped) {
     return (
       <>
         {back}
         {header}
         <p className={`${panelClass} px-5 py-4 text-muted`}>
-          This game ended before 15 minutes, which is too short to analyze. Here&apos;s the
-          scoreboard.
+          {skipped} Here&apos;s the scoreboard.
         </p>
         {scoreboard}
         {notes}
