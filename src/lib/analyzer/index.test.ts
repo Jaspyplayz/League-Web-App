@@ -9,16 +9,20 @@ function onMap(mapId: number, players = participants()) {
   return game;
 }
 
-// Arena: 16 players in pairs, on the Rings of Wrath (map 30). Newer Arena
-// queues have 18.
-function arena(players: number) {
+// 16 or 18 players with no lane positions, the way Riot sends Arena games
+// (newer Arena queues have 18). Arena is on the Rings of Wrath (map 30).
+function arenaPlayers(count: number) {
   const ten = participants();
-  const extra = Array.from({ length: players - 10 }, (_, i) => ({
+  return Array.from({ length: count }, (_, i) => ({
     ...ten[i % 10],
-    puuid: `player-${11 + i}`,
-    participantId: 11 + i,
+    puuid: `player-${i + 1}`,
+    participantId: i + 1,
+    teamPosition: "",
+    individualPosition: "",
   }));
-  return onMap(30, [...ten, ...extra]);
+}
+function arena(players: number) {
+  return onMap(30, arenaPlayers(players));
 }
 
 describe("analyzeMatch", () => {
@@ -98,7 +102,7 @@ describe("isAnalyzable", () => {
     expect(isAnalyzable(onMap(12))).toBe(false);
   });
 
-  it("skips Arena games of 16 or 18 players", () => {
+  it("skips Arena games, which are on the Rings of Wrath", () => {
     expect(isAnalyzable(arena(16))).toBe(false);
     expect(isAnalyzable(arena(18))).toBe(false);
   });
@@ -134,5 +138,7 @@ describe("whyNotAnalyzed", () => {
     expect(whyNotAnalyzed(match(participants().slice(0, 8)))).toBe(
       "Only 5v5 games are analyzed.",
     );
+    // A second guard for Arena-sized games, should one ever say map 11.
+    expect(whyNotAnalyzed(match(arenaPlayers(16)))).toBe("Only 5v5 games are analyzed.");
   });
 });

@@ -108,7 +108,7 @@ All analysis lives in pure TypeScript functions (input: match JSON + timeline JS
 `isAnalyzable` in `src/lib/analyzer/index.ts` decides, and `whyNotAnalyzed` gives the sentence players see when the answer is no. A game is analyzed when all three hold, checked in this order:
 
 1. It was on Summoner's Rift (`info.mapId` 11). That covers ranked, normals, Swiftplay and bot games. ARAM is on the Howling Abyss (12) and Arena on the Rings of Wrath (30), where there are no lanes to compare and the replay's walls are wrong. Message: "Only Summoner's Rift games are analyzed."
-2. It had 10 players, since everything pairs them into five lanes. Arena has 16 or 18, and a custom game on the Rift can have fewer. Message: "Only 5v5 games are analyzed."
+2. It had 10 players, since everything pairs them into five lanes. Arena's 16 or 18 players never get this far, because the map check already skips them. This catches a custom game on the Rift with fewer players. Message: "Only 5v5 games are analyzed."
 3. It lasted 15 minutes or more (remakes and early surrenders are shorter). Message: "This game ended before 15 minutes, which is too short to analyze."
 
 A game that isn't analyzed shows its scoreboard and the message, and its row on the profile has no "Analysis" link. The share image, recaps, Ask and the MCP server's `analyze_game` all check `isAnalyzable` first. Saved games keep Riot's whole match in `matches.raw`, so games saved before this check have `mapId` too.
