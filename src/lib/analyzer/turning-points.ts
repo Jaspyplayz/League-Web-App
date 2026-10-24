@@ -234,9 +234,9 @@ function winningTitle(f: Facts, opp: string): { title: string; at?: number } {
   return { title: `Pulled ahead of ${opp}` };
 }
 
-// A solo death has one enemy in it. That's usually your lane opponent, but in
-// bot lane it can be their support, so the title and sentence name whoever it
-// was rather than your opponent.
+// A solo death has one enemy in it. That's usually the enemy in your role, but
+// in bot lane it can be either enemy bot laner (a support killing your ADC, or
+// an ADC killing your support), so the title and sentence name whoever it was.
 function deathTitle(d: Death, ctx: TurningPointContext): string {
   switch (d.label) {
     case "solo":

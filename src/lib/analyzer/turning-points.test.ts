@@ -125,6 +125,13 @@ describe("findTurningPoints, a death in lane", () => {
     );
   });
 
+  it("names the ADC who killed you alone when you play support", () => {
+    // Blue Thresh (5) against red Nautilus (10); only Kai'Sa (9) gets the kill.
+    const point = swingFromDeath(5, 10, kill("8:10", 9, 5, [], SPOTS.botLane));
+    expect(point.title).toBe("Lost a 1v1 to Kai'Sa");
+    expect(point.detail).toMatch(/^Kai'Sa killed you one on one\..*gold against Nautilus/);
+  });
+
   it("still names your lane opponent when they killed you alone in mid", () => {
     const point = swingFromDeath(3, 8, kill("8:10", 8, 3, [], SPOTS.midLane));
     expect(point.title).toBe("Lost a 1v1 to Syndra");
