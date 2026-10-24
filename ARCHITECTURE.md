@@ -86,7 +86,7 @@ src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and 
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/lib/season-store.ts Season champion stats; loads the season's games 10 per profile visit
 src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
-src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves answers, ask-rules.ts the caps
+src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves each question before Claude answers, ask-rules.ts the caps
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
 scripts/          Command-line jobs run with tsx (benchmarks, train-score, train-win-chance, train-phase-score, tempo study, item check)

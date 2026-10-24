@@ -21,6 +21,7 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `match_notes` | signed-in account × game, a private note on that game | never; deleted with the account, or when the note is cleared |
 | `match_recaps` | game × player, a short AI-written recap ([match-recap.md](match-recap.md)) | never; games don't change |
 | `ask_questions` | one question on the Ask tab, with Claude's answer, the games it read and its cost ([ask.md](ask.md)) | never; deleted with the account |
+| `ask_spend` | one question's cost and date, with no account, question or answer, for the site's monthly Ask budget ([ask.md](ask.md#limits-and-cost)) | never; outlives a deleted account, so its spending still counts |
 | `riot_rate_limits` | Riot host (`na1`, `americas`...), how many requests each of Riot's rate limit windows has used and any cooldown after a 429 ([`src/lib/riot/rate-limit-store.ts`](../src/lib/riot/rate-limit-store.ts)) | not Riot data; updated before every Riot request so all servers share one count |
 
 The schema lives in [`src/db/schema.ts`](../src/db/schema.ts), with a comment on every column that isn't obvious. The refresh rules live in [`src/db/freshness.ts`](../src/db/freshness.ts).

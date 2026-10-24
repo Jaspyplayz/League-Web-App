@@ -134,6 +134,20 @@
       "when": 1792464052722,
       "tag": "0018_ask_questions",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792583152791,
+      "tag": "0019_ask_spend",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792583157481,
+      "tag": "0020_backfill_ask_spend",
+      "breakpoints": true
     }
   ]
 }

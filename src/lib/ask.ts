@@ -3,12 +3,14 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import Anthropic from "@anthropic-ai/sdk";
 import type {
+  BetaMessage,
   BetaMessageParam,
   BetaTool,
   BetaToolResultBlockParam,
   BetaToolUseBlock,
+  MessageCreateParamsNonStreaming,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
-import { costMicros, gameLabel, type AskGame } from "@/lib/ask-rules";
+import { costMicros, gameLabel, HOLD_MICROS, type AskGame } from "@/lib/ask-rules";
 import { riotErrorMessage } from "@/lib/mcp/answers";
 import { analyzeGameFor, MAX_RECENT_GAMES, recentGamesFor } from "@/lib/mcp/tools";
 import type { Region } from "@/lib/regions";
@@ -89,29 +91,44 @@ const TOOLS: BetaTool[] = [
 ];
 
 export type AskResult = {
-  // Null when Claude refused, ran out of room or rounds. The cost still counts.
+  // Null when Claude refused, ran out of room or rounds, or a round failed.
+  // The cost still counts.
   answer: string | null;
   games: AskGame[];
   model: string;
+  // What the question cost, in millionths of a dollar: the token counts
+  // Anthropic reported for each round, plus HOLD_MICROS for each round in
+  // which a try may have been billed without a reply (see sendRound).
   costMicros: number;
+  // Set when a round failed (Anthropic overloaded, a timeout, no network),
+  // for the caller to report. The rounds before it were still paid for, so
+  // their cost is in costMicros rather than lost with the error.
+  error?: unknown;
 };
 
-// Network and API errors are thrown, for the caller to report.
 export async function answerQuestion(
   region: Region,
   account: Account,
   question: string,
 ): Promise<AskResult> {
-  // One retry and a minute per round, so a whole question fits well inside
-  // the page's time limit (maxDuration in the Ask page).
-  const client = new Anthropic({ maxRetries: 1, timeout: 60_000 });
+  // A minute per try, and two tries per round (see sendRound). A question
+  // that runs past the page's time limit (maxDuration in the Ask page) is
+  // cut off; it was saved with an estimated cost before it started
+  // (src/lib/ask-store.ts), so it still counts.
+  const client = new Anthropic({ maxRetries: 0, timeout: 60_000 });
   const messages: BetaMessageParam[] = [{ role: "user", content: question }];
   const tools = new ToolRunner(region, account);
   let model = ASK_MODEL;
   let cost = 0;
+  const result = (answer: string | null): AskResult => ({
+    answer,
+    games: tools.gamesRead(),
+    model,
+    costMicros: cost,
+  });
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
-    const response = await client.beta.messages.create({
+    const sent = await sendRound(client, {
       model: ASK_MODEL,
       max_tokens: 8000,
       // Saves the conversation so far in Anthropic's cache, so the next
@@ -130,6 +147,12 @@ export async function answerQuestion(
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
     });
+    if (sent.mayBeBilled) cost += HOLD_MICROS;
+    // Both tries failed. Each earlier round's cost was added as soon as
+    // Anthropic replied, so it's still counted.
+    if (!sent.ok) return { ...result(null), error: sent.error };
+
+    const response = sent.response;
     model = response.model;
     cost += costMicros(response.model, response.usage);
 
@@ -148,10 +171,77 @@ export async function answerQuestion(
       .join("\n\n")
       .trim();
     const answered = response.stop_reason === "end_turn" && text !== "";
-    return { answer: answered ? text : null, games: tools.gamesRead(), model, costMicros: cost };
+    return result(answered ? text : null);
   }
   // Unreachable: the last round can't call tools.
-  return { answer: null, games: tools.gamesRead(), model, costMicros: cost };
+  return result(null);
+}
+
+// How long to wait before a round's second try: half a second, the SDK's
+// own first pause, unless Anthropic says how long (see pauseBeforeRetry).
+const RETRY_PAUSE_MS = 500;
+// The longest pause Anthropic can ask for that we'll wait out, so a question
+// still fits in the page's time limit. If it asks for longer, the second try
+// will likely be turned down too, which costs nothing.
+const MAX_RETRY_PAUSE_MS = 10_000;
+
+type SentRound =
+  | { ok: true; response: BetaMessage; mayBeBilled: boolean }
+  | { ok: false; error: unknown; mayBeBilled: boolean };
+
+// Sends one round, and tries once more if the first try fails. The SDK can
+// retry on its own, but then only the last try's error is seen, so the
+// retry is done here instead, where every try can be checked. Unlike the
+// SDK, it retries every error, even one that will fail the same way again
+// (a bad request). Those are turned down straight away and aren't billed,
+// so that only costs the pause.
+//
+// A try Anthropic turned down (see turnedDown) wasn't run, and isn't billed.
+// A try that timed out, lost its connection or failed partway through may
+// have been run anyway, and Anthropic bills a request that was on its way to
+// succeeding even if we stopped waiting. We can't tell which, so
+// `mayBeBilled` says to count the round as HOLD_MICROS, the same estimate as
+// a question still being answered. That also charges a network outage that
+// never reached Anthropic, which errs on the safe side.
+async function sendRound(
+  client: Anthropic,
+  request: MessageCreateParamsNonStreaming,
+): Promise<SentRound> {
+  let mayBeBilled = false;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await client.beta.messages.create(request);
+      // A success without token counts (an empty reply, or one that isn't
+      // JSON) can't be priced, but Anthropic may have run it, so it's a
+      // failed try that may have been billed.
+      if (!response?.usage) throw new Error("Anthropic's reply had no message");
+      return { ok: true, response, mayBeBilled };
+    } catch (error) {
+      if (!turnedDown(error)) mayBeBilled = true;
+      if (attempt === 2) return { ok: false, error, mayBeBilled };
+      await new Promise((resolve) => setTimeout(resolve, pauseBeforeRetry(error)));
+    }
+  }
+}
+
+// Whether Anthropic refused a try before running it: a 4xx answer (a bad
+// request, rate limited) or 529 (overloaded). A timeout or a lost connection
+// is an APIError with no status, and a reply cut off partway isn't an
+// APIError at all. Any other 5xx, like 500 (an error on Anthropic's side) or
+// 504 (Anthropic ran out of time), may have come partway through the work,
+// so it's treated like our own timeout.
+function turnedDown(error: unknown): boolean {
+  if (!(error instanceof Anthropic.APIError) || error.status === undefined) return false;
+  return (error.status >= 400 && error.status < 500) || error.status === 529;
+}
+
+// How long to wait before the second try. Anthropic can say how many seconds
+// to wait in a "retry-after" header, which it sends when we're rate limited;
+// trying sooner would be turned down again.
+function pauseBeforeRetry(error: unknown): number {
+  const headers = error instanceof Anthropic.APIError ? error.headers : undefined;
+  const seconds = Number(headers?.get("retry-after") ?? NaN);
+  return seconds > 0 ? Math.min(seconds * 1000, MAX_RETRY_PAUSE_MS) : RETRY_PAUSE_MS;
 }
 
 // Runs Claude's tool calls for one player and remembers which games it read.

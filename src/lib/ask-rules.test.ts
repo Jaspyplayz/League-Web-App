@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACCOUNT_MONTHLY_BUDGET_USD,
   allowance,
   cleanQuestion,
   costMicros,
   gameLabel,
+  HOLD_MICROS,
+  leftAfter,
   MAX_QUESTION_LENGTH,
   MONTHLY_BUDGET_USD,
   monthStart,
@@ -57,15 +60,74 @@ describe("monthStart", () => {
 });
 
 describe("allowance", () => {
+  const none = { askedToday: 0, accountSpent: 0, siteSpent: 0 };
+  const dollars = (usd: number) => usd * 1_000_000;
+
   it("counts down the day's questions", () => {
-    expect(allowance(0, 0)).toEqual({ ok: true, left: QUESTIONS_PER_DAY });
-    expect(allowance(QUESTIONS_PER_DAY - 1, 0)).toEqual({ ok: true, left: 1 });
-    expect(allowance(QUESTIONS_PER_DAY, 0).ok).toBe(false);
+    expect(allowance(none)).toEqual({ ok: true, left: QUESTIONS_PER_DAY });
+    expect(allowance({ ...none, askedToday: QUESTIONS_PER_DAY - 1 })).toEqual({ ok: true, left: 1 });
+    expect(allowance({ ...none, askedToday: QUESTIONS_PER_DAY }).ok).toBe(false);
   });
 
   it("pauses everyone once the month's budget is spent", () => {
-    expect(allowance(0, MONTHLY_BUDGET_USD * 1_000_000).ok).toBe(false);
-    expect(allowance(0, MONTHLY_BUDGET_USD * 1_000_000 - 1).ok).toBe(true);
+    expect(allowance({ ...none, siteSpent: dollars(MONTHLY_BUDGET_USD) }).ok).toBe(false);
+    expect(allowance({ ...none, siteSpent: dollars(MONTHLY_BUDGET_USD) - 1 }).ok).toBe(true);
+  });
+
+  it("stops one account once it has spent its share of the month", () => {
+    const spent = allowance({ ...none, accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD) });
+    expect(spent).toEqual({
+      ok: false,
+      message: "You've used your Ask allowance for this month. It resets on the 1st.",
+    });
+    expect(allowance({ ...none, accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD) - 1 }).ok).toBe(
+      true,
+    );
+  });
+
+  it("leaves room for other accounts after one reaches its share", () => {
+    expect(ACCOUNT_MONTHLY_BUDGET_USD).toBeLessThan(MONTHLY_BUDGET_USD);
+  });
+
+  it("names the limit that lasts longest when several are reached", () => {
+    const all = {
+      askedToday: QUESTIONS_PER_DAY,
+      accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD),
+      siteSpent: dollars(MONTHLY_BUDGET_USD),
+    };
+    expect(allowance(all)).toMatchObject({ message: expect.stringContaining("paused") });
+    // "Try again tomorrow" would be wrong: tomorrow the month is still used up.
+    expect(allowance({ ...all, siteSpent: 0 })).toMatchObject({
+      message: expect.stringContaining("this month"),
+    });
+  });
+});
+
+describe("leftAfter", () => {
+  const none = { askedToday: 0, accountSpent: 0, siteSpent: 0 };
+  const dollars = (usd: number) => usd * 1_000_000;
+
+  it("counts the question just asked", () => {
+    expect(leftAfter({ ...none, askedToday: 3 }, 150_000)).toBe(QUESTIONS_PER_DAY - 4);
+  });
+
+  it("is 0 once that question used up the account's or the site's month", () => {
+    const accountNearlySpent = { ...none, accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD) - 1 };
+    const siteNearlySpent = { ...none, siteSpent: dollars(MONTHLY_BUDGET_USD) - 1 };
+    expect(leftAfter(accountNearlySpent, 1)).toBe(0);
+    expect(leftAfter(siteNearlySpent, 1)).toBe(0);
+    expect(leftAfter(accountNearlySpent, 0)).toBe(QUESTIONS_PER_DAY - 1);
+  });
+});
+
+describe("HOLD_MICROS", () => {
+  // The estimate a question counts as until its cost is in. Questions sent
+  // at the same moment are each checked against the ones before them at
+  // this estimate, so the further a question's cost can go past it, the
+  // further a burst of them can go past the caps. So it has to be well
+  // above what a question usually costs (5 to 20 cents).
+  it("is at least twice the top of a question's usual cost", () => {
+    expect(HOLD_MICROS).toBeGreaterThanOrEqual(2 * 200_000);
   });
 });
 
