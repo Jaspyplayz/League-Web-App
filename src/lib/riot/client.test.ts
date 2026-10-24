@@ -34,6 +34,14 @@ function respond(status: number, body: unknown = {}, headers: Record<string, str
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+// Headers arrived (often HTTP 200) but the body did not: json() rejects the
+// way a truncated response or a dropped connection does.
+function unreadableBody(status = 200) {
+  const response = new Response(null, { status });
+  response.json = () => Promise.reject(new TypeError("body read failed"));
+  return response;
+}
+
 // Runs riotGet while fast-forwarding through its retry waits.
 async function call(host = "americas", path = "/x") {
   const promise = riotGet(host, path);
@@ -86,6 +94,20 @@ describe("riotGet", () => {
     fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
     fetchMock.mockResolvedValueOnce(respond(200, "ok"));
     await expect(call()).resolves.toBe("ok");
+  });
+
+  it("retries when a 200 body's json() throws, then returns the next body", async () => {
+    fetchMock
+      .mockResolvedValueOnce(unreadableBody(200))
+      .mockResolvedValueOnce(respond(200, { puuid: "abc" }));
+    await expect(call()).resolves.toEqual({ puuid: "abc" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up as unavailable when json() throws on all three attempts", async () => {
+    fetchMock.mockImplementation(async () => unreadableBody(200));
+    await expect(call()).rejects.toMatchObject({ kind: "unavailable" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("on a 429, reports Retry-After and pauses that host only", async () => {
