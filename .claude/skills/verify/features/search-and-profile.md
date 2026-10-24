@@ -23,7 +23,7 @@ Preconditions: `npm run shot -- --check` exits 0, and its profile line says `ok`
 - **Home page.** `npm run shot -- --pr <n> /` shows the heading "Find the minute" and the search form.
 - **Profile.** `npm run shot -- --pr <n> "/player/kr/Hide%20on%20bush-KR1"` shows the region named `Player summary`, the `Ranked Solo/Duo` card and `Recent matches`. Searching lands on this URL, so shoot it directly.
 - **Sections.** Add `/champions`, `/insights`, `/log` or `/ask` to the profile path.
-- **Not found.** `npm run shot -- --pr <n> /this-page-does-not-exist` reports `not-found` and exits 1. That is the expected result, so prove the 404 page from the test in `e2e/smoke.spec.ts` instead.
+- **Not found.** `npm run shot -- --pr <n> --expect not-found /this-page-does-not-exist` saves the 404 page. Without `--expect` it reports `not-found` and exits 1, and so does a player or match link with a typo, even though those pages answer 200.
 
 ## Gotchas
 

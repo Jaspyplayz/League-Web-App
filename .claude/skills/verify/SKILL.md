@@ -5,13 +5,13 @@ description: Drive Turnpoint in a real browser and save screenshots as proof, on
 
 # Verify Turnpoint
 
-`npm run shot` ([scripts/shot.ts](../../../scripts/shot.ts)) opens pages in Chromium the way a player would and saves full-page screenshots to `.cache/verify/` (git-ignored). It won't save a page that isn't the app working: Vercel's login (`vercel-login`), the Riot key notice (`riot-key`), a 404 (`not-found`) or an error page (`error`). It prints what the page showed instead and exits with code 1. Exit code 0 means every page loaded.
+`npm run shot` ([scripts/shot.ts](../../../scripts/shot.ts)) opens pages in Chromium the way a player would and saves full-page screenshots to `.cache/verify/` (git-ignored). It won't save a page that isn't the app working: Vercel's login (`vercel-login`), the Riot key notice (`riot-key`), the 404 page or "No player found" (`not-found`), or an error page or alert (`error`), such as Riot's "Too many lookups right now". It prints what the page showed instead and exits with code 1. Exit code 0 means every page loaded.
 
 In Git Bash, start every command with `MSYS_NO_PATHCONV=1`, or Git Bash turns `/settings` into `C:/Program Files/Git/settings`. PowerShell and cloud machines don't need it.
 
 ## Pick the site
 
-- **The PR's preview, `--pr <number>`.** This is the evidence a PR needs. The preview has its own database and Riot key. The script finds the preview through GitHub and gets past Vercel's login with `VERCEL_AUTOMATION_BYPASS_SECRET`, read from `.env.local` (a worktree falls back to the main checkout's). If every run says `vercel-login`, the secret is missing. Only Jasper can add it, so say "no preview screenshots: bypass secret not set" in the PR. Don't try another way past the login.
+- **The PR's preview, `--pr <number>`.** This is the evidence a PR needs. The preview has its own database and Riot key. The script finds the preview through GitHub and gets past Vercel's login with `VERCEL_AUTOMATION_BYPASS_SECRET`, read from `.env.local` (a worktree falls back to the main checkout's). It sends the secret only to the preview that `--pr` found, never to a `--base` URL. If every run says `vercel-login`, the secret is missing. Only Jasper can add it, so say "no preview screenshots: bypass secret not set" in the PR. Don't try another way past the login.
 - **The live site, `--base https://league-web-app.vercel.app`.** What `main` shows now. Use it for a "before" screenshot.
 - **A local dev server, `--base http://localhost:<port>`.** For checking work before you push. Without `--base` the script uses `BASE_URL`, then `http://localhost:3000`.
 
@@ -39,9 +39,10 @@ npm run shot -- --pr 155 --tab "Deep dive" "/player/kr/Hide%20on%20bush-KR1/matc
 
 - `--light` and `--phone` cover the issue template's "on a phone, and in light mode" criterion. `--phone` is a Pixel 7 screen.
 - `--tab <name>` clicks a tab (`role="tab"`) after the page loads. Only the match page has them.
-- Several paths in one run share the same options. Files are named after the path and options, such as `settings-light-phone.png`. `--out <dir>` changes the folder.
+- `--expect <outcome>` saves a page that isn't `ok` on purpose, for a PR that changes one: `--expect not-found /no-such-page` for the 404 page.
+- Several paths in one run share the same options. Files are named after the site, the path and the options, such as `pr155-settings-light-phone.png`, or `league-web-app-…` for the live site and `localhost-…` for a dev server, so a before and an after don't overwrite each other. `--out <dir>` changes the folder.
 
-Search, profile sections and Insights views are plain URLs, so shoot the page an action leads to. A journey the flags can't reach, such as typing into a form, goes in a Playwright test in `e2e/` that you run with `BASE_URL=<preview url> npm run test:e2e`.
+Search, profile sections and Insights views are plain URLs, so shoot the page an action leads to. A journey the flags can't reach, such as typing into a form, goes in a Playwright test in `e2e/`. Run it against your dev server with `BASE_URL=http://localhost:3100 npm run test:e2e`, and the smoke test runs it on the preview after you push. Don't run `test:e2e` against a preview yourself: it doesn't read `.env.local`, and until #156 is fixed it sends the secret to every site the page loads from.
 
 The pages, with their paths, labels and traps, are in [features/README.md](features/README.md).
 
@@ -49,7 +50,7 @@ The pages, with their paths, labels and traps, are in [features/README.md](featu
 
 - One screenshot per acceptance criterion, showing the state the criterion names. A page that loaded is not proof that the criterion holds.
 - A screenshot shows what a player sees. A change that saves data also needs the test, or a second visit, that shows the saved value.
-- Put them in the PR with `gh pr create --attach` or `gh pr comment <number> --attach`. A body line like `![Settings in light mode](.cache/verify/settings-light-phone.png)` places the image where the criterion is listed.
+- Put them in the PR with `gh pr create --attach` or `gh pr comment <number> --attach`. A body line like `![Settings in light mode](.cache/verify/pr155-settings-light-phone.png)` places the image where the criterion is listed.
 - Screenshots from the live site or a worktree's server prove nothing about the PR. Name the site under each one.
 
 ## Cleanup

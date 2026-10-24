@@ -3,7 +3,8 @@
 // that a page works. Kept apart from scripts/shot.ts so it can be tested
 // without a browser.
 
-export type Outcome = "ok" | "vercel-login" | "riot-key" | "not-found" | "error";
+export const OUTCOMES = ["ok", "vercel-login", "riot-key", "not-found", "error"] as const;
+export type Outcome = (typeof OUTCOMES)[number];
 
 export type PageLoad = {
   /** The origin `npm run shot` asked for, such as http://localhost:3000. */
@@ -14,16 +15,31 @@ export type PageLoad = {
   status: number | null;
   /** The page's visible text. */
   text: string;
+  /**
+   * Whether the page asks search engines not to index it. Next.js adds that
+   * to its not-found page, which the player and match pages show with status
+   * 200 when they call notFound() inside a Suspense boundary.
+   */
+  noindex: boolean;
+  /**
+   * The text of each role="alert" element. The site uses them only for
+   * failures: a Riot notice, a Riot ID that isn't one, a failed sign-in.
+   */
+  alerts: string[];
 };
 
 // The same notice e2e/smoke.spec.ts waits for. Pages that need Riot show it
 // when the development key has expired (every 24 hours) or the server has no
 // key at all, like a dev server started in a worktree without .env.local.
-const RIOT_KEY_NOTICE = "The site's Riot API key isn't working";
+export const RIOT_KEY_NOTICE = "The site's Riot API key isn't working";
+
+// The player page's answer to a Riot ID that doesn't exist. It is an ordinary
+// page, not the not-found one, so it has neither a 404 nor noindex.
+export const NO_PLAYER = "No player found";
 
 // src/app/global-error.tsx, and Next.js's own message when the page crashes in
 // the browser.
-const ERROR_TEXTS = ["Something went wrong", "Application error: a client-side exception"];
+export const ERROR_TEXTS = ["Something went wrong", "Application error: a client-side exception"];
 
 export function classify(load: PageLoad): { outcome: Outcome; reason: string } {
   const landed = new URL(load.url);
@@ -40,10 +56,19 @@ export function classify(load: PageLoad): { outcome: Outcome; reason: string } {
   if (load.status === null || load.status >= 400) {
     return { outcome: "error", reason: `the site answered ${load.status ?? "nothing"}` };
   }
+  if (load.noindex) {
+    return { outcome: "not-found", reason: `the site answered ${load.status} with its not-found page` };
+  }
+  if (load.text.includes(NO_PLAYER)) {
+    return { outcome: "not-found", reason: `the page shows "${NO_PLAYER}"` };
+  }
   if (load.text.includes(RIOT_KEY_NOTICE)) {
     return { outcome: "riot-key", reason: `the page shows "${RIOT_KEY_NOTICE}"` };
   }
   const error = ERROR_TEXTS.find((text) => load.text.includes(text));
   if (error) return { outcome: "error", reason: `the page shows "${error}"` };
+  if (load.alerts.length > 0) {
+    return { outcome: "error", reason: `the page shows an alert: "${load.alerts[0].slice(0, 120)}"` };
+  }
   return { outcome: "ok", reason: `the site answered ${load.status}` };
 }
