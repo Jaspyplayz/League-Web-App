@@ -1,7 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
-// The bypass secret opens every preview of this site, so only the preview may
-// receive it, never Data Dragon's images or Sentry's error reports (#156).
 test("send the preview bypass secret only to the preview", async ({ page, baseURL }) => {
   test.skip(!process.env.VERCEL_AUTOMATION_BYPASS_SECRET, "No bypass secret to check.");
   const site = new URL(baseURL!).origin;
@@ -18,7 +16,6 @@ test("send the preview bypass secret only to the preview", async ({ page, baseUR
     );
   });
 
-  // The sample game shows champion and item images from Data Dragon.
   await page.goto("/");
   await page.getByRole("link", { name: "See a sample analysis" }).click();
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText("Victory", {
