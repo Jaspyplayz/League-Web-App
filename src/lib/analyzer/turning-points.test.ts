@@ -92,3 +92,55 @@ describe("findTurningPoints", () => {
     });
   });
 });
+
+// One death at 8:10 that costs `meId` 1000 gold against `opponentId` by 9:00.
+function swingFromDeath(meId: number, opponentId: number, death: TrimmedEvent) {
+  const me = players[meId - 1];
+  const opponent = players[opponentId - 1];
+  const deathEvents = [death];
+  const [point] = findTurningPoints({
+    frames: frames(12, (minute, id) => ({
+      gold: id === meId && minute > 8 ? 400 * minute - 1000 : 400 * minute,
+    })),
+    events: deathEvents,
+    me,
+    opponent,
+    participants: players,
+    deaths: findDeaths(deathEvents, { me, opponent, participants: players }),
+    name: (id) =>
+      ({ 3: "Ahri", 4: "Jinx", 5: "Thresh", 8: "Syndra", 9: "Kai'Sa", 10: "Nautilus" })[id] ??
+      "Someone",
+  });
+  return point;
+}
+
+describe("findTurningPoints, a death in lane", () => {
+  it("names the support who killed you alone in bot lane, not your lane opponent", () => {
+    // Blue Jinx (4) against red Kai'Sa (9); only Nautilus (10) gets the kill.
+    const point = swingFromDeath(4, 9, kill("8:10", 10, 4, [], SPOTS.botLane));
+    expect(point.title).toBe("Lost a 1v1 to Nautilus");
+    expect(point.detail).toBe(
+      "Nautilus killed you one on one. " +
+        "You went from 0 to −1,000 gold against Kai'Sa between 8:00 and 9:00.",
+    );
+  });
+
+  it("names the ADC who killed you alone when you play support", () => {
+    // Blue Thresh (5) against red Nautilus (10); only Kai'Sa (9) gets the kill.
+    const point = swingFromDeath(5, 10, kill("8:10", 9, 5, [], SPOTS.botLane));
+    expect(point.title).toBe("Lost a 1v1 to Kai'Sa");
+    expect(point.detail).toMatch(/^Kai'Sa killed you one on one\..*gold against Nautilus/);
+  });
+
+  it("still names your lane opponent when they killed you alone in mid", () => {
+    const point = swingFromDeath(3, 8, kill("8:10", 8, 3, [], SPOTS.midLane));
+    expect(point.title).toBe("Lost a 1v1 to Syndra");
+    expect(point.detail).toMatch(/^Syndra killed you one on one\./);
+  });
+
+  it("names both enemy bot laners in a 2v2", () => {
+    const point = swingFromDeath(4, 9, kill("8:10", 9, 4, [10], SPOTS.botLane));
+    expect(point.title).toBe("Lost a 2v2 in lane");
+    expect(point.detail).toMatch(/^Kai'Sa and Nautilus killed you in a 2v2\./);
+  });
+});

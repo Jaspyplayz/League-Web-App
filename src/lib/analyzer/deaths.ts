@@ -7,7 +7,7 @@ import { playedPosition } from "./matchup";
 import type { ChampionKill, TrimmedEvent } from "./trim";
 
 export type DeathLabel =
-  | "solo" // only your opponent was involved
+  | "solo" // only one lane opponent was involved (in bot lane, either enemy bot laner)
   | "lane" // bot lane only: killed by the enemy bot lane duo
   | "gank" // someone else joined, in your lane
   | "teamfight" // three or more enemies were involved
