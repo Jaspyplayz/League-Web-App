@@ -66,7 +66,8 @@ src/lib/riot/     Server-only Riot client (retries; rate-limit.ts counts request
                   across servers in Postgres by rate-limit-store.ts) and one function per endpoint
 src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turning points, deaths,
                   trends.ts rolls games up into the Insights page, compare.ts
-                  sets them against one rank's games or one chosen player's,
+                  sets them against one rank's games or one chosen player's
+                  (skill.ts names the one skill behind that rank),
                   habits.ts reads early-game habits (habit-trends.ts splits wins by them),
                   sessions.ts groups games played back to back into blocks,
                   death-recap.ts adds up what hit you in each death,

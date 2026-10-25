@@ -2,9 +2,11 @@ import Form from "next/form";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import type { BenchmarkComparison as Comparison } from "@/lib/analyzer/compare";
 import { plural } from "@/lib/analyzer/format";
+import type { SkillFocus } from "@/lib/analyzer/skill";
 import type { DataDragon } from "@/lib/ddragon";
 import { tierName, type Tier } from "@/lib/tiers";
 import { BenchmarkComparison } from "./benchmark-comparison";
+import { SkillCompare } from "./skill-compare";
 import { panelClass } from "@/components/ui/panel";
 
 const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
@@ -16,6 +18,7 @@ export function TierComparison({
   tier,
   tiers,
   comparison,
+  skill,
   keep,
   dd,
 }: {
@@ -23,6 +26,7 @@ export function TierComparison({
   tiers: { tier: Tier; games: number }[];
   // Null when none of your games has enough of this rank's games to compare.
   comparison: Comparison | null;
+  skill: SkillFocus | null;
   // The page's other choices, carried along so picking a rank keeps them.
   keep: Record<string, string>;
   dd: DataDragon | null;
@@ -60,6 +64,7 @@ export function TierComparison({
           </button>
         </Form>
       </div>
+      <SkillCompare focus={skill} />
       {comparison ? (
         <BenchmarkComparison comparison={comparison} against={{ kind: "tier", tier }} dd={dd} />
       ) : (

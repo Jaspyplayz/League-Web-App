@@ -7,6 +7,7 @@ import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
 import { addUpDeaths, deathsInGames } from "@/lib/analyzer/death-recap";
 import { compareHabits } from "@/lib/analyzer/habit-trends";
+import { skillToImprove } from "@/lib/analyzer/skill";
 import { analyzeSessions, toSessionGames } from "@/lib/analyzer/sessions";
 import { checkWeaknesses, computeTrends } from "@/lib/analyzer/trends";
 import { loadBenchmarks, loadBenchmarkTiers } from "@/lib/benchmark-store";
@@ -25,6 +26,7 @@ import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
 import { fromSlug, toSlug } from "@/lib/riot-id";
+import { tierName } from "@/lib/tiers";
 import { fillCounts } from "@/lib/insight-fill";
 import { loadTrendGames } from "@/lib/trend-games";
 import { advanceInsights } from "./advance";
@@ -242,6 +244,9 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const benchmarks = tier ? await loadBenchmarks(tier) : [];
   const comparison = compareWithBenchmarks(games, benchmarks, classOf);
   const habits = compareHabits(games, benchmarks);
+  const skill = tier
+    ? skillToImprove(comparison?.stats ?? null, habits, tierName(tier))
+    : null;
   // Session blocks use every game that loaded, ARAM and other champions
   // included: they're about when you played, so leaving games out would
   // break blocks apart. Only matches are needed, no timelines.
@@ -290,6 +295,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
               tier={tier}
               tiers={tiers}
               comparison={comparison}
+              skill={skill}
               keep={without("tier")}
               dd={dd}
             />
