@@ -19,7 +19,7 @@ const SAMPLE_GOLD_DIFF: DiffPoint[] = [
 ].map((diff, minute) => ({ minute, diff }));
 
 const SAMPLE_MARKERS: TurningPointMarker[] = [
-  { minute: 8, label: "8:10 Died to a jungle gank", tone: "behind" },
+  { minute: 8, label: "8:10 Died to a gank", tone: "behind" },
 ];
 
 const STEPS = [
@@ -29,7 +29,7 @@ const STEPS = [
   },
   {
     title: "Turning points in plain words",
-    body: "Turnpoint finds the swings that decided your game and says what happened, like a death to a gank, a lost objective or a missed camp.",
+    body: "Turnpoint finds the swings that decided your game and says what happened, like a death to a gank, a lost objective or a missed wave.",
   },
   {
     title: "Patterns across 20 games",
@@ -93,11 +93,11 @@ export default function Home() {
             </div>
             <div className="flex flex-col gap-0.5">
               <p className="text-[15px] font-semibold">
-                <span className="font-mono text-behind">8:10</span> Died to a jungle gank
+                <span className="font-mono text-behind">8:10</span> Died to a gank
               </p>
               <p className="text-sm text-muted">
-                You pushed past your river ward with Lee Sin unaccounted for. That death cost
-                420 gold of lead, and you stayed behind until the Dragon fight at 22:05.
+                Lee Sin ganked you in your lane. You went from +90 to −1,290 gold against Syndra
+                between 7:00 and 11:00.
               </p>
             </div>
           </div>

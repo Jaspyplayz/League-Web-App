@@ -168,6 +168,11 @@ export default function HowItWorksPage() {
           ahead later, when inhibitors, Baron and Elder start deciding games. It only ever runs on
           finished games: Riot doesn&apos;t allow predictions during a live game.
         </p>
+        <p>
+          These numbers flatter the model. They include the last moment of each game, when the
+          winner is nearly certain, so a game surrendered at 20:10 adds an easy guess to the 20:00
+          row. A fairer check is planned.
+        </p>
 
         {winChance.ranks.length > 0 && (
           <>
@@ -175,7 +180,8 @@ export default function HowItWorksPage() {
             <p>
               Maybe leads are worth less in Iron, where games get thrown more often. To check, each
               rank (and Emerald+ and Master+) got a model of its own, trained only on games at that
-              rank, and both were tested on that rank&apos;s games they hadn&apos;t seen.
+              rank, and both were tested on that rank&apos;s games they hadn&apos;t seen. These are
+              counted like the table above, so they flatter the models too.
             </p>
             <Panel className="overflow-x-auto p-0">
               <table className="w-full text-body">
