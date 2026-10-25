@@ -1,6 +1,6 @@
 # AI match recaps
 
-On the match page, a signed-in player can click **Write recap** to get a headline and a few short points, each with its game time, on what decided the game. The headline also shows under that game on the Log tab.
+On the match page, a signed-in player can click **Write recap** to get a headline and a few short points, each with its game time, on what decided the game. The headline also shows under that game on the Log tab. A signed-out visitor on a game with no saved recap sees one labeled illustration under Game recap, plus the sign-in link. Writing a recap still requires sign-in, and a saved recap is shown as written.
 
 ## How it works
 

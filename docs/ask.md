@@ -1,6 +1,6 @@
 # Ask (ask your history)
 
-A player profile's **Ask** tab lets anyone signed in type a question about that player's games, like "What do my losses have in common?". Claude reads the games through Turnpoint's own tools and answers in a few sentences, with links to the games it read.
+A player profile's **Ask** tab lets anyone signed in type a question about that player's games, like "What do my losses have in common?". Claude reads the games through Turnpoint's own tools and answers in a few sentences, with links to the games it read. A signed-out visitor sees one labeled illustration of an answer and the sign-in link. The illustration is not about the player in the address, and the page does not call Claude.
 
 ## How it works
 

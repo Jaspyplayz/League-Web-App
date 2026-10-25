@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { SignInLink } from "@/components/sign-in-link";
-import { Panel } from "@/components/ui/panel";
+import { Panel, panelClass } from "@/components/ui/panel";
 import { askEnabled } from "@/lib/ask";
 import { checkAllowance, readQuestions } from "@/lib/ask-store";
 import { getCurrentUser } from "@/lib/auth";
@@ -72,6 +72,25 @@ async function Ask({ params }: { params: Params }) {
   );
 }
 
+const ASK_ILLUSTRATION = {
+  label: "Illustration · not a real game",
+  question: "What do my losses have in common?",
+  answer:
+    "The losses in this example start the same way. An early gank turns a small gold lead into a deficit, and the other team takes dragon off the fight. The games that stay close are the ones where that first death does not happen.",
+} as const;
+
+function AskIllustration() {
+  return (
+    <>
+      <span className="font-mono text-[13px] text-faint">{ASK_ILLUSTRATION.label}</span>
+      <div className={`${panelClass} flex flex-col gap-3 p-6`}>
+        <p className="font-semibold text-ink">{ASK_ILLUSTRATION.question}</p>
+        <p className="whitespace-pre-line text-body">{ASK_ILLUSTRATION.answer}</p>
+      </div>
+    </>
+  );
+}
+
 async function AskContent({
   region,
   riotId,
@@ -90,10 +109,13 @@ async function AskContent({
   const user = await getCurrentUser();
   if (!user) {
     return (
-      <p className="text-muted">
-        <SignInLink className="font-medium text-ahead-soft hover:underline" /> to ask questions
-        about this player&apos;s games, like &ldquo;What do my losses have in common?&rdquo;
-      </p>
+      <div className="flex flex-col gap-4">
+        <p className="text-muted">
+          <SignInLink className="font-medium text-ahead-soft hover:underline" /> to ask questions
+          about this player&apos;s games, like &ldquo;What do my losses have in common?&rdquo;
+        </p>
+        <AskIllustration />
+      </div>
     );
   }
 
