@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RememberSearchedPlayer } from "@/components/saved-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { ProfileSkeleton } from "@/components/loading-skeleton";
 import { MatchListSkeleton } from "@/components/match-list-skeleton";
 import { loadProfile } from "@/lib/profile-store";
 import { readQueueFilter } from "@/lib/queue-filters";
@@ -30,7 +31,7 @@ export default function PlayerPage({
       <Link href="/" className="text-sm text-muted hover:underline">
         ← New search
       </Link>
-      <Suspense fallback={<p className="text-faint">Looking up player…</p>}>
+      <Suspense fallback={<ProfileSkeleton />}>
         <Player params={params} searchParams={searchParams} />
       </Suspense>
     </main>

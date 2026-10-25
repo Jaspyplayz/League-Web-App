@@ -82,6 +82,10 @@ function useSavedPlayers(key: ListKey): SavedPlayer[] {
   return useMemo(() => parseSavedPlayers(saved, MAX[key]), [saved, key]);
 }
 
+export function useRecentPlayers(): SavedPlayer[] {
+  return useSavedPlayers(RECENT_PLAYERS_KEY);
+}
+
 // The search box calls this when you search, before the page changes. See
 // PENDING_SEARCH_KEY in src/lib/saved-players.ts for why it's saved for later
 // instead of going straight into Recent.
