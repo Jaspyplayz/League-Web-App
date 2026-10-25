@@ -15,7 +15,7 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `match_timelines` | game, trimmed timeline | never, fetched only when the match is opened |
 | `match_insights` | player × game, analyzer output | never; recomputed locally when `version` changes |
 | `benchmark_games` | Sampled player (Iron to Challenger) × game, summary only, with the player's tier | filled by `npm run benchmarks`; keeps each player's last 20, deletes games older than 60 days |
-| `score_games` | benchmark game, all ten players' end-of-game numbers (no names or PUUIDs) | never; filled by `npm run benchmarks`, read by `npm run train-score` ([docs/game-score.md](game-score.md)) |
+| `score_games` | benchmark game, all ten players' end-of-game numbers (no names or PUUIDs) | never; filled by `npm run benchmarks`, read by `npm run train-score` and `npm run check-score` ([docs/game-score.md](game-score.md)) |
 | `win_chance_games` | benchmark game, both teams' gold, XP, kills, towers, dragons and buffs at every minute (no names or PUUIDs) | never; filled by `npm run benchmarks`, which deletes games older than 60 days; read by `npm run train-win-chance` ([docs/win-chance.md](win-chance.md)) |
 | `user_players` | signed-in account, the player it marked with "This is me" | never; Supabase deletes the row when the account is deleted |
 | `match_notes` | signed-in account × game, a private note on that game | never; deleted with the account, or when the note is cleared |

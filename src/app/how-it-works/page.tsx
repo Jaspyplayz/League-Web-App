@@ -43,6 +43,7 @@ export default function HowItWorksPage() {
   // What 3,000 gold and 2,000 XP ahead at 20:00 is worth, by rank.
   const lead = { minute: 20, goldLead: 3000, xpLead: 2000, dragonLead: 0, inhibitorLead: 0, baron: 0 } as const;
   const at20 = (e: Evaluation) => e.byMinute.find((m) => m.minute === 20)?.accuracy ?? 0;
+  const unseen = SCORE_MODEL.unseen;
 
   return (
     <main className="mx-auto flex w-full max-w-[860px] flex-col gap-12 px-6 pb-[88px] pt-14">
@@ -167,6 +168,11 @@ export default function HowItWorksPage() {
           ahead later, when inhibitors, Baron and Elder start deciding games. It only ever runs on
           finished games: Riot doesn&apos;t allow predictions during a live game.
         </p>
+        <p>
+          These numbers flatter the model. They include the last moment of each game, when the
+          winner is nearly certain, so a game surrendered at 20:10 adds an easy guess to the 20:00
+          row. A fairer check is planned.
+        </p>
 
         {winChance.ranks.length > 0 && (
           <>
@@ -174,7 +180,8 @@ export default function HowItWorksPage() {
             <p>
               Maybe leads are worth less in Iron, where games get thrown more often. To check, each
               rank (and Emerald+ and Master+) got a model of its own, trained only on games at that
-              rank, and both were tested on that rank&apos;s games they hadn&apos;t seen.
+              rank, and both were tested on that rank&apos;s games they hadn&apos;t seen. These are
+              counted like the table above, so they flatter the models too.
             </p>
             <Panel className="overflow-x-auto p-0">
               <table className="w-full text-body">
@@ -229,10 +236,15 @@ export default function HowItWorksPage() {
           role in our games, so a great game in a loss still scores well.
         </p>
         <p>
-          The current model was trained on {SCORE_MODEL.games.toLocaleString("en-US")} games and
-          picks the winning side{" "}
-          <strong className="text-ink">{percent(SCORE_MODEL.shared.accuracy)}</strong> of the time
-          on games it didn&apos;t see, where a coin flip would get 50%.
+          The current model was trained on {SCORE_MODEL.games.toLocaleString("en-US")} games.
+          {unseen && (
+            <>
+              {" "}
+              On {unseen.games.toLocaleString("en-US")} saved games it didn&apos;t train on, it
+              picks the winning side <strong className="text-ink">{percent(unseen.accuracy)}</strong>{" "}
+              of the time, where a coin flip would get 50%.
+            </>
+          )}
         </p>
       </Section>
 

@@ -125,7 +125,7 @@ A game that isn't analyzed shows its scoreboard and the message, and its row on 
 1. Build the gold-difference series vs the lane opponent, one value per minute.
 2. Slide a window of up to 4 minutes over it and find the swings larger than a threshold (start with 750 gold, tune with real games). Merge overlapping windows; keep the biggest 3.
 3. For each window, collect the timeline events between its start and end that involve the player or opponent: deaths, kills, plates, objectives near the lane.
-4. Turn them into a sentence with templates: "You died 2× (both ganks)", "Enemy took 3 plates", "You killed your opponent solo". Pick the most important 1 or 2 causes by gold value.
+4. Turn them into a sentence with templates: "You died 2× (both ganks)", "Enemy took 3 plates", "You killed your opponent solo". Keep the first 2 causes in a fixed order, not ranked by gold. For a swing against you the order is your deaths, then your opponent's kills elsewhere on the map, then lost plates, then CS. For a swing your way it is the kills you took part in, then your opponent's deaths without you, then plates taken, then CS (`losingCauses` and `winningCauses` in `turning-points.ts`).
 
 Store a `version` number with each computed insight (the `match_insights.version` column in the scope doc). When the algorithm changes, bump the version and recompute from the stored data without any new API calls.
 

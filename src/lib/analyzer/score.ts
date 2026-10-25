@@ -193,7 +193,13 @@ export type ScoreModel = RoleModels & {
   trainedAt: string;
   games: number;
   features: string[];
+  // Set by `npm run check-score`, never by training, so a retrained model
+  // has no check until the script runs again.
+  unseen?: UnseenCheck;
 };
+
+// How the saved weights did on games they weren't trained on.
+export type UnseenCheck = { games: number; accuracy: number; checkedAt: string };
 
 // A rating turned into a score, with what helped and hurt it most.
 export type Rating = { score: number; strengths: string[]; weakness: string | null };
@@ -275,22 +281,48 @@ export function rate(
   model: RoleModels,
   features: readonly Feature[],
 ): Rating {
-  const roleModel = model.roles[role];
-  const weights = roleModel.own ?? model.shared;
-  const z = standardize(values, roleModel);
-  // How much each stat pushed the rating up (positive) or down (negative).
-  const pushes = z.map((value, i) => value * weights.weights[i]);
-  const rating = weights.bias + sum(pushes);
-
+  const { rating, pushes } = ratingOf(values, role, model);
   const ranked = pushes.map((push, i) => ({ push, i })).sort((a, b) => b.push - a.push);
   const worst = ranked[ranked.length - 1];
   return {
-    score: Math.round(percentile(rating, roleModel.cuts)),
+    score: Math.round(percentile(rating, model.roles[role].cuts)),
     strengths: ranked
       .filter((r) => r.push > 0)
       .slice(0, 2)
       .map((r) => features[r.i].good),
     weakness: worst && worst.push < 0 ? features[worst.i].bad : null,
+  };
+}
+
+// The weighted sum behind a score.
+function ratingOf(values: number[], role: Role, model: RoleModels) {
+  const roleModel = model.roles[role];
+  const weights = roleModel.own ?? model.shared;
+  // How much each stat pushed the rating up (positive) or down (negative).
+  const pushes = standardize(values, roleModel).map((value, i) => value * weights.weights[i]);
+  return { rating: weights.bias + sum(pushes), pushes };
+}
+
+// How often the saved model's ratings point to each player's real result.
+// Cross-validation tests models retrained without some games; this tests
+// the weights the site uses.
+export function checkScoreModel(
+  model: ScoreModel,
+  games: ScoreGame[],
+  checkedAt: Date,
+): UnseenCheck {
+  if (model.features.join() !== featureKeys().join()) {
+    throw new Error("The saved model was trained on a different list of stats. Retrain it first.");
+  }
+  const scored = games.map(scoreExamples).filter((e) => e.length > 0);
+  const examples = scored.flat();
+  const correct = examples.filter((e) =>
+    pickedRight(ratingOf(e.features, e.role, model).rating, e.win),
+  );
+  return {
+    games: scored.length,
+    accuracy: round(correct.length / Math.max(1, examples.length), 3),
+    checkedAt: checkedAt.toISOString(),
   };
 }
 
@@ -377,8 +409,7 @@ export function crossValidate(
       { features },
     );
     for (const r of test) {
-      const winning = model.bias + dot(model.weights, r.z) > 0;
-      if (winning === r.win) correct++;
+      if (pickedRight(model.bias + dot(model.weights, r.z), r.win)) correct++;
     }
   }
   return round(correct / Math.max(1, rows.length), 3);
@@ -453,6 +484,9 @@ function cutPoints(ratings: number[]): number[] {
   );
 }
 
+// A rating above 0 means the weights expect a win, so a pick is right when
+// that matches the result. Both accuracy checks count picks this way.
+const pickedRight = (rating: number, win: boolean) => (rating > 0) === win;
 const cs = (p: ScorePlayer) => p.totalMinionsKilled + p.neutralMinionsKilled;
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const average = (xs: number[]) => (xs.length ? sum(xs) / xs.length : 0);
