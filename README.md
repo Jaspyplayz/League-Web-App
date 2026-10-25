@@ -86,8 +86,8 @@ Both are logistic regression trained on games saved in the database, written fro
 
 | Model | What it reads | What it gives | How good |
 |---|---|---|---|
-| **Win chance** ([docs](docs/win-chance.md)) | Both teams' gold, XP, kills, towers, inhibitors, dragons, Baron and Elder at each minute | Each team's chance to win at that minute | Picks the winner 80% of the time at 20 minutes, and is well calibrated |
-| **Game score** ([docs](docs/game-score.md)) | Ten stats per player (KDA, kill participation, damage share, CS, vision...), compared with the player's role | A 0 to 100 score: where the player ranks among everyone in that role | Predicts the winner from stats alone 84% of the time |
+| **Win chance** ([docs](docs/win-chance.md)) | Both teams' gold, XP, kills, towers, inhibitors, dragons, Baron and Elder at each minute | Each team's chance to win at that minute | Its accuracy figures include each game's last minutes, which flatter them, so a fairer check is planned ([docs](docs/win-chance.md#how-good-is-it)) |
+| **Game score** ([docs](docs/game-score.md)) | Ten stats per player (KDA, kill participation, damage share, CS, vision...), compared with the player's role | A 0 to 100 score: where the player ranks among everyone in that role | Picks the winning side from stats alone 81% of the time, on 35,326 games it didn't train on |
 
 The win chance's learned weights are worth a look: kills and towers are worth almost nothing on their own, because the gold they pay is already in the gold lead. [docs/win-chance.md](docs/win-chance.md) walks through one real minute of a game by hand. Retrain either model with `npm run train-win-chance` or `npm run train-score`. Win chance only ever runs on finished games, since Riot's policy doesn't allow predictions during a live game.
 
@@ -208,6 +208,7 @@ The keys are only read on the server and never sent to the browser. For the live
 | `npm test` | Unit tests (Vitest) |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons |
 | `npm run train-score` / `npm run train-win-chance` | Retrain the two models on saved games |
+| `npm run check-score` | Check the saved game score on games it didn't train on |
 
 [GitHub Actions](.github/workflows/ci.yml) runs lint, type check, tests and a production build on every pull request and every push to `main`. Vercel deploys `main` to the live site and builds a preview for each pull request.
 
