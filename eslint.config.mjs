@@ -1,10 +1,29 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import turnpoint from "./eslint-rules/turnpoint.mjs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // Turnpoint's own rules. Each is a named rule, not a no-restricted-syntax
+  // pattern: when two blocks set the same rule, the later block's options
+  // replace the earlier ones, so overlapping patterns would silently drop.
+  { plugins: { turnpoint } },
+  {
+    // eslint-rules/ holds this rule's tests, which have to spell out the host.
+    ignores: ["src/lib/riot/**", "eslint-rules/**"],
+    rules: { "turnpoint/no-riot-api-host": "error" },
+  },
+  {
+    files: ["src/lib/**/*.{ts,tsx}", "src/db/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: { "turnpoint/server-only-env": "error" },
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: { "turnpoint/no-green-classes": "error" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
