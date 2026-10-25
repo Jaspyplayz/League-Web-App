@@ -1,4 +1,5 @@
 import Form from "next/form";
+import { PanelSkeleton } from "@/components/loading-skeleton";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { PanelHeading } from "@/components/ui/panel-heading";
 import type { BenchmarkComparison as Comparison } from "@/lib/analyzer/compare";
@@ -150,7 +151,7 @@ function Result({
       }
       // Their games are still coming in; the progress bar at the top covers it.
       if (chosen.waiting > 0) {
-        return <p className={note}>Loading {chosen.name}&apos;s games…</p>;
+        return <PanelSkeleton label={`Loading ${chosen.name}'s games`} />;
       }
       return (
         <p className={note}>

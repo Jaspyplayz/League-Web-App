@@ -5,6 +5,7 @@ import { isRegion, type Region } from "@/lib/regions";
 import { getAccount, RANKED_SOLO_QUEUE } from "@/lib/riot/api";
 import { settle, type RiotApiError } from "@/lib/riot/client";
 import { parseRiotId, toSlug } from "@/lib/riot-id";
+import type { SaveTiming } from "@/lib/match-store";
 import { loadTrendGames } from "@/lib/trend-games";
 
 // The player someone picked in "Compare with a player", such as a pro's solo
@@ -41,7 +42,10 @@ export function readChoice(searchParams: SearchParams): Choice | null {
   return { input, region: isRegion(region) ? region : "kr" };
 }
 
-export async function loadChosenPlayer(choice: Choice): Promise<ChosenPlayer> {
+export async function loadChosenPlayer(
+  choice: Choice,
+  options: { budget?: number; persist?: SaveTiming } = {},
+): Promise<ChosenPlayer> {
   const id = parseRiotId(choice.input);
   if (!id) return { status: "invalid", choice };
 
@@ -54,8 +58,9 @@ export async function loadChosenPlayer(choice: Choice): Promise<ChosenPlayer> {
   const loaded = await settle(
     loadTrendGames(choice.region, puuid, {
       count: GAME_COUNT,
-      budget: TIMELINES_PER_VIEW,
+      budget: options.budget ?? TIMELINES_PER_VIEW,
       queue: RANKED_SOLO_QUEUE,
+      persist: options.persist,
     }),
   );
   if (!loaded.ok) return { status: "error", choice, error: loaded.error };
