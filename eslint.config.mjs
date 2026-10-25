@@ -11,8 +11,7 @@ const eslintConfig = defineConfig([
   // replace the earlier ones, so overlapping patterns would silently drop.
   { plugins: { turnpoint } },
   {
-    // eslint-rules/ holds this rule's tests, which have to spell out the host.
-    ignores: ["src/lib/riot/**", "eslint-rules/**"],
+    ignores: ["src/lib/riot/**"],
     rules: { "turnpoint/no-riot-api-host": "error" },
   },
   {

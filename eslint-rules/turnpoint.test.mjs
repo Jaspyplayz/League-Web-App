@@ -1,3 +1,4 @@
+/* eslint-disable turnpoint/no-riot-api-host -- the sample code spells out Riot's host */
 import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -63,7 +64,15 @@ describe("server-only-env", () => {
 
   it("checks each destructured key in src/db/", async () => {
     const code = "const { DATABASE_URL, NODE_ENV } = process.env;\nexport { DATABASE_URL, NODE_ENV };";
-    expect(await turnpointRules(code, "src/db/x.ts")).toEqual(["turnpoint/server-only-env"]);
+    const messages = await turnpointMessages(code, "src/db/x.ts");
+    expect(messages.map((message) => message.ruleId)).toEqual(["turnpoint/server-only-env"]);
+    expect(messages[0].message).toContain("DATABASE_URL");
+  });
+
+  it("passes a destructure of only public names", async () => {
+    const code =
+      "const { NEXT_PUBLIC_SUPABASE_URL, NODE_ENV } = process.env;\nexport { NEXT_PUBLIC_SUPABASE_URL, NODE_ENV };";
+    expect(await turnpointRules(code, "src/lib/x.ts")).toEqual([]);
   });
 
   it('passes with import "server-only"', async () => {
