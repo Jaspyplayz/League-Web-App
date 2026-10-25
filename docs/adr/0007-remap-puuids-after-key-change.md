@@ -1,4 +1,4 @@
-# 0006: Re-download each old game to move saved rows to the new key's PUUIDs
+# 0007: Re-download each old game to move saved rows to the new key's PUUIDs
 
 Status: draft, waiting on Jasper's "In my words" (issue #154).
 

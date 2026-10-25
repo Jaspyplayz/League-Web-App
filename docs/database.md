@@ -125,7 +125,7 @@ npm run benchmarks -- --regions na --tiers gold --players 2 # a quick test
 
 ## When the Riot key changes
 
-Riot encrypts PUUIDs separately for each app. A refreshed key from the same app keeps every PUUID, but a key from another app sees every player under a different one. Rows saved under the old key then stop matching: the profile looks for the visitor's new PUUID in each saved game, doesn't find it, and leaves the game out. This happened when the site moved to Jasper's personal key on 2026-10-24 ([#154](https://github.com/Jaspyplayz/League-Web-App/issues/154), [decision record 0006](adr/0006-remap-puuids-after-key-change.md)).
+Riot encrypts PUUIDs separately for each app. A refreshed key from the same app keeps every PUUID, but a key from another app sees every player under a different one. Rows saved under the old key then stop matching: the profile looks for the visitor's new PUUID in each saved game, doesn't find it, and leaves the game out. This happened when the site moved to Jasper's personal key on 2026-10-24 ([#154](https://github.com/Jaspyplayz/League-Web-App/issues/154), [decision record 0007](adr/0007-remap-puuids-after-key-change.md)).
 
 `npm run remap-puuids` ([`scripts/remap-puuids.ts`](../scripts/remap-puuids.ts)) moves the rows saved before the cutoff to the new PUUIDs. It reads `RIOT_API_KEY` and `DATABASE_URL` from `.env.local` like the other scripts, and needs the key the live site uses: if `.env.local` still holds an old dev key, set `RIOT_API_KEY` in the shell first, which wins over the file. Only Jasper runs `--apply` and `--rollback`:
 
