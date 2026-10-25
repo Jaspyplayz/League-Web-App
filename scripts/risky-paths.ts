@@ -49,6 +49,7 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "package-lock.json", why: "dependencies" },
 
   // The merge rules themselves.
+  { pattern: ".claude/agent-merge.json", why: "the switch for agent merging" },
   { pattern: "scripts/can-merge", why: "the merge gates" },
   { pattern: "scripts/risky-paths", why: "this list" },
 ];

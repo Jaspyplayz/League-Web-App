@@ -147,6 +147,12 @@ describe("decide", () => {
     expect(detail(decision, "No risky files")).toBe("src/db/schema.ts (the database schema and queries)");
   });
 
+  it("refuses a PR that only changes the agent-merge switch", () => {
+    const decision = decide(pr({ files: [".claude/agent-merge.json"] }), ON, []);
+    expect(failed(decision)).toEqual(["No risky files"]);
+    expect(detail(decision, "No risky files")).toBe(".claude/agent-merge.json (the switch for agent merging)");
+  });
+
   const passing = pr().checks;
   const without = (name: string) => passing.filter((check) => check.name !== name);
 

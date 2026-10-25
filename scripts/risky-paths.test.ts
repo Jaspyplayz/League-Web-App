@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
+import { SWITCH_FILE } from "./can-merge-gates";
 import { RISKY_PATHS, riskyFiles } from "./risky-paths";
 
 describe("riskyFiles", () => {
@@ -21,6 +22,11 @@ describe("riskyFiles", () => {
       { path: ".github/workflows/ci.yml", why: "CI, the smoke test and the PR template" },
       { path: "package.json", why: "the commands CI runs, and dependencies" },
     ]);
+  });
+
+  // Otherwise a PR that turns agent merging on could merge itself.
+  it("flags the agent-merge switch that can-merge reads", () => {
+    expect(riskyFiles([SWITCH_FILE])).toEqual([{ path: SWITCH_FILE, why: "the switch for agent merging" }]);
   });
 
   it("covers every file that starts with a prefix pattern", () => {
