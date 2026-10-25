@@ -1,7 +1,7 @@
 // `npm run can-merge -- <pr> [--merge]`: may Claude Code merge its own PR?
 // (issue #158, docs/workflow.md). The gates are in scripts/can-merge-gates.ts.
 // This file reads what they check through git and gh, and does the merge.
-// Run it from an up-to-date main checkout: it refuses when its own code
+// Run it from an up-to-date main checkout, since it refuses when its own code
 // differs from origin/main's.
 //
 //   npm run can-merge -- 170            print each gate, PASS or FAIL

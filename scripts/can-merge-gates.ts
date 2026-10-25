@@ -8,9 +8,9 @@ import { riskyFiles } from "./risky-paths";
 
 export const SWITCH_FILE = ".claude/agent-merge.json";
 export const MERGED_BY_CLAUDE = "merged-by-claude";
-// can-merge writes this into every merge commit it makes. It, not the label,
-// is how the revert gate finds Claude's merges: main's history changes only
-// through a merge, while anyone with access can add or remove a label.
+// can-merge writes this into every merge commit it makes. The revert gate
+// finds Claude's merges by it, not by the label, because main's history
+// changes only through a merge, while anyone with access can change a label.
 export const MERGE_MARKER = "Merged by Claude Code (npm run can-merge).";
 
 export type CheckState = "success" | "failure" | "pending" | "skipped";
@@ -20,7 +20,7 @@ export type Check =
 
 // Each required check counts only from where it really runs, so a commit
 // status named "check" doesn't pass for the CI workflow's job.
-export const REQUIRED_CHECKS: { name: string; where: string; counts: (check: Check) => boolean }[] = [
+const REQUIRED_CHECKS: { name: string; where: string; counts: (check: Check) => boolean }[] = [
   { name: "check", where: "the CI workflow", counts: (c) => c.kind === "run" && c.workflow === "CI" },
   { name: "smoke", where: "the Smoke test workflow", counts: (c) => c.kind === "run" && c.workflow === "Smoke test" },
   { name: "Vercel", where: "Vercel", counts: (c) => c.kind === "status" && c.url.startsWith("https://vercel.com/") },
@@ -69,7 +69,6 @@ export type PrSnapshot = {
   body: string;
   /** Every path the head commit changes against main, with both paths of a rename. */
   files: string[];
-  /** The checks on the head commit. */
   checks: Check[];
 };
 
