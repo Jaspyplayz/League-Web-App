@@ -24,7 +24,7 @@ Every tier runs the same automatic checks; the extra steps in the lower rows are
 4. **Test first where logic is pure.** Analyzer changes start with a failing test written from the acceptance criteria.
 5. **Implement** in small commits on the thread's branch.
 6. **Automatic checks.** The commit hook, then CI (with the golden tests and dependency review), then the smoke test and accessibility scan on the Vercel preview.
-7. **Self-check against the criteria.** Claude opens the preview and puts one screenshot or test name per criterion in the PR.
+7. **Self-check against the criteria.** Claude takes one screenshot of the preview per criterion with the [`verify` skill](../.claude/skills/verify/SKILL.md) (`npm run shot`), or names the test that shows it, and puts them in the PR.
 8. **Independent review.** The reviewer agent sees the issue, the diff and the test output, never the builder's reasoning. For a risky change, the Cursor chat reviews the same diff on Grok 4.7 and does not edit the code.
 9. **Triage.** The builder fixes findings it can reproduce, rejects the rest with a reason, and brings real disagreements to Jasper (see below).
 10. **Explain back, then merge.** Jasper writes "My read" on the PR and merges; Vercel deploys.
@@ -115,15 +115,17 @@ A cloud agent opens a draft pull request and stops. Jasper writes "My read" and 
 
 ## pstack and cloud agents
 
-pstack runs in Cursor, turned on in [`.cursor/settings.json`](../.cursor/settings.json). Claude Code does not load it. Claude Code's reviewer agent is the first review. On a risky pull request, this Cursor chat runs the pstack review on Grok 4.7 and reports findings without editing the files.
+pstack runs in Cursor, turned on in [`.cursor/settings.json`](../.cursor/settings.json). Since 2026-10-24 it also runs in Claude Code, as the `pstack@pstack-claude` plugin, a port of the Cursor version. Claude Code's reviewer agent is the first review. On a risky pull request, this Cursor chat runs the pstack review on Grok 4.7 and reports findings without editing the files.
 
 `/setup-pstack` writes `~/.cursor/rules/pstack-models.mdc` on that computer. The skill defaults name slugs this Cursor account cannot spawn (`grok-4.7-xhigh-fast`, `claude-opus-5-5-xhigh`). On 2026-10-24 the rule maps those roles to `grok-4.7-high` and `claude-opus-5-5-high`. For this repo the issue wins over that role map: an issue that names Claude Code is written on Opus 5.5, even if a pstack role says Grok writes bug fixes.
+
+Claude Code's copy reads its role models from `~/.claude/pstack-models.md`, which puts every role on Opus except the multi-model review panels. The plugin does not update itself. To update it, run `claude plugin marketplace update pstack-claude`, then `claude plugin update pstack@pstack-claude`, and restart Claude Code. Then check that the role names in the model file still match.
 
 A cloud agent is a separate virtual machine and a separate branch, started from the remote branch (usually `origin/main`). It can install the app and run the checks below on that copy. It does not see uncommitted work on Jasper's computer, and it does not have the live site's secrets unless they are already in the cloud environment. It starts only when the issue names it as the builder. The two-branch limit above still holds.
 
 The audit fixes [#145](https://github.com/Jaspyplayz/League-Web-App/issues/145) and [#148](https://github.com/Jaspyplayz/League-Web-App/issues/148) through [#151](https://github.com/Jaspyplayz/League-Web-App/issues/151) name Claude Code. After each one merges, the Cursor chat updates status and any doc that pull request left wrong.
 
-The loop's proof is the same checks CI runs, not a separate verification skill:
+The loop's proof is the checks CI runs, plus the `verify` skill's screenshots for a change a player can see:
 
 | Check | Command | When |
 |---|---|---|
@@ -131,6 +133,7 @@ The loop's proof is the same checks CI runs, not a separate verification skill:
 | Types | `npm run typecheck` | Every change |
 | Unit and golden tests | `npm test` | Every change |
 | Smoke test and accessibility scan | `npm run test:e2e` | A change a player can see |
+| Screenshots of the preview | `npm run shot -- --pr <number> <path>` | A change a player can see, one per acceptance criterion |
 
 An agent is not done when the code compiles. It is done when the checks that apply have been run, and each acceptance criterion names the test or the screen that shows it.
 
