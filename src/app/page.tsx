@@ -1,15 +1,12 @@
-import Link from "next/link";
 import { DiffChart, type TurningPointMarker } from "@/components/diff-chart";
+import { HomeBrief } from "@/components/home-brief";
+import { HomeOpener } from "@/components/home-opener";
 import { SearchForm } from "@/components/search-form";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Panel } from "@/components/ui/panel";
 import { SectionHeading } from "@/components/ui/section-heading";
 import type { DiffPoint } from "@/lib/diff-chart";
-import { toSlug } from "@/lib/riot-id";
-import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
-
-// A well-known public Riot ID (Faker), so visitors can try a lookup in one click.
-const EXAMPLE_PLAYER = { region: "kr", gameName: "Hide on bush", tagLine: "KR1" };
+import { staticBriefs } from "@/lib/home-ledger";
 
 // Made-up sample game for the hero picture: gold difference, one value per minute.
 const SAMPLE_GOLD_DIFF: DiffPoint[] = [
@@ -22,22 +19,8 @@ const SAMPLE_MARKERS: TurningPointMarker[] = [
   { minute: 8, label: "8:10 Died to a gank", tone: "behind" },
 ];
 
-const STEPS = [
-  {
-    title: "Role matchup, minute by minute",
-    body: "Gold, CS, XP and damage against the player in your role, jungler included, built from Riot's match timeline data.",
-  },
-  {
-    title: "Turning points in plain words",
-    body: "Turnpoint finds the swings that decided your game and says what happened, like a death to a gank, a lost objective or a missed wave.",
-  },
-  {
-    title: "Patterns across 20 games",
-    body: "Recent games roll up into recurring weaknesses, so you know what to practice next instead of guessing.",
-  },
-];
-
 export default function Home() {
+  const briefs = staticBriefs();
   return (
     <main>
       <section className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-12 px-6 pb-14 pt-16 sm:pt-[72px]">
@@ -54,22 +37,6 @@ export default function Home() {
             moments that decided the game.
           </p>
           <SearchForm />
-          <div className="flex flex-wrap items-center gap-2.5 text-sm text-faint">
-            <span>Try it with</span>
-            <Link
-              href={`/player/${EXAMPLE_PLAYER.region}/${toSlug(EXAMPLE_PLAYER)}`}
-              className="rounded-full border border-line-strong px-3.5 py-2 font-mono text-ink-soft transition-colors hover:border-ahead hover:text-ink"
-            >
-              {EXAMPLE_PLAYER.gameName}#{EXAMPLE_PLAYER.tagLine}
-            </Link>
-            <span>or</span>
-            <Link
-              href={SAMPLE_MATCH_HREF}
-              className="rounded-full border border-line-strong px-3.5 py-2 text-ink-soft transition-colors hover:border-ahead hover:text-ink"
-            >
-              See a sample analysis
-            </Link>
-          </div>
         </div>
 
         <Panel className="flex min-w-0 flex-[1_1_440px] flex-col gap-4 p-6">
@@ -106,26 +73,21 @@ export default function Home() {
 
       <section
         id="how"
+        aria-labelledby="home-start-heading"
         className="mx-auto flex max-w-[1200px] scroll-mt-6 flex-col gap-7 px-6 pb-[88px] pt-8"
       >
-        <SectionHeading>How it works</SectionHeading>
-        <ol className="flex flex-wrap gap-4">
-          {STEPS.map((step, i) => (
-            <li
-              key={step.title}
-              className="flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-2xl border border-line bg-surface p-7"
-            >
-              <span aria-hidden="true" className="font-mono text-sm text-ahead">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <h3 className="text-xl font-semibold">{step.title}</h3>
-              <p className="text-[15px] text-muted">{step.body}</p>
-            </li>
-          ))}
-        </ol>
-        <Link href="/how-it-works" className="text-body text-ahead-soft hover:text-ahead-bright">
-          How the win chance and game score models work →
-        </Link>
+        <SectionHeading id="home-start-heading">Look at a game</SectionHeading>
+        <ul className="flex flex-wrap gap-4">
+          <li className="min-w-0 flex-[1.15_1_320px]">
+            <HomeBrief brief={briefs.sample} />
+          </li>
+          <li className="min-w-0 flex-[1_1_280px]">
+            <HomeBrief brief={briefs.habit} />
+          </li>
+          <li className="min-w-0 flex-[1_1_280px]">
+            <HomeOpener />
+          </li>
+        </ul>
       </section>
     </main>
   );
