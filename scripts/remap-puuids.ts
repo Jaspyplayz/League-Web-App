@@ -81,10 +81,13 @@ async function main() {
         break;
       }
       case "rollback": {
-        const { restored, deleted } = await rollback({ db }, mode.backupFile);
+        const { restored, deleted, kept } = await rollback({ db }, mode.backupFile);
         console.log("Rolled back. Rows restored, and rows the apply created that were deleted:");
         for (const [table, rows] of Object.entries(restored)) {
           console.log(`  ${table.padEnd(20)} ${count(rows).padStart(7)} restored, ${count(deleted[table] ?? 0)} deleted`);
+        }
+        for (const [table, rows] of Object.entries(kept)) {
+          console.log(`Kept ${count(rows)} ${table} rows the apply created, because the site has saved rows under them since.`);
         }
         break;
       }

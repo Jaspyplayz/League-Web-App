@@ -594,6 +594,32 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
     expect(await snapshot(db)).toEqual(before);
   });
 
+  it("keeps a player the apply copied when the site has saved rows under it since", async () => {
+    const result = await apply({ db, dir, log }, file, mapPath);
+    if (result.kind !== "applied") throw new Error(result.kind);
+    const point = {
+      puuid: now("carl"),
+      queueType: "RANKED_SOLO_5x5",
+      tier: "SILVER",
+      rank: "IV",
+      leaguePoints: 12,
+      wins: 1,
+      losses: 0,
+      recordedAt: new Date("2026-10-26T12:00:00Z"),
+    };
+    await db.insert(schema.rankHistory).values(point);
+
+    const { deleted, kept } = await rollback({ db }, result.backupFile);
+    expect(kept).toEqual({ players: 1 });
+    expect(deleted).toMatchObject({ rank_history: 3, players: 0 });
+    expect(await rowsOf(db, sql`select puuid, tier from rank_history where puuid = ${now("carl")}`)).toEqual([
+      { puuid: now("carl"), tier: "SILVER" },
+    ]);
+
+    await db.execute(sql`delete from players where puuid = ${now("carl")}`);
+    expect(await snapshot(db)).toEqual(beforeApply);
+  });
+
   it("pages through more rows than fit on one page, in key order, each row once", async () => {
     const { paged, all } = await db.transaction(async (tx) => {
       await tx.execute(sql`

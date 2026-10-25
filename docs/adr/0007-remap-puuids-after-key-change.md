@@ -23,7 +23,7 @@ For `benchmark_games`, remapping would cost about 22,000 calls, and Insights rea
 
 1. **The dry run** first checks the key: the newest old game of Jaspy#CA1 and of Hide on bush#KR1 must map their old PUUIDs to their new-key `players` rows, and the 2 newest games saved since the cutoff must come back unchanged. An old app's key fails the first check, since every PUUID comes back as itself, and a third app's key fails the second. Then it downloads every old game, pairs players by participant number (checking champion and team), and writes the map and a skip list to the git-ignored `.cache/puuid-remap/`. It changes no app table.
 2. **`--apply <map file>`** writes every row it will change or delete to a backup file, then moves them all in one transaction with the map in a TEMP table, so no migration is needed. Where a player has a row under both PUUIDs, the new one stays. `matches.raw` is rewritten by value through the map, so a skipped game is still fixed for anyone the map knows from another game. The transaction checks its own counts, that the backup still matches the rows it locked, and that no mapped PUUID is left anywhere in `raw`, and rolls back if any check fails. After the commit, it deletes old `match_participants` rows twice, right away and 5 minutes later, because a page that read a game just before the commit can save its old rows again.
-3. **`--rollback <backup file>`** puts back exactly the backed-up rows by primary key and deletes the copies the apply created. It doesn't run the map backwards, because the live site keeps writing new-key rows after the apply. It refuses a backup from an apply that stopped early or never committed, and it refuses to run twice.
+3. **`--rollback <backup file>`** puts back exactly the backed-up rows by primary key and deletes the copies the apply created. It keeps a `players` copy the site has saved rows under since the apply, because deleting it would cascade those rows away. It doesn't run the map backwards, because the live site keeps writing new-key rows after the apply. It refuses a backup from an apply that stopped early or never committed, and it refuses to run twice.
 
 ## Consequences
 
@@ -37,7 +37,7 @@ Bad:
 - Insights has no rank comparisons from the apply until `npm run benchmarks` fills the table again, about 2 hours.
 - The apply leaves about 70 MB of the database used that a plain VACUUM doesn't give back, on a free tier of 500 MB.
 - The map and backup files hold PUUIDs on Jasper's computer until they're deleted.
-- Rollback deletes the `players` copies it created, and anything the site saved under them after the apply goes with them, since their foreign keys cascade. Its counts leave those rows out.
+- After a rollback, a player the site saved rows for since the apply has both an old and a new `players` row, as Jaspy#CA1 and Hide on bush#KR1 had before the apply.
 - Rollback doesn't clean up afterwards, so a page that read a game just before it can save that game's new-key scoreboard rows again.
 - A recap written under an old PUUID at the instant of the commit isn't caught by the cleanup.
 - The next key change needs `CUTOFF` and the two anchor players updated by hand. Asking Riot whether a new app can keep this one's PUUIDs would make the remap unnecessary.

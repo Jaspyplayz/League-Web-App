@@ -704,20 +704,6 @@ export async function rollback({ db }: { db: Db }, backupFile: string) {
           "never finished or was already rolled back. Nothing changed.",
       );
     }
-    const deleted: Record<string, number> = {};
-    for (const t of [...TOUCHED].reverse()) {
-      for (const keys of chunks(created.get(t.name) ?? [], BATCH)) {
-        const gone = await tx.execute(sql`
-          delete from ${sql.identifier(t.name)}
-          where (${columnList(t.key)}) in (
-            select ${columnList(t.key)}
-            from jsonb_populate_recordset(null::${sql.identifier(t.name)}, ${JSON.stringify(keys)}::jsonb)
-          )
-          returning 1`);
-        deleted[t.name] = (deleted[t.name] ?? 0) + gone.length;
-      }
-    }
-
     const restored: Record<string, number> = {};
     for (const t of TOUCHED) {
       const columns = getTableConfig(t.table).columns.map((column) => column.name);
@@ -741,8 +727,42 @@ export async function rollback({ db }: { db: Db }, backupFile: string) {
         restored[t.name] = (restored[t.name] ?? 0) + batch.length;
       }
     }
-    return { restored, deleted };
+
+    const deleted: Record<string, number> = {};
+    const kept: Record<string, number> = {};
+    for (const t of [...TOUCHED].reverse()) {
+      const name = sql.identifier(t.name);
+      for (const keys of chunks(created.get(t.name) ?? [], BATCH)) {
+        const isCreated = sql`(${columnList(t.key, "x")}) in (
+          select ${columnList(t.key)} from jsonb_populate_recordset(null::${name}, ${JSON.stringify(keys)}::jsonb)
+        )`;
+        const gone = await tx.execute(sql`
+          delete from ${name} x where ${isCreated} and not (${savedUnder(t)}) returning 1`);
+        deleted[t.name] = (deleted[t.name] ?? 0) + gone.length;
+        const [{ n }] = await tx.execute<{ n: number }>(sql`select count(*)::int as n from ${name} x where ${isCreated}`);
+        if (n > 0) kept[t.name] = (kept[t.name] ?? 0) + n;
+      }
+    }
+    return { restored, deleted, kept };
   });
+}
+
+// Whether a row of table t, aliased x, has rows pointing at it. Rollback asks
+// once the backup is restored and the apply's copies below x are deleted, so
+// any such row is one the site saved since the apply. It isn't in the backup,
+// and deleting x would cascade it away.
+function savedUnder(t: Touched): SQL {
+  const uses = TOUCHED.flatMap((child) =>
+    getTableConfig(child.table)
+      .foreignKeys.map((fk) => fk.reference())
+      .filter((ref) => ref.foreignTable === t.table)
+      .map((ref) => {
+        const from = ref.columns.map((column) => column.name);
+        const to = ref.foreignColumns.map((column) => column.name);
+        return sql`exists (select 1 from ${sql.identifier(child.name)} c where (${columnList(from, "c")}) = (${columnList(to, "x")}))`;
+      }),
+  );
+  return uses.length > 0 ? sql.join(uses, sql` or `) : sql`false`;
 }
 
 function chunks<T>(list: T[], size: number): T[][] {
