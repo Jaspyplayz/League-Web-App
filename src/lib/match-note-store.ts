@@ -7,6 +7,9 @@ import type { ReadNoteResult } from "@/lib/match-note";
 import { database } from "@/lib/match-store";
 
 // Reads and saves notes in the match_notes table (see src/db/schema.ts).
+// Without a database, nothing is found and saving reports a failure. Reads
+// don't go through readCache, which treats a failed read as nothing found
+// (see ReadNoteResult).
 
 export async function readMatchNote(userId: string, matchId: string): Promise<ReadNoteResult> {
   const db = database();

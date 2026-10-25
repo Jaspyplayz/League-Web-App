@@ -7,7 +7,9 @@ import type { ReadDayNotesResult } from "@/lib/match-note";
 import { database } from "@/lib/match-store";
 
 // Reads and saves the notes on Log tab days, in the day_notes table (see
-// src/db/schema.ts).
+// src/db/schema.ts). Works like match-note-store.ts: without a database,
+// nothing is found and saving reports a failure, and a failed read is
+// reported as one.
 
 // The account's notes from `since` ("2026-09-18") on, by day. The server
 // doesn't know the viewer's timezone, so it can't say exactly which days the
