@@ -2,12 +2,13 @@ import { PanelHeading } from "@/components/ui/panel-heading";
 import { panelClass } from "@/components/ui/panel";
 import { formatClock, plural } from "@/lib/analyzer/format";
 import {
-  EARLY_GANK_S,
+  habitLabel,
   type HabitId,
   type HabitReport,
   type HabitResult,
   type HabitSplit,
 } from "@/lib/analyzer/habit-trends";
+import { isRankHabit } from "@/lib/analyzer/skill";
 import type { WinRecord } from "@/lib/analyzer/trends";
 import { positionName } from "@/lib/match-summary";
 import { tierName, type Tier } from "@/lib/tiers";
@@ -18,21 +19,21 @@ const clock = (seconds: number) => formatClock(seconds * 1000);
 function describe(id: HabitId, report: HabitReport, rankName: string | null) {
   switch (id) {
     case "level-6-first":
-      return { title: "Level 6 first", detail: "You hit level 6 before your opponent." };
+      return { title: habitLabel(id), detail: "You hit level 6 before your opponent." };
     case "first-scuttles":
       return {
-        title: "First scuttles",
+        title: habitLabel(id),
         detail: "You took more of the two 3:30 scuttle crabs than the enemy jungler.",
       };
     case "early-gank":
       return {
-        title: `Lane takedown before ${clock(EARLY_GANK_S)}`,
+        title: habitLabel(id),
         detail: "A kill or assist in a lane. Ganks that got nothing don't show up in Riot's data.",
       };
     case "early-back": {
       const whose = report.backFrom === "rank" && rankName ? `${rankName}'s` : "your";
       return {
-        title: `First back before ${clock(report.backBy)}`,
+        title: habitLabel(id, report.backBy),
         detail: `${clock(report.backBy)} is ${whose} usual first back. Backs after dying aren't counted.`,
       };
     }
@@ -90,7 +91,7 @@ function HabitCard({
   // The early-back split is at the rank's usual time, so the rank does it in
   // about half its games by definition. That number says nothing, so it's
   // left out.
-  const showRankRate = rank && rankName && habit.id !== "early-back";
+  const showRankRate = rank && rankName && isRankHabit(habit.id);
   const difference =
     rank && rankName ? winDifference(rank, `${rankName} games`) : winDifference(you, "You");
   return (

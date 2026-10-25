@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Habits } from "./habits";
-import { compareHabits } from "./habit-trends";
+import { compareHabits, habitLabel } from "./habit-trends";
 
 const NONE: Habits = {
   level6First: null,
@@ -100,5 +100,14 @@ describe("compareHabits", () => {
 
   it("is null with no games", () => {
     expect(compareHabits([], [])).toBeNull();
+  });
+});
+
+describe("habitLabel", () => {
+  it("names each habit the way its card does", () => {
+    expect(habitLabel("level-6-first")).toBe("Level 6 first");
+    expect(habitLabel("first-scuttles")).toBe("First scuttles");
+    expect(habitLabel("early-gank")).toBe("Lane takedown before 6:00");
+    expect(habitLabel("early-back", 310)).toBe("First back before 5:10");
   });
 });

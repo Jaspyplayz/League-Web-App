@@ -7,6 +7,7 @@
 // first. The page says so.
 
 import { MIN_BENCHMARK_GAMES } from "./compare";
+import { formatClock } from "./format";
 import type { Habits } from "./habits";
 import type { GameTrend, WinRecord } from "./trends";
 
@@ -19,6 +20,24 @@ export type HabitId = "level-6-first" | "first-scuttles" | "early-gank" | "early
 // junglers finish their first clear a little after 3:00, so this leaves
 // time for one gank after it.
 export const EARLY_GANK_S = 6 * 60;
+
+export function habitLabel(id: Exclude<HabitId, "early-back">): string;
+export function habitLabel(id: "early-back", backBySeconds: number): string;
+export function habitLabel(id: HabitId, backBySeconds?: number): string {
+  switch (id) {
+    case "level-6-first":
+      return "Level 6 first";
+    case "first-scuttles":
+      return "First scuttles";
+    case "early-gank":
+      return `Lane takedown before ${formatClock(EARLY_GANK_S * 1000)}`;
+    case "early-back":
+      if (backBySeconds === undefined) {
+        throw new Error("The first-back label needs the usual back time in seconds");
+      }
+      return `First back before ${formatClock(backBySeconds * 1000)}`;
+  }
+}
 
 type Rule = {
   id: HabitId;

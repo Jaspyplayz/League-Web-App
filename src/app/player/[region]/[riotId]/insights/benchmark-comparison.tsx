@@ -4,69 +4,14 @@ import type {
   BenchmarkComparison as Comparison,
   ChampionComparison,
   StatComparison,
-  StatKey,
 } from "@/lib/analyzer/compare";
+import { statRowStyle } from "@/lib/analyzer/skill";
 import { Gap } from "@/components/ui/gap";
-import { formatSigned, plural, type GapOptions } from "@/lib/analyzer/format";
+import { formatSigned, plural } from "@/lib/analyzer/format";
 import { championClass, championName, type DataDragon } from "@/lib/ddragon";
 import { positionName } from "@/lib/match-summary";
 import { tierName, type Tier } from "@/lib/tiers";
 import { panelClass } from "@/components/ui/panel";
-
-
-// How each stat is labeled and shown. Leads are signed ("+250"), shares are
-// percentages, and rates and counts are plain numbers. `gap` says how the Gap
-// column writes the difference: with the same decimals as the numbers, and
-// "more"/"fewer" for deaths, where fewer is better. Time in the enemy half is
-// neither good nor bad on its own (invading at the wrong time gets you
-// killed), so it isn't colored.
-type StatRowStyle = {
-  label: string;
-  format: (v: number) => string;
-  gap: GapOptions;
-};
-const oneDecimal = (v: number) => v.toFixed(1);
-const percent = (v: number) => `${Math.round(v * 100)}%`;
-const LEAD = { decimals: 0 };
-const ONE_DECIMAL = { decimals: 1 };
-const SHARE = { decimals: 2, format: percent };
-const STAT_ROWS: Record<StatKey, StatRowStyle> = {
-  goldAt10: { label: "Gold lead at 10", format: formatSigned, gap: LEAD },
-  goldAt15: { label: "Gold lead at 15", format: formatSigned, gap: LEAD },
-  csAt10: { label: "CS lead at 10", format: formatSigned, gap: LEAD },
-  csPerMinEarly: { label: "CS/min, 0 to 10", format: oneDecimal, gap: ONE_DECIMAL },
-  csPerMinMid: { label: "CS/min, 10 to 20", format: oneDecimal, gap: ONE_DECIMAL },
-  earlyDeaths: {
-    label: "Deaths before 14:00",
-    format: oneDecimal,
-    gap: { decimals: 1, lowerIsBetter: true },
-  },
-  xpAt15: { label: "XP lead at 15", format: formatSigned, gap: LEAD },
-  earlyTakedowns: { label: "Kills + assists before 14:00", format: oneDecimal, gap: ONE_DECIMAL },
-  visionPerMin: {
-    label: "Vision score per minute",
-    format: (v) => v.toFixed(2),
-    gap: { decimals: 2 },
-  },
-  strongerSide: { label: "Minutes on the stronger side, 3 to 15", format: percent, gap: SHARE },
-  enemyHalf: {
-    label: "Minutes in the enemy half, 3 to 15",
-    format: percent,
-    gap: { ...SHARE, neutral: true },
-  },
-  gankTakedowns: {
-    label: "Kills + assists in lanes before 14:00",
-    format: oneDecimal,
-    gap: ONE_DECIMAL,
-  },
-  objectiveShare: {
-    label: "Dragons, grubs and Heralds your team took",
-    format: percent,
-    gap: SHARE,
-  },
-  enemyJungleKills: { label: "Enemy jungle monsters killed", format: oneDecimal, gap: ONE_DECIMAL },
-  scuttles: { label: "Scuttle crabs", format: oneDecimal, gap: ONE_DECIMAL },
-};
 
 // Who your games are compared with: players of one rank on KR, EUW and NA
 // (see tier-comparison.tsx), or one player you picked (compare-with-player.tsx).
@@ -139,7 +84,7 @@ export function BenchmarkComparison({
 }
 
 function StatRow({ stat }: { stat: StatComparison }) {
-  const { label, format, gap } = STAT_ROWS[stat.key];
+  const { label, format, gap } = statRowStyle(stat.key);
   const better = gap.lowerIsBetter ? stat.you <= stat.them : stat.you >= stat.them;
   const tone = gap.neutral ? "text-ink" : better ? "text-ahead" : "text-behind";
   return (
