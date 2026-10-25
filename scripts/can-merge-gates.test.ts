@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   decide,
@@ -5,16 +6,22 @@ import {
   parseReverts,
   toCheck,
   type AgentMerge,
+  type Check,
   type CheckState,
   type Decision,
+  type MainState,
   type PrSnapshot,
-  type RevertedPr,
   type RollupEntry,
 } from "./can-merge-gates";
 
 const HEAD = "2ee7e1dc85217494c55a3dd20022b87184b8d675";
 const OLDER = "85e30eb0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6";
 const ON: AgentMerge = { on: true, since: "2026-10-25" };
+const VERCEL = "https://vercel.com/jaspy-s-team/league-web-app/Bth8tZWfPTqkq34tGX4qgjxz2ry3";
+
+function main(overrides: Partial<MainState> = {}): MainState {
+  return { agentMerge: ON, changedGateCode: [], reverts: [], claudeMerges: [], ...overrides };
+}
 
 type BodyParts = { tier?: string | null; builder?: string | null; criteria?: string[]; review?: string[] };
 
@@ -59,11 +66,11 @@ function pr(overrides: Partial<PrSnapshot> = {}): PrSnapshot {
     body: body(),
     files: ["src/components/habit-card.tsx", "docs/habits.md"],
     checks: [
-      { name: "check", state: "success" },
-      { name: "Vercel", state: "success" },
-      { name: "smoke", state: "success" },
-      { name: "CodeQL", state: "success" },
-      { name: "Vercel Preview Comments", state: "skipped" },
+      { kind: "run", name: "check", workflow: "CI", state: "success" },
+      { kind: "run", name: "smoke", workflow: "Smoke test", state: "success" },
+      { kind: "status", name: "Vercel", url: VERCEL, state: "success" },
+      { kind: "run", name: "CodeQL", workflow: "", state: "success" },
+      { kind: "run", name: "Vercel Preview Comments", workflow: "", state: "skipped" },
     ],
     ...overrides,
   };
@@ -79,7 +86,7 @@ function detail(decision: Decision, name: string): string {
 
 describe("decide", () => {
   it("allows a normal PR when every gate passes", () => {
-    const decision = decide(pr(), ON, []);
+    const decision = decide(pr(), main());
     expect(decision.ok).toBe(true);
     expect(failed(decision)).toEqual([]);
     expect(detail(decision, "Reviewer cleared the head commit")).toBe(`Reviewer agent at ${HEAD}: no blockers`);
@@ -87,29 +94,50 @@ describe("decide", () => {
 
   it("allows a tiny PR with no review and no criteria, written on GitHub's website", () => {
     const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] }).replaceAll("\n", "\r\n");
-    const decision = decide(pr({ body: tiny }), ON, []);
+    const decision = decide(pr({ body: tiny }), main());
     expect(decision.ok).toBe(true);
+  });
+
+  it("refuses when the gate code here differs from main's", () => {
+    const decision = decide(pr(), main({ changedGateCode: ["scripts/can-merge-gates.ts"] }));
+    expect(failed(decision)).toEqual(["Gate code matches main"]);
+    expect(detail(decision, "Gate code matches main")).toBe(
+      "changed from origin/main: scripts/can-merge-gates.ts. Run can-merge from an up-to-date main checkout",
+    );
   });
 
   it("refuses while agent merging is switched off", () => {
     const off: AgentMerge = { on: false, why: "no .claude/agent-merge.json on origin/main" };
-    const decision = decide(pr(), off, []);
+    const decision = decide(pr(), main({ agentMerge: off }));
     expect(failed(decision)).toEqual(["Agent merging is on"]);
     expect(detail(decision, "Agent merging is on")).toBe("no .claude/agent-merge.json on origin/main");
   });
 
-  it("refuses after a merged-by-claude PR was reverted, and names it", () => {
-    const reverts: RevertedPr[] = [
-      { number: 165, labels: ["merged-by-claude"], revertCommit: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0" },
-    ];
-    const decision = decide(pr(), ON, reverts);
+  const claudeMerge = {
+    subject: "Merge pull request #165 from Jaspyplayz/claude/card",
+    commits: ["d".repeat(40), "e".repeat(40)],
+  };
+  const revertSha = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0";
+
+  it("refuses after a Claude merge was reverted, and names it", () => {
+    const reverts = [{ sha: revertSha, reverts: ["d".repeat(40)] }];
+    const decision = decide(pr(), main({ reverts, claudeMerges: [claudeMerge] }));
     expect(failed(decision)).toEqual(["No Claude merge was reverted"]);
-    expect(detail(decision, "No Claude merge was reverted")).toContain("#165 (reverted in a1b2c3d)");
+    expect(detail(decision, "No Claude merge was reverted")).toContain(
+      '"Merge pull request #165 from Jaspyplayz/claude/card" (reverted in a1b2c3d)',
+    );
   });
 
-  it("doesn't stop for a revert of a PR Jasper merged", () => {
-    const reverts: RevertedPr[] = [{ number: 160, labels: [], revertCommit: OLDER }];
-    expect(decide(pr(), ON, reverts).ok).toBe(true);
+  it("refuses after a revert of one commit that a Claude merge brought in", () => {
+    const reverts = [{ sha: revertSha, reverts: ["e".repeat(40)] }];
+    expect(failed(decide(pr(), main({ reverts, claudeMerges: [claudeMerge] })))).toEqual([
+      "No Claude merge was reverted",
+    ]);
+  });
+
+  it("doesn't stop for a revert of a merge Jasper made", () => {
+    const reverts = [{ sha: revertSha, reverts: [OLDER] }];
+    expect(decide(pr(), main({ reverts, claudeMerges: [claudeMerge] })).ok).toBe(true);
   });
 
   it.each<[string, Partial<PrSnapshot>]>([
@@ -118,7 +146,7 @@ describe("decide", () => {
     ["a draft", { isDraft: true }],
     ["into another branch", { baseRefName: "claude/other-branch" }],
   ])("refuses a PR that is %s", (_, overrides) => {
-    expect(failed(decide(pr(overrides), ON, []))).toEqual(["Open and ready"]);
+    expect(failed(decide(pr(overrides), main()))).toEqual(["Open and ready"]);
   });
 
   it.each<[string, Partial<PrSnapshot>]>([
@@ -129,7 +157,7 @@ describe("decide", () => {
     ["the Cursor chat built it", { body: body({ builder: "Cursor chat on Grok 4.7." }) }],
     ["its Builder line is the template's placeholder", { body: body({ builder: "Claude Code on Opus 5.5, Cursor chat on Grok 4.7, or cloud agent." }) }],
   ])("refuses a PR that Claude Code didn't build: %s", (_, overrides) => {
-    expect(failed(decide(pr(overrides), ON, []))).toEqual(["Built by Claude Code"]);
+    expect(failed(decide(pr(overrides), main()))).toEqual(["Built by Claude Code"]);
   });
 
   it.each<[string, string | null]>([
@@ -137,70 +165,103 @@ describe("decide", () => {
     ["missing", null],
     ["the template's placeholder", "tiny, normal or risky, and why."],
   ])("refuses a PR whose tier is %s", (_, tier) => {
-    expect(failed(decide(pr({ body: body({ tier }) }), ON, []))).toEqual(["Tiny or normal tier"]);
+    expect(failed(decide(pr({ body: body({ tier }) }), main()))).toEqual(["Tiny or normal tier"]);
   });
 
   it("refuses a risky file even when the tier says tiny, and names it", () => {
     const tiny = body({ tier: "tiny. One query.", criteria: [], review: [] });
-    const decision = decide(pr({ body: tiny, files: ["docs/database.md", "src/db/schema.ts"] }), ON, []);
+    const decision = decide(pr({ body: tiny, files: ["docs/database.md", "src/db/schema.ts"] }), main());
     expect(failed(decision)).toEqual(["No risky files"]);
     expect(detail(decision, "No risky files")).toBe("src/db/schema.ts (the database schema and queries)");
   });
 
   it("refuses a PR that only changes the agent-merge switch", () => {
-    const decision = decide(pr({ files: [".claude/agent-merge.json"] }), ON, []);
+    const decision = decide(pr({ files: [".claude/agent-merge.json"] }), main());
     expect(failed(decision)).toEqual(["No risky files"]);
     expect(detail(decision, "No risky files")).toBe(".claude/agent-merge.json (the switch for agent merging)");
   });
 
   const passing = pr().checks;
   const without = (name: string) => passing.filter((check) => check.name !== name);
+  const ci = (state: CheckState): Check => ({ kind: "run", name: "check", workflow: "CI", state });
+  const smoke = (state: CheckState): Check => ({ kind: "run", name: "smoke", workflow: "Smoke test", state });
 
-  it.each<[string, PrSnapshot["checks"], string]>([
-    ["smoke is still running", [...without("smoke"), { name: "smoke", state: "pending" }], "smoke still running"],
-    ["smoke was skipped", [...without("smoke"), { name: "smoke", state: "skipped" }], "smoke skipped"],
-    ["Vercel hasn't reported", without("Vercel"), "Vercel hasn't reported"],
-    ["check failed", [...without("check"), { name: "check", state: "failure" }], "check failed"],
-    ["another check failed", [...passing, { name: "CodeQL", state: "failure" }], "CodeQL failed"],
-    ["another check is running", [...passing, { name: "dependency-review", state: "pending" }], "dependency-review still running"],
+  it.each<[string, Check[], string]>([
+    ["smoke is still running", [...without("smoke"), smoke("pending")], "smoke still running"],
+    ["smoke was skipped", [...without("smoke"), smoke("skipped")], "smoke skipped"],
+    ["Vercel hasn't reported", without("Vercel"), "Vercel hasn't reported from Vercel"],
+    ["check failed", [...without("check"), ci("failure")], "check failed"],
+    ["another check failed", [...passing, { kind: "run", name: "CodeQL", workflow: "", state: "failure" }], "CodeQL failed"],
+    [
+      "another check is running",
+      [...passing, { kind: "run", name: "dependency-review", workflow: "Dependency review", state: "pending" }],
+      "dependency-review still running",
+    ],
+    [
+      "a commit status named check stands in for the CI job",
+      [...without("check"), { kind: "status", name: "check", url: "https://example.com/ci", state: "success" }],
+      "check hasn't reported from the CI workflow",
+    ],
+    [
+      "smoke comes from another workflow",
+      [...without("smoke"), { kind: "run", name: "smoke", workflow: "Quick smoke", state: "success" }],
+      "smoke hasn't reported from the Smoke test workflow",
+    ],
+    [
+      "a check run named Vercel stands in for Vercel's status",
+      [...without("Vercel"), { kind: "run", name: "Vercel", workflow: "Deploy", state: "success" }],
+      "Vercel hasn't reported from Vercel",
+    ],
+    [
+      "the Vercel status links somewhere else",
+      [...without("Vercel"), { kind: "status", name: "Vercel", url: "https://vercel.example.com/x", state: "success" }],
+      "Vercel hasn't reported from Vercel",
+    ],
   ])("refuses when %s", (_, checks, expected) => {
-    const decision = decide(pr({ checks }), ON, []);
+    const decision = decide(pr({ checks }), main());
     expect(failed(decision)).toEqual(["Checks pass at the head commit"]);
     expect(detail(decision, "Checks pass at the head commit")).toBe(expected);
   });
 
+  // The gate counts check and smoke only from these workflows, so renaming one
+  // without updating scripts/can-merge-gates.ts would stop every merge.
+  it("matches the workflow and job names in .github/workflows/", () => {
+    const workflow = (file: string) => readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), "utf8");
+    expect(workflow("ci.yml")).toMatch(/^name: CI\r?\n[\s\S]*^ {2}check:/m);
+    expect(workflow("smoke.yml")).toMatch(/^name: Smoke test\r?\n[\s\S]*^ {2}smoke:/m);
+  });
+
   it("refuses a reviewer verdict on an older commit", () => {
-    const decision = decide(pr({ body: body({ review: [`Reviewer agent at ${OLDER.slice(0, 7)}: no blockers`] }) }), ON, []);
+    const decision = decide(pr({ body: body({ review: [`Reviewer agent at ${OLDER.slice(0, 7)}: no blockers`] }) }), main());
     expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
     expect(detail(decision, "Reviewer cleared the head commit")).toContain("85e30eb, not the head commit 2ee7e1d");
   });
 
   it("refuses when the reviewer found blockers at the head commit", () => {
     const review = [`Reviewer agent at ${OLDER}: 2 blockers`, `Reviewer agent at ${HEAD.slice(0, 12)}: 1 blockers`];
-    expect(failed(decide(pr({ body: body({ review }) }), ON, []))).toEqual(["Reviewer cleared the head commit"]);
+    expect(failed(decide(pr({ body: body({ review }) }), main()))).toEqual(["Reviewer cleared the head commit"]);
   });
 
   it("refuses a normal PR with no reviewer line in the new format", () => {
-    const decision = decide(pr({ body: body({ review: ["Reviewer agent: no blockers."] }) }), ON, []);
+    const decision = decide(pr({ body: body({ review: ["Reviewer agent: no blockers."] }) }), main());
     expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
   });
 
   it("refuses an unticked acceptance criterion", () => {
     const criteria = ["- [x] The card shows: test \"shows\"", "- [ ] It works on phones: screenshot"];
-    const decision = decide(pr({ body: body({ criteria }) }), ON, []);
+    const decision = decide(pr({ body: body({ criteria }) }), main());
     expect(failed(decision)).toEqual(["Acceptance criteria ticked"]);
     expect(detail(decision, "Acceptance criteria ticked")).toContain("It works on phones");
   });
 
   it("refuses a normal PR with no acceptance criteria", () => {
-    expect(failed(decide(pr({ body: body({ criteria: [] }) }), ON, []))).toEqual(["Acceptance criteria ticked"]);
+    expect(failed(decide(pr({ body: body({ criteria: [] }) }), main()))).toEqual(["Acceptance criteria ticked"]);
   });
 
   it("lists every failing gate, not just the first", () => {
     const decision = decide(
       pr({ state: "MERGED", headRefName: "cursor/x", files: ["drizzle/0013.sql"], body: body({ review: [] }) }),
-      { on: false, why: "enabledSince is null in .claude/agent-merge.json" },
-      [],
+      main({ agentMerge: { on: false, why: "enabledSince is null in .claude/agent-merge.json" } }),
     );
     expect(failed(decision)).toEqual([
       "Agent merging is on",
@@ -251,17 +312,41 @@ describe("parseReverts", () => {
 });
 
 describe("toCheck", () => {
+  const run = (status: string, conclusion: string | null): RollupEntry => ({
+    __typename: "CheckRun",
+    name: "smoke",
+    workflowName: "Smoke test",
+    status,
+    conclusion,
+  });
+  const status = (state: string): RollupEntry => ({
+    __typename: "StatusContext",
+    context: "Vercel",
+    targetUrl: VERCEL,
+    state,
+  });
+
   it.each<[string, RollupEntry, CheckState]>([
-    ["a running check", { __typename: "CheckRun", name: "smoke", status: "IN_PROGRESS", conclusion: "" }, "pending"],
-    ["a queued check", { __typename: "CheckRun", name: "smoke", status: "QUEUED", conclusion: null }, "pending"],
-    ["a passed check", { __typename: "CheckRun", name: "check", status: "COMPLETED", conclusion: "SUCCESS" }, "success"],
-    ["a skipped check", { __typename: "CheckRun", name: "check", status: "COMPLETED", conclusion: "SKIPPED" }, "skipped"],
-    ["a cancelled check", { __typename: "CheckRun", name: "check", status: "COMPLETED", conclusion: "CANCELLED" }, "failure"],
-    ["a timed-out check", { __typename: "CheckRun", name: "check", status: "COMPLETED", conclusion: "TIMED_OUT" }, "failure"],
-    ["a pending status", { __typename: "StatusContext", context: "Vercel", state: "PENDING" }, "pending"],
-    ["a passed status", { __typename: "StatusContext", context: "Vercel", state: "SUCCESS" }, "success"],
-    ["an errored status", { __typename: "StatusContext", context: "Vercel", state: "ERROR" }, "failure"],
+    ["a running check", run("IN_PROGRESS", ""), "pending"],
+    ["a queued check", run("QUEUED", null), "pending"],
+    ["a passed check", run("COMPLETED", "SUCCESS"), "success"],
+    ["a skipped check", run("COMPLETED", "SKIPPED"), "skipped"],
+    ["a cancelled check", run("COMPLETED", "CANCELLED"), "failure"],
+    ["a timed-out check", run("COMPLETED", "TIMED_OUT"), "failure"],
+    ["a pending status", status("PENDING"), "pending"],
+    ["a passed status", status("SUCCESS"), "success"],
+    ["an errored status", status("ERROR"), "failure"],
   ])("reads %s as %s", (_, entry, state) => {
     expect(toCheck(entry).state).toBe(state);
+  });
+
+  it("keeps where each check came from", () => {
+    expect(toCheck(run("COMPLETED", "SUCCESS"))).toEqual({
+      kind: "run",
+      name: "smoke",
+      workflow: "Smoke test",
+      state: "success",
+    });
+    expect(toCheck(status("SUCCESS"))).toEqual({ kind: "status", name: "Vercel", url: VERCEL, state: "success" });
   });
 });

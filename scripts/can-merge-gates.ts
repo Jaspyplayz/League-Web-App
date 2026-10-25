@@ -8,22 +8,40 @@ import { riskyFiles } from "./risky-paths";
 
 export const SWITCH_FILE = ".claude/agent-merge.json";
 export const MERGED_BY_CLAUDE = "merged-by-claude";
-const REQUIRED_CHECKS = ["check", "Vercel", "smoke"];
+// can-merge writes this into every merge commit it makes. It, not the label,
+// is how the revert gate finds Claude's merges: main's history changes only
+// through a merge, while anyone with access can add or remove a label.
+export const MERGE_MARKER = "Merged by Claude Code (npm run can-merge).";
 
 export type CheckState = "success" | "failure" | "pending" | "skipped";
-export type Check = { name: string; state: CheckState };
+export type Check =
+  | { kind: "run"; name: string; workflow: string; state: CheckState }
+  | { kind: "status"; name: string; url: string; state: CheckState };
+
+// Each required check counts only from where it really runs, so a commit
+// status named "check" doesn't pass for the CI workflow's job.
+export const REQUIRED_CHECKS: { name: string; where: string; counts: (check: Check) => boolean }[] = [
+  { name: "check", where: "the CI workflow", counts: (c) => c.kind === "run" && c.workflow === "CI" },
+  { name: "smoke", where: "the Smoke test workflow", counts: (c) => c.kind === "run" && c.workflow === "Smoke test" },
+  { name: "Vercel", where: "Vercel", counts: (c) => c.kind === "status" && c.url.startsWith("https://vercel.com/") },
+];
 
 // gh's statusCheckRollup: GitHub Actions and app checks are CheckRuns, and
 // Vercel's deployment check is a commit status.
 export type RollupEntry =
-  | { __typename: "CheckRun"; name: string; status: string; conclusion: string | null }
-  | { __typename: "StatusContext"; context: string; state: string };
+  | { __typename: "CheckRun"; name: string; workflowName: string; status: string; conclusion: string | null }
+  | { __typename: "StatusContext"; context: string; targetUrl: string | null; state: string };
 
 export function toCheck(entry: RollupEntry): Check {
   if (entry.__typename === "StatusContext") {
-    return { name: entry.context, state: statusState(entry.state) };
+    return { kind: "status", name: entry.context, url: entry.targetUrl ?? "", state: statusState(entry.state) };
   }
-  return { name: entry.name, state: checkRunState(entry.status, entry.conclusion) };
+  return {
+    kind: "run",
+    name: entry.name,
+    workflow: entry.workflowName,
+    state: checkRunState(entry.status, entry.conclusion),
+  };
 }
 
 function statusState(state: string): CheckState {
@@ -49,7 +67,7 @@ export type PrSnapshot = {
   headRefOid: string;
   author: { login: string; isBot: boolean };
   body: string;
-  /** Every path the PR changes, with both the old and new path of a rename. */
+  /** Every path the head commit changes against main, with both paths of a rename. */
   files: string[];
   /** The checks on the head commit. */
   checks: Check[];
@@ -92,14 +110,24 @@ export function parseReverts(log: string, since: string): RevertCommit[] {
   });
 }
 
-/** A PR that a revert commit on main undid. */
-export type RevertedPr = { number: number; labels: string[]; revertCommit: string };
+/** A merge commit on main with MERGE_MARKER, and every commit it brought in. */
+export type ClaudeMerge = { subject: string; commits: string[] };
+
+/** What can-merge reads from origin/main and from the folder it runs in. */
+export type MainState = {
+  agentMerge: AgentMerge;
+  /** Gate code (scripts/can-merge*, scripts/risky-paths*, package.json) that differs from origin/main here. */
+  changedGateCode: string[];
+  /** Reverts on main since enabledSince. */
+  reverts: RevertCommit[];
+  claudeMerges: ClaudeMerge[];
+};
 
 export type Gate = { name: string; pass: boolean; detail: string };
 export type Decision = { ok: boolean; gates: Gate[] };
 
 type Tier = { ok: true; tier: "tiny" | "normal" } | { ok: false; why: string };
-type Context = { pr: PrSnapshot; agentMerge: AgentMerge; reverts: RevertedPr[]; tier: Tier };
+type Context = { pr: PrSnapshot; main: MainState; tier: Tier };
 type Result = { pass: boolean; detail: string };
 
 const pass = (detail: string): Result => ({ pass: true, detail });
@@ -114,18 +142,32 @@ const SAID: Record<CheckState, string> = {
 
 const GATES: { name: string; check: (context: Context) => Result }[] = [
   {
+    name: "Gate code matches main",
+    check: ({ main }) => {
+      if (main.changedGateCode.length === 0) return pass("these gates are origin/main's");
+      const changed = main.changedGateCode.join(", ");
+      return fail(`changed from origin/main: ${changed}. Run can-merge from an up-to-date main checkout`);
+    },
+  },
+  {
     name: "Agent merging is on",
-    check: ({ agentMerge }) =>
+    check: ({ main: { agentMerge } }) =>
       agentMerge.on ? pass(`enabledSince ${agentMerge.since} on origin/main`) : fail(agentMerge.why),
   },
   {
     name: "No Claude merge was reverted",
-    check: ({ agentMerge, reverts }) => {
-      if (!agentMerge.on) return pass("nothing to count while merging is off");
-      const reverted = reverts.filter((pr) => pr.labels.includes(MERGED_BY_CLAUDE));
-      if (reverted.length === 0) return pass(`no ${MERGED_BY_CLAUDE} PR reverted since ${agentMerge.since}`);
-      const list = reverted.map((pr) => `#${pr.number} (reverted in ${pr.revertCommit.slice(0, 7)})`);
-      return fail(`${list.join(", ")}. Jasper turns merging back on with a new enabledSince`);
+    check: ({ main }) => {
+      if (!main.agentMerge.on) return pass("nothing to count while merging is off");
+      const reverted = new Set(
+        main.reverts.flatMap((revert) =>
+          revert.reverts.flatMap((sha) => {
+            const merge = main.claudeMerges.find(({ commits }) => commits.includes(sha));
+            return merge ? [`"${merge.subject}" (reverted in ${revert.sha.slice(0, 7)})`] : [];
+          }),
+        ),
+      );
+      if (reverted.size === 0) return pass(`no Claude merge reverted since ${main.agentMerge.since}`);
+      return fail(`${[...reverted].join(", ")}. Jasper turns merging back on with a later enabledSince`);
     },
   },
   {
@@ -168,20 +210,20 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
     name: "Checks pass at the head commit",
     check: ({ pr }) => {
       const problems: string[] = [];
-      for (const name of REQUIRED_CHECKS) {
-        const runs = pr.checks.filter((check) => check.name === name);
+      for (const { name, where, counts } of REQUIRED_CHECKS) {
+        const runs = pr.checks.filter((check) => check.name === name && counts(check));
         const notPassed = runs.find((check) => check.state !== "success");
-        if (runs.length === 0) problems.push(`${name} hasn't reported`);
+        if (runs.length === 0) problems.push(`${name} hasn't reported from ${where}`);
         else if (notPassed) problems.push(`${name} ${SAID[notPassed.state]}`);
       }
       for (const check of pr.checks) {
-        const other = !REQUIRED_CHECKS.includes(check.name);
-        if (other && (check.state === "failure" || check.state === "pending")) {
+        const required = REQUIRED_CHECKS.some(({ name, counts }) => check.name === name && counts(check));
+        if (!required && (check.state === "failure" || check.state === "pending")) {
           problems.push(`${check.name} ${SAID[check.state]}`);
         }
       }
       if (problems.length > 0) return fail(problems.join("; "));
-      return pass(`${REQUIRED_CHECKS.join(", ")} passed, and no other check failed or is still running`);
+      return pass("check, smoke and Vercel passed, and no other check failed or is still running");
     },
   },
   {
@@ -223,8 +265,8 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
 ];
 
 // Every gate runs, even after one fails, so the output lists every reason.
-export function decide(pr: PrSnapshot, agentMerge: AgentMerge, reverts: RevertedPr[]): Decision {
-  const context: Context = { pr, agentMerge, reverts, tier: readTier(pr.body) };
+export function decide(pr: PrSnapshot, main: MainState): Decision {
+  const context: Context = { pr, main, tier: readTier(pr.body) };
   const gates = GATES.map(({ name, check }) => ({ name, ...check(context) }));
   return { ok: gates.every((gate) => gate.pass), gates };
 }
