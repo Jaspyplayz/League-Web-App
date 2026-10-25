@@ -18,7 +18,7 @@ import {
   type StripDay,
 } from "@/lib/daily-log";
 import { FOCUS_GOALS, type Focus } from "@/lib/focus";
-import { MAX_NOTE_LENGTH, type SaveNoteResult } from "@/lib/match-note";
+import { MAX_NOTE_LENGTH, type ReadDayNotesResult, type SaveNoteResult } from "@/lib/match-note";
 import { useFocus } from "../insights/focus";
 
 // The Log tab's content. It runs in the browser because days depend on the
@@ -30,7 +30,7 @@ type Props = {
   ranks: LogRankPoint[];
   // The signed-in player's notes by day, or null when this isn't their
   // profile (then no notes or note boxes show).
-  notes: Record<string, string> | null;
+  notes: ReadDayNotesResult | null;
   player: string; // playerKey(), for the focus goal
   playerPath: string;
 };
@@ -67,6 +67,11 @@ export function DailyLog({ games, ranks, notes, player, playerPath }: Props) {
         <h2 className="text-label font-medium uppercase tracking-[0.12em] text-faint">Days</h2>
         <ViewSwitch view={view} />
       </div>
+      {notes?.ok === false && (
+        <p className="text-note text-behind">
+          Your day notes couldn&apos;t be loaded. Reload the page to try again.
+        </p>
+      )}
       <ol className="flex flex-col gap-2.5">
         {days.map((day) => (
           <li key={day.day}>
@@ -75,7 +80,7 @@ export function DailyLog({ games, ranks, notes, player, playerPath }: Props) {
               now={now}
               detailed={view === "detailed"}
               focus={focus}
-              note={notes ? (notes[day.day] ?? "") : null}
+              note={notes?.ok ? (notes.byDay[day.day] ?? "") : null}
               playerPath={playerPath}
             />
           </li>

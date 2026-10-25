@@ -27,3 +27,10 @@ export function withNoteLine(text: string, line: string): string {
 
 // What the save action tells the notes box.
 export type SaveNoteResult = { status: "saved" } | { status: "failed"; message: string };
+
+// What reading saved notes found. A failed read is kept apart from "no
+// note": shown as an empty box, saving it would delete the note that's
+// really there. "" means nothing saved.
+export type ReadNoteResult = { ok: true; text: string } | { ok: false };
+
+export type ReadDayNotesResult = { ok: true; byDay: Record<string, string> } | { ok: false };

@@ -11,6 +11,7 @@ import { readDayNotes } from "@/lib/day-note-store";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { playerKey } from "@/lib/focus";
 import { scoreGame } from "@/lib/game-score";
+import type { ReadDayNotesResult } from "@/lib/match-note";
 import { summarizeMatch } from "@/lib/match-summary";
 import { loadMatches, loadTimelines } from "@/lib/match-store";
 import { readMyPlayer } from "@/lib/my-player";
@@ -175,7 +176,7 @@ async function Log({ params }: { params: Params }) {
 // The signed-in account's day notes, but only on the profile it marked with
 // "This is me": notes are about your own days, so nobody else's log shows
 // them or a box to write one. Null means no notes on this page.
-async function loadNotes(puuid: string, since: string): Promise<Record<string, string> | null> {
+async function loadNotes(puuid: string, since: string): Promise<ReadDayNotesResult | null> {
   if (!supabaseConfig()) return null;
   const user = await getCurrentUser();
   if (!user) return null;

@@ -33,7 +33,7 @@ A play's size is Win Probability Added: how much it changed your team's chance t
 The questions ask what you knew or saw, never what you should have done. Riot's rules don't allow apps to dictate players' decisions, and the grade can't tell a bad call from bad luck.
 
 - **Watch in replay** opens the Deep dive tab with the replay at the play's first second, with the play shown in the play bar under the timeline, so the map, scoreboard and timers show the moment.
-- **Add to notes** adds a line like "6:30 Lost a fight 0 for 2: " to your [private notes](../src/app/player/[region]/[riotId]/match/[matchId]/match-notes.tsx) on the game, ready to finish and save. It's hidden when sign-in isn't set up. Signed out, it takes you to the "Sign in" line where the notes box would be.
+- **Add to notes** adds a line like "6:30 Lost a fight 0 for 2: " to your [private notes](../src/app/player/[region]/[riotId]/match/[matchId]/match-notes.tsx) on the game, ready to finish and save. It's hidden when sign-in isn't set up. Signed out, it takes you to the "Sign in" line where the notes box would be, and when your note couldn't be loaded, to the line saying so.
 
 ## Not yet
 
