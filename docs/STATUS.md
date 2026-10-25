@@ -18,6 +18,7 @@ Where Turnpoint is right now: what's being worked on, what just shipped and what
 
 ## Recently shipped
 
+- **#149** A note that fails to load says so and offers no box, on the match page and the Log tab, so saving can't erase the note that's really there.
 - **#160** Games saved before the Riot key change show on profiles again. On 2026-10-25 a one-off script moved them, with their ranks and recaps, to the new key's PUUIDs, and the benchmarks were collected again ([docs/database.md](database.md#when-the-riot-key-changes)).
 - **#142** Crawlers can't spend the Riot allowance on player pages: `robots.txt` asks them to skip `/player/` and `/api/`, and only the plain profile page loads more season games.
 - **#140** The preview bypass secret is no longer saved in CI's uploaded Playwright traces.
@@ -35,7 +36,6 @@ Where Turnpoint is right now: what's being worked on, what just shipped and what
 - **The rest of the audit's top 8**, in order:
   4. Only analyze Summoner's Rift games (#145): ARAM games are drawn on the wrong map and Arena games crash. Starts once #144 or #146 merges.
   5. A bot-lane solo death names the wrong champion (`turning-points.ts`).
-  6. A failed note read erases the note.
   7. Visiting a player on the wrong region overwrites their profile.
   8. The Riot client doesn't retry when reading a response body fails (`src/lib/riot/client.ts`).
 - **The site in Korean, Spanish and Portuguese**, once no other branch is editing pages.
