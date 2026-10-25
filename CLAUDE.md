@@ -44,7 +44,7 @@ Routes live in `src/app/`, React components in `src/components/` and helpers in 
 | Command | What it does |
 |---|---|
 | `npm run dev` | Dev server at http://localhost:3000 |
-| `npm run lint` | ESLint |
+| `npm run lint` | ESLint, plus the project rules in `eslint-rules/`: Riot hosts only in `src/lib/riot/`, `"server-only"` on files that read secrets, no green classes |
 | `npm run typecheck` | Next.js type generation + `tsc` |
 | `npm test` | Vitest unit tests, including golden tests on four real games (`src/lib/analyzer/golden.test.ts`) |
 | `npm run test:e2e` | Playwright smoke test and accessibility scan (`e2e/`); runs on each Vercel preview ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test)) |

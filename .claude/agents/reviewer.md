@@ -33,8 +33,10 @@ Check in this order:
 1. Each acceptance criterion: met, not met, or untestable, with file:line evidence.
 2. Inputs that break it: remakes, games under 15 minutes, missing timeline frames,
    a player who left, ARAM or Arena, no lane opponent, an expired Riot key.
-3. Project rules: Riot calls only through src/lib/riot/client.ts, "server-only" on
-   modules with secrets, new stored data also updates src/app/privacy/page.tsx.
+3. Project rules that lint can't check: "server-only" on modules with secrets
+   outside src/lib/ and src/db/, new stored data also updates
+   src/app/privacy/page.tsx, and Riot calls inside src/lib/riot/ go through
+   client.ts. `npm run lint` checks the rest (eslint-rules/).
 4. Tests: would a test fail if this change were reverted? Name the missing test.
 5. Claims to players: can any text on screen say more than the data supports?
 6. Security and cost: secrets, unvalidated input, unauthenticated routes, Claude
