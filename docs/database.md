@@ -121,4 +121,33 @@ npm run benchmarks -- --regions na --tiers gold --players 2 # a quick test
 - The script stays under 70 Riot calls per 2 minutes per server, leaving the live site part of the key's allowance. A first full run takes about 2 hours (the three servers run side by side). Later runs skip games already saved, and a stopped run loses nothing, so it's fine to run a few tiers at a time with `--tiers`.
 - When `summarizeGame` gains a stat, its column is added as nullable and `BENCHMARK_STATS_VERSION` in `src/db/rows.ts` goes up. The next run fetches games saved with an older `stats_version` again and updates them, so it costs about as much as a first run. Until then, Insights leaves a new stat out of the comparison for any group with fewer than 10 games that have it. Version 2 added XP lead at 15, kills + assists before 14:00, vision per minute, and the jungle and support stats (time on the stronger side and in the enemy half, lane takedowns, objective share, enemy jungle monsters, scuttle crabs; see `src/lib/analyzer/roaming.ts` and `trends.ts`). Version 3 added the win chance training data, and version 4 the [habits](habits.md) (level 6 first, first scuttles, first gank and first back).
 - One-tricks aren't stored. They're worked out from the rows (`findOneTricks` in `src/lib/analyzer/benchmarks.ts`): someone with at least 60% of their last 20 games on one champion.
-- PUUIDs are tied to the Riot app that issued the key. When Turnpoint switches to a production key, empty this table (`delete from benchmark_games`) and run the script again.
+- PUUIDs are tied to the Riot app that issued the key. When Turnpoint switches to a key from another app, the old rows have to go before the next run ([below](#when-the-riot-key-changes)).
+
+## When the Riot key changes
+
+Riot encrypts PUUIDs separately for each app. A refreshed key from the same app keeps every PUUID, but a key from another app sees every player under a different one. Rows saved under the old key then stop matching: the profile looks for the visitor's new PUUID in each saved game, doesn't find it, and leaves the game out. This happened when the site moved to Jasper's personal key on 2026-10-24 ([#154](https://github.com/Jaspyplayz/League-Web-App/issues/154), [decision record 0007](adr/0007-remap-puuids-after-key-change.md)).
+
+`npm run remap-puuids` ([`scripts/remap-puuids.ts`](../scripts/remap-puuids.ts)) moves the rows saved before the cutoff to the new PUUIDs. It reads `RIOT_API_KEY` and `DATABASE_URL` from `.env.local` like the other scripts, and needs the key the live site uses: if `.env.local` still holds an old dev key, set `RIOT_API_KEY` in the shell first, which wins over the file. Only Jasper runs `--apply` and `--rollback`:
+
+```sh
+npm run remap-puuids                                                       # dry run: writes the map, changes nothing
+npm run remap-puuids -- --apply .cache/puuid-remap/map-<time>.json         # back up, then move every row
+npm run remap-puuids -- --rollback .cache/puuid-remap/backup-<time>.jsonl  # put back exactly the backed-up rows
+```
+
+- **The dry run** checks the key on 4 games first, and stops if it's the old app's key (every PUUID would come back unchanged) or a third app's. Then it downloads every old game again, at most 50 calls every 2 minutes on each Riot region, about 30 minutes for 1,300 games. It pairs each player by participant number, checking the champion and team. A game Riot can't find, a game whose players don't match, and a PUUID that maps two ways all go on the skip list. It prints its counts next to the plan's.
+- **`--apply`** saves every row it will change or delete to a backup file first. Then, in one transaction, it moves `players`, `ranked_entries`, `player_seasons`, `rank_history`, `user_players`, `match_recaps`, `ask_questions`, `match_insights`, `matches.raw` and `match_participants`, and deletes the old `benchmark_games` rows. Where a player has a row under both PUUIDs, the new one stays. Any failed check rolls everything back. After the commit it cleans up twice, right away and 5 minutes later, because a page that read a game just before the commit can save its old scoreboard rows again. Running it again with the same map only cleans up. It refuses to start if the database plus the extra space it needs would pass 450 MB.
+- **Right after `--apply`, run `npm run benchmarks`.** The apply deletes every old `benchmark_games` row, which on 2026-10-24 was all of them, so Insights has no rank comparisons until the collector fills the table again (about 2 hours for a full run, and Insights caches the old answer for up to an hour).
+- **`--rollback`** refuses a backup file from an apply that stopped before changing anything, and a backup whose apply never committed or was already rolled back. Use the file the finished apply printed after "To undo". It keeps a `players` row the apply created if the site has saved rows under it since, so those rows aren't lost.
+- **The files** in `.cache/puuid-remap/` hold PUUIDs. Never commit them, and delete them once the site checks out.
+- **Next time,** change `CUTOFF` in `scripts/remap-puuids-map.ts` and the two players in `ANCHORS` in `scripts/remap-puuids-db.ts`, who must each have a players row under both keys. Before applying for a production key, ask Riot whether the new app can keep this one's PUUIDs; that would make the remap unnecessary.
+
+`scripts/remap-puuids-db.test.ts` runs the dry run, apply and rollback against a throwaway Postgres with a fake Riot. It empties the app's tables, so it only runs when `REMAP_TEST_DATABASE_URL` points at localhost. Set `DATABASE_URL_DIRECT` on the command line, so it wins over `.env.local`, and use `127.0.0.1`: Docker on Windows may not answer `localhost` over IPv6. The `auth` schema stands in for Supabase's.
+
+```sh
+docker run -d --rm --name remap-pg -e POSTGRES_PASSWORD=local -p 127.0.0.1:55432:5432 postgres:17
+docker exec remap-pg psql -U postgres -c "create schema auth; create table auth.users (id uuid primary key);"
+DATABASE_URL_DIRECT=postgres://postgres:local@127.0.0.1:55432/postgres npm run db:migrate
+REMAP_TEST_DATABASE_URL=postgres://postgres:local@127.0.0.1:55432/postgres npx vitest run scripts/remap-puuids-db.test.ts
+docker stop remap-pg
+```

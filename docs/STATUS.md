@@ -18,6 +18,7 @@ Where Turnpoint is right now: what's being worked on, what just shipped and what
 
 ## Recently shipped
 
+- **#160** Games saved before the Riot key change show on profiles again. On 2026-10-25 a one-off script moved them, with their ranks and recaps, to the new key's PUUIDs, and the benchmarks were collected again ([docs/database.md](database.md#when-the-riot-key-changes)).
 - **#142** Crawlers can't spend the Riot allowance on player pages: `robots.txt` asks them to skip `/player/` and `/api/`, and only the plain profile page loads more season games.
 - **#140** The preview bypass secret is no longer saved in CI's uploaded Playwright traces.
 - **#139** "What keeps killing you" on Insights: the champions and abilities in most of your deaths, and the damage type.
