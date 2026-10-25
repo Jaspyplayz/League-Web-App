@@ -1,4 +1,5 @@
 **Tier:** tiny, normal or risky, and why.
+**Builder:** Claude Code on Opus 5.5, Cursor chat on Grok 4.7, or cloud agent.
 Closes #
 
 ## Walkthrough
@@ -10,7 +11,7 @@ new to the codebase.
 
 ## Review
 Reviewer findings, each fixed (with the test that shows it) or rejected
-(with the evidence). Risky PRs: the second model's findings too.
+(with the evidence). Risky PRs: the Grok 4.7 review from the Cursor chat too.
 
 ## Docs and decisions touched
 The docs/ or docs/adr/ files this changes, or "none".

@@ -1,6 +1,6 @@
 # How a change gets made
 
-Claude writes most of Turnpoint's code, so the automatic checks were already strong. What was missing came after the code was written: a check by something other than the Claude that wrote it, and proof that Jasper understands what he merges. This page is that loop: how much review a change gets, who does each step, and what "done" means. [CLAUDE.md](../CLAUDE.md) holds the short rules agents follow; this is the detail behind its "Review tiers" line.
+One tool writes each change, Claude Code by default, so the automatic checks were already strong. What was missing came after the code was written: a check by something other than the Claude that wrote it, and proof that Jasper understands what he merges. This page is that loop: how much review a change gets, who does each step, and what "done" means. [CLAUDE.md](../CLAUDE.md) holds the short rules agents follow; this is the detail behind its "Review tiers" line.
 
 It comes from the workflow audit of 2026-10-20 (a Claude Doc, only viewable from Jasper's account: https://claude.ai/artifact/AKHHeybFuR3cLMBbDnDyd8).
 
@@ -14,22 +14,22 @@ The thread picks a tier when it starts and names it in the PR, so tiny changes s
 | Normal | A feature or fix inside one area, such as a new Insights card; a Dependabot major version bump; a change in `.github/` or `.claude/` that adds or tightens a check | An issue with 3 to 5 acceptance criteria; Claude reads the code and posts a short plan | Tiny's checks, plus the [reviewer agent](../.claude/agents/reviewer.md) and a screenshot or test name per criterion | "My read" on the PR before merging |
 | Risky | `src/db/`, `drizzle/`, sign-in, the Riot client and rate limiter, `src/app/api/`, anything that spends Claude API money, model retraining, a new judgment shown to players (a grade, a cause, a rating), Riot policy questions, anything that removes or loosens a check (a CI step, the commit hook, a deny rule) | Normal's issue, plus a draft [decision record](#decision-records); Jasper approves the plan | Normal's checks, plus a second model's review and Jasper's own test of the preview | `/explain-back`, then "My read" |
 
-Every tier runs the same automatic checks; the extra steps in the lower rows are where Jasper's time goes. Until a second model is set up, risky PRs say "no second review yet" in their Review section.
+Every tier runs the same automatic checks; the extra steps in the lower rows are where Jasper's time goes. Claude Code writes this app on Opus 5.5. The second look on a risky pull request is Grok 4.7, in the Cursor chat, through pstack ([`.cursor/settings.json`](../.cursor/settings.json)). If that review cannot be run, the PR says "no second review yet".
 
 ## The steps for a normal change
 
-1. **Frame.** Claude turns Jasper's message into an issue from the "Feature or fix" template ([`.github/ISSUE_TEMPLATE/feature.md`](../.github/ISSUE_TEMPLATE/feature.md)): the player problem in one sentence, acceptance criteria, and what is out of scope. Jasper edits or approves it.
+1. **Frame.** The builder turns Jasper's message into an issue from the "Feature or fix" template ([`.github/ISSUE_TEMPLATE/feature.md`](../.github/ISSUE_TEMPLATE/feature.md)): the player problem in one sentence, acceptance criteria, what is out of scope, and which tool will write the code. Jasper edits or approves it.
 2. **Inspect.** Claude reads the code and docs it will touch, names the files, and checks open PRs for overlap.
 3. **Plan.** A short plan in the thread. Normal changes go ahead unless Jasper objects; risky ones wait for his yes.
 4. **Test first where logic is pure.** Analyzer changes start with a failing test written from the acceptance criteria.
 5. **Implement** in small commits on the thread's branch.
 6. **Automatic checks.** The commit hook, then CI (with the golden tests and dependency review), then the smoke test and accessibility scan on the Vercel preview.
-7. **Self-check against the criteria.** Claude opens the preview and puts one screenshot or test name per criterion in the PR.
-8. **Independent review.** The reviewer agent sees the issue, the diff and the test output, never the builder's reasoning. A second model joins only for risky changes.
+7. **Self-check against the criteria.** Claude takes one screenshot of the preview per criterion with the [`verify` skill](../.claude/skills/verify/SKILL.md) (`npm run shot`), or names the test that shows it, and puts them in the PR.
+8. **Independent review.** The reviewer agent sees the issue, the diff and the test output, never the builder's reasoning. For a risky change, the Cursor chat reviews the same diff on Grok 4.7 and does not edit the code.
 9. **Triage.** The builder fixes findings it can reproduce, rejects the rest with a reason, and brings real disagreements to Jasper (see below).
 10. **Explain back, then merge.** Jasper writes "My read" on the PR and merges; Vercel deploys.
 11. **Close out in the same PR.** Docs and decision records change with the code, and `Closes #N` closes the issue.
-12. **After the merge.** A scheduled task on Jasper's PC pulls `main` every 30 minutes, but only when that folder is on `main` with nothing uncommitted, so it never touches a branch in progress. A local git hook then rebuilds the notes in his private Obsidian vault from the merged PRs. The thread that drove the PR adds a dated, facts-only entry to his Dev Log there (what changed, what's next); the "why" and "what I learned" lines are his to write.
+12. **After the merge.** The Cursor chat, on Grok 4.7, updates [docs/STATUS.md](STATUS.md) and any doc the pull request left wrong. It does not redo the code. A scheduled task on Jasper's PC pulls `main` every 30 minutes, but only when that folder is on `main` with nothing uncommitted, so it never touches a branch in progress. A local git hook then rebuilds the notes in his private Obsidian vault from the merged PRs. The thread that drove the PR adds a dated, facts-only entry to his Dev Log there (what changed, what's next); the "why" and "what I learned" lines are his to write.
 
 Tiny changes skip the issue, the plan, the reviewer and "My read": the thread reads the code, makes the change and opens the PR, and Jasper skims the diff and the preview before merging. Step 12 still happens.
 
@@ -40,9 +40,9 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 | Work | Who | Why |
 |---|---|---|
 | Lint, types, unit and golden tests, build, smoke test, accessibility scan, dependency review, CodeQL, Dependabot | Automatic tools | Same answer every time, free, never tired |
-| Framing, planning, implementing, docs | The thread's Claude | It holds the context; handing off loses it |
-| Searching a large area, reviewing a diff, digging through logs | A subagent with a fresh context | Keeps noise out of the builder's context and gives an unbiased read |
-| Reviewing risky changes | A second model from another company | Different training, different blind spots |
+| Framing, planning, implementing, docs that belong with the code | Claude Code, on Opus 5.5 | It holds the thread, and the code has to stay explainable |
+| Searching a large area, digging through logs | A subagent with a fresh context | Keeps noise out of the builder's context |
+| Reviewing a risky diff, then updating status and leftover docs after the merge | The Cursor chat, on Grok 4.7 | A different model family from the one that wrote the code |
 | Acceptance criteria, product calls, the preview check, "My read", merging | Jasper | Judgment, and the learning is the point |
 
 ## The reviewer agent
@@ -98,6 +98,44 @@ Numbers 0001 to 0004 are saved for the four records [#16](https://github.com/Jas
 - **Merged:** CI is green and it deployed.
 - **Verified:** every acceptance criterion has evidence, and Jasper wrote "My read".
 - **Validated:** at least three players used it, and Jasper recorded what they said.
+
+## Which tool writes the code
+
+One change has one builder. Running Claude Code, the Cursor chat, and a cloud agent on the same issue spends two bills and drops the context each time it changes hands. Name the builder when the issue starts.
+
+| Builder | Model | Use it when |
+|---|---|---|
+| Claude Code, in Cursor or the terminal | Opus 5.5 | The default for this app. A feature, a fix, and anything Jasper has to explain. The hard mistakes here are judgments: a wrong death sentence, a wiped profile, a Riot call that gives up. |
+| Cursor chat | Grok 4.7 | Jasper is at the machine. A small edit, a review of a pull request Claude Code opened, and the status and doc update after that pull request merges. It can see files that are not committed yet. It does not take an issue whose builder is Claude Code. |
+| A Cursor cloud agent | Grok 4.7 or Composer | The issue names it, and the work can start from `origin/main`. Opus stays in Claude Code. A Claude model on a cloud agent spends prepaid credit. |
+
+The other two stay off that branch. Cursor can review a pull request Claude Code opened, and Claude Code can review one a cloud agent opened. That is the second look, not a second builder.
+
+A cloud agent opens a draft pull request and stops. Jasper writes "My read" and merges, the same as any other branch. The two-branch limit still holds, whichever tools are writing.
+
+## pstack and cloud agents
+
+pstack runs in Cursor, turned on in [`.cursor/settings.json`](../.cursor/settings.json). Since 2026-10-24 it also runs in Claude Code, as the `pstack@pstack-claude` plugin, a port of the Cursor version. Claude Code's reviewer agent is the first review. On a risky pull request, the Cursor chat runs the pstack review on Grok 4.7 and reports findings without editing the files.
+
+`/setup-pstack` writes `~/.cursor/rules/pstack-models.mdc` on that computer. The skill defaults name slugs this Cursor account cannot spawn (`grok-4.7-xhigh-fast`, `claude-opus-5-5-xhigh`). On 2026-10-24 the rule maps those roles to `grok-4.7-high` and `claude-opus-5-5-high`. For this repo the issue wins over that role map: an issue that names Claude Code is written on Opus 5.5, even if a pstack role says Grok writes bug fixes.
+
+Claude Code's copy reads its role models from `~/.claude/pstack-models.md`, which puts every role on Opus except the multi-model review panels. The plugin does not update itself. To update it, run `claude plugin marketplace update pstack-claude`, then `claude plugin update pstack@pstack-claude`, and restart Claude Code. Then check that the role names in the model file still match.
+
+A cloud agent is a separate virtual machine and a separate branch, started from the remote branch (usually `origin/main`). It can install the app and run the checks below on that copy. It does not see uncommitted work on Jasper's computer, and it does not have the live site's secrets unless they are already in the cloud environment. It starts only when the issue names it as the builder. The two-branch limit above still holds.
+
+The audit fixes [#145](https://github.com/Jaspyplayz/League-Web-App/issues/145) and [#148](https://github.com/Jaspyplayz/League-Web-App/issues/148) through [#151](https://github.com/Jaspyplayz/League-Web-App/issues/151) name Claude Code. After each one merges, the Cursor chat updates status and any doc that pull request left wrong.
+
+The loop's proof is the checks CI runs, plus the `verify` skill's screenshots for a change a player can see:
+
+| Check | Command | When |
+|---|---|---|
+| Lint | `npm run lint` | Every change |
+| Types | `npm run typecheck` | Every change |
+| Unit and golden tests | `npm test` | Every change |
+| Smoke test and accessibility scan | `npm run test:e2e` | A change a player can see |
+| Screenshots of the preview | `npm run shot -- --pr <number> <path>` | A change a player can see, one per acceptance criterion |
+
+An agent is not done when the code compiles. It is done when the checks that apply have been run, and each acceptance criterion names the test or the screen that shows it.
 
 ## Checking that the loop is worth it
 
