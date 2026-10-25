@@ -71,6 +71,8 @@ export type Counts = {
   insightsOld: number;
   askOld: number;
   benchmarkOld: number;
+  databaseBytes: number;
+  oldRawBytes: number;
 };
 
 type SavedGame = { match_id: string; platform_id: string; raw: unknown };
@@ -248,7 +250,9 @@ async function countRows(db: Db): Promise<Counts> {
       (select count(*) from match_insights
         where puuid in (select puuid from op) or opponent_puuid in (select puuid from op))::int as "insightsOld",
       (select count(*) from ask_questions where puuid in (select puuid from op))::int as "askOld",
-      (select count(*) from benchmark_games where collected_at < ${cutoff})::int as "benchmarkOld"`);
+      (select count(*) from benchmark_games where collected_at < ${cutoff})::int as "benchmarkOld",
+      pg_database_size(current_database())::float8 as "databaseBytes",
+      (select coalesce(sum(pg_column_size(raw)), 0) from om)::float8 as "oldRawBytes"`);
   const platforms = await db.execute<{ platform_id: string; games: number }>(sql`
     select platform_id, count(*)::int as games from matches
     where fetched_at < ${cutoff} group by platform_id`);
@@ -394,13 +398,10 @@ async function writeBackup(tx: Tx, path: string, mapPath: string): Promise<Backu
   const summary: BackupSummary = new Map();
   for (const t of TOUCHED) {
     const hashes: string[] = [];
-    for (let offset = 0; ; offset += BATCH) {
-      const rows = await tx.execute<{ row: unknown; hash: string }>(sql`
-        select to_jsonb(t) as row, md5(to_jsonb(t)::text) as hash from ${sql.identifier(t.name)} t
-        where ${t.rows} order by ${columnList(t.key)} limit ${BATCH} offset ${offset}`);
+    const select = sql`to_jsonb(t) as row, md5(to_jsonb(t)::text) as hash`;
+    for await (const rows of pages<{ row: unknown; hash: string }>(tx, t.name, t.key, select, t.rows)) {
       appendFileSync(partial, rows.map((r) => `${JSON.stringify({ type: "row", table: t.name, row: r.row })}\n`).join(""));
       hashes.push(...rows.map((r) => r.hash));
-      if (rows.length < BATCH) break;
     }
     summary.set(t.name, { rows: hashes.length, digest: digest(hashes) });
   }
@@ -543,11 +544,8 @@ async function moveRows(tx: Tx, table: string, other: string) {
 // 2.5
 async function rewriteMatches(tx: Tx, file: MapFile): Promise<number> {
   let rewritten = 0;
-  for (let offset = 0; ; offset += BATCH) {
-    const games = await tx.execute<{ match_id: string; raw: unknown }>(sql`
-      select match_id, raw from matches where fetched_at < ${cutoff}
-      order by match_id limit ${BATCH} offset ${offset}`);
-    if (games.length === 0) break;
+  const oldGames = sql`fetched_at < ${cutoff}`;
+  for await (const games of pages<{ match_id: string; raw: unknown }>(tx, "matches", ["match_id"], sql`match_id, raw`, oldGames)) {
     const updates = games.map((game) => ({
       match_id: game.match_id,
       raw: rewriteRaw(game.raw, file.map, file.summonerIds.get(game.match_id)),
@@ -558,7 +556,6 @@ async function rewriteMatches(tx: Tx, file: MapFile): Promise<number> {
       where m.match_id = x.match_id
       returning 1`);
     rewritten += done.length;
-    if (games.length < BATCH) break;
   }
   return rewritten;
 }
@@ -620,13 +617,27 @@ async function verifyApply(tx: Tx, file: MapFile, playersDeleted: string[]): Pro
 async function gamesHoldingOldPuuids(tx: Tx, map: PuuidMap): Promise<string[]> {
   const find = findOldPuuids(map);
   const holding: string[] = [];
-  for (let offset = 0; ; offset += BATCH) {
-    const games = await tx.execute<{ match_id: string; text: string }>(sql`
-      select match_id, raw::text as text from matches order by match_id limit ${BATCH} offset ${offset}`);
+  const select = sql`match_id, raw::text as text`;
+  for await (const games of pages<{ match_id: string; text: string }>(tx, "matches", ["match_id"], select, sql`true`)) {
     for (const game of games) if (find(game.text).length > 0) holding.push(game.match_id);
-    if (games.length < BATCH) break;
   }
   return holding;
+}
+
+// A table's rows a page at a time, in primary-key order. Each page starts
+// after the last key of the one before: with OFFSET, Postgres would read,
+// convert and sort every skipped row again for every page.
+async function* pages<R>(tx: Tx, table: string, key: string[], select: SQL, where: SQL) {
+  let after = sql`true`;
+  for (;;) {
+    const rows = await tx.execute<R & { page_key: Key }>(sql`
+      select ${select}, ${keyJson(key, "t")} as page_key from ${sql.identifier(table)} t
+      where (${where}) and ${after} order by ${columnList(key, "t")} limit ${BATCH}`);
+    if (rows.length > 0) yield rows;
+    if (rows.length < BATCH) return;
+    const last = rows[rows.length - 1].page_key;
+    after = sql`(${columnList(key, "t")}) > (${sql.join(key.map((name) => sql`${last[name]}`), sql`, `)})`;
+  }
 }
 
 // 2.9

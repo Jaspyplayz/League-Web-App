@@ -40,6 +40,9 @@ loadEnvConfig(process.cwd());
 const CALLS_PER_WINDOW = 50;
 const WINDOW_MS = 2 * 60 * 1000;
 const SECOND_CLEANUP_MS = 5 * 60 * 1000;
+// On a copy the size of production, the database grew by 1.2 times the old
+// games' stored JSON at the apply's peak (issue #154).
+const SPACE_PER_RAW_BYTE = 1.25;
 const DIR = join(process.cwd(), ".cache", "puuid-remap");
 
 const USAGE = "Usage: npm run remap-puuids [-- --apply <map file> | -- --rollback <backup file>]";
@@ -160,6 +163,12 @@ function printDryRun(path: string, file: MapFile, counts: Counts) {
   console.log(`\n${"".padEnd(26)}${"Plan".padEnd(25)}Now`);
   for (const [what, plan, now] of rows) console.log(`${what.padEnd(26)}${plan.padEnd(25)}${now}`);
 
+  const needed = SPACE_PER_RAW_BYTE * counts.oldRawBytes;
+  console.log(
+    `\nThe database is ${mb(counts.databaseBytes)}; the free tier holds 500 MB. The apply needs about ` +
+      `${mb(needed)} more, and most of it stays used afterwards, since Postgres keeps the old copies' space for new rows.`,
+  );
+
   console.log(`\nMapped ${count(file.map.size)} old PUUIDs to new ones.`);
   if (file.skips.length === 0) {
     console.log("Nothing skipped.");
@@ -176,6 +185,10 @@ function printDryRun(path: string, file: MapFile, counts: Counts) {
 
 function count(n: number): string {
   return n.toLocaleString("en-US");
+}
+
+function mb(bytes: number): string {
+  return `${Math.round(bytes / 1024 / 1024)} MB`;
 }
 
 main().catch((error: unknown) => {

@@ -376,7 +376,11 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
       insightsOld: 3,
       askOld: 1,
       benchmarkOld: 3,
+      databaseBytes: expect.any(Number),
+      oldRawBytes: expect.any(Number),
     });
+    expect(result.counts.oldRawBytes).toBeGreaterThan(0);
+    expect(result.counts.databaseBytes).toBeGreaterThan(result.counts.oldRawBytes);
 
     const placed = ["jaspy", "carl", "faker", ...names("p", 8).slice(1), ...names("q", 9), ...names("r", 15), "b1", "b2", "b3", ...names("s", 9)];
     expect(new Map(file.map)).toEqual(new Map(placed.map((name) => [old(name), now(name)])));
