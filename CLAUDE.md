@@ -49,6 +49,7 @@ Routes live in `src/app/`, React components in `src/components/` and helpers in 
 | `npm test` | Vitest unit tests, including golden tests on four real games (`src/lib/analyzer/golden.test.ts`) |
 | `npm run test:e2e` | Playwright smoke test and accessibility scan (`e2e/`); runs on each Vercel preview ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test)) |
 | `npm run shot -- --pr <number> <path>` | Screenshot a page on a PR's preview (or `--base` the live site or a dev server) into `.cache/verify/`, for a PR's evidence. Agents use it through the `verify` skill ([.claude/skills/verify/SKILL.md](.claude/skills/verify/SKILL.md)) |
+| `npm run can-merge -- <pr> [--merge]` | Print each gate a PR must pass before Claude Code merges it; `--merge` merges it only if all pass ([docs/workflow.md](docs/workflow.md#the-steps-for-a-normal-change), step 10) |
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
@@ -88,13 +89,13 @@ Dark "scouting report" style with a light theme. **Blue = you / ahead / win, red
 
 - **Never commit secrets.** No keys, tokens or connection strings in code, docs, commits or PR text.
 - **Small PRs**, one topic each, on a branch. Never push to `main`.
-- **Jasper merges every PR himself** after reading it. Claude never merges, and waits for CI and the Vercel check to pass.
+- **Claude Code merges its own tiny and normal PRs**, only through `npm run can-merge -- <pr> --merge` run from an up-to-date main checkout, which merges nothing unless every gate passes at the head commit. Risky, Dependabot, Cursor and cloud-agent PRs stay Jasper's to merge.
 - **Every PR description has a plain-language walkthrough**: what changed, why, and how to try it, written for someone new to the codebase. Use the sections in `.github/pull_request_template.md`; GitHub only fills them in for PRs opened on its website.
-- **Review tiers.** Pick tiny, normal or risky when a thread starts and name it in the PR; normal and risky PRs get the reviewer agent (`.claude/agents/reviewer.md`) before Jasper reads them. The steps are in [docs/workflow.md](docs/workflow.md). Risky PRs also get a Grok 4.7 review in the Cursor chat. If that review cannot be run, the PR says "no second review yet".
+- **Review tiers.** Pick tiny, normal or risky when a thread starts and name it in the PR; normal and risky PRs get the reviewer agent (`.claude/agents/reviewer.md`) before they merge. The steps are in [docs/workflow.md](docs/workflow.md). Risky PRs also get a Grok 4.7 review in the Cursor chat. If that review cannot be run, the PR says "no second review yet".
 - **When sources disagree,** trust the code and live settings, then repo docs and decision records, then GitHub issues and PRs, then Jasper's Obsidian vault, project memory and the shared notes, and name the one that is out of date.
-- **Leave "My read" to Jasper.** He writes it before merging normal and risky PRs and runs `/explain-back` on risky ones; never fill it in.
+- **Leave "My read" to Jasper.** He writes it when he chooses, and it isn't a merge gate. He runs `/explain-back` on risky PRs. Claude never writes it.
 - **Skills** in `.claude/skills/` are general advice, most copied unchanged from other repos ([notices](.claude/skills/THIRD-PARTY-NOTICES.md)); where one disagrees with this file or `docs/workflow.md`, the repo wins. Use `doubt-driven-development` only on risky changes.
-- At most two branches in progress at once, touching different files. One builder per change, named on the issue before any code. Claude Code on Opus 5.5 writes this app's features and fixes. The Cursor chat on Grok 4.7 reviews a risky diff and updates status and leftover docs after the merge. A cloud agent on Grok or Composer starts only when the issue says so, from `origin/main`. Jasper still merges every PR himself. The detail is in [docs/workflow.md](docs/workflow.md#which-tool-writes-the-code).
+- At most two branches in progress at once, touching different files. One builder per change, named on the issue before any code. Claude Code on Opus 5.5 writes this app's features and fixes. The Cursor chat on Grok 4.7 reviews a risky diff and updates status and leftover docs after the merge. A cloud agent on Grok or Composer starts only when the issue says so, from `origin/main`. Claude Code merges only its own tiny and normal PRs; Jasper merges the rest. The detail is in [docs/workflow.md](docs/workflow.md#which-tool-writes-the-code).
 - **Merge conflicts:** merge `main` into the branch (don't rebase shared branches). For `package-lock.json`, take `main`'s version and re-run `npm install`.
 - `next dev` may re-add a block to `AGENTS.md`; committing it is fine.
 

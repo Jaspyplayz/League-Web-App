@@ -10,9 +10,9 @@ The thread picks a tier when it starts and names it in the PR, so tiny changes s
 
 | Tier | What counts | Before code | After code | Jasper's part |
 |---|---|---|---|---|
-| Tiny | Copy, styling inside one component, docs, Dependabot's weekly minor and patch bumps | Nothing | Commit hook, CI, smoke test and accessibility scan | Skim the diff and the preview, merge |
-| Normal | A feature or fix inside one area, such as a new Insights card; a Dependabot major version bump; a change in `.github/` or `.claude/` that adds or tightens a check | An issue with 3 to 5 acceptance criteria; Claude reads the code and posts a short plan | Tiny's checks, plus the [reviewer agent](../.claude/agents/reviewer.md) and a screenshot or test name per criterion | "My read" on the PR before merging |
-| Risky | `src/db/`, `drizzle/`, sign-in, the Riot client and rate limiter, `src/app/api/`, anything that spends Claude API money, model retraining, a new judgment shown to players (a grade, a cause, a rating), Riot policy questions, anything that removes or loosens a check (a CI step, the commit hook, a deny rule) | Normal's issue, plus a draft [decision record](#decision-records); Jasper approves the plan | Normal's checks, plus a second model's review and Jasper's own test of the preview | `/explain-back`, then "My read" |
+| Tiny | Copy, styling inside one component, docs, Dependabot's weekly minor and patch bumps | Nothing | Commit hook, CI, smoke test and accessibility scan | None for Claude Code's own PRs off the [risky list](../scripts/risky-paths.ts), which it merges with `npm run can-merge`. Skim and merge the rest |
+| Normal | A feature or fix inside one area, such as a new Insights card; a Dependabot major version bump; a change in `.github/` or `.claude/` that adds or tightens a check | An issue with 3 to 5 acceptance criteria; Claude reads the code and posts a short plan | Tiny's checks, plus the [reviewer agent](../.claude/agents/reviewer.md) and a screenshot or test name per criterion | None for Claude Code's own PRs off the risky list, once the reviewer finds no blockers. Merge the rest. "My read" when he chooses |
+| Risky | `src/db/`, `drizzle/`, sign-in, the Riot client and rate limiter, `src/app/api/`, anything that spends Claude API money, model retraining, a new judgment shown to players (a grade, a cause, a rating), Riot policy questions, anything that removes or loosens a check (a CI step, the commit hook, a deny rule) | Normal's issue, plus a draft [decision record](#decision-records); Jasper approves the plan | Normal's checks, plus a second model's review and Jasper's own test of the preview | `/explain-back`, then he merges it himself |
 
 Every tier runs the same automatic checks; the extra steps in the lower rows are where Jasper's time goes. Claude Code writes this app on Opus 5.5. The second look on a risky pull request is Grok 4.7, in the Cursor chat, through pstack ([`.cursor/settings.json`](../.cursor/settings.json)). If that review cannot be run, the PR says "no second review yet".
 
@@ -26,12 +26,12 @@ Every tier runs the same automatic checks; the extra steps in the lower rows are
 6. **Automatic checks.** The commit hook, then CI (with the golden tests and dependency review), then the smoke test and accessibility scan on the Vercel preview.
 7. **Self-check against the criteria.** Claude takes one screenshot of the preview per criterion with the [`verify` skill](../.claude/skills/verify/SKILL.md) (`npm run shot`), or names the test that shows it, and puts them in the PR.
 8. **Independent review.** The reviewer agent sees the issue, the diff and the test output, never the builder's reasoning. For a risky change, the Cursor chat reviews the same diff on Grok 4.7 and does not edit the code.
-9. **Triage.** The builder fixes findings it can reproduce, rejects the rest with a reason, and brings real disagreements to Jasper (see below).
-10. **Explain back, then merge.** Jasper writes "My read" on the PR and merges; Vercel deploys.
+9. **Triage.** The builder fixes findings it can reproduce, rejects the rest with a reason, and brings real disagreements to Jasper (see below). A fix after the review needs a fresh review of the new head commit.
+10. **Merge.** Claude Code merges its own tiny or normal PR with `npm run can-merge -- <pr> --merge`, run from an up-to-date main checkout. It merges only when every gate in [`scripts/can-merge-gates.ts`](../scripts/can-merge-gates.ts) passes at the head commit: agent merging is on, no Claude merge was reverted, the PR is Claude Code's, it's tiny or normal, it touches nothing on the [risky list](../scripts/risky-paths.ts), and `check`, `Vercel` and `smoke` passed. A normal PR also needs the reviewer's "no blockers" for that commit and every criterion ticked. It marks the merge commit as Claude's, then labels the PR `merged-by-claude` and comments with each gate. Jasper merges risky PRs, after `/explain-back`, and every PR Claude Code didn't build. Vercel deploys.
 11. **Close out in the same PR.** Docs and decision records change with the code, and `Closes #N` closes the issue.
 12. **After the merge.** The Cursor chat, on Grok 4.7, updates [docs/STATUS.md](STATUS.md) and any doc the pull request left wrong. It does not redo the code. A scheduled task on Jasper's PC pulls `main` every 30 minutes, but only when that folder is on `main` with nothing uncommitted, so it never touches a branch in progress. A local git hook then rebuilds the notes in his private Obsidian vault from the merged PRs. The thread that drove the PR adds a dated, facts-only entry to his Dev Log there (what changed, what's next); the "why" and "what I learned" lines are his to write.
 
-Tiny changes skip the issue, the plan, the reviewer and "My read": the thread reads the code, makes the change and opens the PR, and Jasper skims the diff and the preview before merging. Step 12 still happens.
+Tiny changes skip the issue, the plan, the reviewer and "My read". The thread reads the code, makes the change, opens the PR and, once the checks pass, merges it with `npm run can-merge`. Step 12 still happens.
 
 The PR template ([`.github/pull_request_template.md`](../.github/pull_request_template.md)) has a section for each of these: the tier, the walkthrough, the criteria with their evidence, the review, the docs touched and "My read".
 
@@ -40,10 +40,10 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 | Work | Who | Why |
 |---|---|---|
 | Lint, types, unit and golden tests, build, smoke test, accessibility scan, dependency review, CodeQL, Dependabot | Automatic tools | Same answer every time, free, never tired |
-| Framing, planning, implementing, docs that belong with the code | Claude Code, on Opus 5.5 | It holds the thread, and the code has to stay explainable |
+| Framing, planning, implementing, docs that belong with the code, merging its own tiny and normal PRs | Claude Code, on Opus 5.5 | It holds the thread, and the code has to stay explainable |
 | Searching a large area, digging through logs | A subagent with a fresh context | Keeps noise out of the builder's context |
 | Reviewing a risky diff, then updating status and leftover docs after the merge | The Cursor chat, on Grok 4.7 | A different model family from the one that wrote the code |
-| Acceptance criteria, product calls, the preview check, "My read", merging | Jasper | Judgment, and the learning is the point |
+| Acceptance criteria, product calls, the preview check, "My read", merging risky PRs and every PR Claude Code didn't build | Jasper | Judgment, and the learning is the point |
 
 ## The reviewer agent
 
@@ -51,7 +51,7 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 
 - **When:** once a normal or risky PR's checks pass, the thread asks the reviewer to review its branch against the issue. Jasper can ask for it too: in a project thread in the Claude app, "run the reviewer on #135"; in Claude Code on his computer, "use the reviewer agent on this branch".
 - **What it gets:** the acceptance criteria, the diff against `main` and the test output. It treats the PR description as claims to check, not evidence.
-- **What comes back:** at most 7 findings, each with a severity (blocker, should-fix, nit), a file and line, a concrete input that goes wrong and a confidence; or "No blockers" and what it checked.
+- **What comes back:** a first line naming the commit it reviewed, `Reviewer agent at <sha>: no blockers` or `Reviewer agent at <sha>: <n> blockers`, which the builder copies into the PR's Review section for `npm run can-merge`. Then at most 7 findings, each with a severity (blocker, should-fix, nit), a file and line, a concrete input that goes wrong and a confidence; or "No blockers" and what it checked.
 - **Afterwards:** it has Bash for `git diff` and `npm test`, so it ends with `git status` to show it changed nothing. The builder lists each finding in the PR's Review section as fixed (with the test that shows it) or rejected (with the evidence).
 
 ## When the reviewer and the builder disagree
@@ -63,7 +63,7 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 
 ## "My read" and `/explain-back`
 
-"My read" is the last section of every normal and risky PR: three to five sentences in Jasper's own words, written before he merges. Claude never writes it, because writing it is how the code becomes his to explain in an interview.
+"My read" is the last section of every normal and risky PR: three to five sentences in Jasper's own words, written when he chooses, before or after the merge. It isn't a merge gate. Claude never writes it, because writing it is how the code becomes his to explain in an interview.
 
 On risky PRs, Jasper first asks for a quiz: in a project thread in the Claude app, "quiz me on #135" (or `/explain-back 135`), and in Claude Code on his computer, `/explain-back 135`. The skill ([`.claude/skills/explain-back/SKILL.md`](../.claude/skills/explain-back/SKILL.md)) asks him three questions about the PR, one at a time: what it does, one decision it made, and one input that would break it. Then it lists what he got right and what he missed, with a file and line for each miss. Its description tells Claude to start it only when he asks, never on its own.
 
@@ -95,8 +95,8 @@ Numbers 0001 to 0004 are saved for the four records [#16](https://github.com/Jas
 
 ## Three meanings of done
 
-- **Merged:** CI is green and it deployed.
-- **Verified:** every acceptance criterion has evidence, and Jasper wrote "My read".
+- **Merged:** CI is green and it deployed, whether Jasper or `npm run can-merge` merged it.
+- **Verified:** every acceptance criterion has evidence. "My read" can come later and isn't part of it.
 - **Validated:** at least three players used it, and Jasper recorded what they said.
 
 ## Which tool writes the code
@@ -111,7 +111,7 @@ One change has one builder. Running Claude Code, the Cursor chat, and a cloud ag
 
 The other two stay off that branch. Cursor can review a pull request Claude Code opened, and Claude Code can review one a cloud agent opened. That is the second look, not a second builder.
 
-A cloud agent opens a draft pull request and stops. Jasper writes "My read" and merges, the same as any other branch. The two-branch limit still holds, whichever tools are writing.
+A cloud agent opens a draft pull request and stops. Jasper merges it, since `npm run can-merge` only takes Claude Code's own pull requests. The two-branch limit still holds, whichever tools are writing.
 
 ## pstack and cloud agents
 
@@ -146,6 +146,7 @@ The next three normal PRs go through the whole loop, then a 15-minute retro: did
 - **GitHub** is the lock. The "Protect Main Branch" ruleset requires a pull request before anything reaches `main` (0 approvals, since GitHub won't let you approve your own PR), requires the `check` and `Vercel` checks to pass, and blocks force pushes and deleting `main`.
 - **Claude Code's deny rules** in [`.claude/settings.json`](../.claude/settings.json) stop Claude's file tools, and commands like `cat` and `sed`, from reading `.env.local`, where the real keys live on Jasper's computer. They also refuse force pushes (`--force`, `--force-with-lease`, `-f` or a `+branch`, written as `git push` or `git -C <folder> push`). A Bash rule matches the command as Claude writes it, so the docs say it "isn't a security boundary" ([permissions](https://code.claude.com/docs/en/permissions)): a search like `grep -r` over the whole folder, a script that opens the file, or a combined flag like `-uf` gets past these. They catch mistakes; GitHub is the lock.
 - **The commit hook** in the same file runs lint and typecheck when Claude runs `git commit`, or `git -C <folder> commit` the way subagents commit in their own worktrees, and checks the folder the commit lands in, so CI rarely goes red.
+- **Agent merging** ([`scripts/can-merge.ts`](../scripts/can-merge.ts), decision record [0008](adr/0008-agents-merge-two-way-doors.md)) lets Claude Code merge its own tiny and normal PRs. Claude runs it from the main checkout, and it refuses when its own code there differs from `origin/main`. Its switch, `.claude/agent-merge.json`, is read from `origin/main`, never the working copy, and is on the risky list, so only a PR Jasper merges can turn merging on or off. The risky list is one file, [`scripts/risky-paths.ts`](../scripts/risky-paths.ts), and a PR that touches a path on it is Jasper's, whatever its tier says. The changed files come from the PR's head commit itself. `check` and `smoke` count only from their workflows, and `Vercel` only from a status that links to vercel.com. The merge runs `gh pr merge --merge --match-head-commit <sha>`, so only the commit that was checked can land, and writes "Merged by Claude Code (npm run can-merge)." into the merge commit. A revert on main of a commit marked that way, or of a commit it brought in, since `enabledSince`, stops agent merging until Jasper sets a later date. `gh` runs as Jasper, so GitHub shows him as the merger. The `merged-by-claude` label and the comment are for people reading the PR; the marker is the record, since a label can be changed by anyone with access. Claude's deny rules block editing the switch and running `gh pr merge` directly, so Claude merges only through `can-merge`. Jasper can still merge from GitHub. All of this stops mistakes, not an agent set on getting around it, since `gh` runs with Jasper's credentials. GitHub's ruleset stays the lock, and a revert of a Claude merge switches merging off. A GitHub Action that merges with main's gate code, so the agent never holds merge rights, is the stronger option, left out for now.
 - **Project lint rules** in [`eslint-rules/turnpoint.mjs`](../eslint-rules/turnpoint.mjs) check three rules from `CLAUDE.md` in `npm run lint`, so they run on every commit and in CI: Riot API hosts appear only in `src/lib/riot/`, a file in `src/lib/` or `src/db/` that reads a secret env var imports `"server-only"`, and no green, emerald or lime color classes. Their tests run in `npm test`. A mistake caught twice becomes a check like these (a lint rule, a test or a hook) rather than another line of instructions.
 - **Dependency review** ([`.github/workflows/dependency-review.yml`](../.github/workflows/dependency-review.yml)) fails a PR that adds a package version with a known vulnerability. It isn't a required check yet.
 - **The accessibility scan** ([`e2e/accessibility.spec.ts`](../e2e/accessibility.spec.ts)) runs with the smoke test on each preview and lists what axe finds on the run's summary page. Any finding fails the smoke test, so a PR can't add one to the pages it visits (`FAIL_ON_FINDINGS` in the spec).
