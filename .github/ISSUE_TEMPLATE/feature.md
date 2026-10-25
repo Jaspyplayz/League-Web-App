@@ -13,6 +13,8 @@ about: A player problem with acceptance criteria, for normal and risky changes
 
 **Tier.** Tiny, normal or risky, and why.
 
-**Plan** (Claude fills in before coding). Files, data, tests, docs to update.
+**Builder.** Claude Code on Opus 5.5 (default), Cursor chat on Grok 4.7, or a cloud agent. One builder for this issue.
+
+**Plan** (the builder fills in before coding). Files, data, tests, docs to update.
 
 **How we'll verify.** Test names, preview steps, screenshots.
