@@ -58,15 +58,11 @@ export function WinChanceChart({
 
 // Where the win chance comes from, under the charts.
 export function WinChanceNote({ model }: { model: WinChanceModel }) {
-  const at20 = model.evaluation.byMinute.find((m) => m.minute === 20);
   return (
     <p className="text-note text-faint">
       Win chance comes from a model trained on {model.games.toLocaleString("en-US")} ranked{" "}
       {model.rank === ALL_RANKS ? "games" : `${model.rank} games, this player's rank`}: how often
       teams in the same spot (gold, XP, kills, towers, dragons, buffs) went on to win.
-      {at20 && at20.examples > 0
-        ? ` At 20 minutes it picks the winner ${percent(at20.accuracy)} of the time in games it hasn't seen.`
-        : ""}
     </p>
   );
 }

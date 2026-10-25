@@ -43,6 +43,7 @@ export default function HowItWorksPage() {
   // What 3,000 gold and 2,000 XP ahead at 20:00 is worth, by rank.
   const lead = { minute: 20, goldLead: 3000, xpLead: 2000, dragonLead: 0, inhibitorLead: 0, baron: 0 } as const;
   const at20 = (e: Evaluation) => e.byMinute.find((m) => m.minute === 20)?.accuracy ?? 0;
+  const unseen = SCORE_MODEL.unseen;
 
   return (
     <main className="mx-auto flex w-full max-w-[860px] flex-col gap-12 px-6 pb-[88px] pt-14">
@@ -229,10 +230,15 @@ export default function HowItWorksPage() {
           role in our games, so a great game in a loss still scores well.
         </p>
         <p>
-          The current model was trained on {SCORE_MODEL.games.toLocaleString("en-US")} games and
-          picks the winning side{" "}
-          <strong className="text-ink">{percent(SCORE_MODEL.shared.accuracy)}</strong> of the time
-          on games it didn&apos;t see, where a coin flip would get 50%.
+          The current model was trained on {SCORE_MODEL.games.toLocaleString("en-US")} games.
+          {unseen && (
+            <>
+              {" "}
+              On {unseen.games.toLocaleString("en-US")} saved games it didn&apos;t train on, it
+              picks the winning side <strong className="text-ink">{percent(unseen.accuracy)}</strong>{" "}
+              of the time, where a coin flip would get 50%.
+            </>
+          )}
         </p>
       </Section>
 

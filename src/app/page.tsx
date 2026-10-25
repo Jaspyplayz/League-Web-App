@@ -77,12 +77,12 @@ export default function Home() {
             <h2 className="font-display text-[22px] font-semibold uppercase tracking-[0.02em]">
               Gold vs your opponent
             </h2>
-            <span className="font-mono text-[13px] text-faint">Sample game · Ahri vs Syndra · Mid</span>
+            <span className="font-mono text-[13px] text-faint">Illustration · not a real game</span>
           </div>
           <DiffChart
             points={SAMPLE_GOLD_DIFF}
             markers={SAMPLE_MARKERS}
-            description="Sample game. Gold difference against the opponent in the same role over 31 minutes: slightly ahead until 8 minutes, then behind, briefly ahead at 22 minutes, and 2,900 gold behind at the end."
+            description="Illustration, not a real game. Gold difference against the opponent in the same role over 31 minutes: slightly ahead until 8 minutes, then behind, briefly ahead at 22 minutes, and 2,900 gold behind at the end."
           />
           <div className="flex items-start gap-3.5 rounded-xl bg-page px-4 py-3.5">
             <div
