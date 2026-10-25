@@ -187,7 +187,7 @@ main().catch((error: unknown) => {
   } else if (error instanceof ApplyCheckError) {
     console.error(error.message);
   } else if (error instanceof RiotApiError && error.kind === "bad-key") {
-    console.error(`${error.message}. RIOT_API_KEY has to be the key the live site uses.`);
+    console.error(`${error.message}. Use the key the live site uses.`);
   } else if (error instanceof RiotApiError) {
     console.error(`Riot API error: ${error.message}`);
   } else {
