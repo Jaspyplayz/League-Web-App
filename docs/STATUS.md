@@ -18,6 +18,7 @@ Where Turnpoint is right now: what's being worked on, what just shipped and what
 
 ## Recently shipped
 
+- **#160** Games saved before the Riot key change show on profiles again. On 2026-10-25 a one-off script moved them, with their ranks and recaps, to the new key's PUUIDs, and the benchmarks were collected again ([docs/database.md](database.md#when-the-riot-key-changes)).
 - **#142** Crawlers can't spend the Riot allowance on player pages: `robots.txt` asks them to skip `/player/` and `/api/`, and only the plain profile page loads more season games.
 - **#140** The preview bypass secret is no longer saved in CI's uploaded Playwright traces.
 - **#139** "What keeps killing you" on Insights: the champions and abilities in most of your deaths, and the damage type.
@@ -46,7 +47,6 @@ Jasper's own to-dos: Riot API key that doesn't expire (#17, personal key applied
 
 ## Known issues
 
-- **Games saved before 2026-10-24 09:00 UTC hold the old Riot app's PUUIDs** (#154), so profiles leave them out until Jasper runs `npm run remap-puuids` ([docs/database.md](database.md#when-the-riot-key-changes)). Don't run `npm run benchmarks` before then, and run it right after: the apply deletes the old benchmark rows, so Insights has no rank comparisons until it does.
 - **Riot dev key expires every 24 hours** until the personal key is approved (#17), and the rate limits in `RIOT_LIMITS` are set for a dev key.
 - **Vercel bypass secret**: it was in Playwright traces uploaded by failed smoke runs before #140, and the smoke test sent it to Data Dragon and Sentry until #159. Rotating the secret (once every branch in progress has merged `main`) and deleting the old trace artifacts is on Jasper. (check with Jasper whether this is done)
 - **`/api/mcp` has no request limit**, so an AI app looking up many new players could use up the Riot allowance ([ARCHITECTURE.md](../ARCHITECTURE.md#known-limits)).
