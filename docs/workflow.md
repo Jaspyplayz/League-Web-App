@@ -129,7 +129,7 @@ The loop's proof is the checks CI runs, plus the `verify` skill's screenshots fo
 
 | Check | Command | When |
 |---|---|---|
-| Lint | `npm run lint` | Every change |
+| Lint, with the project rules in `eslint-rules/` | `npm run lint` | Every change |
 | Types | `npm run typecheck` | Every change |
 | Unit and golden tests | `npm test` | Every change |
 | Smoke test and accessibility scan | `npm run test:e2e` | A change a player can see |
@@ -146,6 +146,7 @@ The next three normal PRs go through the whole loop, then a 15-minute retro: did
 - **GitHub** is the lock. The "Protect Main Branch" ruleset requires a pull request before anything reaches `main` (0 approvals, since GitHub won't let you approve your own PR), requires the `check` and `Vercel` checks to pass, and blocks force pushes and deleting `main`.
 - **Claude Code's deny rules** in [`.claude/settings.json`](../.claude/settings.json) stop Claude's file tools, and commands like `cat` and `sed`, from reading `.env.local`, where the real keys live on Jasper's computer. They also refuse force pushes (`--force`, `--force-with-lease`, `-f` or a `+branch`, written as `git push` or `git -C <folder> push`). A Bash rule matches the command as Claude writes it, so the docs say it "isn't a security boundary" ([permissions](https://code.claude.com/docs/en/permissions)): a search like `grep -r` over the whole folder, a script that opens the file, or a combined flag like `-uf` gets past these. They catch mistakes; GitHub is the lock.
 - **The commit hook** in the same file runs lint and typecheck when Claude runs `git commit`, or `git -C <folder> commit` the way subagents commit in their own worktrees, and checks the folder the commit lands in, so CI rarely goes red.
+- **Project lint rules** in [`eslint-rules/turnpoint.mjs`](../eslint-rules/turnpoint.mjs) check three rules from `CLAUDE.md` in `npm run lint`, so they run on every commit and in CI: Riot API hosts appear only in `src/lib/riot/`, a file in `src/lib/` or `src/db/` that reads a secret env var imports `"server-only"`, and no green, emerald or lime color classes. Their tests run in `npm test`. A mistake caught twice becomes a check like these (a lint rule, a test or a hook) rather than another line of instructions.
 - **Dependency review** ([`.github/workflows/dependency-review.yml`](../.github/workflows/dependency-review.yml)) fails a PR that adds a package version with a known vulnerability. It isn't a required check yet.
 - **The accessibility scan** ([`e2e/accessibility.spec.ts`](../e2e/accessibility.spec.ts)) runs with the smoke test on each preview and lists what axe finds on the run's summary page. Any finding fails the smoke test, so a PR can't add one to the pages it visits (`FAIL_ON_FINDINGS` in the spec).
 - **Golden tests** ([`src/lib/analyzer/golden.test.ts`](../src/lib/analyzer/golden.test.ts)) run the analyzer on four real, anonymized games inside `npm test`. If a change moves the gold leads or the turning points it finds in those games, CI fails until someone checks the new values make sense and updates them.
