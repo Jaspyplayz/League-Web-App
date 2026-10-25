@@ -48,7 +48,7 @@ Jasper's own to-dos: Riot API key that doesn't expire (#17, personal key applied
 
 - **Games saved before 2026-10-24 09:00 UTC hold the old Riot app's PUUIDs** (#154), so profiles leave them out until Jasper runs `npm run remap-puuids` ([docs/database.md](database.md#when-the-riot-key-changes)). Don't run `npm run benchmarks` before then, and run it right after: the apply deletes the old benchmark rows, so Insights has no rank comparisons until it does.
 - **Riot dev key expires every 24 hours** until the personal key is approved (#17), and the rate limits in `RIOT_LIMITS` are set for a dev key.
-- **Vercel bypass secret**: it was in Playwright traces uploaded by failed smoke runs before #140. Rotating the secret and deleting the old trace artifacts is on Jasper. (check with Jasper whether this is done)
+- **Vercel bypass secret**: it was in Playwright traces uploaded by failed smoke runs before #140, and the smoke test sent it to Data Dragon and Sentry until #159. Rotating the secret (once every branch in progress has merged `main`) and deleting the old trace artifacts is on Jasper. (check with Jasper whether this is done)
 - **`/api/mcp` has no request limit**, so an AI app looking up many new players could use up the Riot allowance ([ARCHITECTURE.md](../ARCHITECTURE.md#known-limits)).
 - **Crawlers are only asked to stay out.** Rude crawlers ignore `robots.txt`; Vercel's bot protection would be the next step.
 - **One free database**: Supabase's free tier holds 500 MB and has no downloadable backups.

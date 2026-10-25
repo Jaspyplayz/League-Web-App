@@ -19,6 +19,7 @@ import { loadEnvConfig } from "@next/env";
 import { chromium, devices, type BrowserContext, type Page } from "@playwright/test";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { THEME_KEY } from "@/lib/theme";
+import { passPreviewLogin } from "../e2e/preview-login";
 import { classify, OUTCOMES, type Outcome } from "./shot-outcome";
 
 const USAGE = `Usage: npm run shot -- [--pr <number> | --base <url>] [--light] [--phone] [--tab <name>] [--expect <outcome>] <path>...
@@ -75,20 +76,6 @@ function previewUrl(pr: string): string {
     throw new Error(`PR #${pr}'s latest commit has no finished Vercel preview yet. Wait for the Vercel check.`);
   }
   return url;
-}
-
-// The secret goes only to the preview that --pr found, never to a --base URL,
-// which could be anyone's site. Playwright's extraHTTPHeaders would also send
-// it with every image from Data Dragon and every report to Sentry (issue #156).
-async function passPreviewLogin(context: BrowserContext, origin: string) {
-  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  if (!secret) return;
-  await context.route("**/*", async (route) => {
-    const request = route.request();
-    if (new URL(request.url()).origin !== origin) return route.continue();
-    const headers = { ...(await request.allHeaders()), "x-vercel-protection-bypass": secret };
-    return route.continue({ headers });
-  });
 }
 
 type Look = { outcome: Outcome; reason: string; text: string };
@@ -215,16 +202,15 @@ async function main() {
     return;
   }
   loadEnv();
-  const origin = new URL(
-    options.pr ? previewUrl(options.pr) : (options.base ?? process.env.BASE_URL ?? "http://localhost:3000"),
-  ).origin;
+  const preview = options.pr ? new URL(previewUrl(options.pr)).origin : undefined;
+  const origin = preview ?? new URL(options.base ?? process.env.BASE_URL ?? "http://localhost:3000").origin;
   const site = options.pr ? `pr${options.pr}` : new URL(origin).hostname.split(".")[0];
 
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext(devices[options.phone ? "Pixel 7" : "Desktop Chrome"]);
     if (options.light) await context.addInitScript((key) => localStorage.setItem(key, "light"), THEME_KEY);
-    if (options.pr) await passPreviewLogin(context, origin);
+    if (preview) await passPreviewLogin(context, preview);
 
     let ok = true;
     if (options.check) ok = await check(context, origin);
