@@ -1,9 +1,6 @@
 import { Panel } from "@/components/ui/panel";
 
-// Grey rows shown while the recent matches load, so the page doesn't jump
-// from a line of text to a full list. The pulse stops when the player has
-// asked for reduced motion. `quiet` is for a parent skeleton that already
-// has its own loading label.
+// `quiet` drops the loading label. A parent skeleton already announces the wait.
 export function MatchListSkeleton({ quiet = false }: { quiet?: boolean }) {
   return (
     <div

@@ -51,10 +51,7 @@ import { Weaknesses } from "./weaknesses";
 //
 // Every game needs its match and timeline, each one Riot call the first
 // time. A new player's 100 games would be 200 calls, twice the dev key's
-// allowance (100 calls per 2 minutes). This render only reads games already
-// saved. <AnalysisProgress> asks for the next handful, then refreshes the
-// route once that handful is stored, so the charts catch up without a timer
-// reloading the page (see src/lib/trend-games.ts).
+// allowance (100 calls per 2 minutes).
 
 type Params = Promise<{ region: string; riotId: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -131,8 +128,6 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const chosen = choice ? await loadChosenPlayer(choice, { budget: 0 }) : null;
   const theirs = chosen?.status === "ok" ? chosen : null;
 
-  // One progress bar for both players' games. The batch is the only Riot
-  // fetch. It re-reads the same window the URL asked for.
   const counts = fillCounts([
     {
       analyzed: allGames.length,

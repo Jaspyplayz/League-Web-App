@@ -9,11 +9,9 @@ import { fromSlug } from "@/lib/riot-id";
 import { loadTrendGames } from "@/lib/trend-games";
 import { loadChosenPlayer, readChoice } from "./chosen-player";
 
-// One Insights batch. The page itself only reads the cache, so this is the
-// call that asks Riot for the next matches and timelines. The write finishes
-// before the result goes back, so the refresh that follows can see the rows.
-// Anyone can call a server action, so the region, the slug and the window
-// are checked here the same way the page checks them.
+// The write finishes before the result goes back, so the refresh that follows
+// can see the rows. Anyone can call a server action, so the region, the slug
+// and the window are checked here the same way the page checks them.
 
 const TIMELINES_PER_BATCH = 5;
 

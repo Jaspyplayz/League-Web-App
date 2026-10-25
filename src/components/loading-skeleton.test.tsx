@@ -2,9 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { InsightsSkeleton, MatchSkeleton, ProfileSkeleton } from "./loading-skeleton";
 
-// What a player gets in the HTML while a page is still loading. The shape is
-// grey blocks with a name for assistive tech, not a lone "Loading…" sentence.
-
 describe("loading skeletons", () => {
   it("draws the profile instead of a lookup sentence", () => {
     const html = renderToStaticMarkup(<ProfileSkeleton />);

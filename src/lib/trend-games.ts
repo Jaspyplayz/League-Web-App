@@ -14,8 +14,7 @@ import type { Match } from "@/lib/riot/types";
 // Every game needs its match and its timeline, each one Riot call the first
 // time. At most `matchBudget` new matches (10 unless a caller says otherwise)
 // and `budget` new timelines are fetched per call, so one view can't use up
-// the rate limit. `waiting` is how many are still missing. The Insights page
-// reads with both budgets at 0 and lets the batch action do the fetching.
+// the rate limit.
 export type TrendGames = {
   matches: Match[]; // every match that loaded
   trendMatches: Match[]; // the ones with a role matchup to compare
@@ -51,8 +50,6 @@ export async function loadTrendGames(
 ): Promise<TrendGames> {
   const ids = await getMatchIds(region, puuid, count, { queue });
 
-  // A match that fails to load is retried on the next batch, like a
-  // missing timeline.
   const loaded = await loadMatches(region, ids, matchBudget, persist);
   const { matches } = loaded;
   const trendMatches = matches.filter((m) => isTrendGame(m, puuid));

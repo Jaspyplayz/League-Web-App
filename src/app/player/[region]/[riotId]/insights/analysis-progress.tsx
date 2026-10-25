@@ -11,18 +11,8 @@ import {
   type FillCounts,
 } from "@/lib/insight-fill";
 
-// How long a Log reload can sit still before we stop and offer a button.
-// Insights doesn't use this. Its batch tells us immediately whether it moved.
 const GIVE_UP_MS = 20_000;
 
-// "Analyzed 8 of 18 games" while games are still being stored.
-//
-// Insights passes `batch`. That action fetches the next handful and the bar
-// updates from the result. The route refreshes only when the counts changed,
-// so the charts redraw from the cache. It does not reload on a timer.
-//
-// The Log doesn't pass `batch`. Its page render is what fetches the next
-// handful, so a refresh is still how that page moves forward.
 export function AnalysisProgress({
   analyzed,
   total,
@@ -45,7 +35,6 @@ export function AnalysisProgress({
   const [stalled, setStalled] = useState(false);
   // Bumped by "Try again" so the effect below runs again.
   const [attempt, setAttempt] = useState(0);
-  // Milliseconds to wait before the next Insights batch. 0 starts at once.
   const [holdMs, setHoldMs] = useState(0);
   const running = useRef(false);
   const shown = batch && ahead ? mergeCounts(ahead, server) : server;
@@ -75,8 +64,6 @@ export function AnalysisProgress({
       running.current = true;
       batch()
         .then((result) => {
-          // Clear this before the state updates, so the effect that follows
-          // can schedule the next batch.
           running.current = false;
           if (result.status === "pause") {
             if (result.retryAfterS == null) setStalled(true);

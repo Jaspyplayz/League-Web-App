@@ -2,11 +2,6 @@ import type { ReactNode } from "react";
 import { MatchListSkeleton } from "@/components/match-list-skeleton";
 import { Panel } from "@/components/ui/panel";
 
-// Grey blocks in the shape of a page, shown while the real panels are still
-// on their way. The pulse is Tailwind's, and motion-safe turns it off when
-// the player asked for reduced motion. Screen readers get the label. The
-// blocks themselves stay quiet.
-
 function Frame({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div role="status" aria-busy="true" aria-label={label} className="flex flex-col gap-7 motion-safe:animate-pulse">
@@ -74,8 +69,6 @@ export function InsightsSkeleton() {
   );
 }
 
-// The chart area under the progress bar, while the first games are still
-// being stored. The bar already announces the wait, so these blocks are quiet.
 export function ChartPlaceholders() {
   return (
     <div aria-hidden="true" className="flex flex-col gap-5 motion-safe:animate-pulse">
