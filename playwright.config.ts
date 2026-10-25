@@ -4,8 +4,6 @@ import { defineConfig, devices } from "@playwright/test";
 // Vercel preview once it has deployed. Locally:
 //   BASE_URL=https://<preview>.vercel.app npm run test:e2e
 // or start `npm run dev` and run `npm run test:e2e` with no BASE_URL.
-const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-
 export default defineConfig({
   testDir: "e2e",
   // Riot can be slow, and the first visit to a preview starts a cold server.
@@ -14,14 +12,11 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
     baseURL: process.env.BASE_URL ?? "http://localhost:3000",
-    // Lets the test through Vercel's preview protection, when it's turned on.
-    extraHTTPHeaders: bypass
-      ? { "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" }
-      : undefined,
     // A trace records every request header, including the bypass secret
-    // above, and CI uploads failed runs' files where anyone signed in to
-    // GitHub can download them. So CI keeps only screenshots; the failing
-    // test also prints the page's text into the log (e2e/smoke.spec.ts).
+    // sent to the preview, and CI uploads failed runs' files where anyone
+    // signed in to GitHub can download them. So CI keeps only screenshots;
+    // the failing test also prints the page's text into the log
+    // (e2e/smoke.spec.ts).
     trace: process.env.CI ? "off" : "retain-on-failure",
     screenshot: process.env.CI ? "only-on-failure" : "off",
   },

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 // One happy path through the real site: search a player, see their profile,
 // open the sample analysis. It runs against each PR's Vercel preview, so it
