@@ -1,20 +1,12 @@
-import { expect, test } from "./fixtures";
+import { expect, recordSent, test } from "./fixtures";
 
+// The fixture fails any test whose requests took the secret to another site.
+// This test checks that check has something to catch: the preview got the
+// secret, and the page also loaded from other sites.
 test("send the preview bypass secret only to the preview", async ({ page, baseURL }) => {
   test.skip(!process.env.VERCEL_AUTOMATION_BYPASS_SECRET, "No bypass secret to check.");
   const site = new URL(baseURL!).origin;
-  const sent: Promise<{ origin: string; secret: boolean }>[] = [];
-  // Headers a route adds show up only once the request has gone out, so read
-  // them when it finishes, not when it starts.
-  page.on("requestfinished", (request) => {
-    const url = new URL(request.url());
-    if (!url.protocol.startsWith("http")) return;
-    sent.push(
-      request
-        .allHeaders()
-        .then((headers) => ({ origin: url.origin, secret: "x-vercel-protection-bypass" in headers })),
-    );
-  });
+  const sent = recordSent(page.context());
 
   await page.goto("/");
   await page.getByRole("link", { name: "See a sample analysis" }).click();
@@ -23,13 +15,7 @@ test("send the preview bypass secret only to the preview", async ({ page, baseUR
   });
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
 
-  const requests = await Promise.all(sent);
-  const toSite = requests.filter((r) => r.origin === site);
-  const elsewhere = requests.filter((r) => r.origin !== site);
-  const leaked: Record<string, number> = {};
-  for (const r of elsewhere) if (r.secret) leaked[r.origin] = (leaked[r.origin] ?? 0) + 1;
-
-  expect(toSite.filter((r) => r.secret).length, "requests to the preview with the secret").toBeGreaterThan(0);
-  expect(elsewhere.length, "requests to other sites").toBeGreaterThan(0);
-  expect(leaked, "requests to other sites that got the secret").toEqual({});
+  const requests = await sent();
+  expect(requests.filter((r) => r.origin === site && r.secret).length, "requests to the preview with the secret").toBeGreaterThan(0);
+  expect(requests.filter((r) => r.origin !== site).length, "requests to other sites").toBeGreaterThan(0);
 });
