@@ -18,8 +18,6 @@ export type HabitBrief = {
 
 export type StaticBriefs = { sample: SampleBrief; habit: HabitBrief };
 
-// The sample game and the level-6 card do not depend on this browser, so one
-// object is enough for every render.
 const briefs: StaticBriefs = {
   sample: {
     href: SAMPLE_MATCH_HREF,
@@ -45,9 +43,6 @@ export type Opener =
   | { source: "example"; player: PublicExample }
   | { source: "recent"; player: SavedPlayer };
 
-// An empty list means this browser has not looked anyone up, so the card
-// offers the public example. A list that starts with that same account stays
-// recent, because the lookup already happened.
 export function resolveOpener(recent: readonly SavedPlayer[]): Opener {
   if (recent.length === 0) return { source: "example", player: SAMPLE_MATCH };
   return { source: "recent", player: recent[0] };

@@ -82,8 +82,6 @@ function useSavedPlayers(key: ListKey): SavedPlayer[] {
   return useMemo(() => parseSavedPlayers(saved, MAX[key]), [saved, key]);
 }
 
-// The home page's third card reads this same list. The server snapshot stays
-// empty, so the first HTML offers the example player and hydration matches.
 export function useRecentPlayers(): SavedPlayer[] {
   return useSavedPlayers(RECENT_PLAYERS_KEY);
 }
