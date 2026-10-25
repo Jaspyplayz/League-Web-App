@@ -31,23 +31,12 @@ const RECAP_ILLUSTRATION = {
   ],
 } as const;
 
-// RecapText always prints "Written by AI (Claude) from the stats on this
-// page." That sentence is false for an illustration.
 function RecapIllustration() {
+  const detail = RECAP_ILLUSTRATION.points.map((point) => `${point.time}\t${point.text}`).join("\n");
   return (
     <>
       <span className="font-mono text-[13px] text-faint">{RECAP_ILLUSTRATION.label}</span>
-      <p className="text-body font-semibold text-ink">{RECAP_ILLUSTRATION.headline}</p>
-      <ul className="flex flex-col divide-y divide-line">
-        {RECAP_ILLUSTRATION.points.map((point) => (
-          <li key={point.time} className="flex gap-4 py-2">
-            <span className="w-24 shrink-0 font-mono text-sm leading-6 text-ahead-soft tabular-nums">
-              {point.time}
-            </span>
-            <span className="text-ink-soft">{point.text}</span>
-          </li>
-        ))}
-      </ul>
+      <RecapText headline={RECAP_ILLUSTRATION.headline} detail={detail} fromThisPage={false} />
     </>
   );
 }
