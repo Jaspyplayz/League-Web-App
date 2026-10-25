@@ -15,7 +15,7 @@ Eight skills in this folder come from other people's open-source repos. Jasper i
 
 ## How they fit this repo
 
-- They are general advice. Where one disagrees with [CLAUDE.md](../../CLAUDE.md) or [docs/workflow.md](../../docs/workflow.md), the repo's rules win: Jasper merges every PR, migrations come from `npm run db:generate`, decision records use the sections in docs/workflow.md, and colors come from the tokens in `src/app/globals.css`.
+- They are general advice. Where one disagrees with [CLAUDE.md](../../CLAUDE.md) or [docs/workflow.md](../../docs/workflow.md), the repo's rules win: Claude merges only its own tiny and normal PRs, through `npm run can-merge`, migrations come from `npm run db:generate`, decision records use the sections in docs/workflow.md, and colors come from the tokens in `src/app/globals.css`.
 - Some link to `../../references/*.md`. Those files live in the source repo and aren't installed by `npx skills add`, so the links lead nowhere here; skip them.
 - Edit nothing inside these folders, so they stay identical to their source. To update one, copy the newer folder from its source repo in a PR of its own.
 

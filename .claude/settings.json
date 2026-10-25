@@ -2,6 +2,10 @@
   "permissions": {
     "deny": [
       "Read(.env.local)",
+      "Edit(.claude/agent-merge.json)",
+      "Write(.claude/agent-merge.json)",
+      "Bash(gh pr merge)",
+      "Bash(gh pr merge*)",
       "Bash(git push *--force*)",
       "Bash(git push -f*)",
       "Bash(git push * -f*)",

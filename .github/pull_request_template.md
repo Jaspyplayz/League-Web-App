@@ -10,11 +10,13 @@ new to the codebase.
 - [ ] Criterion: screenshot or test name
 
 ## Review
-Reviewer findings, each fixed (with the test that shows it) or rejected
-(with the evidence). Risky PRs: the Grok 4.7 review from the Cursor chat too.
+The reviewer's first line, `Reviewer agent at <sha>: no blockers`, then its
+findings, each fixed (with the test that shows it) or rejected (with the
+evidence). Risky PRs: the Grok 4.7 review from the Cursor chat too.
 
 ## Docs and decisions touched
 The docs/ or docs/adr/ files this changes, or "none".
 
 ## My read (Jasper)
-Three to five sentences in my own words, before merging. Tiny PRs skip this.
+Three to five sentences in my own words, written when I choose. It doesn't
+hold up the merge. Tiny PRs skip this.

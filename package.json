@@ -27,7 +27,8 @@
     "check-positions": "tsx --conditions=react-server scripts/check-positions.ts",
     "rift-map": "tsx --conditions=react-server scripts/rift-map.ts",
     "remap-puuids": "tsx --conditions=react-server scripts/remap-puuids.ts",
-    "shot": "tsx scripts/shot.ts"
+    "shot": "tsx scripts/shot.ts",
+    "can-merge": "tsx scripts/can-merge.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
