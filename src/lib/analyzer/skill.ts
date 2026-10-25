@@ -1,5 +1,3 @@
-// Ranked from the stat rows and habit rates Insights already computed.
-
 import type { StatComparison, StatKey } from "./compare";
 import {
   formatClock,
@@ -60,7 +58,7 @@ type StatSkill = {
   subject: string;
   format: (value: number) => string;
   gap: SkillGap;
-  scale: number;
+  roundedGapForScore1: number;
   domain: Domain;
 };
 
@@ -69,7 +67,7 @@ type HabitSkill = {
   youDid: string;
   format: (value: number) => string;
   gap: SkillGap;
-  scale: number;
+  roundedGapForScore1: number;
   domain: "unit";
 };
 
@@ -82,7 +80,6 @@ const tenthGap = { decimals: 1 };
 const hundredthGap = { decimals: 2 };
 const shareGap = { decimals: 2, format: percent };
 
-// `scale` is the rounded gap that scores 1, so a gold lead and a death count share one ranking.
 const STAT_SKILLS = {
   goldAt10: {
     key: "goldAt10",
@@ -90,7 +87,7 @@ const STAT_SKILLS = {
     subject: "gold lead at 10",
     format: formatSigned,
     gap: leadGap,
-    scale: 400,
+    roundedGapForScore1: 400,
     domain: "lead",
   },
   goldAt15: {
@@ -99,7 +96,7 @@ const STAT_SKILLS = {
     subject: "gold lead at 15",
     format: formatSigned,
     gap: leadGap,
-    scale: 400,
+    roundedGapForScore1: 400,
     domain: "lead",
   },
   csAt10: {
@@ -108,7 +105,7 @@ const STAT_SKILLS = {
     subject: "CS lead at 10",
     format: formatSigned,
     gap: leadGap,
-    scale: 10,
+    roundedGapForScore1: 10,
     domain: "lead",
   },
   csPerMinEarly: {
@@ -117,7 +114,7 @@ const STAT_SKILLS = {
     subject: "CS per minute from 0 to 10",
     format: oneDecimal,
     gap: tenthGap,
-    scale: 1,
+    roundedGapForScore1: 1,
     domain: "from-zero",
   },
   csPerMinMid: {
@@ -126,7 +123,7 @@ const STAT_SKILLS = {
     subject: "CS per minute from 10 to 20",
     format: oneDecimal,
     gap: tenthGap,
-    scale: 1,
+    roundedGapForScore1: 1,
     domain: "from-zero",
   },
   earlyDeaths: {
@@ -135,7 +132,7 @@ const STAT_SKILLS = {
     subject: "deaths before 14:00",
     format: oneDecimal,
     gap: { decimals: 1, lowerIsBetter: true },
-    scale: 1,
+    roundedGapForScore1: 1,
     domain: "from-zero",
   },
   xpAt15: {
@@ -144,7 +141,7 @@ const STAT_SKILLS = {
     subject: "XP lead at 15",
     format: formatSigned,
     gap: leadGap,
-    scale: 500,
+    roundedGapForScore1: 500,
     domain: "lead",
   },
   earlyTakedowns: {
@@ -153,7 +150,7 @@ const STAT_SKILLS = {
     subject: "kill and assist count before 14:00",
     format: oneDecimal,
     gap: tenthGap,
-    scale: 1,
+    roundedGapForScore1: 1,
     domain: "from-zero",
   },
   visionPerMin: {
@@ -162,7 +159,7 @@ const STAT_SKILLS = {
     subject: "vision score per minute",
     format: twoDecimals,
     gap: hundredthGap,
-    scale: 0.25,
+    roundedGapForScore1: 0.25,
     domain: "from-zero",
   },
   strongerSide: {
@@ -171,7 +168,7 @@ const STAT_SKILLS = {
     subject: "share of minutes on the stronger side from 3 to 15",
     format: percent,
     gap: shareGap,
-    scale: 0.1,
+    roundedGapForScore1: 0.1,
     domain: "unit",
   },
   gankTakedowns: {
@@ -180,7 +177,7 @@ const STAT_SKILLS = {
     subject: "lane takedown count before 14:00",
     format: oneDecimal,
     gap: tenthGap,
-    scale: 1,
+    roundedGapForScore1: 1,
     domain: "from-zero",
   },
   objectiveShare: {
@@ -189,7 +186,7 @@ const STAT_SKILLS = {
     subject: "share of dragons, grubs and Heralds your team took",
     format: percent,
     gap: shareGap,
-    scale: 0.1,
+    roundedGapForScore1: 0.1,
     domain: "unit",
   },
   enemyJungleKills: {
@@ -198,7 +195,7 @@ const STAT_SKILLS = {
     subject: "enemy jungle monster count",
     format: oneDecimal,
     gap: tenthGap,
-    scale: 2,
+    roundedGapForScore1: 2,
     domain: "from-zero",
   },
   scuttles: {
@@ -207,7 +204,7 @@ const STAT_SKILLS = {
     subject: "scuttle crab count",
     format: oneDecimal,
     gap: tenthGap,
-    scale: 1,
+    roundedGapForScore1: 1,
     domain: "from-zero",
   },
 } satisfies { [K in GradedStat]: StatSkill & { key: K } };
@@ -218,7 +215,7 @@ const HABIT_SKILLS = {
     youDid: "hit level 6 first",
     format: percent,
     gap: shareGap,
-    scale: 0.1,
+    roundedGapForScore1: 0.1,
     domain: "unit",
   },
   "first-scuttles": {
@@ -226,7 +223,7 @@ const HABIT_SKILLS = {
     youDid: "took more of the two 3:30 scuttle crabs than the enemy jungler",
     format: percent,
     gap: shareGap,
-    scale: 0.1,
+    roundedGapForScore1: 0.1,
     domain: "unit",
   },
   "early-gank": {
@@ -234,14 +231,14 @@ const HABIT_SKILLS = {
     youDid: `had a kill or assist in a lane before ${formatClock(EARLY_GANK_S * 1000)}`,
     format: percent,
     gap: shareGap,
-    scale: 0.1,
+    roundedGapForScore1: 0.1,
     domain: "unit",
   },
 } satisfies { [K in RankHabitId]: HabitSkill & { id: K } };
 
 for (const row of [...Object.values(STAT_SKILLS), ...Object.values(HABIT_SKILLS)]) {
-  if (!Number.isFinite(row.scale) || row.scale <= 0) {
-    throw new Error("A skill scale must be a positive finite number");
+  if (!Number.isFinite(row.roundedGapForScore1) || row.roundedGapForScore1 <= 0) {
+    throw new Error("The rounded gap that scores 1 must be a positive finite number");
   }
 }
 
@@ -251,8 +248,7 @@ export type StatRowStyle = {
   gap: GapOptions;
 };
 
-// Time in the enemy half is shown on the table and left out of the ranking.
-// Invading at the wrong moment gets you killed, so it has no better or worse color.
+// Invading at the wrong moment gets you killed, so time in the enemy half has no better or worse color.
 const ENEMY_HALF: StatRowStyle = {
   label: "Minutes in the enemy half, 3 to 15",
   format: percent,
@@ -294,7 +290,7 @@ export function skillToImprove(
   for (const row of Object.values(STAT_SKILLS)) {
     const found = stats?.find((item) => item.key === row.key);
     if (!found) continue;
-    const judged = note(grade(found.you, found.them, row.gap, row.scale));
+    const judged = note(grade(found.you, found.them, row.gap, row.roundedGapForScore1));
     if (judged?.tone !== "worse" || !beats(judged.score)) continue;
     best = {
       score: judged.score,
@@ -322,7 +318,7 @@ export function skillToImprove(
       if (youGames === 0 || rankGames === 0) continue;
       const you = found.you.with.games / youGames;
       const them = found.rank.with.games / rankGames;
-      const judged = note(grade(you, them, row.gap, row.scale));
+      const judged = note(grade(you, them, row.gap, row.roundedGapForScore1));
       if (judged?.tone !== "worse" || !beats(judged.score)) continue;
       best = {
         score: judged.score,
@@ -376,11 +372,11 @@ type Grade =
   | { tone: "even" }
   | { tone: "worse"; score: number; text: string };
 
-function grade(you: number, them: number, options: SkillGap, scale: number): Grade {
+function grade(you: number, them: number, options: SkillGap, roundedGapForScore1: number): Grade {
   if (!Number.isFinite(you) || !Number.isFinite(them)) return { tone: "skip" };
   const gap = formatGap(you, them, options);
   if (gap.tone !== "worse") return { tone: gap.tone };
-  const score = Math.abs(roundedGap(you, them, options.decimals ?? 0)) / scale;
+  const score = Math.abs(roundedGap(you, them, options.decimals ?? 0)) / roundedGapForScore1;
   return { tone: "worse", score, text: gap.text };
 }
 
@@ -415,8 +411,6 @@ function habitSentence(
   );
 }
 
-// Leads are signed, so the line can start below zero. The zero tick exists
-// only when that span crosses even. A lead from 0 to 800 has no tick.
 function trackOf(domain: Domain, you: number, them: number): SkillTrack {
   const low = domain === "lead" ? Math.min(you, them, 0) : 0;
   const high = domain === "unit" ? 1 : Math.max(you, them, 0);
