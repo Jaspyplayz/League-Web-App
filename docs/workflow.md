@@ -115,7 +115,7 @@ A cloud agent opens a draft pull request and stops. Jasper writes "My read" and 
 
 ## pstack and cloud agents
 
-pstack runs in Cursor, turned on in [`.cursor/settings.json`](../.cursor/settings.json). Since 2026-10-24 it also runs in Claude Code, as the `pstack@pstack-claude` plugin, a port of the Cursor version. Claude Code's reviewer agent is the first review. On a risky pull request, this Cursor chat runs the pstack review on Grok 4.7 and reports findings without editing the files.
+pstack runs in Cursor, turned on in [`.cursor/settings.json`](../.cursor/settings.json). Since 2026-10-24 it also runs in Claude Code, as the `pstack@pstack-claude` plugin, a port of the Cursor version. Claude Code's reviewer agent is the first review. On a risky pull request, the Cursor chat runs the pstack review on Grok 4.7 and reports findings without editing the files.
 
 `/setup-pstack` writes `~/.cursor/rules/pstack-models.mdc` on that computer. The skill defaults name slugs this Cursor account cannot spawn (`grok-4.7-xhigh-fast`, `claude-opus-5-5-xhigh`). On 2026-10-24 the rule maps those roles to `grok-4.7-high` and `claude-opus-5-5-high`. For this repo the issue wins over that role map: an issue that names Claude Code is written on Opus 5.5, even if a pstack role says Grok writes bug fixes.
 

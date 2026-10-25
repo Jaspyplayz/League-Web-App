@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Who writes this change
 
-One branch has one builder, named on the issue. Claude Code on Opus 5.5 writes this app's features and fixes. This chat, on Grok 4.7, does a small edit while Jasper is at the machine, reviews a risky pull request without editing it, and updates status and leftover docs after that pull request merges. A cloud agent is the builder only when the issue says so. The full rule is [docs/workflow.md](docs/workflow.md#which-tool-writes-the-code).
+One branch has one builder, named on the issue. Claude Code on Opus 5.5 writes this app's features and fixes. The Cursor chat, on Grok 4.7, does a small edit while Jasper is at the machine, reviews a risky pull request without editing it, and updates status and leftover docs after that pull request merges. A cloud agent is the builder only when the issue says so. The full rule is [docs/workflow.md](docs/workflow.md#which-tool-writes-the-code).
 
 If another open pull request already edits a file, leave that file alone.
 

@@ -1,6 +1,6 @@
 # Status
 
-Where Turnpoint is right now: what's being worked on, what just shipped and what comes next. Claude Code and Jasper's other assistant (League App Dev) both keep this file current. Update it in the same PR whenever a PR finishes a focus item or changes what's next. Anything marked "(check with Jasper)" wasn't clear from the repo; ask him instead of guessing.
+Where Turnpoint is right now: what's being worked on, what just shipped and what comes next. The Cursor chat updates this file after each merge (step 12 in [docs/workflow.md](workflow.md#the-steps-for-a-normal-change)), so a pull request can leave it alone. Anything marked "(check with Jasper)" wasn't clear from the repo; ask him instead of guessing.
 
 ## Last updated
 
