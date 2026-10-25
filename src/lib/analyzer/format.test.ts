@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatGap, formatSigned, listNames, plural, times } from "./format";
+import {
+  formatClock,
+  formatGap,
+  formatSigned,
+  listNames,
+  plural,
+  roundedGap,
+  times,
+} from "./format";
 
 describe("formatSigned", () => {
   it.each([
@@ -56,6 +64,14 @@ describe("formatGap for shares and neutral stats", () => {
       tone: "even",
     });
     expect(formatGap(2, 3, { neutral: true })).toEqual({ text: "1 less", tone: "even" });
+  });
+});
+
+describe("roundedGap", () => {
+  it("rounds the difference before a word is chosen", () => {
+    expect(roundedGap(5.41, 5.39, 1)).toBe(0);
+    expect(roundedGap(-194, 420)).toBe(-614);
+    expect(roundedGap(3, 1, 1)).toBe(2);
   });
 });
 

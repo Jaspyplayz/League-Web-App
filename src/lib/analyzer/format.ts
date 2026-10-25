@@ -24,14 +24,17 @@ export type GapOptions = {
   format?: (size: number) => string;
 };
 
+// Round first, so 5.41 vs 5.39 shown as "5.4" and "5.4" reads "Even".
+export function roundedGap(you: number, them: number, decimals = 0): number {
+  return Math.round((you - them) * 10 ** decimals) / 10 ** decimals;
+}
+
 export function formatGap(
   you: number,
   them: number,
   { decimals = 0, lowerIsBetter = false, neutral = false, format }: GapOptions = {},
 ): Gap {
-  // Round first, so 5.41 vs 5.39 shown as "5.4" and "5.4" reads "Even".
-  const scale = 10 ** decimals;
-  const diff = Math.round((you - them) * scale) / scale;
+  const diff = roundedGap(you, them, decimals);
   if (diff === 0) return { text: "Even", tone: "even" };
   const size = format
     ? format(Math.abs(diff))
