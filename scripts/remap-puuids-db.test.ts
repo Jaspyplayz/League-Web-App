@@ -1,13 +1,12 @@
-// Runs the remap's dry run, apply and rollback against a real Postgres with a
-// fake Riot. It needs a throwaway database with the migrations applied and a
-// stub of Supabase's auth.users, so it's skipped unless
-// REMAP_TEST_DATABASE_URL points at one (docs/database.md, "When the Riot key
-// changes"). It deletes everything in that database first.
+// Needs a throwaway database with the migrations applied and a stub of
+// Supabase's auth.users, so it's skipped unless REMAP_TEST_DATABASE_URL points
+// at one (docs/database.md, "When the Riot key changes").
 
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sql, type SQL } from "drizzle-orm";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -26,6 +25,7 @@ import {
   KeyCheckError,
   readMapFile,
   rollback,
+  TOUCHED,
   type FetchMatch,
 } from "./remap-puuids-db";
 import { BOT_PUUID, findOldPuuids, type MapFile } from "./remap-puuids-map";
@@ -67,21 +67,18 @@ const bots: GameSpec = {
   startedAt: "2026-10-17T20:00:00Z",
   humansOnlyInMetadata: true,
 };
-// Riot answers 404 for this one.
 const missing: GameSpec = {
   matchId: "NA1_1004",
   platformId: "NA1",
   players: ["carl", ...names("m", 9)],
   startedAt: "2026-10-16T20:00:00Z",
 };
-// Riot's copy has another champion for participant 3.
 const mismatch: GameSpec = {
   matchId: "KR_2002",
   platformId: "KR",
   players: ["faker", ...names("n", 9)],
   startedAt: "2026-10-15T12:00:00Z",
 };
-// Riot's copy gives p1 a different new PUUID from the one in g1.
 const conflict: GameSpec = {
   matchId: "NA1_1005",
   platformId: "NA1",
@@ -113,8 +110,6 @@ function savedCopy(spec: GameSpec): Match {
   return game(spec, RECENT.includes(spec) ? "new" : "old");
 }
 
-// `key` is the app whose key Riot sees: the live site's ("new"), or the old
-// one, which gets every game back as it was saved.
 function fakeRiot(key: "new" | "old") {
   const calls: string[] = [];
   const fetchMatch: FetchMatch = async (region, matchId) => {
@@ -128,7 +123,6 @@ function fakeRiot(key: "new" | "old") {
   return { fetchMatch, calls };
 }
 
-// Every table the remap can touch, each sorted the same way every time.
 const TABLES = [
   "players",
   "ranked_entries",
@@ -290,10 +284,6 @@ async function seed(db: Db) {
   ]);
 }
 
-// What each saved game's JSON should be once the remap is in. A game that
-// paired up becomes Riot's copy, except that p1, whom the map couldn't place,
-// keeps the old PUUID. The missing and mismatched games keep their saved copy,
-// with only the players the map learned from other games changed.
 function expectedRaw(spec: GameSpec): Match {
   if (spec === g1 || spec === conflict) return withPuuids(game(spec, "new"), spec, ["p1"], "old");
   if (spec === missing) return withPuuids(game(spec, "old"), spec, ["carl"], "new");
@@ -311,6 +301,17 @@ function withPuuids(match: Match, spec: GameSpec, players: string[], key: Key): 
   return match;
 }
 
+it("lists every table after the tables it points at, so rollback restores parents first", () => {
+  const names = TOUCHED.map((t) => t.name);
+  const outOfOrder = TOUCHED.flatMap((t, i) =>
+    getTableConfig(t.table)
+      .foreignKeys.map((fk) => getTableConfig(fk.reference().foreignTable).name)
+      .filter((target) => names.indexOf(target) > i)
+      .map((target) => `${t.name} -> ${target}`),
+  );
+  expect(outOfOrder).toEqual([]);
+});
+
 describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
   let db: Db;
   let dir: string;
@@ -321,7 +322,6 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
   const log = () => {};
 
   beforeAll(async () => {
-    // It truncates every table, so never let it near a real database.
     if (!/@(localhost|127\.0\.0\.1)(:\d+)?\//.test(url!)) {
       throw new Error("REMAP_TEST_DATABASE_URL must point at a local throwaway database");
     }
@@ -346,7 +346,6 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
       "Jaspy#CA1's old PUUID came back as a different PUUID from its new-key players row.",
       "Hide on bush#KR1's old PUUID came back as a different PUUID from its new-key players row.",
     ]);
-    // The two newest new-key games and one old game per anchor, not all seven old games.
     expect(riot.calls.sort()).toEqual([g1.matchId, g2.matchId, recent1.matchId, recent2.matchId].sort());
     expect(readdirSync(dir)).toEqual([]);
     expect(await snapshot(db)).toEqual(before);
@@ -405,7 +404,6 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
   });
 
   it("rolls the whole apply back when a check fails", async () => {
-    // An old PUUID in a field the rewrite doesn't know about.
     await db.execute(sql`
       update matches set raw = jsonb_set(raw, '{info,note}', to_jsonb(${old("jaspy")}::text))
       where match_id = ${g1.matchId}`);
@@ -422,9 +420,6 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
   });
 
   it("changes nothing when a row changes between the backup and the apply", async () => {
-    // The apply opens two transactions: one reads the backup, one changes
-    // things. This one saves a recap under an old PUUID in between, as a
-    // page could.
     let transactions = 0;
     const busy = new Proxy(db, {
       get(target, prop, receiver) {
@@ -476,7 +471,6 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
       beforeApply[table].filter((row) => (row as { puuid: string }).puuid === id);
     const players = await rowsOf<{ puuid: string; row: unknown }>(db, sql`select puuid, to_jsonb(p) as row from players p order by puuid`);
     expect(players.map((p) => p.puuid)).toEqual([now("carl"), now("faker"), now("jaspy"), old("p1")]);
-    // The copy of Carl's old row, and the new-key rows that were already there, untouched.
     const oldCarl = beforeApply.players.find((row) => (row as { puuid: string }).puuid === old("carl"));
     expect(players[0].row).toEqual({ ...(oldCarl as object), puuid: now("carl") });
     expect(players[1].row).toEqual(unchangedNewRows("players", now("faker"))[0]);
@@ -529,7 +523,6 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
       expect(find(text), match_id).toEqual([]);
     }
 
-    // The scoreboard agrees with each game's JSON, and nobody is counted twice.
     for (const spec of [...OLD_GAMES, ...RECENT]) {
       const rows = await rowsOf<{ puuid: string }>(db, sql`select puuid from match_participants where match_id = ${spec.matchId}`);
       const inRaw = new Set((RECENT.includes(spec) ? savedCopy(spec) : expectedRaw(spec)).info.participants.map((p) => p.puuid));
@@ -543,7 +536,6 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
   });
 
   it("deletes the old scoreboard rows a page saves again just after the commit", async () => {
-    // What saveMatch does with a game it read before the commit.
     const stale = await db
       .insert(schema.matchParticipants)
       .values(participantRows(savedCopy(g1)))

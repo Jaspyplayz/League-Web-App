@@ -1,7 +1,4 @@
-// The database half of `npm run remap-puuids` (scripts/remap-puuids.ts). Each
-// mode takes the database and a way to download a match as parameters, so the
-// tests run it on a throwaway Postgres with a fake Riot. Step numbers are the
-// ones in the plan on issue #154.
+// Step numbers are the ones in the plan on issue #154.
 
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -38,15 +35,13 @@ export type FetchMatch = (region: Region, matchId: string) => Promise<Match>;
 type Log = (line: string) => void;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
-// The two players the plan names: each has an old-key and a new-key players
-// row, so the map has to send one to the other.
+// The two players the plan names. Each has an old-key and a new-key players
+// row.
 const ANCHORS = [
   { gameName: "Jaspy", tagLine: "CA1" },
   { gameName: "Hide on bush", tagLine: "KR1" },
 ];
 
-// Rows per query when reading or writing in batches. A saved game is about
-// 60 KB of JSON, so this keeps each query to a few MB.
 const BATCH = 100;
 
 const cutoff = sql`${CUTOFF.toISOString()}::timestamptz`;
@@ -58,7 +53,6 @@ export class KeyCheckError extends Error {
   }
 }
 
-// The dry-run counts, under the same names as the plan's table.
 export type Counts = {
   matches: number;
   oldMatches: number;
@@ -81,9 +75,6 @@ export type Counts = {
 
 type SavedGame = { match_id: string; platform_id: string; raw: unknown };
 
-// Downloads every game saved before the cutoff again and writes the map to
-// `dir`. Writes nothing to the app's tables. Stops before the big download if
-// the key isn't the live site's.
 export async function dryRun({
   db,
   fetchMatch,
@@ -110,7 +101,6 @@ export async function dryRun({
 
   log("The key is the live site's. Downloading every game saved before the cutoff...");
   const plan = buildMap(await refetchOldGames(db, fetchMatch, log));
-  // The same checks again, now on every game instead of a sample.
   const late = anchorProblems(plan.map, anchors);
   const unchanged = mapsToItself(plan.map);
   if (unchanged.length > 0) late.unshift(`${unchanged.length} PUUIDs came back unchanged.`);
@@ -128,7 +118,6 @@ export async function dryRun({
     ...plan,
   };
   const path = join(dir, `map-${stamp(file.writtenAt)}.json`);
-  // The counts are for whoever reads the file; --apply doesn't use them.
   writeAtomically(path, JSON.stringify({ ...mapFileJson(file), counts }, null, 2));
   return { path, file, counts };
 }
@@ -148,8 +137,6 @@ async function findAnchors(db: Db): Promise<Anchor[]> {
   );
 }
 
-// The newest games saved since the cutoff, which already hold the live key's
-// PUUIDs, so Riot's copy has to match them exactly.
 async function refetchNewKeyGames(db: Db, fetchMatch: FetchMatch) {
   const saved = await db.execute<SavedGame>(sql`
     select match_id, platform_id, raw from matches
@@ -164,7 +151,6 @@ async function refetchNewKeyGames(db: Db, fetchMatch: FetchMatch) {
   return { games, problems };
 }
 
-// The newest old-key game of each anchor, paired with Riot's copy.
 async function refetchSamples(db: Db, fetchMatch: FetchMatch, anchors: Anchor[]) {
   const samples: GameResult[] = [];
   for (const { olds } of anchors) {
@@ -180,7 +166,7 @@ async function refetchSamples(db: Db, fetchMatch: FetchMatch, anchors: Anchor[])
 }
 
 // Riot counts each regional host's limit on its own, so the hosts run side
-// by side, each one game at a time. fetchMatch does the pacing.
+// by side, each one game at a time.
 async function refetchOldGames(db: Db, fetchMatch: FetchMatch, log: Log): Promise<GameResult[]> {
   const games = await db.execute<{ match_id: string; platform_id: string }>(sql`
     select match_id, platform_id from matches where fetched_at < ${cutoff} order by match_id`);
@@ -189,7 +175,6 @@ async function refetchOldGames(db: Db, fetchMatch: FetchMatch, log: Log): Promis
     [...byHost].map(async ([host, list]) => {
       const out: GameResult[] = [];
       for (const [i, { match_id }] of list.entries()) {
-        // One game's JSON at a time, so 1,300 of them never sit in memory.
         const [game] = await db.execute<SavedGame>(
           sql`select match_id, platform_id, raw from matches where match_id = ${match_id}`,
         );
@@ -208,8 +193,6 @@ async function refetch(fetchMatch: FetchMatch, game: SavedGame): Promise<GameRes
   return pairGame(game.match_id, game.raw, fresh.match);
 }
 
-// A game Riot can't find or can't send right now goes on the skip list, and
-// another dry run tries it again. A rejected key stops everything.
 async function download(
   fetchMatch: FetchMatch,
   matchId: string,
@@ -240,7 +223,6 @@ function hostOf(platformId: string): string | undefined {
   return region && REGIONS[region].regional;
 }
 
-// The plan's count query, as of now.
 async function countRows(db: Db): Promise<Counts> {
   const [row] = await db.execute<Omit<Counts, "oldMatchesByHost">>(sql`
     with om as (select match_id, raw from matches where fetched_at < ${cutoff}),
@@ -286,9 +268,6 @@ export function readMapFile(path: string): MapFile {
   return file;
 }
 
-// Runs `work` in one transaction with the map loaded into a TEMP table named
-// remap, which the queries below join on. Postgres drops it when the
-// transaction ends, so no migration is needed and nothing is left behind.
 async function withMap<T>(
   db: Db,
   map: PuuidMap,
@@ -312,17 +291,13 @@ async function withMap<T>(
 
 const OLD = sql`(select old_puuid from remap)`;
 
-// Every table the apply changes, and which of its rows it changes or deletes.
-// The backup, the check that nothing changed since the backup, and the
-// rollback all go through this list in this order: rows that are pointed at
-// come before the rows pointing at them.
 type Touched = { table: PgTable; name: string; key: string[]; rows: SQL };
 
 function touched(table: PgTable, key: string[], rows: SQL): Touched {
   return { table, name: getTableConfig(table).name, key, rows };
 }
 
-const TOUCHED: Touched[] = [
+export const TOUCHED: Touched[] = [
   touched(schema.players, ["puuid"], sql`puuid in ${OLD}`),
   touched(schema.rankedEntries, ["puuid", "queue_type"], sql`puuid in ${OLD}`),
   touched(schema.playerSeasons, ["puuid", "season"], sql`puuid in ${OLD}`),
@@ -345,7 +320,6 @@ function columnList(names: string[], alias?: string): SQL {
   );
 }
 
-// A row's primary key as JSON, e.g. {"puuid": "...", "queue_type": "..."}.
 // Timestamps stay as Postgres text, which keeps their microseconds.
 function keyJson(key: string[], alias: string): SQL {
   return sql`jsonb_build_object(${sql.join(
@@ -361,10 +335,6 @@ export type ApplyResult =
   | { kind: "applied"; backupFile: string; backedUp: Record<string, number>; created: Record<string, number> }
   | { kind: "already-applied" };
 
-// Saves a backup of every row the apply will change or delete, then moves
-// everything to the new PUUIDs in one transaction (steps 2.1 to 2.8). Any
-// failed check rolls the whole transaction back. Running it again with the
-// same map once it's in changes nothing.
 export async function apply(
   { db, dir, log }: { db: Db; dir: string; log: Log },
   file: MapFile,
@@ -380,8 +350,6 @@ export async function apply(
   const created = await withMap(db, file.map, async (tx) => {
     await checkBackupStillHolds(tx, backup);
     const keys = await moveEverything(tx, file, backup);
-    // Written before the commit, so a committed apply always has it. If the
-    // commit fails after this, the rollback finds nothing to delete.
     const lines = [...keys].flatMap(([table, list]) =>
       list.map((key) => `${JSON.stringify({ type: "created", table, key })}\n`),
     );
@@ -396,9 +364,6 @@ export async function apply(
   };
 }
 
-// A finished apply deletes every old players row it moved, so if none are
-// left this map is already in. Anything in between means something else
-// changed the database since the dry run, so nothing is touched.
 async function alreadyApplied(db: Db, file: MapFile): Promise<boolean> {
   const moved = file.oldPlayers.filter((puuid) => file.map.has(puuid));
   const [{ present, oldMatches }] = await db.execute<{ present: number; oldMatches: number }>(sql`
@@ -420,9 +385,7 @@ async function alreadyApplied(db: Db, file: MapFile): Promise<boolean> {
   return false;
 }
 
-// One JSON object per line: a header, then each row as to_jsonb gives it, so
-// timestamps keep their microseconds. Written to a .partial file and renamed
-// when complete, so a backup file on disk is never half written.
+// Each row as to_jsonb gives it, so timestamps keep their microseconds.
 async function writeBackup(tx: Tx, path: string, mapPath: string): Promise<BackupSummary> {
   mkdirSync(dirname(path), { recursive: true });
   const partial = `${path}.partial`;
@@ -445,9 +408,6 @@ async function writeBackup(tx: Tx, path: string, mapPath: string): Promise<Backu
   return summary;
 }
 
-// The backup was read just before this transaction began. Locking the same
-// rows and comparing their contents proves it still holds exactly what this
-// transaction is about to change.
 async function checkBackupStillHolds(tx: Tx, backup: BackupSummary) {
   for (const t of TOUCHED) {
     const rows = await tx.execute<{ hash: string }>(sql`
@@ -469,17 +429,14 @@ export class ApplyCheckError extends Error {
   }
 }
 
-// Steps 2.1 to 2.8, inside the apply's transaction. Returns the primary keys
-// of the rows it created under new PUUIDs, which a rollback deletes.
+// Steps 2.1 to 2.8.
 async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Promise<Map<string, Key[]>> {
   const created = new Map<string, Key[]>();
-  // How many backed-up rows each step changed or deleted, checked in 2.8.
   const handled = new Map<string, number>();
   const count = (table: string, rows: number) => handled.set(table, (handled.get(table) ?? 0) + rows);
   const keep = (table: string, rows: { key: Key }[]) => addTo(created, table, rows.map((row) => row.key));
 
-  // 2.1 A copy of each old players row under its new PUUID. A new-key row
-  // that's already there, even one a visitor makes during the apply, stays.
+  // 2.1
   keep("players", await tx.execute<{ key: Key }>(sql`
     insert into players
     select copy.* from players p
@@ -488,7 +445,7 @@ async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Pro
     on conflict (puuid) do nothing
     returning ${keyJson(["puuid"], "players")} as key`));
 
-  // 2.2 (moveRows keeps the new row where both PUUIDs have one)
+  // 2.2
   for (const [table, other] of [["ranked_entries", "queue_type"], ["player_seasons", "season"]]) {
     const { moved, deleted } = await moveRows(tx, table, other);
     keep(table, moved);
@@ -509,8 +466,7 @@ async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Pro
   );
   count("rank_history", historyDeleted.length);
 
-  // 2.4 user_players and ask_questions are keyed by account and question,
-  // so their rows change in place.
+  // 2.4
   count("user_players", (await tx.execute(sql`
     update user_players u set puuid = r.new_puuid from remap r where u.puuid = r.old_puuid returning 1`)).length);
   const recaps = await moveRows(tx, "match_recaps", "match_id");
@@ -518,13 +474,17 @@ async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Pro
   count("match_recaps", recaps.moved.length + recaps.deleted);
   count("ask_questions", (await tx.execute(sql`
     update ask_questions q set puuid = r.new_puuid from remap r where q.puuid = r.old_puuid returning 1`)).length);
-  keep("match_insights", (await moveRows(tx, "match_insights", "match_id")).moved);
-  await tx.execute(sql`
-    update match_insights i set opponent_puuid = r.new_puuid from remap r where i.opponent_puuid = r.old_puuid`);
+  const insights = await moveRows(tx, "match_insights", "match_id");
+  keep("match_insights", insights.moved);
+  const opponents = await tx.execute<{ key: Key }>(sql`
+    update match_insights i set opponent_puuid = r.new_puuid from remap r where i.opponent_puuid = r.old_puuid
+    returning ${keyJson(["match_id", "puuid"], "i")} as key`);
+  const insightRows = new Set([...insights.moved, ...opponents].map((row) => JSON.stringify(row.key)));
+  count("match_insights", insightRows.size + insights.deleted);
 
   count("matches", await rewriteMatches(tx, file));
 
-  // 2.6 Through the same map as raw, so the two always agree.
+  // 2.6
   const participants = await tx.execute<{ key: Key }>(sql`
     update match_participants mp set puuid = r.new_puuid from remap r
     where mp.puuid = r.old_puuid
@@ -532,9 +492,7 @@ async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Pro
   keep("match_participants", participants);
   count("match_participants", participants.length);
 
-  // 2.7 Last, because deleting a players row deletes the rows that point at
-  // it (ON DELETE CASCADE). Checking first means a row this script missed
-  // fails the apply instead of quietly disappearing with it.
+  // 2.7
   const pointing = await oldPuuidsLeft(tx, PLAYER_CHILDREN);
   if (pointing.length > 0) throw new ApplyCheckError(pointing);
   const playersDeleted = await tx.execute<{ puuid: string }>(
@@ -542,13 +500,12 @@ async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Pro
   );
   count("players", playersDeleted.length);
 
-  // Decision 4 on the issue: the old-key benchmark rows go, so the next
-  // `npm run benchmarks` doesn't count the same games twice.
+  // Decision 4 on the issue.
   count("benchmark_games", (await tx.execute(
     sql`delete from benchmark_games where collected_at < ${cutoff} returning 1`,
   )).length);
 
-  // 2.8 Any problem found here throws, which rolls the whole transaction back.
+  // 2.8
   const problems = [
     ...(await oldPuuidsLeft(tx, PUUID_COLUMNS)),
     ...(await verifyApply(tx, file, playersDeleted.map((row) => row.puuid))),
@@ -556,10 +513,7 @@ async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Pro
   if (copied.length !== historyDeleted.length) {
     problems.push(`Copied ${copied.length} rank_history rows but deleted ${historyDeleted.length}.`);
   }
-  // match_insights rows can be changed twice (player and opponent), so the
-  // check above that no old PUUID is left covers them instead.
   for (const t of TOUCHED) {
-    if (t.name === "match_insights") continue;
     const expected = backup.get(t.name)?.rows ?? 0;
     const got = handled.get(t.name) ?? 0;
     if (got !== expected) problems.push(`Changed ${got} ${t.name} rows, but ${expected} were backed up.`);
@@ -568,10 +522,6 @@ async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Pro
   return created;
 }
 
-// Moves a table's rows from each old PUUID to its new one. Where the new
-// PUUID already has a row with the same `other` key (queue, season or match),
-// that row is fresher, so it stays and the old one is deleted (it's in the
-// backup). Returns the keys of the moved rows.
 async function moveRows(tx: Tx, table: string, other: string) {
   const name = sql.identifier(table);
   const otherColumn = sql.identifier(other);
@@ -590,8 +540,7 @@ async function moveRows(tx: Tx, table: string, other: string) {
   return { moved, deleted: deleted.length };
 }
 
-// 2.5 Rewrites each old-key game's JSON through the map, a batch at a time.
-// Returns how many games it rewrote.
+// 2.5
 async function rewriteMatches(tx: Tx, file: MapFile): Promise<number> {
   let rewritten = 0;
   for (let offset = 0; ; offset += BATCH) {
@@ -614,8 +563,6 @@ async function rewriteMatches(tx: Tx, file: MapFile): Promise<number> {
   return rewritten;
 }
 
-// Every column that holds a PUUID, and so may not hold an old one after the
-// apply. The first four point at players.
 const PLAYER_CHILDREN = [
   ["ranked_entries", "puuid"],
   ["rank_history", "puuid"],
@@ -642,7 +589,7 @@ async function oldPuuidsLeft(tx: Tx, columns: readonly (readonly [string, string
   return problems;
 }
 
-// The rest of 2.8: what has to be true once everything has moved.
+// The rest of 2.8.
 async function verifyApply(tx: Tx, file: MapFile, playersDeleted: string[]): Promise<string[]> {
   const problems: string[] = [];
   const [row] = await tx.execute<{ noNewRow: number; disagree: number; oldBenchmarks: number; sharedRiotIds: number }>(sql`
@@ -670,7 +617,6 @@ async function verifyApply(tx: Tx, file: MapFile, playersDeleted: string[]): Pro
   return problems;
 }
 
-// Every game whose JSON text still holds a PUUID from the map, in any field.
 async function gamesHoldingOldPuuids(tx: Tx, map: PuuidMap): Promise<string[]> {
   const find = findOldPuuids(map);
   const holding: string[] = [];
@@ -683,12 +629,7 @@ async function gamesHoldingOldPuuids(tx: Tx, map: PuuidMap): Promise<string[]> {
   return holding;
 }
 
-// 2.9 A page that read a game's old JSON just before the commit can save it
-// again just after: fetchTimeline calls saveMatch with its copy in memory
-// (src/lib/match-store.ts), which brings back that game's old scoreboard rows
-// next to the new ones. Run right after the apply and again a few minutes
-// later; it deletes those rows and checks no old PUUID came back into a
-// game's JSON.
+// 2.9
 export async function cleanUp(db: Db, map: PuuidMap) {
   return withMap(db, map, async (tx) => {
     const deleted = await tx.execute(
@@ -725,11 +666,6 @@ function addTo(index: Map<string, Key[]>, table: string, keys: Key[]) {
   index.set(table, list);
 }
 
-// Puts back exactly the rows in the backup, by table and primary key, and
-// deletes the rows the apply created under new PUUIDs. It never runs the map
-// backwards over whole tables: since the apply, the live site keeps saving
-// new-key rows that must not be touched. Rows the site saved under a players
-// copy the apply created go with that copy (ON DELETE CASCADE).
 export async function rollback({ db }: { db: Db }, backupFile: string) {
   const { rows, created } = readBackup(backupFile);
   return db.transaction(async (tx) => {

@@ -12,7 +12,7 @@
 // .cache/puuid-remap/ and hold PUUIDs, so they never go in a commit. The dry
 // run makes one Riot call per old game, at most 50 every 2 minutes on each
 // Riot region, which leaves the live site half the key's allowance: about 30
-// minutes for 1,300 games. Only Jasper runs --apply and --rollback.
+// minutes for 1,300 games.
 
 import { join } from "node:path";
 import { loadEnvConfig } from "@next/env";
@@ -34,8 +34,7 @@ import {
 } from "./remap-puuids-db";
 import { parseMode, type MapFile, type Mode } from "./remap-puuids-map";
 
-// Read .env.local the same way `next dev` does. The imports above only read
-// the environment when they're first used, which is after this line.
+// Read .env.local the same way `next dev` does.
 loadEnvConfig(process.cwd());
 
 const CALLS_PER_WINDOW = 50;
@@ -93,8 +92,7 @@ async function main() {
   }
 }
 
-// Step 2.9: right away, and again once requests that were running at the
-// commit have finished.
+// Step 2.9 on issue #154.
 async function cleanUpTwice(db: Db, file: MapFile) {
   for (const [i, wait] of [0, SECOND_CLEANUP_MS].entries()) {
     if (wait > 0) {
@@ -112,7 +110,7 @@ async function cleanUpTwice(db: Db, file: MapFile) {
 
 // One pacer per Riot region, so each keeps under its own limit, and a wait
 // and retry when Riot says to slow down anyway, since the live site uses the
-// same key. Like the benchmark collector's.
+// same key.
 function pacedGetMatch(): FetchMatch {
   const pacers = new Map<string, () => Promise<void>>();
   return async (region, matchId) => {
@@ -137,7 +135,7 @@ function pacedGetMatch(): FetchMatch {
 }
 
 // The plan's dry-run table on issue #154, read on production on 2026-10-24
-// around 20:30 UTC, next to what this run found.
+// around 20:30 UTC.
 function printDryRun(path: string, file: MapFile, counts: Counts) {
   const hosts = Object.entries(counts.oldMatchesByHost)
     .map(([host, games]) => `${host} ${count(games)}`)
@@ -162,7 +160,6 @@ function printDryRun(path: string, file: MapFile, counts: Counts) {
   console.log(`\n${"".padEnd(26)}${"Plan".padEnd(25)}Now`);
   for (const [what, plan, now] of rows) console.log(`${what.padEnd(26)}${plan.padEnd(25)}${now}`);
 
-  // Every distinct old PUUID but BOT, unless some are skipped.
   console.log(`\nMapped ${count(file.map.size)} old PUUIDs to new ones.`);
   if (file.skips.length === 0) {
     console.log("Nothing skipped.");

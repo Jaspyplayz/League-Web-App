@@ -172,7 +172,6 @@ describe("keyCheckProblems", () => {
   ];
   const jaspy: Anchor = { riotId: "Jaspy#CA1", olds: [oldId("jaspy")], news: [newId("jaspy")] };
 
-  // `riot` is the key Riot answers with: a copy of each game under that key.
   function check(riot: "old" | "new" | "other", anchors = [jaspy]) {
     const sent = (spec: GameSpec, saved: "old" | "new") => {
       if (riot === "other") return game(spec, "new", { puuids: Object.fromEntries(spec.players.map((n) => [n, `other-${n}`])) });
@@ -218,7 +217,6 @@ describe("keyCheckProblems", () => {
   });
 });
 
-// Every path where two JSON values differ, like "info.participants.0.puuid".
 function differingPaths(a: unknown, b: unknown, path = ""): string[] {
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
     return Object.is(a, b) ? [] : [path];

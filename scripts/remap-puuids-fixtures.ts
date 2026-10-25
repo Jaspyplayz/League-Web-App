@@ -1,14 +1,9 @@
-// Made-up games for the remap tests (remap-puuids-map.test.ts and
-// remap-puuids-db.test.ts). Each game is described once by its players'
-// names and built under either key, the way Riot would send it to the old
-// app and to the new one.
-
 import type { Match, Participant } from "@/lib/riot/types";
 import { BOT_PUUID } from "./remap-puuids-map";
 
 export type Key = "old" | "new";
 
-// 78 characters, like Riot's, and readable in a failing test.
+// 78 characters, like Riot's.
 export function puuid(key: Key, name: string): string {
   return `${key}-${name}-`.padEnd(78, "x");
 }
@@ -20,7 +15,6 @@ export function summonerId(key: Key, name: string): string {
 export type GameSpec = {
   matchId: string;
   platformId: string;
-  // In participant order. "BOT" is a bot.
   players: string[];
   startedAt: string;
   queueId?: number;
@@ -28,11 +22,8 @@ export type GameSpec = {
   humansOnlyInMetadata?: boolean;
 };
 
-// What differs in Riot's copy, for the games that shouldn't pair up.
 export type Changes = {
-  // Participant number -> champion ID.
   champions?: Record<number, number>;
-  // Player name -> the PUUID Riot sends instead.
   puuids?: Record<string, string>;
 };
 
@@ -79,8 +70,7 @@ export function game(spec: GameSpec, key: Key, changes: Changes = {}): Match {
     tripleKills: 0,
     quadraKills: 0,
     pentaKills: 0,
-    // Fractions, so a rewrite that rounds numbers would show.
-    damagePerMinute: 666.6666666666666,
+    damagePerMinute: 2000 / 3,
     challenges: { laneMinionsFirst10Minutes: 71, jungleCsBefore10Minutes: 0.5 },
     perks: {
       statPerks: { offense: 5008, flex: 5008, defense: 5011 },

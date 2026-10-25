@@ -1,8 +1,3 @@
-// The pure half of `npm run remap-puuids` (scripts/remap-puuids.ts): pairing
-// each saved game with Riot's copy of it today, building the old -> new PUUID
-// map from those pairs, and rewriting a game's JSON through the map. Kept
-// apart so it can be tested without Riot or a database.
-//
 // Riot encrypts PUUIDs separately for each app. After the site moved to a key
 // from another app, every player has a new PUUID, while the games saved before
 // the move still hold the old ones (issue #154). Downloading an old game again
@@ -11,21 +6,16 @@
 import { parseArgs } from "node:util";
 import { z } from "zod";
 
-// Both kinds are strings, and handing an old one to code that expects a new
-// one is exactly the bug this script fixes, so the compiler keeps them apart.
 export type OldPuuid = string & { readonly __brand: "OldPuuid" };
 export type NewPuuid = string & { readonly __brand: "NewPuuid" };
 export type PuuidMap = ReadonlyMap<OldPuuid, NewPuuid>;
 export type Pair = { old: OldPuuid; new: NewPuuid };
 
-// Games saved before this were saved with the old app's key. The last old-key
-// write was 2026-10-20 18:51 UTC and the first new-key one this minute.
 export const CUTOFF = new Date("2026-10-24T09:00:00Z");
 
 // Every bot in a bot game has this PUUID instead of a real one.
 export const BOT_PUUID = "BOT";
 
-// How many games saved since the cutoff the key check downloads again.
 export const NEW_KEY_GAMES = 2;
 
 export type Mode =
@@ -46,8 +36,6 @@ export function parseMode(argv: string[]): Mode {
   return { kind: "dry-run" };
 }
 
-// What the remap reads from each player in a game. The rest of Riot's JSON
-// is left as it is.
 const slotSchema = z.object({
   participantId: z.number(),
   puuid: z.string(),
@@ -63,16 +51,11 @@ export type GameResult =
       kind: "paired";
       matchId: string;
       pairs: Pair[];
-      // Participant number -> summoner ID, from Riot's copy.
       summonerIds: Record<string, string>;
     }
   | { kind: "mismatch" | "missing"; matchId: string; reason: string };
 
-// Pairs each player in the saved copy of a game with the same participant
-// number in Riot's copy. If any champion or team differs, the two copies
-// can't be trusted to be the same game, so none of its pairs are used. The
-// summoner ID isn't checked: no code reads it, and Riot sometimes sends it
-// blank.
+// The summoner ID isn't checked: Riot sometimes sends it blank.
 export function pairGame(matchId: string, saved: unknown, fresh: unknown): GameResult {
   const mismatch = (reason: string): GameResult => ({ kind: "mismatch", matchId, reason });
   const before = slotsOf(saved);
@@ -107,7 +90,6 @@ export function pairGame(matchId: string, saved: unknown, fresh: unknown): GameR
   return { kind: "paired", matchId, pairs, summonerIds };
 }
 
-// A game's players by participant number, or what's wrong with its JSON.
 function slotsOf(raw: unknown): Map<number, Slot> | string {
   const parsed = gameSchema.safeParse(raw);
   if (!parsed.success) return "a player is missing participantId, puuid, championId or teamId";
@@ -124,14 +106,9 @@ export type Skip =
 export type RemapPlan = {
   map: PuuidMap;
   skips: Skip[];
-  // Match ID -> participant number -> summoner ID, for the games Riot sent.
   summonerIds: ReadonlyMap<string, Record<string, string>>;
 };
 
-// Puts every game's pairs together. Each old PUUID must come back as one new
-// PUUID in every game it's in, and each new PUUID must belong to one old one.
-// A PUUID that breaks either rule is left out of the map with everything it
-// was paired with, and goes on the skip list.
 export function buildMap(games: Iterable<GameResult>): RemapPlan {
   const skips: Skip[] = [];
   const summonerIds = new Map<string, Record<string, string>>();
@@ -190,34 +167,24 @@ function addTo<K, V>(index: Map<K, Set<V>>, key: K, value: V) {
   index.set(key, values);
 }
 
-// Old PUUIDs that came back unchanged. Under the live site's key there are
-// none: an old-app key sends back the old PUUIDs.
 export function mapsToItself(map: PuuidMap): OldPuuid[] {
   return [...map].filter(([old, now]) => sameText(old, now)).map(([old]) => old);
 }
 
-// The brands make `old === now` a type error, which is the point everywhere
-// except these two checks for a PUUID that didn't change.
 function sameText(a: string, b: string) {
   return a === b;
 }
 
-// A player whose old-key and new-key players rows are both known, such as
-// Jaspy#CA1. The map has to agree with them.
 export type Anchor = { riotId: string; olds: OldPuuid[]; news: NewPuuid[] };
 
 export type KeyCheck = {
-  // Games saved since the cutoff, each with Riot's copy of it now.
   newKeyGames: { matchId: string; saved: unknown; fresh: unknown }[];
-  // Old-key games the anchors played, paired with Riot's copy.
   samples: GameResult[];
   anchors: Anchor[];
 };
 
-// Everything that says this isn't the live site's key. A key from the old
-// app would send back the old PUUIDs, every player would map to themselves,
-// and every other check would still pass, so the dry run stops on any of
-// these before it downloads the rest.
+// A key from the old app would send back the old PUUIDs, every player would
+// map to themselves, and every other check would still pass.
 export function keyCheckProblems({ newKeyGames, samples, anchors }: KeyCheck): string[] {
   const problems: string[] = [];
   if (newKeyGames.length < NEW_KEY_GAMES) {
@@ -226,7 +193,6 @@ export function keyCheckProblems({ newKeyGames, samples, anchors }: KeyCheck): s
     );
   }
   for (const game of newKeyGames) {
-    // Here "old" is just the saved copy: these games already have new PUUIDs.
     const result = pairGame(game.matchId, game.saved, game.fresh);
     if (result.kind !== "paired") {
       problems.push(`${game.matchId} (saved since the cutoff): ${result.reason}.`);
@@ -269,13 +235,8 @@ function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// Swaps the old PUUIDs in a saved game's JSON for new ones. It goes by value,
-// not by position: any PUUID the map knows is replaced wherever the game
-// lists it, so a game whose own download failed is still fixed for players
-// the map learned from other games, and the bot game's short
-// metadata.participants list can't shift out of line. `summonerIds` comes
-// from Riot's copy of this game. Nothing else changes, and `raw` itself is
-// left untouched.
+// It goes by value, not by position, so the bot game's short
+// metadata.participants list can't shift out of line.
 export function rewriteRaw(
   raw: unknown,
   map: PuuidMap,
@@ -309,9 +270,6 @@ export function rewriteRaw(
 const PLAIN = /^[\w-]+$/;
 const RUNS = /[\w-]+/g;
 
-// Returns a function that lists every old PUUID from the map found anywhere
-// in a game's JSON text, in any field. Only the runs of PUUID characters are
-// checked, which keeps it quick on 60 KB games.
 export function findOldPuuids(map: PuuidMap): (text: string) => OldPuuid[] {
   const olds = [...map.keys()];
   const plain = new Set(olds.filter((old) => PLAIN.test(old)));
@@ -332,13 +290,10 @@ export function findOldPuuids(map: PuuidMap): (text: string) => OldPuuid[] {
   };
 }
 
-// The file the dry run writes and --apply reads, in .cache/puuid-remap/.
 export type MapFile = {
   cutoff: string;
   writtenAt: string;
-  // Every old-key players row at the time of the dry run.
   oldPlayers: OldPuuid[];
-  // How many games were saved before the cutoff.
   oldMatches: number;
   map: PuuidMap;
   summonerIds: ReadonlyMap<string, Record<string, string>>;
@@ -387,8 +342,6 @@ export function mapFileJson(file: MapFile): z.input<typeof mapFileSchema> {
   };
 }
 
-// The map file sits on disk between the dry run and --apply, so it's checked
-// again here rather than trusted: one-to-one, and nobody mapped to themselves.
 export function parseMapFile(text: string): MapFile {
   const file = mapFileSchema.parse(JSON.parse(text));
   const map = new Map<OldPuuid, NewPuuid>();
