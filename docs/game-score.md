@@ -43,7 +43,7 @@ All ten players from one game always land in the same group. Teammates share a r
 
 Each of those predictions comes from a model retrained without one group, not from the saved weights. So cross-validation shows how well the training works on the games it had, and says less about the saved model on new games.
 
-`npm run check-score` scores the saved weights on games they could not have trained on. It reads the `score_games` rows collected after the model's `trainedAt`, and leaves out any game the site had saved in `matches` by then, because training reads both tables. It skips games that can't be scored (see [What's not scored](#whats-not-scored)). A pick counts as right when the player's rating is above 0 and they won, or below 0 and they lost, the same rule cross-validation uses. The script saves the game count, the accuracy and the date in the model as `unseen`, and How it works shows them. Training never writes `unseen`, so a retrained model shows no accuracy on How it works until the check runs again.
+`npm run check-score` scores the saved weights on games they could not have trained on. It reads the `score_games` rows collected after the model's `trainedAt`, and leaves out any game the site had saved in `matches` by then, because training reads both tables. It skips games that can't be scored (see [What's not scored](#whats-not-scored)). A pick counts as right when the player's rating is above 0 and they won, or below 0 and they lost, the same rule cross-validation uses. The script saves the game count, the accuracy and the date in the model as `unseen`, and How it works shows the count and the accuracy. Training never writes `unseen`, so a retrained model shows no accuracy on How it works until the check runs again.
 
 The first model was trained on the 86 Summoner's Rift games saved in October 2026 (860 players). With that little data it relied mostly on KDA, objective damage, damage taken and deaths, and gave the other stats a weight of 0. More games should let more stats count.
 
@@ -67,7 +67,7 @@ npm run train-score    # needs DATABASE_URL; makes no Riot calls
 
 The script prints the new accuracy and weights. If they look right, commit the new `score-model.json`. Scoring a game on the site costs nothing: the model is a small JSON file bundled with the code.
 
-The new file has no `unseen` check, so How it works stops showing an accuracy. Once `npm run benchmarks` has collected games since the retrain, run `npm run check-score` (needs `DATABASE_URL`, only reads the database) and commit `score-model.json` again.
+The new file has no `unseen` check, so How it works stops showing an accuracy. Once `npm run benchmarks` has collected games since the retrain, run `npm run check-score` (needs `DATABASE_URL`, only reads the database) and commit `score-model.json` again. Update the game score row in the README's models table to the new result in the same commit.
 
 If you change the list of stats in `SCORE_FEATURES`, retrain before deploying. A saved model trained on a different list is ignored, so scores disappear until it's retrained.
 

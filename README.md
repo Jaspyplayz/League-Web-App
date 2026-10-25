@@ -87,7 +87,7 @@ Both are logistic regression trained on games saved in the database, written fro
 | Model | What it reads | What it gives | How good |
 |---|---|---|---|
 | **Win chance** ([docs](docs/win-chance.md)) | Both teams' gold, XP, kills, towers, inhibitors, dragons, Baron and Elder at each minute | Each team's chance to win at that minute | Its accuracy figures include each game's last minutes, which flatter them, so a fairer check is planned ([docs](docs/win-chance.md#how-good-is-it)) |
-| **Game score** ([docs](docs/game-score.md)) | Ten stats per player (KDA, kill participation, damage share, CS, vision...), compared with the player's role | A 0 to 100 score: where the player ranks among everyone in that role | Picks the winning side from stats alone 81% of the time, on 35,326 games it didn't train on |
+| **Game score** ([docs](docs/game-score.md)) | Ten stats per player (KDA, kill participation, damage share, CS, vision...), compared with the player's role | A 0 to 100 score: where the player ranks among everyone in that role | Picks the winning side from stats alone 81% of the time, on 35,326 games it didn't train on (checked 25 October 2026) |
 
 The win chance's learned weights are worth a look: kills and towers are worth almost nothing on their own, because the gold they pay is already in the gold lead. [docs/win-chance.md](docs/win-chance.md) walks through one real minute of a game by hand. Retrain either model with `npm run train-win-chance` or `npm run train-score`. Win chance only ever runs on finished games, since Riot's policy doesn't allow predictions during a live game.
 
