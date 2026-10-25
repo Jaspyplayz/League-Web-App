@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { ChartPlaceholders, InsightsSkeleton } from "@/components/loading-skeleton";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
@@ -24,7 +25,9 @@ import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
 import { fromSlug, toSlug } from "@/lib/riot-id";
+import { fillCounts } from "@/lib/insight-fill";
 import { loadTrendGames } from "@/lib/trend-games";
+import { advanceInsights } from "./advance";
 import { AnalysisProgress } from "./analysis-progress";
 import { loadChosenPlayer, readChoice } from "./chosen-player";
 import { CompareWithPlayer } from "./compare-with-player";
@@ -48,17 +51,14 @@ import { Weaknesses } from "./weaknesses";
 //
 // Every game needs its match and timeline, each one Riot call the first
 // time. A new player's 100 games would be 200 calls, twice the dev key's
-// allowance (100 calls per 2 minutes), so each page view fetches only a few
-// (see src/lib/trend-games.ts). The page shows trends from the games it has
-// so far, and <AnalysisProgress> reloads it until every game is in.
+// allowance (100 calls per 2 minutes).
 
 type Params = Promise<{ region: string; riotId: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = { title: "Insights" };
 
-const TIMELINES_PER_VIEW = 5;
-// Trends from one or two games would be noise, so wait for a few.
+// Trends from one or two games would be noise, so the charts wait for a few.
 const MIN_GAMES = 3;
 
 export default function InsightsPage({
@@ -70,7 +70,7 @@ export default function InsightsPage({
 }) {
   return (
     <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-7 px-6 pb-20 pt-7">
-      <Suspense fallback={<p className="text-muted">Loading insights…</p>}>
+      <Suspense fallback={<InsightsSkeleton />}>
         <Insights params={params} searchParams={searchParams} />
       </Suspense>
     </main>
@@ -105,7 +105,9 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const filters = readFilters(query);
   const view = readView(query.view);
   const [loaded, dd, tiers] = await Promise.all([
-    settle(loadTrendGames(region, puuid, { count: filters.games, budget: TIMELINES_PER_VIEW })),
+    // Budgets stay at 0 here. A non-zero budget would fetch on every refresh,
+    // and the refresh exists only to redraw charts from what the batch stored.
+    settle(loadTrendGames(region, puuid, { count: filters.games, budget: 0, matchBudget: 0 })),
     getDataDragon().catch(() => null),
     loadBenchmarkTiers(),
   ]);
@@ -123,18 +125,39 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   // The player picked in "Compare with a player", if any. Loaded after your
   // games rather than alongside them, so the two don't hit Riot at once.
   const choice = readChoice(query);
-  const chosen = choice ? await loadChosenPlayer(choice) : null;
+  const chosen = choice ? await loadChosenPlayer(choice, { budget: 0 }) : null;
   const theirs = chosen?.status === "ok" ? chosen : null;
 
-  // One progress bar for both players' games.
-  const waiting = loaded.value.waiting + (theirs?.waiting ?? 0);
-  const firstError = loaded.value.error ?? theirs?.error ?? null;
+  const counts = fillCounts([
+    {
+      analyzed: allGames.length,
+      waiting: loaded.value.waiting,
+      retryAfterS: loaded.value.error?.kind === "rate-limited" ? (loaded.value.error.retryAfter ?? null) : null,
+    },
+    ...(theirs
+      ? [
+          {
+            analyzed: theirs.games.length,
+            waiting: theirs.waiting,
+            retryAfterS: theirs.error?.kind === "rate-limited" ? (theirs.error.retryAfter ?? null) : null,
+          },
+        ]
+      : []),
+  ]);
+  const waiting = counts.total - counts.analyzed;
   const progress = (
     <AnalysisProgress
-      analyzed={allGames.length + (theirs?.games.length ?? 0)}
-      total={allGames.length + (theirs?.games.length ?? 0) + waiting}
-      retryAfterS={firstError?.kind === "rate-limited" ? (firstError.retryAfter ?? null) : null}
+      analyzed={counts.analyzed}
+      total={counts.total}
+      retryAfterS={counts.retryAfterS}
       whose={theirs ? `your and ${theirs.name}'s games` : undefined}
+      batch={advanceInsights.bind(null, {
+        region,
+        riotId,
+        games: filters.games,
+        vs: choice?.input ?? null,
+        vsRegion: choice?.region ?? null,
+      })}
     />
   );
 
@@ -143,7 +166,10 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       <>
         {header}
         {waiting > 0 ? (
-          progress
+          <>
+            {progress}
+            <ChartPlaceholders />
+          </>
         ) : (
           <NotEnoughGames window={filters.games} skipped={matches.length - trendMatches.length} />
         )}
