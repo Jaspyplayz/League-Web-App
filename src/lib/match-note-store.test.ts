@@ -24,17 +24,20 @@ afterEach(() => {
 describe("readMatchNote", () => {
   it("returns the saved note", async () => {
     findFirst.mockResolvedValue({ text: "Ward river before 3:15" });
-    expect(await readMatchNote("user-1", "NA1_1")).toEqual("Ward river before 3:15");
+    expect(await readMatchNote("user-1", "NA1_1")).toEqual({
+      ok: true,
+      text: "Ward river before 3:15",
+    });
   });
 
   it("returns nothing saved when there's no note", async () => {
     findFirst.mockResolvedValue(undefined);
-    expect(await readMatchNote("user-1", "NA1_1")).toEqual(null);
+    expect(await readMatchNote("user-1", "NA1_1")).toEqual({ ok: true, text: "" });
   });
 
   it("returns nothing saved without a database, not a failure", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    expect(await readMatchNote("user-1", "NA1_1")).toEqual(null);
+    expect(await readMatchNote("user-1", "NA1_1")).toEqual({ ok: true, text: "" });
   });
 
   it("reports a failed read when the query throws", async () => {

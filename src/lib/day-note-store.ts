@@ -3,23 +3,28 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { and, eq, gte } from "drizzle-orm";
 import { tables } from "@/db";
-import { database, readCache } from "@/lib/match-store";
+import type { ReadDayNotesResult } from "@/lib/match-note";
+import { database } from "@/lib/match-store";
 
 // Reads and saves the notes on Log tab days, in the day_notes table (see
-// src/db/schema.ts). Works like match-note-store.ts: without a database,
-// nothing is found and saving reports a failure.
+// src/db/schema.ts).
 
 // The account's notes from `since` ("2026-09-18") on, by day. The server
 // doesn't know the viewer's timezone, so it can't say exactly which days the
 // page will show; the caller asks for a few days extra.
-export async function readDayNotes(userId: string, since: string): Promise<Record<string, string>> {
-  const rows = await readCache((db) =>
-    db.query.dayNotes.findMany({
+export async function readDayNotes(userId: string, since: string): Promise<ReadDayNotesResult> {
+  const db = database();
+  if (!db) return { ok: true, byDay: {} };
+  try {
+    const rows = await db.query.dayNotes.findMany({
       columns: { day: true, text: true },
       where: and(eq(tables.dayNotes.userId, userId), gte(tables.dayNotes.day, since)),
-    }),
-  );
-  return Object.fromEntries((rows ?? []).map((r) => [r.day, r.text]));
+    });
+    return { ok: true, byDay: Object.fromEntries(rows.map((r) => [r.day, r.text])) };
+  } catch (error) {
+    Sentry.captureException(error);
+    return { ok: false };
+  }
 }
 
 // Saves the note, or deletes it when the text is empty. Returns false when

@@ -48,8 +48,6 @@ export function AnalysisTabs({ summary, deepDive }: { summary: ReactNode; deepDi
       },
       addNote: (line) => {
         flushSync(() => setNoteRequest({ line }));
-        // The box is there only when you're signed in. Otherwise this lands
-        // on the "Sign in to keep notes" line in its place.
         const box = document.getElementById("match-note");
         if (box instanceof HTMLTextAreaElement) {
           box.focus({ preventScroll: true });

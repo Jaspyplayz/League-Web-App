@@ -27,3 +27,7 @@ export function withNoteLine(text: string, line: string): string {
 
 // What the save action tells the notes box.
 export type SaveNoteResult = { status: "saved" } | { status: "failed"; message: string };
+
+export type ReadNoteResult = { ok: true; text: string } | { ok: false };
+
+export type ReadDayNotesResult = { ok: true; byDay: Record<string, string> } | { ok: false };

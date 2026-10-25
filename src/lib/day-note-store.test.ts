@@ -28,19 +28,22 @@ describe("readDayNotes", () => {
       { day: "2026-10-22", text: "Full clears on Viego" },
     ]);
     expect(await readDayNotes("user-1", "2026-09-25")).toEqual({
-      "2026-10-20": "Stopped after two losses",
-      "2026-10-22": "Full clears on Viego",
+      ok: true,
+      byDay: {
+        "2026-10-20": "Stopped after two losses",
+        "2026-10-22": "Full clears on Viego",
+      },
     });
   });
 
   it("returns nothing saved when there are no notes", async () => {
     findMany.mockResolvedValue([]);
-    expect(await readDayNotes("user-1", "2026-09-25")).toEqual({});
+    expect(await readDayNotes("user-1", "2026-09-25")).toEqual({ ok: true, byDay: {} });
   });
 
   it("returns nothing saved without a database, not a failure", async () => {
     vi.stubEnv("DATABASE_URL", "");
-    expect(await readDayNotes("user-1", "2026-09-25")).toEqual({});
+    expect(await readDayNotes("user-1", "2026-09-25")).toEqual({ ok: true, byDay: {} });
   });
 
   it("reports a failed read when the query throws", async () => {

@@ -24,20 +24,21 @@ export function MatchNotes(props: Props) {
 async function Notes({ region, matchId }: Props) {
   if (!supabaseConfig()) return null;
   const user = await getCurrentUser();
+  const note = user ? await readMatchNote(user.id, matchId) : null;
 
   return (
     <Panel className="flex flex-col gap-3 p-6">
       <PanelHeading id="notes-heading">Your notes</PanelHeading>
-      {user ? (
-        <NotesForm
-          region={region}
-          matchId={matchId}
-          savedText={(await readMatchNote(user.id, matchId)) ?? ""}
-        />
-      ) : (
+      {!note ? (
         <p className="text-muted">
           <SignInLink className="font-medium text-ahead-soft hover:underline" /> to keep private
           notes on this game, like what you&apos;d do differently.
+        </p>
+      ) : note.ok ? (
+        <NotesForm region={region} matchId={matchId} savedText={note.text} />
+      ) : (
+        <p className="text-sm text-behind">
+          Your note couldn&apos;t be loaded. Reload the page to try again.
         </p>
       )}
     </Panel>
