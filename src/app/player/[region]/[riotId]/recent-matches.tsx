@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { FilterableMatchList } from "@/components/filterable-match-list";
+import { PanelSkeleton } from "@/components/loading-skeleton";
 import { MatchDetails } from "@/components/match-details";
 import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
@@ -97,7 +98,7 @@ export async function RecentMatches({
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <aside className="flex flex-col gap-4 lg:w-80 lg:shrink-0">
         {ranks}
-        <Suspense fallback={<p className="text-sm text-faint">Loading season champions…</p>}>
+        <Suspense fallback={<PanelSkeleton label="Loading season champions" />}>
           <SeasonChampions
             region={region}
             puuid={puuid}

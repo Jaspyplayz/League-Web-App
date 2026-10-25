@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
 import { loadBuildsAction } from "@/app/player/[region]/[riotId]/actions";
 import { BuildView } from "@/components/build-view";
+import { BuildSkeleton } from "@/components/loading-skeleton";
 import { teamOrder } from "@/lib/analyzer/team-analysis";
 import type { BuildsResult } from "@/lib/match-builds";
 
@@ -118,7 +119,7 @@ export function MatchTabs({
 }
 
 function BuildTab({ result, playerId }: { result: BuildsResult | null; playerId: number }) {
-  if (!result) return <p className="text-[13px] text-faint">Loading builds…</p>;
+  if (!result) return <BuildSkeleton />;
   if (result.status === "failed") {
     return (
       <p className="text-[13px] text-behind">

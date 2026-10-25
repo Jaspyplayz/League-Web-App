@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { MatchSkeleton } from "@/components/loading-skeleton";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { panelClass } from "@/components/ui/panel";
 import { analyzeMatch, findPlayer, findPlayerByRiotId, whyNotAnalyzed } from "@/lib/analyzer";
 import { replayChances } from "@/lib/analyzer/plays";
 import { championName, getDataDragon } from "@/lib/ddragon";
@@ -20,7 +22,6 @@ import { MatchHeader } from "./match-header";
 import { MatchNotes } from "./match-notes";
 import { MatchRecap } from "./match-recap";
 import { Scoreboard } from "./scoreboard";
-import { panelClass } from "@/components/ui/panel";
 
 // The match analysis page: one game, from one player's point of view.
 // URL: /player/na/Name-TAG/match/NA1_1234567890
@@ -36,7 +37,7 @@ export const metadata = {
 export default function MatchPage({ params }: { params: Params }) {
   return (
     <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-7 px-6 pb-20 pt-7">
-      <Suspense fallback={<p className="text-muted">Analyzing match…</p>}>
+      <Suspense fallback={<MatchSkeleton />}>
         <Analysis params={params} />
       </Suspense>
     </main>

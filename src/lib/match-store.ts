@@ -50,6 +50,7 @@ export async function loadMatches(
   region: Region,
   ids: string[],
   budget: number,
+  timing: SaveTiming = "after",
 ): Promise<{ matches: Match[]; waiting: number; error: RiotApiError | null }> {
   const found = new Map<string, Match>();
   const rows = ids.length
@@ -77,7 +78,7 @@ export async function loadMatches(
     }
     const match = result.value;
     found.set(match.metadata.matchId, match);
-    saveLater((db) => saveMatch(db, match));
+    await remember(timing, (db) => saveMatch(db, match));
   }
 
   const matches = ids.flatMap((id) => found.get(id) ?? []);
@@ -124,6 +125,7 @@ export async function loadTimelines(
   region: Region,
   matches: Match[],
   budget: number,
+  timing: SaveTiming = "after",
 ): Promise<{ timelines: Map<string, TrimmedTimeline>; error: RiotApiError | null }> {
   const timelines = new Map<string, TrimmedTimeline>();
   const ids = matches.map((m) => m.metadata.matchId);
@@ -148,7 +150,7 @@ export async function loadTimelines(
   const limit = database() ? budget : matches.length;
   const missing = matches.filter((m) => !timelines.has(m.metadata.matchId)).slice(0, limit);
   const fetched = await mapWithLimit(missing, TIMELINE_CONCURRENCY, (m) =>
-    settle(fetchTimeline(region, m)),
+    settle(fetchTimeline(region, m, timing)),
   );
   let error: RiotApiError | null = null;
   for (const [i, result] of fetched.entries()) {
@@ -162,10 +164,14 @@ export async function loadTimelines(
 const TIMELINE_CONCURRENCY = 5;
 
 // Downloads a timeline from Riot, trims it, and saves it for next time.
-async function fetchTimeline(region: Region, match: Match): Promise<TrimmedTimeline> {
+async function fetchTimeline(
+  region: Region,
+  match: Match,
+  timing: SaveTiming = "after",
+): Promise<TrimmedTimeline> {
   const { matchId } = match.metadata;
   const timeline = trimTimeline(await getTimeline(region, matchId));
-  saveLater(async (db) => {
+  await remember(timing, async (db) => {
     // The timeline row points at the match row, so make sure that's there.
     await saveMatch(db, match);
     const row = { frames: timeline.frames, events: timeline.events, trimVersion: TRIM_VERSION };
@@ -214,8 +220,11 @@ export async function readCache<T>(read: (db: Db) => Promise<T | undefined>): Pr
   }
 }
 
-// Saves to the cache after the page has been sent, so a visitor never waits
-// for the write. See https://nextjs.org/docs/app/api-reference/functions/after
+// "after" writes once the response is on its way, so a page doesn't wait.
+// "now" waits for the write, for the Insights batch: the next read has to
+// see the rows, and a write scheduled with after() can still be pending.
+export type SaveTiming = "after" | "now";
+
 function saveLater(write: (db: Db) => Promise<void>) {
   const db = database();
   if (!db) return;
@@ -226,4 +235,18 @@ function saveLater(write: (db: Db) => Promise<void>) {
       Sentry.captureException(error);
     }
   });
+}
+
+async function remember(timing: SaveTiming, write: (db: Db) => Promise<void>) {
+  if (timing === "after") {
+    saveLater(write);
+    return;
+  }
+  const db = database();
+  if (!db) return;
+  try {
+    await write(db);
+  } catch (error) {
+    Sentry.captureException(error);
+  }
 }
