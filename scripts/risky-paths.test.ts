@@ -29,6 +29,8 @@ describe("riskyFiles", () => {
       "src/lib/ask-store.ts",
       "src/lib/recap-points.test.ts",
       "scripts/train-win-chance.ts",
+      "scripts/can-merge.ts",
+      "scripts/can-merge-gates.test.ts",
       "scripts/risky-paths.ts",
     ];
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
