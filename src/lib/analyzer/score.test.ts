@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { Participant } from "@/lib/riot/types";
 import {
+  checkScoreModel,
   fitLogistic,
   gameScores,
   isScorable,
   percentile,
+  ROLES,
   SCORE_FEATURES,
   scoreExamples,
   scoreFeatures,
   toScoreGame,
   trainScoreModel,
+  type Role,
+  type RoleModel,
+  type ScoreGame,
+  type ScoreModel,
 } from "./score";
 import { match, participants } from "./test-fixtures";
 
@@ -184,5 +190,71 @@ describe("trainScoreModel and gameScores", () => {
 
   it("ignores a saved model that was trained on different stats", () => {
     expect(gameScores(games[0], { ...model, features: ["kda"] })).toBeNull();
+  });
+
+  it("leaves the check on unseen games out of a new model", () => {
+    expect(model).not.toHaveProperty("unseen");
+  });
+});
+
+describe("checkScoreModel", () => {
+  // A hand-made model that only looks at KDA. The role's normal KDA is a
+  // ratio of 1, so a player above it is expected to win and one below to lose.
+  const shared = {
+    weights: SCORE_FEATURES.map((f) => (f.key === "kda" ? 1 : 0)),
+    bias: 0,
+    samples: 0,
+    accuracy: 0,
+  };
+  const role: RoleModel = {
+    samples: 0,
+    mean: SCORE_FEATURES.map((f) => (f.key === "kda" ? Math.log1p(1) : 0)),
+    std: SCORE_FEATURES.map(() => 1),
+    own: null,
+    cuts: [],
+  };
+  const model: ScoreModel = {
+    trainedAt: new Date(0).toISOString(),
+    games: 0,
+    features: SCORE_FEATURES.map((f) => f.key),
+    shared,
+    roles: Object.fromEntries(ROLES.map((r) => [r, role])) as Record<Role, RoleModel>,
+  };
+
+  // Red (players 6 to 10) wins, as in participants(). The players in
+  // `strong` get a KDA ratio of 3, everyone else 1/3.
+  function game(matchId: string, strong: number[], durationS = 1800): ScoreGame {
+    const players = participants().map((p) =>
+      strong.includes(p.participantId)
+        ? { ...p, kills: 3, deaths: 1 }
+        : { ...p, kills: 1, deaths: 3 },
+    );
+    return { ...toScoreGame(match(players, durationS)), matchId };
+  }
+
+  it("counts how often a player's rating points to their real result", () => {
+    const games = [
+      game("A", [6, 7, 8, 9, 10]), // all 10 right
+      game("B", [6, 7, 8]), // winners 9 and 10 look like losers: 8 right
+      game("C", [1, 2, 3, 4, 5], 9 * 60), // too short to score, so left out
+    ];
+    expect(checkScoreModel(model, games, new Date(0))).toEqual({
+      games: 2,
+      accuracy: 0.9, // 18 of 20 players
+      checkedAt: "1970-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("uses a role's own weights where the site would", () => {
+    // Supports' own weights expect every support to lose: right for blue's,
+    // wrong for red's.
+    const support = { ...role, own: { ...shared, bias: -10 } };
+    const withOwn = { ...model, roles: { ...model.roles, UTILITY: support } };
+    expect(checkScoreModel(withOwn, [game("A", [6, 7, 8, 9, 10])], new Date(0)).accuracy).toBe(0.9);
+  });
+
+  it("refuses a model the site would ignore", () => {
+    expect(() => checkScoreModel(model, [], new Date(0))).not.toThrow();
+    expect(() => checkScoreModel({ ...model, features: ["kda"] }, [], new Date(0))).toThrow();
   });
 });
