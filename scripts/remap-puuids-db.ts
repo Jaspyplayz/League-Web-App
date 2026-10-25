@@ -23,12 +23,14 @@ import {
   pairGame,
   parseMapFile,
   rewriteRaw,
+  spaceProblem,
   type Anchor,
   type GameResult,
   type MapFile,
   type NewPuuid,
   type OldPuuid,
   type PuuidMap,
+  type Space,
 } from "./remap-puuids-map";
 
 export type FetchMatch = (region: Region, matchId: string) => Promise<Match>;
@@ -71,9 +73,7 @@ export type Counts = {
   insightsOld: number;
   askOld: number;
   benchmarkOld: number;
-  databaseBytes: number;
-  oldRawBytes: number;
-};
+} & Space;
 
 type SavedGame = { match_id: string; platform_id: string; raw: unknown };
 
@@ -226,7 +226,7 @@ function hostOf(platformId: string): string | undefined {
 }
 
 async function countRows(db: Db): Promise<Counts> {
-  const [row] = await db.execute<Omit<Counts, "oldMatchesByHost">>(sql`
+  const [row] = await db.execute<Omit<Counts, "oldMatchesByHost" | keyof Space>>(sql`
     with om as (select match_id, raw from matches where fetched_at < ${cutoff}),
     slots as (
       select s.value as puuid from om, jsonb_array_elements_text(om.raw->'metadata'->'participants') s
@@ -250,9 +250,7 @@ async function countRows(db: Db): Promise<Counts> {
       (select count(*) from match_insights
         where puuid in (select puuid from op) or opponent_puuid in (select puuid from op))::int as "insightsOld",
       (select count(*) from ask_questions where puuid in (select puuid from op))::int as "askOld",
-      (select count(*) from benchmark_games where collected_at < ${cutoff})::int as "benchmarkOld",
-      pg_database_size(current_database())::float8 as "databaseBytes",
-      (select coalesce(sum(pg_column_size(raw)), 0) from om)::float8 as "oldRawBytes"`);
+      (select count(*) from benchmark_games where collected_at < ${cutoff})::int as "benchmarkOld"`);
   const platforms = await db.execute<{ platform_id: string; games: number }>(sql`
     select platform_id, count(*)::int as games from matches
     where fetched_at < ${cutoff} group by platform_id`);
@@ -261,7 +259,14 @@ async function countRows(db: Db): Promise<Counts> {
     const host = hostOf(platform_id) ?? platform_id;
     oldMatchesByHost[host] = (oldMatchesByHost[host] ?? 0) + games;
   }
-  return { ...row, oldMatchesByHost };
+  return { ...row, ...(await measureSpace(db)), oldMatchesByHost };
+}
+
+async function measureSpace(db: Db): Promise<Space> {
+  const [space] = await db.execute<Space>(sql`
+    select pg_database_size(current_database())::float8 as "databaseBytes",
+      (select coalesce(sum(pg_column_size(raw)), 0) from matches where fetched_at < ${cutoff})::float8 as "oldRawBytes"`);
+  return space;
 }
 
 export function readMapFile(path: string): MapFile {
@@ -345,6 +350,8 @@ export async function apply(
   mapPath: string,
 ): Promise<ApplyResult> {
   if (await alreadyApplied(db, file)) return { kind: "already-applied" };
+  const space = spaceProblem(await measureSpace(db));
+  if (space) throw new ApplyCheckError([space]);
 
   const backupFile = join(dir, `backup-${stamp(new Date().toISOString())}.jsonl`);
   const backup = await withMap(db, file.map, (tx) => writeBackup(tx, backupFile, mapPath), "repeatable read");
@@ -425,7 +432,7 @@ function digest(hashes: string[]): string {
 
 export class ApplyCheckError extends Error {
   constructor(readonly problems: string[]) {
-    super(`A check failed, so the apply was rolled back and nothing changed:\n${problems.map((p) => `- ${p}`).join("\n")}`);
+    super(`A check failed, so nothing changed:\n${problems.map((p) => `- ${p}`).join("\n")}`);
     this.name = "ApplyCheckError";
   }
 }
@@ -627,7 +634,7 @@ async function gamesHoldingOldPuuids(tx: Tx, map: PuuidMap): Promise<string[]> {
 // A table's rows a page at a time, in primary-key order. Each page starts
 // after the last key of the one before: with OFFSET, Postgres would read,
 // convert and sort every skipped row again for every page.
-async function* pages<R>(tx: Tx, table: string, key: string[], select: SQL, where: SQL) {
+export async function* pages<R>(tx: Tx, table: string, key: string[], select: SQL, where: SQL) {
   let after = sql`true`;
   for (;;) {
     const rows = await tx.execute<R & { page_key: Key }>(sql`
@@ -679,7 +686,24 @@ function addTo(index: Map<string, Key[]>, table: string, keys: Key[]) {
 
 export async function rollback({ db }: { db: Db }, backupFile: string) {
   const { rows, created } = readBackup(backupFile);
+  if (created.size === 0) {
+    throw new Error(
+      `${backupFile} is from an apply that stopped before it changed anything, so there's nothing to undo. ` +
+        `Use the file the finished apply printed after "To undo".`,
+    );
+  }
   return db.transaction(async (tx) => {
+    const [{ n: oldPlayersLeft }] = await tx.execute<{ n: number }>(sql`
+      select count(*)::int as n from players
+      where puuid in (
+        select puuid from jsonb_populate_recordset(null::players, ${JSON.stringify(rows.get("players") ?? [])}::jsonb)
+      )`);
+    if (oldPlayersLeft > 0) {
+      throw new Error(
+        `${oldPlayersLeft} old players rows from ${backupFile} are still in the database, so its apply ` +
+          "never finished or was already rolled back. Nothing changed.",
+      );
+    }
     const deleted: Record<string, number> = {};
     for (const t of [...TOUCHED].reverse()) {
       for (const keys of chunks(created.get(t.name) ?? [], BATCH)) {

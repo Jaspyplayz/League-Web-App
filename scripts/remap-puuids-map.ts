@@ -18,6 +18,30 @@ export const BOT_PUUID = "BOT";
 
 export const NEW_KEY_GAMES = 2;
 
+// On a copy the size of production, the database grew by 1.2 times the old
+// games' stored JSON at the apply's peak, and most of that stayed used.
+const SPACE_PER_RAW_BYTE = 1.25;
+// Supabase's free tier holds 500 MB; stopping 50 MB short leaves the site room.
+const SPACE_LIMIT_BYTES = 450 * 1024 * 1024;
+
+export type Space = { databaseBytes: number; oldRawBytes: number };
+
+export function spaceNeeded({ oldRawBytes }: Space): number {
+  return SPACE_PER_RAW_BYTE * oldRawBytes;
+}
+
+export function spaceProblem(space: Space): string | undefined {
+  if (space.databaseBytes + spaceNeeded(space) <= SPACE_LIMIT_BYTES) return undefined;
+  return (
+    `The database is ${mb(space.databaseBytes)} and the apply needs about ${mb(spaceNeeded(space))} more, ` +
+    `past the ${mb(SPACE_LIMIT_BYTES)} this script allows on the free tier's 500 MB. Make room before applying.`
+  );
+}
+
+export function mb(bytes: number): string {
+  return `${Math.round(bytes / 1024 / 1024)} MB`;
+}
+
 export type Mode =
   | { kind: "dry-run" }
   | { kind: "apply"; mapFile: string }

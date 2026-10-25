@@ -24,6 +24,7 @@ import {
   dryRun,
   KeyCheckError,
   readMapFile,
+  pages,
   rollback,
   TOUCHED,
   type FetchMatch,
@@ -574,5 +575,42 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
 
     const lines = readFileSync(backupFile, "utf8").trim().split("\n");
     expect(lines.filter((line) => line.includes('"type":"created"'))).toHaveLength(62);
+  });
+
+  it("refuses a second rollback, and a backup from an apply that stopped early", async () => {
+    const before = await snapshot(db);
+    const stopped = readdirSync(dir)
+      .filter((name) => name.startsWith("backup-") && name.endsWith(".jsonl"))
+      .map((name) => join(dir, name))
+      .filter((path) => path !== backupFile);
+    expect(stopped).toHaveLength(2);
+
+    for (const path of stopped) {
+      await expect(rollback({ db }, path)).rejects.toThrow("stopped before it changed anything");
+    }
+    await expect(rollback({ db }, backupFile)).rejects.toThrow(
+      "3 old players rows from " + backupFile + " are still in the database",
+    );
+    expect(await snapshot(db)).toEqual(before);
+  });
+
+  it("pages through more rows than fit on one page, in key order, each row once", async () => {
+    const { paged, all } = await db.transaction(async (tx) => {
+      await tx.execute(sql`
+        create temp table paged (queue text, at timestamptz, primary key (queue, at)) on commit drop`);
+      await tx.execute(sql`
+        insert into paged
+        select q, timestamptz '2026-10-01 00:00:00Z' + i * interval '1 microsecond'
+        from generate_series(1, 125) i, unnest(array['FLEX', 'SOLO']) q`);
+      const row = sql`queue || ' ' || at::text as row`;
+      const paged: string[] = [];
+      for await (const page of pages<{ row: string }>(tx, "paged", ["queue", "at"], row, sql`true`)) {
+        paged.push(...page.map((r) => r.row));
+      }
+      const all = await tx.execute<{ row: string }>(sql`select ${row} from paged order by queue, at`);
+      return { paged, all: all.map((r) => r.row) };
+    });
+    expect(all).toHaveLength(250);
+    expect(paged).toEqual(all);
   });
 });

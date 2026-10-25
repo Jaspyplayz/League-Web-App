@@ -11,6 +11,7 @@ import {
   parseMapFile,
   parseMode,
   rewriteRaw,
+  spaceProblem,
   type Anchor,
   type GameResult,
   type MapFile,
@@ -62,6 +63,21 @@ describe("parseMode", () => {
     expect(() => parseMode(["--apply"])).toThrow();
     expect(() => parseMode(["--aply", "map.json"])).toThrow();
     expect(() => parseMode(["map.json"])).toThrow();
+  });
+});
+
+describe("spaceProblem", () => {
+  const MB = 1024 * 1024;
+
+  it("lets the apply run when the database stays under 450 MB", () => {
+    expect(spaceProblem({ databaseBytes: 200 * MB, oldRawBytes: 60 * MB })).toBeUndefined();
+  });
+
+  it("stops the apply when the extra copies would pass 450 MB", () => {
+    expect(spaceProblem({ databaseBytes: 400 * MB, oldRawBytes: 60 * MB })).toBe(
+      "The database is 400 MB and the apply needs about 75 MB more, past the 450 MB this script " +
+        "allows on the free tier's 500 MB. Make room before applying.",
+    );
   });
 });
 

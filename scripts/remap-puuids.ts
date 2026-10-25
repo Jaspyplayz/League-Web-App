@@ -32,7 +32,7 @@ import {
   type Counts,
   type FetchMatch,
 } from "./remap-puuids-db";
-import { parseMode, type MapFile, type Mode } from "./remap-puuids-map";
+import { mb, parseMode, spaceNeeded, spaceProblem, type MapFile, type Mode } from "./remap-puuids-map";
 
 // Read .env.local the same way `next dev` does.
 loadEnvConfig(process.cwd());
@@ -40,9 +40,8 @@ loadEnvConfig(process.cwd());
 const CALLS_PER_WINDOW = 50;
 const WINDOW_MS = 2 * 60 * 1000;
 const SECOND_CLEANUP_MS = 5 * 60 * 1000;
-// On a copy the size of production, the database grew by 1.2 times the old
-// games' stored JSON at the apply's peak (issue #154).
-const SPACE_PER_RAW_BYTE = 1.25;
+const UNAVAILABLE_RETRIES = 2;
+const UNAVAILABLE_WAIT_MS = 15_000;
 const DIR = join(process.cwd(), ".cache", "puuid-remap");
 
 const USAGE = "Usage: npm run remap-puuids [-- --apply <map file> | -- --rollback <backup file>]";
@@ -76,7 +75,7 @@ async function main() {
           for (const [table, rows] of Object.entries(result.backedUp)) {
             console.log(`  ${table.padEnd(20)} ${count(rows).padStart(7)} backed up, ${count(result.created[table] ?? 0)} created`);
           }
-          console.log(`To undo: npm run remap-puuids -- --rollback ${result.backupFile}`);
+          console.log(`To undo: npm run remap-puuids -- --rollback "${result.backupFile}"`);
         }
         await cleanUpTwice(db, file);
         break;
@@ -100,7 +99,7 @@ async function cleanUpTwice(db: Db, file: MapFile) {
   for (const [i, wait] of [0, SECOND_CLEANUP_MS].entries()) {
     if (wait > 0) {
       console.log(`Waiting ${wait / 60_000} minutes for the second cleanup...`);
-      await new Promise((resolve) => setTimeout(resolve, wait));
+      await sleep(wait);
     }
     const { participantsDeleted, gamesHolding } = await cleanUp(db, file.map);
     console.log(`Cleanup ${i + 1}: deleted ${count(participantsDeleted)} old match_participants rows saved again by the site.`);
@@ -113,14 +112,16 @@ async function cleanUpTwice(db: Db, file: MapFile) {
 
 // One pacer per Riot region, so each keeps under its own limit, and a wait
 // and retry when Riot says to slow down anyway, since the live site uses the
-// same key.
+// same key. riotGet already retries a failed request within a second; a game
+// that still fails would go on the skip list, and clearing that takes another
+// 30-minute dry run, so it's tried again after a longer wait.
 function pacedGetMatch(): FetchMatch {
   const pacers = new Map<string, () => Promise<void>>();
   return async (region, matchId) => {
     const host = REGIONS[region].regional;
     const wait = pacers.get(host) ?? createPacer(CALLS_PER_WINDOW, WINDOW_MS);
     pacers.set(host, wait);
-    for (;;) {
+    for (let failures = 0; ; ) {
       await wait();
       try {
         return await getMatch(region, matchId);
@@ -128,13 +129,23 @@ function pacedGetMatch(): FetchMatch {
         if (error instanceof RiotApiError && error.kind === "rate-limited") {
           const seconds = error.retryAfter ?? 10;
           console.log(`[${host}] Rate limited, waiting ${seconds}s`);
-          await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+          await sleep(seconds * 1000);
+          continue;
+        }
+        if (error instanceof RiotApiError && error.kind === "unavailable" && failures < UNAVAILABLE_RETRIES) {
+          failures++;
+          console.log(`[${host}] ${matchId}: ${error.message}. Trying again in ${UNAVAILABLE_WAIT_MS / 1000}s`);
+          await sleep(UNAVAILABLE_WAIT_MS);
           continue;
         }
         throw error;
       }
     }
   };
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // The plan's dry-run table on issue #154, read on production on 2026-10-24
@@ -163,13 +174,20 @@ function printDryRun(path: string, file: MapFile, counts: Counts) {
   console.log(`\n${"".padEnd(26)}${"Plan".padEnd(25)}Now`);
   for (const [what, plan, now] of rows) console.log(`${what.padEnd(26)}${plan.padEnd(25)}${now}`);
 
-  const needed = SPACE_PER_RAW_BYTE * counts.oldRawBytes;
   console.log(
     `\nThe database is ${mb(counts.databaseBytes)}; the free tier holds 500 MB. The apply needs about ` +
-      `${mb(needed)} more, and most of it stays used afterwards, since Postgres keeps the old copies' space for new rows.`,
+      `${mb(spaceNeeded(counts))} more, and most of it stays used afterwards, since Postgres keeps the old copies' space for new rows.`,
   );
+  const space = spaceProblem(counts);
+  if (space) console.log(`STOP: ${space}`);
 
   console.log(`\nMapped ${count(file.map.size)} old PUUIDs to new ones.`);
+  const unmapped = file.oldPlayers.filter((puuid) => !file.map.has(puuid)).length;
+  console.log(
+    unmapped === 0
+      ? `All ${count(file.oldPlayers.length)} old players rows are in the map.`
+      : `${unmapped} of ${count(file.oldPlayers.length)} old players rows aren't in the map, so they and their rank history keep their old PUUID.`,
+  );
   if (file.skips.length === 0) {
     console.log("Nothing skipped.");
   } else {
@@ -180,15 +198,11 @@ function printDryRun(path: string, file: MapFile, counts: Counts) {
     }
     if (file.skips.length > 20) console.log(`  ...and ${count(file.skips.length - 20)} more in the map file.`);
   }
-  console.log(`\nWrote ${path}\nNext, after reading the above: npm run remap-puuids -- --apply ${path}`);
+  console.log(`\nWrote ${path}\nNext, after reading the above: npm run remap-puuids -- --apply "${path}"`);
 }
 
 function count(n: number): string {
   return n.toLocaleString("en-US");
-}
-
-function mb(bytes: number): string {
-  return `${Math.round(bytes / 1024 / 1024)} MB`;
 }
 
 main().catch((error: unknown) => {
