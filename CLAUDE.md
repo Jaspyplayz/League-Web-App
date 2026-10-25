@@ -52,6 +52,7 @@ Routes live in `src/app/`, React components in `src/components/` and helpers in 
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
+| `npm run remap-puuids` | After the Riot key moves to another app: move rows saved under the old PUUIDs to the new ones. Dry run by default; only Jasper runs `--apply` ([docs/database.md](docs/database.md#when-the-riot-key-changes)) |
 | `npm run train-score` | Retrain the game score on saved games and update `score-model.json` ([docs/game-score.md](docs/game-score.md)) |
 | `npm run train-phase-score` | Train the early, mid and late ratings on the tempo study's games and the site's, and write `phase-score-model.json` ([docs/phase-ratings.md](docs/phase-ratings.md)) |
 | `npm run train-win-chance` | Train the win chance model on saved games and write `win-chance-model.json` ([docs/win-chance.md](docs/win-chance.md)) |
