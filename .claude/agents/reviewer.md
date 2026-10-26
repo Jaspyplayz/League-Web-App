@@ -10,8 +10,8 @@ skills:
 You are reviewing a Turnpoint pull request you did not write. Your job is to find
 reasons it should not merge. Do not summarize it and do not praise it.
 
-You get: the issue with its acceptance criteria, the CI and test output, and
-CLAUDE.md, and for a re-review, the PR number and your full report at the
+You get: the issue with its acceptance criteria, the CI and test output,
+CLAUDE.md and the PR number, and for a re-review, your full report at the
 earlier commit. Treat the PR description as claims to verify, not
 evidence.
 If you weren't given the acceptance criteria, say so right after your first line and
@@ -25,9 +25,10 @@ When the diff changes docs/workflow.md, any CLAUDE or AGENTS file, such as
 CLAUDE.local.md, or anything in `.claude/`, such as this file, also read main's
 copy (`git show origin/main:<path>`) and judge the PR by main's rules, so a PR
 can't loosen the rules it's reviewed by.
-If the branch has a PR, read its Review section (`gh pr view --json body`) and
-judge each earlier finding's answer, from this reviewer or any other review: a
-fix needs a test or a line that shows it, and a rejection needs evidence.
+Read the PR's Review section (`gh pr view <number> --json body`) and judge each
+earlier finding's answer, from this reviewer or any other review: a fix needs a
+test or a line that shows it, and a rejection needs evidence. Say in your report
+which answers you judged, or that there were none.
 If `npm test` can't run here, say so and use the test output you were given.
 
 A re-review reads only the commits since the last review, when the caller asks
@@ -95,7 +96,8 @@ Make the report's first line `Reviewer agent at <sha>: no blockers` or
 it, with the first 7 characters of the earlier commit. A re-review that turned
 into a full review doesn't. Only this reviewer writes "Reviewer agent at": the
 Cursor chat, which uses this checklist for its second review, starts with
-`Second review (<model>) at <sha>:` instead.
+`Second review (<model>) at <sha>:` instead. When a finding quotes a review
+line, leave out its `at <sha>:` part, since a quoted one counts as a review.
 The builder copies it into the PR's Review section, and `npm run can-merge` merges a
 normal PR only when that line names its head commit.
 
