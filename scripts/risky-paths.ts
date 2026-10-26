@@ -4,9 +4,8 @@
 //
 // A path is risky when it starts with a pattern, so a pattern ending in "/"
 // covers a whole folder and "src/lib/ask" covers ask.ts, ask-store.ts and
-// their tests. A pattern with a "*" must match the whole path, and the "*"
-// stays inside one folder, so "src/lib/*-store.ts" covers the stores in
-// src/lib/ but not their tests.
+// their tests. A pattern with a "*" must match the whole path, so
+// "src/lib/*-store.ts" covers the stores but not their tests.
 
 export type RiskyPath = { pattern: string; why: string };
 
@@ -29,6 +28,9 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "src/lib/riot/", why: "the Riot client and rate limiter" },
   { pattern: "src/app/api/", why: "API routes, including the MCP server" },
   { pattern: "src/lib/mcp/", why: "the MCP server's cap on Riot calls" },
+  { pattern: "src/app/actions.ts", why: "a server action anyone can call" },
+  { pattern: "src/app/player/[region]/[riotId]/actions.ts", why: "server actions anyone can call, which spend Riot calls" },
+  { pattern: "src/app/player/[region]/[riotId]/insights/advance.ts", why: "a server action anyone can call, which spends Riot calls" },
   { pattern: "src/lib/ask", why: "Ask spends Claude API money" },
   { pattern: "src/lib/recap", why: "AI recaps spend Claude API money" },
   { pattern: "src/app/player/[region]/[riotId]/ask/", why: "Ask spends Claude API money" },
@@ -68,8 +70,7 @@ export function matchesPattern(pattern: string, path: string): boolean {
   if (star === -1) return path.startsWith(pattern);
   const head = pattern.slice(0, star);
   const tail = pattern.slice(star + 1);
-  if (path.length < head.length + tail.length || !path.startsWith(head) || !path.endsWith(tail)) return false;
-  return !path.slice(head.length, path.length - tail.length).includes("/");
+  return path.length >= head.length + tail.length && path.startsWith(head) && path.endsWith(tail);
 }
 
 export function riskyFiles(paths: readonly string[]): { path: string; why: string }[] {

@@ -130,8 +130,11 @@ type Context = { pr: PrSnapshot; main: MainState; tier: Tier };
 type Result = { pass: boolean; detail: string };
 
 // A PR names its own tier, so tiny skips the reviewer only when every file it
-// changes is a doc (JAS-12).
-const isDoc = (path: string) => path.startsWith("docs/") || path.endsWith(".md");
+// changes is a doc. Agents follow CLAUDE.md, AGENTS.md, docs/workflow.md and
+// the files in .claude/ and .cursor/ as rules, so those aren't docs (JAS-12).
+const isAgentRules = (path: string) =>
+  path.startsWith(".") || path === "docs/workflow.md" || /(^|\/)(CLAUDE|AGENTS)\.md$/.test(path);
+const isDoc = (path: string) => !isAgentRules(path) && (path.startsWith("docs/") || path.endsWith(".md"));
 
 const pass = (detail: string): Result => ({ pass: true, detail });
 const fail = (detail: string): Result => ({ pass: false, detail });
@@ -256,10 +259,11 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
     name: "Acceptance criteria ticked",
     check: ({ pr, tier }) => {
       if (tier.ok && tier.tier === "tiny") return pass("a tiny PR has no acceptance criteria");
-      // A box in any list GitHub renders ("-", "*", "+", "1." or "1)"). Only
-      // "[x]" counts as ticked, and a "[text](url)" link isn't a box.
+      // A box in any list GitHub renders ("-", "*", "+", "1." or "1)"), nested
+      // or inside a ">" quote. Only "[x]" counts as ticked, and a "[text](url)"
+      // link isn't a box.
       const boxes = section(pr.body, "Acceptance criteria").flatMap((line) => {
-        const match = line.match(/^\s*(?:[-*+]|\d+[.)])\s+\[([^\]]*)\](?!\()/);
+        const match = line.match(/^\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[([^\]]*)\](?!\()/);
         return match ? [{ ticked: /^x$/i.test(match[1]), text: line.trim() }] : [];
       });
       if (boxes.length === 0) return fail("the Acceptance criteria section has no boxes");
