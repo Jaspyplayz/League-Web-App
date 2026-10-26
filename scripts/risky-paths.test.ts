@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
-import { RISKY_PATHS, riskyFiles } from "./risky-paths";
+import { matchesPattern, RISKY_PATHS, riskyFiles } from "./risky-paths";
 
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
@@ -80,7 +80,7 @@ describe("riskyFiles", () => {
     const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
       encoding: "utf8",
     }).split("\n");
-    const missing = RISKY_PATHS.filter(({ pattern }) => !files.some((file) => file.startsWith(pattern)));
+    const missing = RISKY_PATHS.filter(({ pattern }) => !files.some((file) => matchesPattern(pattern, file)));
     expect(missing).toEqual([]);
   });
 });

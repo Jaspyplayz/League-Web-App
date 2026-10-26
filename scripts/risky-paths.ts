@@ -4,7 +4,9 @@
 //
 // A path is risky when it starts with a pattern, so a pattern ending in "/"
 // covers a whole folder and "src/lib/ask" covers ask.ts, ask-store.ts and
-// their tests.
+// their tests. A pattern with a "*" must match the whole path, and the "*"
+// stays inside one folder, so "src/lib/*-store.ts" covers the stores in
+// src/lib/ but not their tests.
 
 export type RiskyPath = { pattern: string; why: string };
 
@@ -13,6 +15,10 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "src/db/", why: "the database schema and queries" },
   { pattern: "drizzle/", why: "database migrations" },
   { pattern: "drizzle.config.ts", why: "where migrations run" },
+  { pattern: "src/lib/*-store.ts", why: "database reads and writes, including deletes" },
+  { pattern: "src/lib/my-player.ts", why: "links a user to their player in the database" },
+  { pattern: "scripts/remap-puuids", why: "rewrites player IDs in the live database" },
+  { pattern: "scripts/collect-benchmarks", why: "writes and deletes rows in the live database" },
   { pattern: "src/lib/auth.ts", why: "sign-in" },
   { pattern: "src/lib/sign-in.ts", why: "sign-in" },
   { pattern: "src/lib/supabase/", why: "sign-in sessions" },
@@ -22,6 +28,7 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "src/proxy.ts", why: "refreshes the sign-in session on every request" },
   { pattern: "src/lib/riot/", why: "the Riot client and rate limiter" },
   { pattern: "src/app/api/", why: "API routes, including the MCP server" },
+  { pattern: "src/lib/mcp/", why: "the MCP server's cap on Riot calls" },
   { pattern: "src/lib/ask", why: "Ask spends Claude API money" },
   { pattern: "src/lib/recap", why: "AI recaps spend Claude API money" },
   { pattern: "src/app/player/[region]/[riotId]/ask/", why: "Ask spends Claude API money" },
@@ -37,6 +44,8 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: ".claude/settings.json", why: "Claude's deny rules and commit hook" },
   { pattern: ".claude/hooks/", why: "the commit hook" },
   { pattern: ".claude/agents/reviewer.md", why: "the reviewer agent" },
+  { pattern: ".claude/skills/", why: "skills the reviewer loads" },
+  { pattern: ".claude/rules/", why: "rules the reviewer checks against" },
   { pattern: "eslint.config.mjs", why: "lint" },
   { pattern: "eslint-rules/", why: "lint" },
   { pattern: "tsconfig.json", why: "the type check" },
@@ -54,9 +63,18 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "scripts/risky-paths", why: "this list" },
 ];
 
+export function matchesPattern(pattern: string, path: string): boolean {
+  const star = pattern.indexOf("*");
+  if (star === -1) return path.startsWith(pattern);
+  const head = pattern.slice(0, star);
+  const tail = pattern.slice(star + 1);
+  if (path.length < head.length + tail.length || !path.startsWith(head) || !path.endsWith(tail)) return false;
+  return !path.slice(head.length, path.length - tail.length).includes("/");
+}
+
 export function riskyFiles(paths: readonly string[]): { path: string; why: string }[] {
   return paths.flatMap((path) => {
-    const match = RISKY_PATHS.find(({ pattern }) => path.startsWith(pattern));
+    const match = RISKY_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
     return match ? [{ path, why: match.why }] : [];
   });
 }
