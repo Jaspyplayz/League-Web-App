@@ -14,12 +14,22 @@ const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others",
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
 
+// The in-repo functions that call Claude or create a Supabase client. The
+// rest of their modules, such as recapsEnabled, are safe to import.
+const WRAPPERS = [
+  { name: "answerQuestion", file: "src/lib/ask.ts" },
+  { name: "writeRecap", file: "src/lib/recap.ts" },
+  { name: "createSupabaseClient", file: "src/lib/supabase/server.ts" },
+  { name: "refreshSession", file: "src/lib/supabase/proxy.ts" },
+];
+const USES_WRAPPER = new RegExp(`\\b(?:${WRAPPERS.map(({ name }) => name).join("|")})\\b`);
+
 // A file that belongs on the risky list: a route or a pages/api/ file, which
 // Next.js serves as a public endpoint, or the proxy it runs on every request;
-// a "use server" file; one that imports the Claude API or Supabase client or
-// reads the Claude API key; or one that imports the Postgres client, Drizzle,
-// or src/db/ by the @/ alias or a relative path, in either quote, as a
-// re-export or a dynamic import.
+// a "use server" file; one that imports the Claude API or Supabase client,
+// uses one of the wrappers above, or reads the Claude API key; or one that
+// imports the Postgres client, Drizzle, or src/db/ by the @/ alias or a
+// relative path, in either quote, as a re-export or a dynamic import.
 function mustBeListed(file: string, source: string): boolean {
   if (/(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$|(^|\/)pages\/api\//.test(file)) return true;
   if (/^(src\/)?(proxy|middleware)\.[cm]?[jt]s$/.test(file)) return true;
@@ -27,7 +37,10 @@ function mustBeListed(file: string, source: string): boolean {
   if (/["'](?:postgres|drizzle-orm(?:\/[^"']*)?|@anthropic-ai\/sdk(?:\/[^"']*)?|@supabase\/[^"']+)["']/.test(source)) {
     return true;
   }
-  if (/env(?:\.ANTHROPIC_API_KEY\b|\[\s*["']ANTHROPIC_API_KEY["']\s*\])/.test(source)) return true;
+  if (USES_WRAPPER.test(source)) return true;
+  const readsKey =
+    /env\??\.ANTHROPIC_API_KEY\b|env(?:\?\.)?\[\s*["']ANTHROPIC_API_KEY["']\s*\]|\{[^}]*\bANTHROPIC_API_KEY\b[^}]*\}\s*=\s*process\.env\b/;
+  if (readsKey.test(source)) return true;
   const imports = source.matchAll(/["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)(db(?:\/[^"']*)?)["']/g);
   return [...imports].some((match) => !PURE_DB_MODULES.has(match[1]));
 }
@@ -159,6 +172,12 @@ describe("riskyFiles", () => {
         mustBeListed(file, readFileSync(file, "utf8")),
     );
     expect(unlisted).toEqual([]);
+  });
+
+  // A renamed wrapper would quietly stop being checked.
+  it.each(WRAPPERS)("finds $name exported from $file, which is risky", ({ name, file }) => {
+    expect(readFileSync(file, "utf8")).toMatch(new RegExp(`export async function ${name}\\b`));
+    expect(riskyFiles([file])).toHaveLength(1);
   });
 
   it.each([

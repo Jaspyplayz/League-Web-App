@@ -48,6 +48,7 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: ".claude/hooks/", why: "the commit hook" },
   { pattern: ".claude/agents/", why: "the reviewer agent, and any agent that could take its name" },
   { pattern: ".cursor/settings.json", why: "the Grok review of risky PRs" },
+  { pattern: ".cursor/rules/", why: "rules the Cursor chat follows when it runs the Grok review" },
   { pattern: ".claude/skills/", why: "skills the reviewer loads" },
   { pattern: ".claude/rules/", why: "rules the reviewer checks against" },
   { pattern: "eslint.config.mjs", why: "lint" },
