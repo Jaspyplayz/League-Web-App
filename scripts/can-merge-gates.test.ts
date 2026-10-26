@@ -92,10 +92,63 @@ describe("decide", () => {
     expect(detail(decision, "Reviewer cleared the head commit")).toBe(`Reviewer agent at ${HEAD}: no blockers`);
   });
 
-  it("allows a tiny PR with no review and no criteria, written on GitHub's website", () => {
+  it("allows a tiny PR that changes only docs, with no review and no criteria, written on GitHub's website", () => {
     const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] }).replaceAll("\n", "\r\n");
-    const decision = decide(pr({ body: tiny }), main());
-    expect(decision.ok).toBe(true);
+    const files = ["docs/habits.md", "docs/screenshots/x.png", "README.md", "ARCHITECTURE.md"];
+    expect(decide(pr({ body: tiny, files }), main()).ok).toBe(true);
+  });
+
+  it("refuses a normal PR that changes only docs without the reviewer", () => {
+    const decision = decide(pr({ body: body({ review: [] }), files: ["docs/habits.md"] }), main());
+    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
+  });
+
+  // Agents follow these as rules, so a tiny PR can't loosen them unreviewed (JAS-12).
+  it.each([
+    "CLAUDE.md",
+    "CLAUDE.local.md",
+    "src/lib/analyzer/Claude.md",
+    "docs/CLAUDE.md",
+    "docs/CLAUDE.local.md",
+    "AGENTS.md",
+    "docs/AGENTS.md",
+    "docs/workflow.md",
+    ".cursor/skills/verify-turnpoint/SKILL.md",
+    "src/lib/analyzer/fixtures/README.md",
+    "src/components/docs/notes.md",
+    "docs/notes.test.ts",
+    "docs/run.ts",
+    "docs/Workflow.md",
+    "Docs/workflow.md",
+  ])("refuses a tiny PR that changes %s without the reviewer", (file) => {
+    const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
+    expect(failed(decide(pr({ body: tiny, files: ["docs/habits.md", file] }), main()))).toEqual([
+      "Reviewer cleared the head commit",
+    ]);
+  });
+
+  it.each(["docs/.claude/skills/x/SKILL.md", "docs/adr/.cursor/rules/x.md"])(
+    "refuses a tiny PR that changes %s as risky and unreviewed",
+    (file) => {
+      const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
+      expect(failed(decide(pr({ body: tiny, files: [file] }), main()))).toEqual([
+        "No risky files",
+        "Reviewer cleared the head commit",
+      ]);
+    },
+  );
+
+  // A PR names its own tier, so a tiny one that changes code still gets the reviewer (JAS-12).
+  it("refuses a tiny PR that changes code without the reviewer, and names the file", () => {
+    const tiny = body({ tier: "tiny. Copy.", criteria: [], review: [] });
+    const decision = decide(pr({ body: tiny, files: ["docs/habits.md", "src/lib/analyzer/death-recap.ts"] }), main());
+    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
+    expect(detail(decision, "Reviewer cleared the head commit")).toContain("src/lib/analyzer/death-recap.ts");
+  });
+
+  it("allows a tiny PR that changes code once the reviewer cleared it", () => {
+    const tiny = body({ tier: "tiny. Copy.", criteria: [] });
+    expect(decide(pr({ body: tiny }), main()).ok).toBe(true);
   });
 
   it("refuses when the gate code here differs from main's", () => {
@@ -169,7 +222,7 @@ describe("decide", () => {
   });
 
   it("refuses a risky file even when the tier says tiny, and names it", () => {
-    const tiny = body({ tier: "tiny. One query.", criteria: [], review: [] });
+    const tiny = body({ tier: "tiny. One query.", criteria: [] });
     const decision = decide(pr({ body: tiny, files: ["docs/database.md", "src/db/schema.ts"] }), main());
     expect(failed(decision)).toEqual(["No risky files"]);
     expect(detail(decision, "No risky files")).toBe("src/db/schema.ts (the database schema and queries)");
@@ -252,6 +305,21 @@ describe("decide", () => {
     const decision = decide(pr({ body: body({ criteria }) }), main());
     expect(failed(decision)).toEqual(["Acceptance criteria ticked"]);
     expect(detail(decision, "Acceptance criteria ticked")).toContain("It works on phones");
+  });
+
+  it.each(["1. [ ] B", "2) [ ] B", "+ [ ] B", "* [ ] B", "- [  ] B", "- [ x ] B", "  - [ ] B", "> - [ ] B"])("counts %s as an unticked criterion", (line) => {
+    const criteria = ['- [x] A: test "a"', line];
+    expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
+  });
+
+  it("reads ticked boxes in numbered and + lists, and skips a plain link", () => {
+    const criteria = ['1. [x] A: test "a"', "+ [X] B: screenshot", "- [Screenshot of B](https://example.com/b.png)"];
+    expect(decide(pr({ body: body({ criteria }) }), main()).ok).toBe(true);
+  });
+
+  it.each(["```", "~~~"])("reads criteria past a %s code block that holds a ## line", (fence) => {
+    const criteria = ['- [x] A: test "a"', fence, "## not a heading", fence, "- [ ] B"];
+    expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
   });
 
   it("refuses a normal PR with no acceptance criteria", () => {

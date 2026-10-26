@@ -1,7 +1,32 @@
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
-import { RISKY_PATHS, riskyFiles } from "./risky-paths";
+import { matchesPattern, RISKY_PATHS, riskyFiles } from "./risky-paths";
+
+// -z lists names unquoted, so a file named in other letters is still checked.
+const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
+  encoding: "utf8",
+})
+  .split("\0")
+  .filter(Boolean);
+
+// The modules in src/db/ that never touch the database.
+const PURE_DB_MODULES = new Set(["db/freshness"]);
+
+// A file that belongs on the risky list: a route or a pages/api/ file, which
+// Next.js serves as a public endpoint; a "use server" file; or one that
+// imports the Postgres client, Drizzle, or src/db/ by the @/ alias or a
+// relative path, in either quote, as a re-export or a dynamic import.
+function mustBeListed(file: string, source: string): boolean {
+  if (/(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$|(^|\/)pages\/api\//.test(file)) return true;
+  if (/^\s*["']use server["']/m.test(source)) return true;
+  if (/["'](?:postgres|drizzle-orm(?:\/[^"']*)?)["']/.test(source)) return true;
+  const imports = source.matchAll(/["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)(db(?:\/[^"']*)?)["']/g);
+  return [...imports].some((match) => !PURE_DB_MODULES.has(match[1]));
+}
+
+const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !/\.test\./.test(file);
 
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
@@ -42,6 +67,43 @@ describe("riskyFiles", () => {
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
+  // The stores and my-player.ts write and delete rows outside src/db/, and the
+  // MCP server caps how many Riot calls one request makes (JAS-12).
+  it("flags database code and the MCP server outside src/db/ and src/app/api/", () => {
+    const paths = [
+      "src/lib/match-note-store.ts",
+      "src/lib/profile-store.ts",
+      "src/lib/my-player.ts",
+      "scripts/remap-puuids-db.ts",
+      "scripts/collect-benchmarks.ts",
+      "src/lib/mcp/tools.ts",
+    ];
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // The reviewer agent loads these, so changing them changes the review.
+  it("flags the skills and rules the reviewer loads", () => {
+    const paths = [".claude/skills/code-review-and-quality/SKILL.md", ".claude/rules/database.md"];
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // Windows ignores case, so on Jasper's PC these land on the risky files.
+  it("flags a risky path spelled with other capitals", () => {
+    const paths = [".claude/Settings.json", "src/DB/schema.ts", "scripts/Remap-puuids-db.ts"];
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // Claude Code and Cursor load skills and rules from these folders too (JAS-12).
+  it("flags agent skills and rules below the repo root", () => {
+    const paths = [
+      "src/lib/.claude/rules/database.md",
+      "src/lib/.Claude/rules/x.md",
+      "docs/.claude/skills/x/SKILL.md",
+      "src/.cursor/rules/x.mdc",
+    ];
+    expect(riskyFiles(paths)).toEqual(paths.map((path) => ({ path, why: "agent skills or rules below the repo root" })));
+  });
+
   it("passes docs, pages and components outside the list", () => {
     expect(
       riskyFiles([
@@ -50,6 +112,9 @@ describe("riskyFiles", () => {
         "src/app/page.tsx",
         "src/components/sign-in-link.tsx",
         "src/lib/analyzer/recap-facts.ts",
+        "src/lib/regions.ts",
+        "src/lib/match-store.test.ts",
+        "src/components/theme-store.ts",
         "scripts/shot.ts",
       ]),
     ).toEqual([]);
@@ -57,10 +122,64 @@ describe("riskyFiles", () => {
 
   // A folder renamed without updating the list would quietly stop being risky.
   it("names only paths that exist in the repo", () => {
-    const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
-      encoding: "utf8",
-    }).split("\n");
-    const missing = RISKY_PATHS.filter(({ pattern }) => !files.some((file) => file.startsWith(pattern)));
+    const missing = RISKY_PATHS.filter(({ pattern }) => !repoFiles.some((file) => matchesPattern(pattern, file)));
     expect(missing).toEqual([]);
+  });
+
+  // Anyone can call a server action, and a store under a new name would
+  // otherwise merge as normal code (JAS-12).
+  it("covers every route, every server action and every file that imports the database", () => {
+    const unlisted = repoFiles.filter(
+      (file) =>
+        isSourceFile(file) &&
+        existsSync(file) &&
+        riskyFiles([file]).length === 0 &&
+        mustBeListed(file, readFileSync(file, "utf8")),
+    );
+    expect(unlisted).toEqual([]);
+  });
+
+  it.each([
+    ["src/app/notes/route.ts", true],
+    ["src/app/api/mcp/route.ts", true],
+    ["src/pages/api/refresh.ts", true],
+    ["src/app/notes/page.tsx", false],
+    ["src/lib/reroute.ts", false],
+  ])("counts %s as a route: %s", (file, route) => {
+    expect(mustBeListed(file, "")).toBe(route);
+  });
+
+  it.each([
+    '"use server";',
+    "  'use server';",
+    'import { getDb } from "@/db";',
+    "import { getDb } from '@/db';",
+    'import { tables } from "../../db/schema";',
+    'import { getDb } from "../src/db";',
+    'export { getDb } from "@/db";',
+    'const { getDb } = await import("@/db");',
+    'import postgres from "postgres";',
+    'import { eq } from "drizzle-orm";',
+    'import { drizzle } from "drizzle-orm/postgres-js";',
+    'import { secondsUntilUpdate } from "@/db/freshness";\nimport { getDb } from "@/db";',
+  ])("spots %s as a server action or database import", (source) => {
+    expect(mustBeListed("src/lib/notes.ts", `// a file\n${source}\n`)).toBe(true);
+  });
+
+  it("lets a file import a module in src/db/ that never touches the database", () => {
+    expect(mustBeListed("src/lib/notes.ts", 'import { secondsUntilUpdate } from "@/db/freshness";\n')).toBe(false);
+  });
+
+  it.each([
+    ["a.ts", true],
+    ["a.tsx", true],
+    ["a.mts", true],
+    ["a.mjs", true],
+    ["a.cjs", true],
+    ["a.js", true],
+    ["a.test.ts", false],
+    ["a.json", false],
+  ])("scans %s for database imports: %s", (file, scanned) => {
+    expect(isSourceFile(file)).toBe(scanned);
   });
 });

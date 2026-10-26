@@ -129,6 +129,22 @@ type Tier = { ok: true; tier: "tiny" | "normal" } | { ok: false; why: string };
 type Context = { pr: PrSnapshot; main: MainState; tier: Tier };
 type Result = { pass: boolean; detail: string };
 
+// A PR names its own tier, so tiny skips the reviewer only when every file it
+// changes is a doc: a .md file or image in docs/, or the root README.md or
+// ARCHITECTURE.md. Agents follow docs/workflow.md, any CLAUDE or AGENTS file
+// and anything in a dot folder as rules, so those aren't docs. Windows ignores
+// case, so this does too (JAS-12).
+function isDoc(path: string): boolean {
+  const lower = path.toLowerCase();
+  if (lower === "readme.md" || lower === "architecture.md") return true;
+  return (
+    /^docs\/.*\.(md|png|jpg|gif|webp)$/.test(lower) &&
+    lower !== "docs/workflow.md" &&
+    !/(^|\/)\./.test(lower) &&
+    !/(^|\/)(claude|agents)[^/]*\.md$/.test(lower)
+  );
+}
+
 const pass = (detail: string): Result => ({ pass: true, detail });
 const fail = (detail: string): Result => ({ pass: false, detail });
 
@@ -228,13 +244,16 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
   {
     name: "Reviewer cleared the head commit",
     check: ({ pr, tier }) => {
-      if (tier.ok && tier.tier === "tiny") return pass("a tiny PR skips the reviewer");
+      const tiny = tier.ok && tier.tier === "tiny";
+      const code = pr.files.filter((path) => !isDoc(path));
+      if (tiny && code.length === 0) return pass("a tiny PR that changes only docs skips the reviewer");
       const verdicts = section(pr.body, "Review").flatMap((line) => {
         const match = line.replace(/[*_`]/g, "").match(/Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
         return match ? [{ sha: match[1].toLowerCase(), verdict: match[2].trim(), line: match[0].trim() }] : [];
       });
       if (verdicts.length === 0) {
-        return fail('the Review section has no "Reviewer agent at <sha>: no blockers" line');
+        const missing = 'the Review section has no "Reviewer agent at <sha>: no blockers" line';
+        return fail(tiny ? `${missing}, which a tiny PR needs once it changes ${code.join(", ")}` : missing);
       }
       const atHead = verdicts.filter(({ sha }) => pr.headRefOid.startsWith(sha));
       if (atHead.length === 0) {
@@ -249,9 +268,12 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
     name: "Acceptance criteria ticked",
     check: ({ pr, tier }) => {
       if (tier.ok && tier.tier === "tiny") return pass("a tiny PR has no acceptance criteria");
+      // A box in any list GitHub renders ("-", "*", "+", "1." or "1)"), nested
+      // or inside a ">" quote. Only "[x]" counts as ticked, and a "[text](url)"
+      // link isn't a box.
       const boxes = section(pr.body, "Acceptance criteria").flatMap((line) => {
-        const match = line.match(/^\s*[-*]\s+\[( |x)\]/i);
-        return match ? [{ ticked: match[1] !== " ", text: line.trim() }] : [];
+        const match = line.match(/^\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[([^\]]*)\](?!\()/);
+        return match ? [{ ticked: /^x$/i.test(match[1]), text: line.trim() }] : [];
       });
       if (boxes.length === 0) return fail("the Acceptance criteria section has no boxes");
       const open = boxes.filter(({ ticked }) => !ticked);
@@ -311,6 +333,11 @@ function section(body: string, heading: string): string[] {
   const start = all.findIndex((line) => line.trim().toLowerCase() === `## ${heading.toLowerCase()}`);
   if (start === -1) return [];
   const rest = all.slice(start + 1);
-  const end = rest.findIndex((line) => line.startsWith("## "));
+  // A "## " line inside a code block isn't a heading.
+  let inCode = false;
+  const end = rest.findIndex((line) => {
+    if (/^\s*(```|~~~)/.test(line)) inCode = !inCode;
+    return !inCode && line.startsWith("## ");
+  });
   return end === -1 ? rest : rest.slice(0, end);
 }

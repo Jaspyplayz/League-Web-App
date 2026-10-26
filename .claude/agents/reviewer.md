@@ -19,6 +19,9 @@ Start by running `git fetch origin main`, `git rev-parse HEAD`,
 `git diff origin/main...HEAD` and `npm test`.
 Read CLAUDE.md, the docs the diff touches, and each `.claude/rules/` file whose
 `paths` match a changed file (a diff doesn't load them the way opening a file does).
+When the diff changes CLAUDE.md, AGENTS.md or docs/workflow.md, also read main's
+copy (`git show origin/main:CLAUDE.md`) and judge the PR by main's rules, so a PR
+can't loosen the rules it's reviewed by.
 If `npm test` can't run here, say so and use the test output you were given.
 
 The code-review-and-quality skill is loaded for you. Use its five axes (correctness,
@@ -32,6 +35,8 @@ starts more agents.
 
 Check in this order:
 1. Each acceptance criterion: met, not met, or untestable, with file:line evidence.
+   Say whether the PR names a screenshot or a test for it, since `can-merge` checks
+   only that its box is ticked.
 2. Inputs that break it: remakes, games under 15 minutes, missing timeline frames,
    a player who left, ARAM or Arena, no lane opponent, an expired Riot key.
 3. Project rules that lint can't check: "server-only" on modules with secrets
