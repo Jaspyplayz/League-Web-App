@@ -130,11 +130,12 @@ type Context = { pr: PrSnapshot; main: MainState; tier: Tier };
 type Result = { pass: boolean; detail: string };
 
 // A PR names its own tier, so tiny skips the reviewer only when every file it
-// changes is a doc. Agents follow CLAUDE.md, AGENTS.md, docs/workflow.md and
-// the files in .claude/ and .cursor/ as rules, so those aren't docs (JAS-12).
-const isAgentRules = (path: string) =>
-  path.startsWith(".") || path === "docs/workflow.md" || /(^|\/)(CLAUDE|AGENTS)\.md$/.test(path);
-const isDoc = (path: string) => !isAgentRules(path) && (path.startsWith("docs/") || path.endsWith(".md"));
+// changes is a doc: a file in docs/, or the root README.md or ARCHITECTURE.md.
+// Agents follow docs/workflow.md and any CLAUDE or AGENTS file as rules, so
+// those aren't docs (JAS-12).
+const isDoc = (path: string) =>
+  !/(^|\/)(claude|agents)[^/]*\.md$/i.test(path) &&
+  ((path.startsWith("docs/") && path !== "docs/workflow.md") || path === "README.md" || path === "ARCHITECTURE.md");
 
 const pass = (detail: string): Result => ({ pass: true, detail });
 const fail = (detail: string): Result => ({ pass: false, detail });
@@ -324,6 +325,11 @@ function section(body: string, heading: string): string[] {
   const start = all.findIndex((line) => line.trim().toLowerCase() === `## ${heading.toLowerCase()}`);
   if (start === -1) return [];
   const rest = all.slice(start + 1);
-  const end = rest.findIndex((line) => line.startsWith("## "));
+  // A "## " line inside a code block isn't a heading.
+  let inCode = false;
+  const end = rest.findIndex((line) => {
+    if (/^\s*(```|~~~)/.test(line)) inCode = !inCode;
+    return !inCode && line.startsWith("## ");
+  });
   return end === -1 ? rest : rest.slice(0, end);
 }
