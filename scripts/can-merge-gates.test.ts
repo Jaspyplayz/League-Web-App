@@ -94,8 +94,22 @@ describe("decide", () => {
 
   it("allows a tiny PR that changes only docs, with no review and no criteria, written on GitHub's website", () => {
     const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] }).replaceAll("\n", "\r\n");
-    const decision = decide(pr({ body: tiny, files: ["docs/habits.md", "CLAUDE.md"] }), main());
-    expect(decision.ok).toBe(true);
+    const files = ["docs/habits.md", "docs/screenshots/x.png", "README.md"];
+    expect(decide(pr({ body: tiny, files }), main()).ok).toBe(true);
+  });
+
+  // Agents follow these as rules, so a tiny PR can't loosen them unreviewed (JAS-12).
+  it.each([
+    "CLAUDE.md",
+    "src/lib/analyzer/CLAUDE.md",
+    "AGENTS.md",
+    "docs/workflow.md",
+    ".cursor/skills/verify-turnpoint/SKILL.md",
+  ])("refuses a tiny PR that changes %s without the reviewer", (file) => {
+    const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
+    expect(failed(decide(pr({ body: tiny, files: ["docs/habits.md", file] }), main()))).toEqual([
+      "Reviewer cleared the head commit",
+    ]);
   });
 
   // A PR names its own tier, so a tiny one that changes code still gets the reviewer (JAS-12).
@@ -267,7 +281,7 @@ describe("decide", () => {
     expect(detail(decision, "Acceptance criteria ticked")).toContain("It works on phones");
   });
 
-  it.each(["1. [ ] B", "2) [ ] B", "+ [ ] B", "* [ ] B", "- [  ] B"])("counts %s as an unticked criterion", (line) => {
+  it.each(["1. [ ] B", "2) [ ] B", "+ [ ] B", "* [ ] B", "- [  ] B", "  - [ ] B", "> - [ ] B"])("counts %s as an unticked criterion", (line) => {
     const criteria = ['- [x] A: test "a"', line];
     expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
   });

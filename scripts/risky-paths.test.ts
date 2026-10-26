@@ -1,7 +1,12 @@
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
 import { matchesPattern, RISKY_PATHS, riskyFiles } from "./risky-paths";
+
+const repoFiles = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+  encoding: "utf8",
+}).split("\n");
 
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
@@ -70,6 +75,8 @@ describe("riskyFiles", () => {
         "src/app/page.tsx",
         "src/components/sign-in-link.tsx",
         "src/lib/analyzer/recap-facts.ts",
+        "src/lib/regions.ts",
+        "src/lib/match-store.test.ts",
         "scripts/shot.ts",
       ]),
     ).toEqual([]);
@@ -77,10 +84,26 @@ describe("riskyFiles", () => {
 
   // A folder renamed without updating the list would quietly stop being risky.
   it("names only paths that exist in the repo", () => {
-    const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
-      encoding: "utf8",
-    }).split("\n");
-    const missing = RISKY_PATHS.filter(({ pattern }) => !files.some((file) => matchesPattern(pattern, file)));
+    const missing = RISKY_PATHS.filter(({ pattern }) => !repoFiles.some((file) => matchesPattern(pattern, file)));
     expect(missing).toEqual([]);
+  });
+
+  // Anyone can call a server action, and a store under a new name would
+  // otherwise merge as normal code (JAS-12).
+  it("covers every server action and every file that imports the database", () => {
+    const allowed: Record<string, string> = {
+      "scripts/check-score.ts": "only reads scores",
+      "src/app/player/[region]/[riotId]/profile-header.tsx": "imports secondsUntilUpdate, which has no database access",
+    };
+    const unlisted = repoFiles.filter(
+      (file) =>
+        /\.tsx?$/.test(file) &&
+        !/\.test\.tsx?$/.test(file) &&
+        existsSync(file) &&
+        !(file in allowed) &&
+        riskyFiles([file]).length === 0 &&
+        /^\s*["']use server["']|^import (?!type )[^;]*from "@\/db[/"]/m.test(readFileSync(file, "utf8")),
+    );
+    expect(unlisted).toEqual([]);
   });
 });
