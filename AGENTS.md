@@ -26,3 +26,7 @@ When you review a pull request, read CLAUDE.md first for the project rules,
 use the checklist in .claude/agents/reviewer.md, and report findings
 without editing files. Review is a second look, not a second builder:
 do not start a parallel implementation of the same issue.
+When the Cursor chat reviews a pull request, start your report with
+`Second review (<your model>) at <sha>:`, not the first line reviewer.md asks
+for, and never write `Reviewer agent at`. GitHub's `reviewer` check counts any
+line containing `Reviewer agent at <sha>:` as the reviewer's verdict.

@@ -1,6 +1,6 @@
 # 0010: GitHub requires the reviewer's verdict before any PR merges
 
-Status: draft, waiting on Jasper's "In my words" (Linear JAS-15). Amends [0008](0008-agents-merge-two-way-doors.md).
+Status: draft, waiting on Jasper's "In my words" (Linear JAS-15). Amends [0008](0008-agents-merge-two-way-doors.md). Amended by [0011](0011-shorter-re-reviews.md).
 
 ## Context
 
