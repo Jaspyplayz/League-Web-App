@@ -8,6 +8,11 @@ const repoFiles = execFileSync("git", ["ls-files", "--cached", "--others", "--ex
   encoding: "utf8",
 }).split("\n");
 
+// A "use server" directive, or any import of src/db/: by the @/ alias or a
+// relative path, in either quote, as a re-export or a dynamic import.
+const talksToDatabaseOrCallers = (source: string) =>
+  /^\s*["']use server["']|["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)db(?:\/[^"']*)?["']/m.test(source);
+
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
     expect(
@@ -97,13 +102,25 @@ describe("riskyFiles", () => {
     };
     const unlisted = repoFiles.filter(
       (file) =>
-        /\.tsx?$/.test(file) &&
-        !/\.test\.tsx?$/.test(file) &&
+        /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) &&
+        !/\.test\./.test(file) &&
         existsSync(file) &&
         !(file in allowed) &&
         riskyFiles([file]).length === 0 &&
-        /^\s*["']use server["']|^import (?!type )[^;]*from "@\/db[/"]/m.test(readFileSync(file, "utf8")),
+        talksToDatabaseOrCallers(readFileSync(file, "utf8")),
     );
     expect(unlisted).toEqual([]);
+  });
+
+  it.each([
+    '"use server";',
+    'import { getDb } from "@/db";',
+    "import { getDb } from '@/db';",
+    'import { tables } from "../../db/schema";',
+    'import { getDb } from "../src/db";',
+    'export { getDb } from "@/db";',
+    'const { getDb } = await import("@/db");',
+  ])("spots %s as a server action or database import", (source) => {
+    expect(talksToDatabaseOrCallers(`// a file\n${source}\n`)).toBe(true);
   });
 });

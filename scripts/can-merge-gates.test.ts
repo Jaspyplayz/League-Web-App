@@ -94,17 +94,25 @@ describe("decide", () => {
 
   it("allows a tiny PR that changes only docs, with no review and no criteria, written on GitHub's website", () => {
     const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] }).replaceAll("\n", "\r\n");
-    const files = ["docs/habits.md", "docs/screenshots/x.png", "README.md"];
+    const files = ["docs/habits.md", "docs/screenshots/x.png", "README.md", "ARCHITECTURE.md"];
     expect(decide(pr({ body: tiny, files }), main()).ok).toBe(true);
+  });
+
+  it("refuses a normal PR that changes only docs without the reviewer", () => {
+    const decision = decide(pr({ body: body({ review: [] }), files: ["docs/habits.md"] }), main());
+    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
   });
 
   // Agents follow these as rules, so a tiny PR can't loosen them unreviewed (JAS-12).
   it.each([
     "CLAUDE.md",
-    "src/lib/analyzer/CLAUDE.md",
+    "CLAUDE.local.md",
+    "src/lib/analyzer/Claude.md",
+    "docs/CLAUDE.md",
     "AGENTS.md",
     "docs/workflow.md",
     ".cursor/skills/verify-turnpoint/SKILL.md",
+    "src/lib/analyzer/fixtures/README.md",
   ])("refuses a tiny PR that changes %s without the reviewer", (file) => {
     const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
     expect(failed(decide(pr({ body: tiny, files: ["docs/habits.md", file] }), main()))).toEqual([
@@ -281,7 +289,7 @@ describe("decide", () => {
     expect(detail(decision, "Acceptance criteria ticked")).toContain("It works on phones");
   });
 
-  it.each(["1. [ ] B", "2) [ ] B", "+ [ ] B", "* [ ] B", "- [  ] B", "  - [ ] B", "> - [ ] B"])("counts %s as an unticked criterion", (line) => {
+  it.each(["1. [ ] B", "2) [ ] B", "+ [ ] B", "* [ ] B", "- [  ] B", "- [ x ] B", "  - [ ] B", "> - [ ] B"])("counts %s as an unticked criterion", (line) => {
     const criteria = ['- [x] A: test "a"', line];
     expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
   });
@@ -289,6 +297,11 @@ describe("decide", () => {
   it("reads ticked boxes in numbered and + lists, and skips a plain link", () => {
     const criteria = ['1. [x] A: test "a"', "+ [X] B: screenshot", "- [Screenshot of B](https://example.com/b.png)"];
     expect(decide(pr({ body: body({ criteria }) }), main()).ok).toBe(true);
+  });
+
+  it("reads criteria past a code block that holds a ## line", () => {
+    const criteria = ['- [x] A: test "a"', "```", "## not a heading", "```", "- [ ] B"];
+    expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
   });
 
   it("refuses a normal PR with no acceptance criteria", () => {
