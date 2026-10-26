@@ -39,8 +39,31 @@ export type RollupEntry =
     }
   | { __typename: "StatusContext"; context: string; targetUrl: string | null; state: string };
 
+type RollupRun = Extract<RollupEntry, { __typename: "CheckRun" }>;
+
+// GitHub runs a check again on each push, description edit and re-run, and
+// the rollup lists every run. The merge box counts only the latest run of
+// each, so the gates do too. Runs that started in the same second all count.
 export function toChecks(rollup: RollupEntry[]): Check[] {
-  return rollup.map(toCheck);
+  const key = (run: RollupRun) => JSON.stringify([run.workflowName, run.name]);
+  const latest = new Map<string, number>();
+  for (const entry of rollup) {
+    if (entry.__typename === "CheckRun") {
+      latest.set(key(entry), Math.max(latest.get(key(entry)) ?? -Infinity, started(entry)));
+    }
+  }
+  return rollup
+    .filter((entry) => entry.__typename === "StatusContext" || started(entry) === latest.get(key(entry)))
+    .map(toCheck);
+}
+
+// gh prints Go's zero time for a run that hasn't started.
+const NOT_STARTED = "0001-01-01T00:00:00Z";
+
+// A queued run is the newest, and a run cancelled before it started never ran.
+function started(run: RollupRun): number {
+  if (run.startedAt !== null && run.startedAt !== NOT_STARTED) return Date.parse(run.startedAt);
+  return run.status === "COMPLETED" ? -Infinity : Infinity;
 }
 
 function toCheck(entry: RollupEntry): Check {
