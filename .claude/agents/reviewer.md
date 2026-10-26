@@ -25,6 +25,9 @@ When the diff changes docs/workflow.md, any CLAUDE or AGENTS file, such as
 CLAUDE.local.md, or anything in `.claude/`, such as this file, also read main's
 copy (`git show origin/main:<path>`) and judge the PR by main's rules, so a PR
 can't loosen the rules it's reviewed by.
+If the branch has a PR, read its Review section (`gh pr view --json body`) and
+judge each earlier finding's answer, from this reviewer or any other review: a
+fix needs a test or a line that shows it, and a rejection needs evidence.
 If `npm test` can't run here, say so and use the test output you were given.
 
 A re-review reads only the commits since the last review, when the caller asks
