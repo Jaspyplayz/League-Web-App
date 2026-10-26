@@ -113,6 +113,9 @@ describe("decide", () => {
     "docs/workflow.md",
     ".cursor/skills/verify-turnpoint/SKILL.md",
     "src/lib/analyzer/fixtures/README.md",
+    "src/components/docs/notes.md",
+    "docs/notes.test.ts",
+    "docs/run.ts",
   ])("refuses a tiny PR that changes %s without the reviewer", (file) => {
     const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
     expect(failed(decide(pr({ body: tiny, files: ["docs/habits.md", file] }), main()))).toEqual([
@@ -299,8 +302,8 @@ describe("decide", () => {
     expect(decide(pr({ body: body({ criteria }) }), main()).ok).toBe(true);
   });
 
-  it("reads criteria past a code block that holds a ## line", () => {
-    const criteria = ['- [x] A: test "a"', "```", "## not a heading", "```", "- [ ] B"];
+  it.each(["```", "~~~"])("reads criteria past a %s code block that holds a ## line", (fence) => {
+    const criteria = ['- [x] A: test "a"', fence, "## not a heading", fence, "- [ ] B"];
     expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
   });
 

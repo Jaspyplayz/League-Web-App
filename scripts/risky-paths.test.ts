@@ -8,10 +8,18 @@ const repoFiles = execFileSync("git", ["ls-files", "--cached", "--others", "--ex
   encoding: "utf8",
 }).split("\n");
 
-// A "use server" directive, or any import of src/db/: by the @/ alias or a
+// The modules in src/db/ that never touch the database.
+const PURE_DB_MODULES = new Set(["db/freshness"]);
+
+// A "use server" directive, or an import of src/db/ by the @/ alias or a
 // relative path, in either quote, as a re-export or a dynamic import.
-const talksToDatabaseOrCallers = (source: string) =>
-  /^\s*["']use server["']|["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)db(?:\/[^"']*)?["']/m.test(source);
+function talksToDatabaseOrCallers(source: string): boolean {
+  if (/^\s*["']use server["']/m.test(source)) return true;
+  const imports = source.matchAll(/["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)(db(?:\/[^"']*)?)["']/g);
+  return [...imports].some((match) => !PURE_DB_MODULES.has(match[1]));
+}
+
+const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !/\.test\./.test(file);
 
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
@@ -82,6 +90,7 @@ describe("riskyFiles", () => {
         "src/lib/analyzer/recap-facts.ts",
         "src/lib/regions.ts",
         "src/lib/match-store.test.ts",
+        "src/components/theme-store.ts",
         "scripts/shot.ts",
       ]),
     ).toEqual([]);
@@ -96,16 +105,10 @@ describe("riskyFiles", () => {
   // Anyone can call a server action, and a store under a new name would
   // otherwise merge as normal code (JAS-12).
   it("covers every server action and every file that imports the database", () => {
-    const allowed: Record<string, string> = {
-      "scripts/check-score.ts": "only reads scores",
-      "src/app/player/[region]/[riotId]/profile-header.tsx": "imports secondsUntilUpdate, which has no database access",
-    };
     const unlisted = repoFiles.filter(
       (file) =>
-        /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) &&
-        !/\.test\./.test(file) &&
+        isSourceFile(file) &&
         existsSync(file) &&
-        !(file in allowed) &&
         riskyFiles([file]).length === 0 &&
         talksToDatabaseOrCallers(readFileSync(file, "utf8")),
     );
@@ -114,13 +117,32 @@ describe("riskyFiles", () => {
 
   it.each([
     '"use server";',
+    "  'use server';",
     'import { getDb } from "@/db";',
     "import { getDb } from '@/db';",
     'import { tables } from "../../db/schema";',
     'import { getDb } from "../src/db";',
     'export { getDb } from "@/db";',
     'const { getDb } = await import("@/db");',
+    'import { secondsUntilUpdate } from "@/db/freshness";\nimport { getDb } from "@/db";',
   ])("spots %s as a server action or database import", (source) => {
     expect(talksToDatabaseOrCallers(`// a file\n${source}\n`)).toBe(true);
+  });
+
+  it("lets a file import a module in src/db/ that never touches the database", () => {
+    expect(talksToDatabaseOrCallers('import { secondsUntilUpdate } from "@/db/freshness";\n')).toBe(false);
+  });
+
+  it.each([
+    ["a.ts", true],
+    ["a.tsx", true],
+    ["a.mts", true],
+    ["a.mjs", true],
+    ["a.cjs", true],
+    ["a.js", true],
+    ["a.test.ts", false],
+    ["a.json", false],
+  ])("scans %s for database imports: %s", (file, scanned) => {
+    expect(isSourceFile(file)).toBe(scanned);
   });
 });
