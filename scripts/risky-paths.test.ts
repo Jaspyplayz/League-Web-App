@@ -87,6 +87,13 @@ describe("riskyFiles", () => {
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
+  // Local settings override the commit hook, a copied agent can take the
+  // reviewer's name, and Cursor's settings run the Grok review (JAS-13).
+  it("flags local settings, every agent and Cursor's settings", () => {
+    const paths = [".claude/settings.local.json", ".claude/agents/review-notes.md", ".cursor/settings.json"];
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
   // Windows ignores case, so on Jasper's PC these land on the risky files.
   it("flags a risky path spelled with other capitals", () => {
     const paths = [".claude/Settings.json", "src/DB/schema.ts", "scripts/Remap-puuids-db.ts"];
@@ -114,8 +121,11 @@ describe("riskyFiles", () => {
         "src/lib/analyzer/recap-facts.ts",
         "src/lib/regions.ts",
         "src/lib/match-store.test.ts",
+        "src/lib/match-store.ts.bak",
         "src/components/theme-store.ts",
         "scripts/shot.ts",
+        ".cursor/rules/one-builder.mdc",
+        ".cursor/skills/verify-turnpoint/SKILL.md",
       ]),
     ).toEqual([]);
   });
@@ -127,8 +137,9 @@ describe("riskyFiles", () => {
   });
 
   // Anyone can call a server action, and a store under a new name would
-  // otherwise merge as normal code (JAS-12).
-  it("covers every route, every server action and every file that imports the database", () => {
+  // otherwise merge as normal code (JAS-12). Claude spending and sign-in stay
+  // Jasper's too (JAS-13).
+  it("covers every entry point, server action, and database, Claude API or Supabase client", () => {
     const unlisted = repoFiles.filter(
       (file) =>
         isSourceFile(file) &&
@@ -143,10 +154,13 @@ describe("riskyFiles", () => {
     ["src/app/notes/route.ts", true],
     ["src/app/api/mcp/route.ts", true],
     ["src/pages/api/refresh.ts", true],
+    ["src/proxy.ts", true],
+    ["src/middleware.ts", true],
     ["src/app/notes/page.tsx", false],
     ["src/lib/reroute.ts", false],
-  ])("counts %s as a route: %s", (file, route) => {
-    expect(mustBeListed(file, "")).toBe(route);
+    ["src/lib/supabase/proxy.ts", false],
+  ])("counts %s as a public entry point: %s", (file, entry) => {
+    expect(mustBeListed(file, "")).toBe(entry);
   });
 
   it.each([
@@ -162,12 +176,20 @@ describe("riskyFiles", () => {
     'import { eq } from "drizzle-orm";',
     'import { drizzle } from "drizzle-orm/postgres-js";',
     'import { secondsUntilUpdate } from "@/db/freshness";\nimport { getDb } from "@/db";',
-  ])("spots %s as a server action or database import", (source) => {
+    'import Anthropic from "@anthropic-ai/sdk";',
+    'import { createServerClient } from "@supabase/ssr";',
+    "const key = process.env.ANTHROPIC_API_KEY;",
+    'const key = process.env["ANTHROPIC_API_KEY"];',
+  ])("spots %s as a server action or a database, Claude API or Supabase client", (source) => {
     expect(mustBeListed("src/lib/notes.ts", `// a file\n${source}\n`)).toBe(true);
   });
 
-  it("lets a file import a module in src/db/ that never touches the database", () => {
-    expect(mustBeListed("src/lib/notes.ts", 'import { secondsUntilUpdate } from "@/db/freshness";\n')).toBe(false);
+  it.each([
+    'import { secondsUntilUpdate } from "@/db/freshness";',
+    'import { supabaseConfig } from "@/lib/supabase/config";',
+    'throw new Error("Ask is off here (needs ANTHROPIC_API_KEY)");',
+  ])("lets a file use %s, which reaches no database, Claude API or sign-in", (source) => {
+    expect(mustBeListed("src/lib/notes.ts", `${source}\n`)).toBe(false);
   });
 
   it.each([
