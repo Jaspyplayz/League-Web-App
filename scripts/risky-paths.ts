@@ -18,6 +18,7 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "src/lib/my-player.ts", why: "links a user to their player in the database" },
   { pattern: "scripts/remap-puuids", why: "rewrites player IDs in the live database" },
   { pattern: "scripts/collect-benchmarks", why: "writes and deletes rows in the live database" },
+  { pattern: "scripts/check-score", why: "reads the live database" },
   { pattern: "src/lib/auth.ts", why: "sign-in" },
   { pattern: "src/lib/sign-in.ts", why: "sign-in" },
   { pattern: "src/lib/supabase/", why: "sign-in sessions" },

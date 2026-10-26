@@ -130,12 +130,15 @@ type Context = { pr: PrSnapshot; main: MainState; tier: Tier };
 type Result = { pass: boolean; detail: string };
 
 // A PR names its own tier, so tiny skips the reviewer only when every file it
-// changes is a doc: a file in docs/, or the root README.md or ARCHITECTURE.md.
-// Agents follow docs/workflow.md and any CLAUDE or AGENTS file as rules, so
-// those aren't docs (JAS-12).
+// changes is a doc: a .md file or image in docs/, or the root README.md or
+// ARCHITECTURE.md. Agents follow docs/workflow.md and any CLAUDE or AGENTS
+// file as rules, so those aren't docs (JAS-12).
 const isDoc = (path: string) =>
-  !/(^|\/)(claude|agents)[^/]*\.md$/i.test(path) &&
-  ((path.startsWith("docs/") && path !== "docs/workflow.md") || path === "README.md" || path === "ARCHITECTURE.md");
+  path === "README.md" ||
+  path === "ARCHITECTURE.md" ||
+  (/^docs\/.*\.(md|png|jpe?g|gif|webp)$/i.test(path) &&
+    path !== "docs/workflow.md" &&
+    !/(^|\/)(claude|agents)[^/]*\.md$/i.test(path));
 
 const pass = (detail: string): Result => ({ pass: true, detail });
 const fail = (detail: string): Result => ({ pass: false, detail });
