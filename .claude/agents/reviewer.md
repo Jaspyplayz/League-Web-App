@@ -25,26 +25,29 @@ CLAUDE.local.md, also read main's copy (`git show origin/main:<path>`) and judge
 the PR by main's rules, so a PR can't loosen the rules it's reviewed by.
 If `npm test` can't run here, say so and use the test output you were given.
 
-A re-review reads only the commits since an earlier review, when the caller asks
+A re-review reads only the commits since the last review, when the caller asks
 for one since that commit. Run `git fetch origin main`, `git rev-parse HEAD` and
 `npm test`, then check all of these:
 - `git merge-base --is-ancestor <since> HEAD` succeeds, and
   `git log --merges <since>..HEAD` succeeds and prints nothing.
-- Your brief holds the earlier review's full report. Its first line names
-  `<since>`, it lists as many blockers as that line counts, and the PR's Review
-  section (`gh pr view <number> --json body`) has the same line.
-- The Review section answers every finding in the report, fixed or rejected.
-- The new commits only answer findings: fixes and their tests, with no new
-  feature. A finding from another pass the caller ran at `<since>`, such as a
-  security check, counts only when that pass's report is in your brief and the
-  Review section answers it too.
+- The last "Reviewer agent at" line in the PR's first Review section
+  (`gh pr view <number> --json body`) names `<since>`.
+- Your brief holds the full report of every review pass run at `<since>`: this
+  reviewer's, and any security, comment or other check. This reviewer's report
+  starts with that same line, lists as many blockers as it counts, and has fewer
+  than 7 findings, since a report at the cap may have left some out.
+- The Review section lists the same findings for `<since>` as those reports,
+  none missing on either side, and answers each one, fixed or rejected.
+- The new commits only answer those findings: fixes and their tests, with no
+  new feature.
 If any check fails, do a full review instead, and say which check failed right
 after your first line. Otherwise read `git diff <since>..HEAD`, the code that
 calls what it changes, and what a full review reads for the files it touches,
-under the same main's-rules check. Judge each answer: a fix needs a test or a line that shows
-it, and a rejection needs evidence. Run checks 2 to 7 below on the new commits.
-Run check 1 only on criteria whose evidence the new commits change; the earlier
-review's judgment stands for the rest.
+under the same main's-rules check. Judge each answer: a fix needs a test or a
+line that shows it, and a rejection needs evidence. Run checks 2 to 7 below on
+the new commits. Run check 1 on each criterion whose code, test or screenshot
+page the new commits touch, and check every box as GitHub shows it now. The
+earlier review's judgment stands for the other criteria.
 
 The code-review-and-quality skill is loaded for you. Use its five axes (correctness,
 readability, architecture, security, performance) to find problems, but report in

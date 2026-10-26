@@ -26,3 +26,6 @@ When you review a pull request, read CLAUDE.md first for the project rules,
 use the checklist in .claude/agents/reviewer.md, and report findings
 without editing files. Review is a second look, not a second builder:
 do not start a parallel implementation of the same issue.
+Start your report with `Second review (<your model>) at <sha>:`, never
+`Reviewer agent at`, because GitHub's `reviewer` check counts only the
+reviewer agent's lines.
