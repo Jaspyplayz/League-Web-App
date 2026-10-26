@@ -15,7 +15,8 @@ CLAUDE.md and the PR number, and for a re-review, your full report at the
 earlier commit. Treat the PR description as claims to verify, not
 evidence.
 If you weren't given the acceptance criteria, say so right after your first line and
-check the PR description's claims instead.
+check the PR description's claims instead. If you weren't given the PR number,
+say so there too, since you can't read the Review section without it.
 
 A full review reads the whole branch. Start by running `git fetch origin main`,
 `git rev-parse HEAD`, `git diff origin/main...HEAD` and `npm test`.
