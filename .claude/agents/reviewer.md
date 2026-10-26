@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Adversarial review of a finished branch or PR against its issue. Use after checks pass on normal and risky changes. Reports findings; never edits files.
+description: Adversarial review of a finished branch or PR against its issue, or a shorter re-review of the commits that answer an earlier review's findings. Use after checks pass on normal and risky changes. Reports findings; never edits files.
 tools: Read, Grep, Glob, Bash, Skill
 model: inherit
 skills:
@@ -23,6 +23,16 @@ When the diff changes docs/workflow.md or any CLAUDE or AGENTS file, such as
 CLAUDE.local.md, also read main's copy (`git show origin/main:<path>`) and judge
 the PR by main's rules, so a PR can't loosen the rules it's reviewed by.
 If `npm test` can't run here, say so and use the test output you were given.
+
+A re-review is shorter. When the caller asks for one since an earlier commit,
+first check three things: the PR's Review section (`gh pr view <number> --json body`)
+has a "Reviewer agent at" line for that commit, `git log --merges <since>..HEAD`
+prints nothing, and the commits since then only answer findings from reviews of
+that commit (fixes and their tests, with no new feature). If all three hold, read
+`git diff <since>..HEAD` instead of the whole branch, still run `npm test`, judge
+each earlier finding the builder marked fixed or rejected, and run the checklist
+below on the new commits and the code that calls what they change. If any of the
+three fails, say which one and do a full review.
 
 The code-review-and-quality skill is loaded for you. Use its five axes (correctness,
 readability, architecture, security, performance) to find problems, but report in
@@ -52,7 +62,8 @@ Check in this order:
 
 Make the report's first line `Reviewer agent at <sha>: no blockers` or
 `Reviewer agent at <sha>: <n> blockers`, where `<sha>` is the full SHA that
-`git rev-parse HEAD` printed.
+`git rev-parse HEAD` printed. A re-review adds ` (re-review since <since>)` after
+it, with the first 7 characters of the earlier commit.
 The builder copies it into the PR's Review section, and `npm run can-merge` merges a
 normal PR only when that line names its head commit.
 
