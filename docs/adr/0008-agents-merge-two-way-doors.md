@@ -1,6 +1,6 @@
 # 0008: Claude Code merges its own tiny and normal PRs through one gated command
 
-Status: draft, waiting on Jasper's "In my words" (issue #158). Amended by [0009](0009-can-merge-covers-database-code-and-tiny-code.md).
+Status: draft, waiting on Jasper's "In my words" (issue #158). Amended by [0009](0009-can-merge-covers-database-code-and-tiny-code.md) and [0010](0010-github-requires-the-reviewer.md).
 
 ## Context
 
