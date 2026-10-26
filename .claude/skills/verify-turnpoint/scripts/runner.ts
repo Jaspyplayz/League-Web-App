@@ -1,20 +1,22 @@
 // Shared harness for verify-turnpoint and verify-turnpoint-ux.
 // Drives Turnpoint in headless Chromium (Playwright) and writes evidence to
-// .cache/verify-turnpoint/<run id>/<journey>/ (git-ignored, never removed by cleanup.sh).
+// .cache/verify-turnpoint/<run id>/<journey>/ (git-ignored, never removed by cleanup.ts).
 //
 // Not a test runner: each journey is a list of user steps. Every step saves a
 // screenshot, an ARIA snapshot of <main>, the URL, and a line in steps.jsonl.
 // The first failing expectation stops the journey and is recorded as the result.
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { chromium, devices, expect, type Browser, type Page } from "@playwright/test";
-import { passPreviewLogin } from "../../../../e2e/preview-login";
+import { passPreviewLogin, recordLeaks } from "../../../../e2e/preview-login";
+import { loadEnv } from "../../../../scripts/preview";
+import { isOurs } from "./instance";
+import { pickTarget } from "./target";
 
 export const LIVE = "https://league-web-app.vercel.app";
-export const STATE_FILE = "/tmp/verify-turnpoint/instance.json";
 export const SAMPLE_MATCH_PATH = "/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221";
 export const TEST_PLAYER = { riotId: "Hide on bush#KR1", region: "kr", path: "/player/kr/Hide%20on%20bush-KR1" };
 // The same strings scripts/shot-outcome.ts classifies on.
@@ -47,27 +49,25 @@ function sh(cmd: string, args: string[]): string {
   }
 }
 
-/** Default base: the instance launch.sh started, else nothing (you must pass --base). */
-export function defaultBase(): string | undefined {
-  if (!existsSync(STATE_FILE)) return undefined;
-  return JSON.parse(readFileSync(STATE_FILE, "utf8")).base as string;
-}
-
 export function evidenceRoot(): string {
   return resolve(process.cwd(), ".cache/verify-turnpoint");
 }
 
-async function newPage(browser: Browser, base: string, phone: boolean): Promise<Page> {
+async function newPage(
+  browser: Browser,
+  base: string,
+  phone: boolean,
+  preview: string | undefined,
+): Promise<{ page: Page; leaked: () => Promise<string[]> }> {
   const context = await browser.newContext({
     ...devices[phone ? "Pixel 7" : "Desktop Chrome"],
     baseURL: base,
     // Same reduced-motion setting for every run so smooth scrolls finish before a screenshot.
     reducedMotion: "reduce",
   });
-  const origin = new URL(base).origin;
-  // The bypass secret goes only to a preview's own origin, never the live site or localhost.
-  if (origin.endsWith(".vercel.app") && origin !== LIVE) await passPreviewLogin(context, origin);
-  return context.newPage();
+  if (!preview) return { page: await context.newPage(), leaked: async () => [] };
+  await passPreviewLogin(context, preview);
+  return { page: await context.newPage(), leaked: recordLeaks(context, preview) };
 }
 
 /** Fail fast with the page's own words when it is not the app working. */
@@ -84,6 +84,7 @@ export async function main(journeys: Journey[], usage: string) {
     allowPositionals: true,
     options: {
       base: { type: "string" },
+      pr: { type: "string" },
       run: { type: "string" },
       list: { type: "boolean", default: false },
     },
@@ -101,12 +102,19 @@ export async function main(journeys: Journey[], usage: string) {
     process.exitCode = 1;
     return;
   }
-  const base = (values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
-  if (!base) {
-    console.log("No target. Run scripts/launch.sh first, or pass --base https://league-web-app.vercel.app");
+  const target = pickTarget(values);
+  if ("error" in target) {
+    console.log(target.error);
     process.exitCode = 1;
     return;
   }
+  if (target.instance && !isOurs(target.instance)) {
+    console.log(`The server in the state file (${target.base}) is no longer the one launch.ts started. Run cleanup.ts, then launch.ts.`);
+    process.exitCode = 1;
+    return;
+  }
+  const { base, preview } = target;
+  if (preview) loadEnv();
   const runId = values.run ?? process.env.RUN_ID ?? new Date().toISOString().replace(/[:.]/g, "-");
   const runDir = join(evidenceRoot(), runId);
   mkdirSync(runDir, { recursive: true });
@@ -127,7 +135,7 @@ export async function main(journeys: Journey[], usage: string) {
       const dir = join(runDir, name);
       mkdirSync(dir, { recursive: true });
       const log = join(dir, "steps.jsonl");
-      const page = await newPage(browser, base, journey.phone ?? false);
+      const { page, leaked } = await newPage(browser, base, journey.phone ?? false, preview);
       const consoleErrors: string[] = [];
       page.on("pageerror", (e) => consoleErrors.push(String(e).slice(0, 300)));
       const notes: Record<string, unknown> = {};
@@ -163,8 +171,10 @@ export async function main(journeys: Journey[], usage: string) {
         result = { ok: true };
       } catch (e) {
         result = { ok: false, error: String(e instanceof Error ? e.message : e) };
-        failed += 1;
       }
+      const leaks = await leaked();
+      if (leaks.length) result = { ok: false, error: `the bypass secret went to other sites: ${leaks.join(", ")}` };
+      if (!result.ok) failed += 1;
       writeFileSync(
         join(dir, "result.json"),
         JSON.stringify({ journey: name, feature: journey.feature, base, ...result, notes, pageErrors: consoleErrors }, null, 2),

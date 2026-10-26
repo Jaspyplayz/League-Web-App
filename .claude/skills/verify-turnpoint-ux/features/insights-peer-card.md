@@ -24,7 +24,7 @@ Preconditions:
 - **Lead skill.** Inside that region the heading `Skill to improve` is visible (card heading saved as `notes.rankHeading`).
 - **Switch rank.** In form `Compare with a rank`, select `gold` in `Rank` and click `Compare`. The URL has `tier=gold` and `view=others`; heading `You vs Gold` is visible; calm.
 - **Bad player ID.** In form `Compare with a player`, fill `Their Riot ID` with `nohashtag` and click `Compare`. An alert containing `isn't a Riot ID` is visible and `You vs Gold` is still there.
-- **Run.** `npx tsx .cursor/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] ux-insights-peer-card`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-insights-peer-card`.
 - **Proof.** `02-peer-card-leads-with-one-skill.png`, `03-compare-with-another-rank.png`, `04-compare-with-a-player-rejects-a-bad-id-calmly.png` (scrolled to the message).
 
 ## Gotchas

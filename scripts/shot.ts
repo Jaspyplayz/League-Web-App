@@ -11,15 +11,14 @@
 // is not saved: the run prints what it saw and exits with an error. --expect
 // saves one of those on purpose, for a PR that changes the 404 page.
 
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { loadEnvConfig } from "@next/env";
 import { chromium, devices, type BrowserContext, type Page } from "@playwright/test";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { THEME_KEY } from "@/lib/theme";
 import { passPreviewLogin } from "../e2e/preview-login";
+import { loadEnv, previewUrl } from "./preview";
 import { classify, OUTCOMES, type Outcome } from "./shot-outcome";
 
 const USAGE = `Usage: npm run shot -- [--pr <number> | --base <url>] [--light] [--phone] [--tab <name>] [--expect <outcome>] <path>...
@@ -39,44 +38,6 @@ const { values: options, positionals: paths } = parseArgs({
     check: { type: "boolean", default: false },
   },
 });
-
-function run(command: string, args: string[]): string {
-  return execFileSync(command, args, { encoding: "utf8" }).trim();
-}
-
-// A worktree has no .env.local of its own, so fall back to the main
-// checkout's. Only the bypass secret is used, and it is never printed.
-function loadEnv() {
-  const here = process.cwd();
-  const main = dirname(resolve(here, run("git", ["rev-parse", "--git-common-dir"])));
-  loadEnvConfig(existsSync(join(here, ".env.local")) ? here : main);
-}
-
-// Vercel reports each commit's preview to GitHub as a deployment, which is
-// also how the smoke test finds it (.github/workflows/smoke.yml). Only
-// Vercel's own entries are trusted, since the bypass secret goes to the URL
-// they name.
-function previewUrl(pr: string): string {
-  const sha = run("gh", ["pr", "view", pr, "--json", "headRefOid", "--jq", ".headRefOid"]);
-  const statuses = run("gh", [
-    "api",
-    `repos/{owner}/{repo}/deployments?sha=${sha}&environment=Preview`,
-    "--jq",
-    '[.[] | select(.creator.login == "vercel[bot]")][0].statuses_url // empty',
-  ]);
-  const url =
-    statuses &&
-    run("gh", [
-      "api",
-      statuses,
-      "--jq",
-      '[.[] | select(.state == "success" and .creator.login == "vercel[bot]")][0].environment_url // empty',
-    ]);
-  if (!url) {
-    throw new Error(`PR #${pr}'s latest commit has no finished Vercel preview yet. Wait for the Vercel check.`);
-  }
-  return url;
-}
 
 type Look = { outcome: Outcome; reason: string; text: string };
 

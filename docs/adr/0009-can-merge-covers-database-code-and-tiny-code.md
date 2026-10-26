@@ -2,6 +2,8 @@
 
 Status: draft, waiting on Jasper's "In my words" (Linear JAS-12). Amends [0008](0008-agents-merge-two-way-doors.md).
 
+Update on 2026-10-26 (Linear JAS-16): the journey skills `verify-turnpoint` and `verify-turnpoint-ux` moved from `.cursor/skills/` to `.claude/skills/`, so Cursor and Claude Code share one copy. That puts them on the risky list, so Jasper now merges every change to them, a new journey included. `.cursor/skills/` is empty. The rule below that it gets the reviewer still covers any skill added there later.
+
 ## Context
 
 The reviewer agent reviewed #170, the PR behind 0008, after it merged. Its verdict at 1799eba was one blocker. The risky list in `scripts/risky-paths.ts` protected `src/db/`, but the stores in `src/lib/` also write and delete rows: `match-note-store.ts` deletes a user's notes. A PR labelled tiny that changed a store passed every gate with no review, so 0008's promise that database code stays Jasper's to merge was untrue.

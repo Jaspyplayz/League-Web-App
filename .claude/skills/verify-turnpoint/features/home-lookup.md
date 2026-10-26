@@ -25,7 +25,7 @@ Preconditions:
 - **Open home.** Go to `/`. The level-1 heading contains `Find the minute` and the `search` landmark named `Player lookup` is visible.
 - **Type the ID.** Fill the field labeled `Riot ID` with `Hide on bush#KR1` and pick `kr` in the select labeled `Region`. The field holds `Hide on bush#KR1`.
 - **Submit.** Click the button `Analyze`. The URL becomes `/player/kr/Hide%20on%20bush-KR1`, the level-1 heading contains `Hide on bush`, and the navigation `Profile sections` is visible.
-- **Run.** `npx tsx .cursor/skills/verify-turnpoint/scripts/drive.ts [--base <url>] home-lookup`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] home-lookup`.
 - **Proof.** `03-press-analyze.png` shows the profile header and tabs. `03-press-analyze.aria.yml` holds the heading and `Profile sections` links.
 
 ## Gotchas

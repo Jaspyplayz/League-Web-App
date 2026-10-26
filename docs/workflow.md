@@ -24,7 +24,7 @@ Every tier runs the same automatic checks; the extra steps in the lower rows are
 4. **Test first where logic is pure.** Analyzer changes start with a failing test written from the acceptance criteria.
 5. **Implement** in small commits on the thread's branch.
 6. **Automatic checks.** The commit hook, then CI (with the golden tests and dependency review), then the smoke test and accessibility scan on the Vercel preview.
-7. **Self-check against the criteria.** Claude takes one screenshot of the preview per criterion with the [`verify` skill](../.claude/skills/verify/SKILL.md) (`npm run shot`), or names the test that shows it, and puts them in the PR.
+7. **Self-check against the criteria.** Claude takes one screenshot of the preview per criterion with the [`verify` skill](../.claude/skills/verify/SKILL.md) (`npm run shot`), or names the test that shows it, and puts them in the PR. When a criterion needs a click or typing, a journey from [`verify-turnpoint`](../.claude/skills/verify-turnpoint/SKILL.md) or [`verify-turnpoint-ux`](../.claude/skills/verify-turnpoint-ux/SKILL.md) gives the screenshots before and after it.
 8. **Independent review.** The reviewer agent sees the ticket, the diff and the test output, never the builder's reasoning. For a risky change, the Cursor chat reviews the same diff on Grok 4.7 and does not edit the code.
 9. **Triage.** The builder fixes findings it can reproduce, rejects the rest with a reason, and brings real disagreements to Jasper (see below). A fix after the review needs a fresh review of the new head commit.
 10. **Merge.** Claude Code merges its own tiny or normal PR with `npm run can-merge -- <pr> --merge`, run from an up-to-date main checkout. It merges only when every gate in [`scripts/can-merge-gates.ts`](../scripts/can-merge-gates.ts) passes at the head commit: agent merging is on, no Claude merge was reverted, the PR is Claude Code's, it's tiny or normal, it touches nothing on the [risky list](../scripts/risky-paths.ts), and the latest runs of `check`, `Vercel` and `smoke` passed. A normal PR, and a tiny one that changes anything but docs, also needs the reviewer's "no blockers" for that commit. A normal PR also needs every criterion ticked. `can-merge` checks only the ticks, and the reviewer checks that each criterion has a screenshot or test name ([decision record 0009](adr/0009-can-merge-covers-database-code-and-tiny-code.md)). It marks the merge commit as Claude's, then labels the PR `merged-by-claude` and comments with each gate. Jasper merges risky PRs, after `/explain-back`, and every PR Claude Code didn't build. GitHub's required `reviewer` check ([`.github/workflows/reviewer.yml`](../.github/workflows/reviewer.yml)) runs the same reviewer rule, so nobody can merge a PR from GitHub's website either until the reviewer clears its head commit ([decision record 0010](adr/0010-github-requires-the-reviewer.md)). Once the verdict is in the description, wait for the new `reviewer` run to pass before running `can-merge`, which refuses while any check is still running. Vercel deploys.
@@ -70,12 +70,14 @@ On risky PRs, Jasper first asks for a quiz: in a project thread in the Claude ap
 
 ## Skills
 
-A skill is a Markdown file of instructions that Claude loads when a task matches its description, or when you type its name as a command. The ones in [`.claude/skills/`](../.claude/skills/) work everywhere Claude works on this repo: project threads in the Claude app, subagents such as the reviewer, and Claude Code on Jasper's computer.
+A skill is a Markdown file of instructions that Claude loads when a task matches its description, or when you type its name as a command. The ones in [`.claude/skills/`](../.claude/skills/) work everywhere Claude works on this repo: project threads in the Claude app, subagents such as the reviewer, and Claude Code on Jasper's computer. Cursor loads them too, because it reads `.claude/skills/` as well as its own `.cursor/skills/`. So each skill lives here once and both tools use it. Don't copy one into `.cursor/skills/`.
 
 | Skill | Used for |
 |---|---|
 | `explain-back` | Turnpoint's own: the quiz before merging (above) |
 | `verify` | Turnpoint's own: screenshots of a page on the PR's preview with `npm run shot`, one per acceptance criterion (step 7), plus a map of the main pages and their traps |
+| `verify-turnpoint` | Turnpoint's own: journeys that click and type through the app in Chromium, such as a Riot ID lookup, with a screenshot and an accessibility snapshot after each step. It starts and stops its own dev server on Windows and Linux |
+| `verify-turnpoint-ux` | Turnpoint's own: the same harness for how a flow feels, such as a search form that keeps your text after a mistake, or a home page that fits a phone |
 | `code-review-and-quality` | Five things to check in a review: correctness, readability, architecture, security, performance. The reviewer starts with it |
 | `test-driven-development`, `debugging-and-error-recovery` | Writing the failing test first; finding the cause of a failure before fixing it |
 | `security-and-hardening` | Sign-in, API routes, user input and secrets |
@@ -84,7 +86,7 @@ A skill is a Markdown file of instructions that Claude loads when a task matches
 | `documentation-and-adrs` | Docs and [decision records](#decision-records) |
 | `doubt-driven-development` | An extra fresh-context check of each decision, for risky changes only, since it starts more agents |
 
-All but `explain-back` and `verify` are copied unchanged from other people's open-source repos, with their MIT licenses in [THIRD-PARTY-NOTICES.md](../.claude/skills/THIRD-PARTY-NOTICES.md). They give general advice, so where one disagrees with `CLAUDE.md` or this page, the repo wins.
+All but `explain-back` and the three `verify` skills are copied unchanged from other people's open-source repos, with their MIT licenses in [THIRD-PARTY-NOTICES.md](../.claude/skills/THIRD-PARTY-NOTICES.md). They give general advice, so where one disagrees with `CLAUDE.md` or this page, the repo wins.
 
 Rules that matter in only one part of the code live in [`.claude/rules/`](../.claude/rules/) instead: design, the analyzer, the database and the Riot client. Each loads when Claude opens a file in its area, so they cost nothing the rest of the time.
 

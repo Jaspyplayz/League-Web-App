@@ -26,7 +26,7 @@ Preconditions:
 - **Reach the review.** Scroll the region `60-second review` into view. Its first `listitem` is visible (first lines saved as `notes.firstMoment`).
 - **Watch in replay.** Click the first `Watch in replay` in the review. Tab `Deep dive` has `aria-selected="true"`, tabpanel `Summary` is hidden, and the heading `Replay` is inside the viewport.
 - **Back.** Click the tab `Summary`. The region `60-second review` is visible.
-- **Run.** `npx tsx .cursor/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] ux-review-path`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-review-path`.
 - **Proof.** `03-reach-the-60-second-review.png`, then `04-watch-the-first-moment-in-the-replay.png` (Replay timeline and the play for that moment on screen), then `05-back-to-summary-keeps-the-review.png`.
 
 ## Gotchas

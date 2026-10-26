@@ -14,34 +14,37 @@ The feature map is [features/README.md](features/README.md). Read it, then the f
 Same instance as the functional skill. From the repo root:
 
 ```bash
-.cursor/skills/verify-turnpoint/scripts/launch.sh          # http://127.0.0.1:3100, waits until the home page renders
+npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts          # http://127.0.0.1:3100, waits until the home page renders
 ```
 
 Pick the target from the journey's `needs:`:
 
 - `needs: nothing` (`ux-search-recovery`, `ux-phone-home`): the local dev server works with no `.env.local`.
-- `database`, `riot`, `supabase`: the local server needs `.env.local` (`RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`). Without it, use the live site (`--base https://league-web-app.vercel.app`, what `main` shows now) or a PR preview (`--base https://<preview>.vercel.app` with `VERCEL_AUTOMATION_BYPASS_SECRET` set; only Jasper can add it).
+- `database`, `riot`, `supabase`: the local server needs `.env.local` (`RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`). Without it, use the live site (`--base https://league-web-app.vercel.app`, what `main` shows now) or a PR preview (`--pr <number>`, which needs `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment or `.env.local`; only Jasper can add it). A `--base` URL never gets the secret, so a preview passed that way shows `vercel-login`.
 
-Launch details (port rules, `npm ci`, the state file `/tmp/verify-turnpoint/instance.json`, one server per checkout) are in `.cursor/skills/verify-turnpoint/SKILL.md` → Launch. No migrations or seed step; never run `npm run db:migrate`.
+Launch details (port rules, `npm ci`, the state file `.cache/verify-turnpoint-server/instance.json`, one server per checkout) are in `.claude/skills/verify-turnpoint/SKILL.md` → Launch. No migrations or seed step; never run `npm run db:migrate`.
 
 ## Doctor
 
 ```bash
-npx tsx .cursor/skills/verify-turnpoint/scripts/doctor.ts                                   # launched instance
-npx tsx .cursor/skills/verify-turnpoint/scripts/doctor.ts --base https://league-web-app.vercel.app
+npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts                                   # launched instance
+npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts --base https://league-web-app.vercel.app
+npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts --pr 155                          # that PR's preview
 ```
 
-Require `home page ok`, `owned by our process group` for a local target, and `ok` on each capability the journey needs (`sample game` = database, `player profile` = riot, `signed-out Ask` = supabase). `riot-key` means the Riot key is missing or expired; drive that journey elsewhere rather than weakening it.
+Require `home page ok`, `so the port is ours` for a local target, and `ok` on each capability the journey needs (`sample game` = database, `player profile` = riot, `signed-out Ask` = supabase). `riot-key` means the Riot key is missing or expired; drive that journey elsewhere rather than weakening it.
 
 ## Drive
 
 ```bash
-npx tsx .cursor/skills/verify-turnpoint-ux/scripts/drive.ts --list
-npx tsx .cursor/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] [--run <id>] <journey...|all>
+npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --list
+npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey...|all>
 # e.g. on the launched local instance:
-npx tsx .cursor/skills/verify-turnpoint-ux/scripts/drive.ts ux-search-recovery ux-phone-home
+npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts ux-search-recovery ux-phone-home
 # data journeys on the live site:
-npx tsx .cursor/skills/verify-turnpoint-ux/scripts/drive.ts --base https://league-web-app.vercel.app ux-review-path ux-signed-out-teasers ux-insights-peer-card
+npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --base https://league-web-app.vercel.app ux-review-path ux-signed-out-teasers ux-insights-peer-card
+# proof for a PR, on its preview:
+npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --pr 155 ux-search-recovery
 ```
 
 | Journey | needs | Device | Feature file |
@@ -71,19 +74,19 @@ Same layout and folder as the functional skill (git-ignored, kept by cleanup): `
 ## Cleanup
 
 ```bash
-.cursor/skills/verify-turnpoint/scripts/cleanup.sh
+npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts
 ```
 
-Stops only the process group `launch.sh` recorded, removes the state file and log, keeps `.cache/verify-turnpoint/`. Never kill `node` by name. Run it after failed attempts too.
+Stops only the server `launch.ts` recorded and its children, removes the state file and log, keeps `.cache/verify-turnpoint/`. Never kill `node` by name. Run it after failed attempts too.
 
 ## Helpers
 
 | Helper | Invocation | Does |
 |---|---|---|
-| `scripts/drive.ts` (this skill) | `npx tsx .cursor/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] [--run <id>] <journey…\|all>` | UX journeys; `expectCalm`, `panel(page, heading)`, `inViewport(page, heading)` helpers |
-| `launch.sh` | `.cursor/skills/verify-turnpoint/scripts/launch.sh [port]` | starts and waits for our dev server |
-| `doctor.ts` | `npx tsx .cursor/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]` | read-only health and capability check |
+| `scripts/drive.ts` (this skill) | `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> \| --pr <number>] [--run <id>] <journey…\|all>` | UX journeys; `expectCalm`, `panel(page, heading)`, `inViewport(page, heading)` helpers |
+| `launch.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts [port]` | starts and waits for our dev server |
+| `doctor.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> \| --pr <number>]` | read-only health and capability check |
 | `runner.ts` | imported from `../../verify-turnpoint/scripts/runner` | browser and device, preview bypass, step recorder, evidence layout |
-| `cleanup.sh` | `.cursor/skills/verify-turnpoint/scripts/cleanup.sh` | stops our dev server, keeps evidence |
+| `cleanup.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts` | stops our dev server, keeps evidence |
 
 Keep the map honest as the app changes with `/maintain-verification-skill`. When Soft Rounded ships, re-run every journey, look at the screenshots, and update feature files whose copy or layout changed.

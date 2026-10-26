@@ -1,16 +1,18 @@
 // Read-only: is this Turnpoint instance worth driving, and which journeys can pass on it?
-//   npx tsx .cursor/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]
+//   npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> | --pr <number>]
 // Exit 0 = the home page is the app. Each capability line says which `needs:` it unlocks.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
-import { passPreviewLogin } from "../../../../e2e/preview-login";
-import { defaultBase, ERROR_TEXTS, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, STATE_FILE, TEST_PLAYER } from "./runner";
+import { passPreviewLogin, recordLeaks } from "../../../../e2e/preview-login";
+import { loadEnv } from "../../../../scripts/preview";
+import { isOurs, readInstance } from "./instance";
+import { ERROR_TEXTS, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, TEST_PLAYER } from "./runner";
+import { pickTarget } from "./target";
 
-const { values } = parseArgs({ options: { base: { type: "string" } } });
-const base = (values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
+const { values } = parseArgs({ options: { base: { type: "string" }, pr: { type: "string" } } });
 
 function sh(cmd: string, args: string[]): string {
   try {
@@ -21,40 +23,44 @@ function sh(cmd: string, args: string[]): string {
 }
 
 async function run() {
-  if (!base) {
-    console.log("target: none. Run launch.sh, or pass --base https://league-web-app.vercel.app");
+  const target = pickTarget(values);
+  if ("error" in target) {
+    console.log(target.error);
     return 1;
   }
+  const { base, preview } = target;
   console.log(`target: ${base}`);
   console.log(`checkout: ${sh("git", ["rev-parse", "--short", "HEAD"])} on ${sh("git", ["branch", "--show-current"])}`);
   const local = /^http:\/\/(127\.0\.0\.1|localhost)/.test(base);
   if (local) {
-    if (!existsSync(STATE_FILE)) {
-      console.log("instance: NOT OURS. No state file; launch.sh didn't start this server. Don't drive it.");
+    const instance = readInstance();
+    if (!instance) {
+      console.log("instance: NOT OURS. No state file; launch.ts didn't start this server. Don't drive it.");
       return 1;
     }
-    const st = JSON.parse(readFileSync(STATE_FILE, "utf8"));
-    if (st.base !== base) {
-      console.log(`instance: NOT OURS. Our instance is ${st.base}.`);
+    if (instance.base !== base) {
+      console.log(`instance: NOT OURS. Our instance is ${instance.base}.`);
       return 1;
     }
-    const alive = sh("ps", ["-o", "pid=", "-g", String(st.pgid)]) !== "";
-    const listener = sh("ss", ["-ltnpH", `sport = :${st.port}`]);
-    const pids = sh("ps", ["-o", "pid=", "-g", String(st.pgid)]).split(/\s+/).filter(Boolean);
-    const owned = pids.some((p) => listener.includes(`pid=${p},`));
-    console.log(`instance: pid ${st.pid} ${alive ? "alive" : "DEAD"}, port ${st.port} ${owned ? "owned by our process group" : "NOT owned by us"}`);
+    // next dev exits when its port is taken, so while our server runs, the
+    // port is ours.
+    const ours = isOurs(instance);
+    console.log(`instance: pid ${instance.pid} ${ours ? "runs our next dev, so the port is ours" : "NOT OURS any more: our server exited. Run cleanup.ts"}, port ${instance.port}`);
     console.log(`env: .env.local ${existsSync(".env.local") ? "present" : "absent (no Riot key, database or Supabase)"}`);
-    if (!alive || !owned) return 1;
+    if (!ours) return 1;
   } else if (base === LIVE) {
     console.log("instance: live site (what main shows now). Read-only journeys only; each profile load spends Riot requests.");
+  } else if (preview) {
+    loadEnv();
+    console.log(`instance: preview of #${values.pr}. bypass secret ${process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? "set" : "NOT set (expect vercel-login)"}`);
   } else {
-    console.log(`instance: preview. bypass secret ${process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? "set" : "NOT set (expect vercel-login)"}`);
+    console.log("instance: remote. No bypass secret goes to a --base URL, so a preview shows vercel-login; pass --pr <number> for one.");
   }
 
   const browser = await chromium.launch();
   const context = await browser.newContext({ baseURL: base });
-  const origin = new URL(base).origin;
-  if (origin.endsWith(".vercel.app") && origin !== LIVE) await passPreviewLogin(context, origin);
+  if (preview) await passPreviewLogin(context, preview);
+  const leaked = preview ? recordLeaks(context, preview) : async () => [];
   const page = await context.newPage();
   const probe = async (path: string, want: string) => {
     try {
@@ -77,12 +83,14 @@ async function run() {
   const riot = await probe(TEST_PLAYER.path, "Recent matches");
   let supa = await probe(`${TEST_PLAYER.path}/ask`, "to ask questions");
   if (supa !== "ok" && riot === "ok") supa = `${supa}; Ask is off here (needs ANTHROPIC_API_KEY + Supabase + DATABASE_URL)`;
+  const leaks = await leaked();
   await browser.close();
   console.log(`home page            [needs: nothing]  ${home}`);
   console.log(`sample game          [needs: database] ${db}`);
   console.log(`player profile       [needs: riot]     ${riot}`);
   console.log(`signed-out Ask       [needs: supabase] ${supa}`);
-  return home === "ok" ? 0 : 1;
+  if (leaks.length) console.log(`LEAK: the bypass secret went to other sites: ${leaks.join(", ")}`);
+  return home === "ok" && !leaks.length ? 0 : 1;
 }
 
 run().then((code) => (process.exitCode = code));
