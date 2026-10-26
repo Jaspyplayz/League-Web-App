@@ -34,9 +34,12 @@ for one since that commit. Run `git fetch origin main`, `git rev-parse HEAD` and
   `git log --merges <since>..HEAD` succeeds and prints nothing.
 - Your review at `<since>` is the only review there or after it. Every review
   in the PR's first Review section (`gh pr view <number> --json body`), this
-  reviewer's or any other such as a second review or a security check, saw
-  `<since>` or an earlier commit (`git merge-base --is-ancestor <sha> <since>`),
-  and the only one that saw `<since>` is `Reviewer agent at <since>:`.
+  reviewer's or any other such as a second review, a security check or a
+  comment check, has its own line naming the commit it saw, as
+  `<name> at <sha>:`. Each of those commits is `<since>` or an earlier one
+  (`git merge-base --is-ancestor <sha> <since>`), and the only line at
+  `<since>` is `Reviewer agent at <since>:`. A review recorded without such a
+  line fails this check.
 - Your brief holds that review's full report. It starts with that same line,
   lists as many blockers as it counts, and has fewer than 7 findings, since a
   report at the cap may have left some out.

@@ -19,10 +19,10 @@ The agents' logs from 2026-10-24 to 10-26 show 32 review agents, with a median o
 
 Option 2, for the reviewer agent's own review only:
 - The builder asks for a re-review since the commit the reviewer last saw. It passes the reviewer's full report from that commit, not a summary.
-- A re-review works only when that review is the only one at that commit or after it. After a Grok review or a security check, the next review is a full one. The first drafts let a re-review cover every review at the earlier commit, and five rounds of review each found another way one review's findings could go unchecked. The last was a review recorded after the earlier commit, which no check looked at. Covering one review closes that kind of hole and is easier to explain. Re-reviews still save time on normal PRs, where the reviewer agent is usually the only review.
+- A re-review works only when that review is the only one at that commit or after it. After any other review, such as Grok's, a security check or a comment check, the next review is a full one. Every review gets its own line in the PR's Review section naming the commit it saw, even when it found nothing, and a review without one sends the re-review back to a full review. The first drafts let a re-review cover every review at the earlier commit, and four of the first five rounds of review each found another way one review's findings could go unchecked. The last was a review recorded after the earlier commit, which no check looked at. Covering one review closes that kind of hole and is easier to explain. Re-reviews still save time on normal PRs where the reviewer agent is the only review.
 - Before it narrows anything, the reviewer checks all of these, and does a full review if any fails:
   - the earlier commit is an ancestor of the head, with no merge since;
-  - every review in the PR's Review section saw that commit or an earlier one, and the only one that saw it is the "Reviewer agent at" line for it;
+  - every review in the PR's Review section has its own line naming the commit it saw, each of those commits is that commit or an earlier one, and the only line at it is the "Reviewer agent at" line;
   - the reviewer's report starts with that line, lists as many blockers as it counts, and has fewer than 7 findings, since a report at the cap may have left some out;
   - the Review section lists the same findings as the report, none missing on either side, and answers each one;
   - the new commits only answer those findings.
@@ -36,7 +36,7 @@ Option 2, for the reviewer agent's own review only:
 Good:
 - A fix round should cost about half a full review. That's a guess from one focused review on JAS-16, which was a hand-written brief, not this exact procedure.
 - The first review still reads the whole branch. CI, the smoke test and `npm test` still run on every commit.
-- A finding missing from either the brief or the Review section sends the re-review back to a full review. So does a Grok review or a security check at or after the earlier commit.
+- A finding missing from either the brief or the Review section sends the re-review back to a full review. So does any other review at or after the earlier commit, or one recorded without its commit.
 - The verdict line says what the review covered, so anyone reading the PR can tell a re-review from a full one.
 
 Bad:
@@ -44,7 +44,7 @@ Bad:
 - The reviewer decides whether the new commits only answer findings. If a builder slips new work into a fix commit, only the reviewer can catch it.
 - A finding missing from both the brief and the Review section isn't caught, whether by mistake, such as a should-fix lost in copying, or on purpose. Neither is a review nobody recorded, such as a security check the builder forgot to write down. The gate doesn't check that a full review came first either. It's the same bar as 0010: it stops many mistakes, not someone set on getting around it. Putting the number of findings in the verdict line would catch a lost should-fix. It was left out because it changes the line every PR uses.
 - A security check runs again only when the fix commits touch secrets, sign-in, API routes or user input. A fix elsewhere that brings in a security problem relies on the re-review's security check.
-- A report at the 7-finding cap, a session that lost the earlier report, and a fix round after a Grok review or a security check all get a full review, so they save nothing. Risky PRs, which get the Grok review, save less.
+- A report at the 7-finding cap, a session that lost the earlier report, and a fix round after any other review all get a full review, so they save nothing. Risky PRs, which get the Grok review, save less. Step 8 starts every pass on the same commit, and the security check runs again when a fix touches secrets, sign-in, API routes or user input. So a PR that gets a security check, such as one touching `src/app/api/`, gets a full review in every round.
 - The rule to judge a PR by main's copy lives in `reviewer.md` itself. A reviewer started from the branch's checkout runs the branch's copy, so a PR that deletes that rule escapes it. The backstops are the builder's brief, which can name main's rules, and the risky list, which sends any change to `.claude/agents/` to Jasper.
 
 ## In my words
