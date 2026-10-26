@@ -15,13 +15,19 @@ const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others",
 const PURE_DB_MODULES = new Set(["db/freshness"]);
 
 // A file that belongs on the risky list: a route or a pages/api/ file, which
-// Next.js serves as a public endpoint; a "use server" file; or one that
-// imports the Postgres client, Drizzle, or src/db/ by the @/ alias or a
-// relative path, in either quote, as a re-export or a dynamic import.
+// Next.js serves as a public endpoint, or the proxy it runs on every request;
+// a "use server" file; one that imports the Claude API or Supabase client or
+// reads the Claude API key; or one that imports the Postgres client, Drizzle,
+// or src/db/ by the @/ alias or a relative path, in either quote, as a
+// re-export or a dynamic import.
 function mustBeListed(file: string, source: string): boolean {
   if (/(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$|(^|\/)pages\/api\//.test(file)) return true;
+  if (/^(src\/)?(proxy|middleware)\.[cm]?[jt]s$/.test(file)) return true;
   if (/^\s*["']use server["']/m.test(source)) return true;
-  if (/["'](?:postgres|drizzle-orm(?:\/[^"']*)?)["']/.test(source)) return true;
+  if (/["'](?:postgres|drizzle-orm(?:\/[^"']*)?|@anthropic-ai\/sdk(?:\/[^"']*)?|@supabase\/[^"']+)["']/.test(source)) {
+    return true;
+  }
+  if (/env(?:\.ANTHROPIC_API_KEY\b|\[\s*["']ANTHROPIC_API_KEY["']\s*\])/.test(source)) return true;
   const imports = source.matchAll(/["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)(db(?:\/[^"']*)?)["']/g);
   return [...imports].some((match) => !PURE_DB_MODULES.has(match[1]));
 }
