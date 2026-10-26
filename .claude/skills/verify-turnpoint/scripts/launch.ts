@@ -15,6 +15,12 @@ const log = join(INSTANCE_DIR, `dev-${port}.log`);
 
 const tail = () => readFileSync(log, "utf8").split("\n").slice(-40).join("\n");
 
+// On Windows a detached process has no console, so the worker next dev forks
+// would get a console of its own and Windows Terminal would show it. Started
+// from that detached process with windowsHide, next dev gets a hidden console
+// instead, and its worker shares it.
+const HIDDEN_CONSOLE = `require("node:child_process").spawn(process.execPath, process.argv.slice(1), { stdio: "inherit", windowsHide: true }).on("exit", (code) => process.exit(code ?? 1));`;
+
 async function homeRenders(): Promise<boolean> {
   try {
     const res = await fetch(`${base}/`, { signal: AbortSignal.timeout(60_000) });
@@ -42,7 +48,8 @@ async function launch(): Promise<number> {
   // detached gives the server its own process group on Linux and macOS, so
   // cleanup.ts stops it and its children and nothing else. On Windows,
   // cleanup.ts stops its process tree.
-  const server = spawn(process.execPath, [next, ...serverArgs(port)], {
+  const command = [next, ...serverArgs(port)];
+  const server = spawn(process.execPath, process.platform === "win32" ? ["-e", HIDDEN_CONSOLE, ...command] : command, {
     cwd: root,
     detached: true,
     stdio: ["ignore", out, out],

@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -55,8 +55,10 @@ async function freePort(): Promise<number> {
   return port;
 }
 
+// Detached only for the process group stopTree stops on Linux and macOS. On
+// Windows a detached stand-in has no console, so its worker would open a window.
 function start(command: string[], cwd: string) {
-  const child = spawn(process.execPath, command, { cwd, stdio: "ignore", detached: true });
+  const child = spawn(process.execPath, command, { cwd, stdio: "ignore", detached: process.platform !== "win32", windowsHide: true });
   children.push(child);
   return child;
 }
@@ -75,6 +77,23 @@ function stopTree(pid: number) {
       // Already gone.
     }
   }
+}
+
+// The visible windows that belong to pid or a process under it.
+function windowsOf(pid: number): string {
+  const script = `
+Add-Type -Namespace W -Name U -MemberDefinition '
+  public delegate bool P(System.IntPtr h, System.IntPtr l);
+  [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool EnumWindows(P p, System.IntPtr l);
+  [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsWindowVisible(System.IntPtr h);
+  [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr h, out uint pid);'
+$all = Get-CimInstance Win32_Process
+$tree = @(${pid})
+do { $n = $tree.Count; $tree = @($tree + @($all | Where-Object { $tree -contains $_.ParentProcessId } | ForEach-Object ProcessId) | Sort-Object -Unique) } while ($tree.Count -gt $n)
+$owners = New-Object System.Collections.Generic.List[uint32]
+[void][W.U]::EnumWindows({ param($h) if ([W.U]::IsWindowVisible($h)) { $p = [uint32]0; [void][W.U]::GetWindowThreadProcessId($h, [ref]$p); $owners.Add($p) }; $true }, [IntPtr]::Zero)
+$owners | Where-Object { $tree -contains $_ }`;
+  return spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", windowsHide: true }).stdout.trim();
 }
 
 afterEach(() => {
@@ -100,6 +119,16 @@ describe("the state file launch.ts writes", () => {
     expect(cleanup.code).toBe(0);
     expect(await portAnswers(port)).toBe(false);
     expect(existsSync(stateFile(root))).toBe(false);
+  });
+
+  // Windows Terminal opens a window for each console a process gets without
+  // windowsHide, and next dev forks its worker without it.
+  it.runIf(process.platform === "win32")("launch opens no window on Windows", async () => {
+    const { root } = checkout();
+    const port = await freePort();
+    expect(run("launch.ts", root, String(port)).code).toBe(0);
+    const { pid } = JSON.parse(readFileSync(stateFile(root), "utf8"));
+    expect(windowsOf(pid)).toBe("");
   });
 
   // A state file outlives its server after a crash, a reboot or a session that
