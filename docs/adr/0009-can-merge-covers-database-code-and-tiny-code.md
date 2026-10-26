@@ -8,7 +8,7 @@ The reviewer agent reviewed #170, the PR behind 0008, after it merged. Its verdi
 
 The review found two more gaps. A PR's own tier line switched the reviewer off, whatever files the PR changed. The checkbox gate missed boxes in numbered and `+` lists, so an unticked criterion could pass.
 
-The review of the fix (#178) found that the tiny rule still let a PR change `CLAUDE.md`, `AGENTS.md` or `docs/workflow.md` with no review. Agents follow those files as rules. It also found three server actions off the list. Anyone can call a server action, and two of them spend Riot calls. A second review found the same gap for `CLAUDE.local.md` and for rule files under other names, so the rule now names what counts as a doc instead of what doesn't.
+The review of the fix (#178) found that the tiny rule still let a PR change `CLAUDE.md`, `AGENTS.md` or `docs/workflow.md` with no review. Agents follow those files as rules. It also found three server actions off the list. Anyone can call a server action, and two of them spend Riot calls. A second review found the same gap for `CLAUDE.local.md` and for rule files under other names, so the rule now names what counts as a doc instead of what doesn't. A third found the same for code files in `docs/`, which `npm test` runs.
 
 ## Options considered
 
@@ -20,9 +20,9 @@ The review of the fix (#178) found that the tiny rule still let a PR change `CLA
 ## Decision
 
 Option 2:
-- The risky list also covers `src/lib/*-store.ts`, `src/lib/my-player.ts`, `scripts/remap-puuids`, `scripts/collect-benchmarks`, `src/lib/mcp/`, the three server actions, `.claude/skills/` and `.claude/rules/`.
-- A test in `scripts/risky-paths.test.ts` fails when a server action, or a file that imports `src/db/` by any path, is off the list, unless the test names why it's safe. A store under a new name can't merge as normal code.
-- A tiny PR skips the reviewer only when it changes nothing but docs. Docs here means the files in `docs/` and the root `README.md` and `ARCHITECTURE.md`. `docs/workflow.md` and any `CLAUDE` or `AGENTS` file aren't docs, because agents follow them as rules. A tiny PR that changes anything else, such as `CLAUDE.local.md` or a fixtures README, needs the reviewer's "no blockers" line at its head commit.
+- The risky list also covers `src/lib/*-store.ts`, `src/lib/my-player.ts`, `scripts/remap-puuids`, `scripts/collect-benchmarks`, `scripts/check-score`, `src/lib/mcp/`, the three server actions, `.claude/skills/` and `.claude/rules/`.
+- A test in `scripts/risky-paths.test.ts` fails when a server action, or a file that imports `src/db/` by any path, is off the list. It allows only imports of modules in `src/db/` that never touch the database, such as `freshness.ts`. A store under a new name can't merge as normal code.
+- A tiny PR skips the reviewer only when it changes nothing but docs. Docs here means the `.md` files and images in `docs/` and the root `README.md` and `ARCHITECTURE.md`. `docs/workflow.md` and any `CLAUDE` or `AGENTS` file aren't docs, because agents follow them as rules. A tiny PR that changes anything else, such as `CLAUDE.local.md` or a fixtures README, needs the reviewer's "no blockers" line at its head commit.
 - Any box that isn't `[x]`, in any list GitHub renders, nested or quoted, counts as unticked. A `## ` line inside a code block doesn't end the section.
 - `can-merge` checks only that each criterion is ticked. The reviewer checks that each one has a screenshot or a test name, because a code check of free text would refuse good evidence or accept bad. `.claude/agents/reviewer.md` asks it to.
 
@@ -30,12 +30,13 @@ Option 2:
 
 Good:
 - Database code, server actions, the MCP server's cap on Riot calls, and the reviewer's agent file, skills and rules are Jasper's to merge again, whatever the tier says.
-- Claude Code merges no change outside `docs/`, `README.md` and `ARCHITECTURE.md` without a second look.
+- Claude Code merges no change without a second look, unless it touches only the `.md` files and images in `docs/`, `README.md` or `ARCHITECTURE.md`.
 
 Bad:
 - A tiny copy fix in a component waits for one reviewer run before it merges.
 - An agent can still change `CLAUDE.md`, `AGENTS.md` or `docs/workflow.md` with only the reviewer's look, not Jasper's.
 - The risky list is still a list. The test catches server actions and database imports, not every kind of risk. Caps on Riot calls inside pages, such as the log page's `TIMELINES_PER_VIEW`, stay off it, and the rate limiter in `src/lib/riot/` still bounds the total. `.claude/rules/database.md` names the same database paths, so the two lists can drift apart.
+- `can-merge` reads the PR body line by line, not as GitHub renders it. A box inside an HTML comment or a four-backtick code block can still be misread, so the reviewer's check of each criterion still matters.
 - A tier line that says "risky" anywhere, such as "nothing on the risky list", is refused as naming two tiers. That is safe, but the builder has to keep tier words out of the reason.
 
 ## In my words
