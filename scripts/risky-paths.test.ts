@@ -94,9 +94,15 @@ describe("riskyFiles", () => {
   });
 
   // Local settings override the commit hook, a copied agent can take the
-  // reviewer's name, and Cursor's settings run the Grok review (JAS-13).
-  it("flags local settings, every agent and Cursor's settings", () => {
-    const paths = [".claude/settings.local.json", ".claude/agents/review-notes.md", ".cursor/settings.json"];
+  // reviewer's name, and Cursor's settings and rules set up the Grok review
+  // (JAS-13).
+  it("flags local settings, every agent, and Cursor's settings and rules", () => {
+    const paths = [
+      ".claude/settings.local.json",
+      ".claude/agents/helper.md",
+      ".cursor/settings.json",
+      ".cursor/rules/one-builder.mdc",
+    ];
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
@@ -130,7 +136,6 @@ describe("riskyFiles", () => {
         "src/lib/match-store.ts.bak",
         "src/components/theme-store.ts",
         "scripts/shot.ts",
-        ".cursor/rules/one-builder.mdc",
         ".cursor/skills/verify-turnpoint/SKILL.md",
       ]),
     ).toEqual([]);
@@ -145,7 +150,7 @@ describe("riskyFiles", () => {
   // Anyone can call a server action, and a store under a new name would
   // otherwise merge as normal code (JAS-12). Claude spending and sign-in stay
   // Jasper's too (JAS-13).
-  it("covers every entry point, server action, and database, Claude API or Supabase client", () => {
+  it("covers routes, the proxy, server actions, and database, Claude API or Supabase clients", () => {
     const unlisted = repoFiles.filter(
       (file) =>
         isSourceFile(file) &&
@@ -165,7 +170,7 @@ describe("riskyFiles", () => {
     ["src/app/notes/page.tsx", false],
     ["src/lib/reroute.ts", false],
     ["src/lib/supabase/proxy.ts", false],
-  ])("counts %s as a public entry point: %s", (file, entry) => {
+  ])("counts %s as a route or the proxy: %s", (file, entry) => {
     expect(mustBeListed(file, "")).toBe(entry);
   });
 
@@ -186,6 +191,12 @@ describe("riskyFiles", () => {
     'import { createServerClient } from "@supabase/ssr";',
     "const key = process.env.ANTHROPIC_API_KEY;",
     'const key = process.env["ANTHROPIC_API_KEY"];',
+    "const key = process.env?.ANTHROPIC_API_KEY;",
+    "const { ANTHROPIC_API_KEY } = process.env;",
+    'import { writeRecap } from "@/lib/recap";',
+    "const result = await answerQuestion(region, account, question);",
+    'import { createSupabaseClient } from "@/lib/supabase/server";',
+    "return refreshSession(request);",
   ])("spots %s as a server action or a database, Claude API or Supabase client", (source) => {
     expect(mustBeListed("src/lib/notes.ts", `// a file\n${source}\n`)).toBe(true);
   });
@@ -194,6 +205,9 @@ describe("riskyFiles", () => {
     'import { secondsUntilUpdate } from "@/db/freshness";',
     'import { supabaseConfig } from "@/lib/supabase/config";',
     'throw new Error("Ask is off here (needs ANTHROPIC_API_KEY)");',
+    'import { recapsEnabled } from "@/lib/recap";',
+    'import type { Recap } from "@/lib/recap";',
+    'import { askEnabled } from "@/lib/ask";',
   ])("lets a file use %s, which reaches no database, Claude API or sign-in", (source) => {
     expect(mustBeListed("src/lib/notes.ts", `${source}\n`)).toBe(false);
   });
