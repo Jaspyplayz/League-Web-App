@@ -29,10 +29,21 @@ const REQUIRED_CHECKS: { name: string; where: string; counts: (check: Check) => 
 // gh's statusCheckRollup: GitHub Actions and app checks are CheckRuns, and
 // Vercel's deployment check is a commit status.
 export type RollupEntry =
-  | { __typename: "CheckRun"; name: string; workflowName: string; status: string; conclusion: string | null }
+  | {
+      __typename: "CheckRun";
+      name: string;
+      workflowName: string;
+      status: string;
+      conclusion: string | null;
+      startedAt: string | null;
+    }
   | { __typename: "StatusContext"; context: string; targetUrl: string | null; state: string };
 
-export function toCheck(entry: RollupEntry): Check {
+export function toChecks(rollup: RollupEntry[]): Check[] {
+  return rollup.map(toCheck);
+}
+
+function toCheck(entry: RollupEntry): Check {
   if (entry.__typename === "StatusContext") {
     return { kind: "status", name: entry.context, url: entry.targetUrl ?? "", state: statusState(entry.state) };
   }
