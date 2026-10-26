@@ -20,19 +20,20 @@ Option 2:
 - The script reads the PR from the event file GitHub writes, lists its files with `scripts/can-merge-files.ts`, and runs `reviewerCleared` from `scripts/can-merge-gates.ts`. That is the same function as `can-merge`'s "Reviewer cleared the head commit" gate, so the two read the verdict line the same way. A tiny PR that changes only docs passes without the line.
 - Main's ruleset requires the `reviewer` check from GitHub Actions only, so a commit status named `reviewer` doesn't count. Nobody is on the bypass list.
 - `can-merge` counts only the latest run of each check, as GitHub's merge box does. Without that, a `reviewer` run that failed before the verdict line went in would block `can-merge` forever.
-- On a PR Claude Code didn't build, such as Dependabot's, the Cursor chat's or a cloud agent's, Claude runs the reviewer and adds a `## Review` section with the verdict line to the description.
+- On a PR Claude Code didn't build, such as Dependabot's, the Cursor chat's or a cloud agent's, Claude runs the reviewer and puts the verdict line in the description's Review section, adding the section if it has none. The check reads only the first `## Review` heading.
 
 ## Consequences
 
 Good:
-- Nobody, Jasper included, can merge a PR before the reviewer clears its head commit. A push after the review fails the check again until a fresh review.
+- Nobody, Jasper included, can merge a PR that needs the reviewer before it clears the head commit. A push after the review fails the check again until a fresh review.
 - GitHub and `can-merge` read the verdict line with one function, and both count only the latest run of a check.
 
 Bad:
 - The check reads text, so anyone who can edit the description can type the line. It stops early merges by habit, not someone set on getting around it, the same bar as 0008.
 - It runs the PR's own copy of the workflow and the script, so a PR can change what it checks. Both are on the risky list, so Jasper merges any PR that touches them.
 - Each PR Claude Code didn't build waits until Claude runs the reviewer and edits the description. When Dependabot rebases, it rewrites the description, but it also makes a new head commit, which needs a new review anyway.
-- GitHub's Re-run button reads the description from when the first run started, so only an edit to the description runs the check again. GitHub doesn't run it while the PR has a merge conflict.
+- GitHub's Re-run button reads the description from when that run first started, so it can bring back an old result, even a pass from before a later review found blockers. Only an edit to the description runs the check on the current text. GitHub doesn't run it while the PR has a merge conflict.
+- The check fails on purpose when a PR opens and after each push, until the verdict goes in. GitHub tells whoever started a failed run, and that is Jasper's account, since Claude pushes as him. So he may get a failure notice for every push, depending on his notification settings.
 - Every edit and push starts one more Actions run.
 - The Grok second review on risky PRs still isn't enforced.
 - In an emergency, Jasper removes `reviewer` from the ruleset's required checks in GitHub's settings.
