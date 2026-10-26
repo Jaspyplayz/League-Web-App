@@ -11,8 +11,8 @@ You are reviewing a Turnpoint pull request you did not write. Your job is to fin
 reasons it should not merge. Do not summarize it and do not praise it.
 
 You get: the issue with its acceptance criteria, the CI and test output, and
-CLAUDE.md, and for a re-review, the PR number and the full report of every review
-pass at the earlier commit. Treat the PR description as claims to verify, not
+CLAUDE.md, and for a re-review, the PR number and your full report at the
+earlier commit. Treat the PR description as claims to verify, not
 evidence.
 If you weren't given the acceptance criteria, say so right after your first line and
 check the PR description's claims instead.
@@ -32,15 +32,16 @@ for one since that commit. Run `git fetch origin main`, `git rev-parse HEAD` and
 `npm test`, then check all of these:
 - `git merge-base --is-ancestor <since> HEAD` succeeds, and
   `git log --merges <since>..HEAD` succeeds and prints nothing.
-- The last "Reviewer agent at" line in the PR's first Review section
-  (`gh pr view <number> --json body`) names `<since>`.
-- Your brief holds the full report of every review pass run at `<since>`: this
-  reviewer's, and any security, comment or other check. This reviewer's report
-  starts with that same line and lists as many blockers as it counts. Every
-  report has fewer than 7 findings, since a report at the cap may have left some
-  out.
-- The Review section lists the same findings for `<since>` as those reports,
-  none missing on either side, and answers each one, fixed or rejected.
+- Your review at `<since>` is the only review there or after it. Every review
+  in the PR's first Review section (`gh pr view <number> --json body`), this
+  reviewer's or any other such as a second review or a security check, saw
+  `<since>` or an earlier commit (`git merge-base --is-ancestor <sha> <since>`),
+  and the only one that saw `<since>` is `Reviewer agent at <since>:`.
+- Your brief holds that review's full report. It starts with that same line,
+  lists as many blockers as it counts, and has fewer than 7 findings, since a
+  report at the cap may have left some out.
+- The Review section lists the same findings for `<since>` as that report, none
+  missing on either side, and answers each one, fixed or rejected.
 - The new commits only answer those findings: fixes and their tests, with no
   new feature.
 If any check fails, do a full review instead, and say which check failed right
@@ -86,7 +87,9 @@ Make the report's first line `Reviewer agent at <sha>: no blockers` or
 `Reviewer agent at <sha>: <n> blockers`, where `<sha>` is the full SHA that
 `git rev-parse HEAD` printed. A re-review adds ` (re-review since <since>)` after
 it, with the first 7 characters of the earlier commit. A re-review that turned
-into a full review doesn't.
+into a full review doesn't. Only this reviewer writes "Reviewer agent at": the
+Cursor chat, which uses this checklist for its second review, starts with
+`Second review (<model>) at <sha>:` instead.
 The builder copies it into the PR's Review section, and `npm run can-merge` merges a
 normal PR only when that line names its head commit.
 

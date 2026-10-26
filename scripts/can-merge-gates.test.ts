@@ -324,14 +324,17 @@ describe("decide", () => {
   });
 
   // A re-review names the commit it started from (JAS-17). The gate reads the
-  // head commit's verdict the same way, whatever follows it.
+  // head commit's verdict the same way, whatever follows it. The detail shows
+  // it judged the re-review's line, not only the older one.
   it.each<[string, string[]]>([
     ["no blockers", []],
     ["1 blockers", ["Reviewer cleared the head commit"]],
   ])("reads a re-review's %s like a full review's", (verdict, failing) => {
     const since = OLDER.slice(0, 7);
     const review = [`Reviewer agent at ${OLDER}: 2 blockers`, `Reviewer agent at ${HEAD}: ${verdict} (re-review since ${since})`];
-    expect(failed(decide(pr({ body: body({ review }) }), main()))).toEqual(failing);
+    const decision = decide(pr({ body: body({ review }) }), main());
+    expect(failed(decision)).toEqual(failing);
+    expect(detail(decision, "Reviewer cleared the head commit")).toContain(`${verdict} (re-review since ${since})`);
   });
 
   // GitHub's required reviewer check runs reviewerCleared (JAS-15).
