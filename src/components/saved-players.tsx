@@ -19,7 +19,7 @@ import {
 } from "@/lib/saved-players";
 import { toSlug } from "@/lib/riot-id";
 import { StarIcon } from "./icons";
-import { panelClass } from "./ui/panel";
+import { softPanelClass } from "./ui/panel";
 
 // The recent and pinned player lists are kept in this browser's localStorage
 // (see src/lib/saved-players.ts). These components run in the browser
@@ -173,7 +173,7 @@ export function SavedPlayersMenu({ query, onPick }: { query: string; onPick: () 
       // Clicking inside the menu keeps the cursor in the search box, so the
       // menu doesn't close under the mouse before the click lands.
       onMouseDown={(event) => event.preventDefault()}
-      className={`${panelClass} absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-1 py-2 shadow-lg`}
+      className={`${softPanelClass} absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-1 py-2 shadow-lg`}
     >
       {recent.length > 0 && (
         <MenuSection
