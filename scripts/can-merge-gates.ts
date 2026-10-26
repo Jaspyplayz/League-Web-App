@@ -138,7 +138,7 @@ function isDoc(path: string): boolean {
   const lower = path.toLowerCase();
   if (lower === "readme.md" || lower === "architecture.md") return true;
   return (
-    /^docs\/.*\.(md|png|jpe?g|gif|webp)$/.test(lower) &&
+    /^docs\/.*\.(md|png|jpg|gif|webp)$/.test(lower) &&
     lower !== "docs/workflow.md" &&
     !/(^|\/)\./.test(lower) &&
     !/(^|\/)(claude|agents)[^/]*\.md$/.test(lower)

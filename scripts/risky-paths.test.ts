@@ -4,19 +4,22 @@ import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
 import { matchesPattern, RISKY_PATHS, riskyFiles } from "./risky-paths";
 
-const repoFiles = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+// -z lists names unquoted, so a file named in other letters is still checked.
+const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
   encoding: "utf8",
-}).split("\n");
+})
+  .split("\0")
+  .filter(Boolean);
 
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
 
-// A file that belongs on the risky list: a route, which Next.js serves as a
-// public endpoint; a "use server" file; or one that imports the Postgres
-// client, Drizzle, or src/db/ by the @/ alias or a relative path, in either
-// quote, as a re-export or a dynamic import.
+// A file that belongs on the risky list: a route or a pages/api/ file, which
+// Next.js serves as a public endpoint; a "use server" file; or one that
+// imports the Postgres client, Drizzle, or src/db/ by the @/ alias or a
+// relative path, in either quote, as a re-export or a dynamic import.
 function mustBeListed(file: string, source: string): boolean {
-  if (/(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$/.test(file)) return true;
+  if (/(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$|(^|\/)pages\/api\//.test(file)) return true;
   if (/^\s*["']use server["']/m.test(source)) return true;
   if (/["'](?:postgres|drizzle-orm(?:\/[^"']*)?)["']/.test(source)) return true;
   const imports = source.matchAll(/["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)(db(?:\/[^"']*)?)["']/g);
@@ -92,7 +95,12 @@ describe("riskyFiles", () => {
 
   // Claude Code and Cursor load skills and rules from these folders too (JAS-12).
   it("flags agent skills and rules below the repo root", () => {
-    const paths = ["src/lib/.claude/rules/database.md", "docs/.claude/skills/x/SKILL.md", "src/.cursor/rules/x.mdc"];
+    const paths = [
+      "src/lib/.claude/rules/database.md",
+      "src/lib/.Claude/rules/x.md",
+      "docs/.claude/skills/x/SKILL.md",
+      "src/.cursor/rules/x.mdc",
+    ];
     expect(riskyFiles(paths)).toEqual(paths.map((path) => ({ path, why: "agent skills or rules below the repo root" })));
   });
 
@@ -134,6 +142,7 @@ describe("riskyFiles", () => {
   it.each([
     ["src/app/notes/route.ts", true],
     ["src/app/api/mcp/route.ts", true],
+    ["src/pages/api/refresh.ts", true],
     ["src/app/notes/page.tsx", false],
     ["src/lib/reroute.ts", false],
   ])("counts %s as a route: %s", (file, route) => {
