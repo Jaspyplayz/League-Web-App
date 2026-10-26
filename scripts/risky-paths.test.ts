@@ -14,12 +14,22 @@ const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others",
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
 
+// The in-repo functions that call Claude or create a Supabase client. The
+// rest of their modules, such as recapsEnabled, are safe to import.
+const WRAPPERS = [
+  { name: "answerQuestion", file: "src/lib/ask.ts" },
+  { name: "writeRecap", file: "src/lib/recap.ts" },
+  { name: "createSupabaseClient", file: "src/lib/supabase/server.ts" },
+  { name: "refreshSession", file: "src/lib/supabase/proxy.ts" },
+];
+const USES_WRAPPER = new RegExp(`\\b(?:${WRAPPERS.map(({ name }) => name).join("|")})\\b`);
+
 // A file that belongs on the risky list: a route or a pages/api/ file, which
 // Next.js serves as a public endpoint, or the proxy it runs on every request;
-// a "use server" file; one that imports the Claude API or Supabase client or
-// reads the Claude API key; or one that imports the Postgres client, Drizzle,
-// or src/db/ by the @/ alias or a relative path, in either quote, as a
-// re-export or a dynamic import.
+// a "use server" file; one that imports the Claude API or Supabase client,
+// uses one of the wrappers above, or reads the Claude API key; or one that
+// imports the Postgres client, Drizzle, or src/db/ by the @/ alias or a
+// relative path, in either quote, as a re-export or a dynamic import.
 function mustBeListed(file: string, source: string): boolean {
   if (/(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$|(^|\/)pages\/api\//.test(file)) return true;
   if (/^(src\/)?(proxy|middleware)\.[cm]?[jt]s$/.test(file)) return true;
@@ -27,7 +37,10 @@ function mustBeListed(file: string, source: string): boolean {
   if (/["'](?:postgres|drizzle-orm(?:\/[^"']*)?|@anthropic-ai\/sdk(?:\/[^"']*)?|@supabase\/[^"']+)["']/.test(source)) {
     return true;
   }
-  if (/env(?:\.ANTHROPIC_API_KEY\b|\[\s*["']ANTHROPIC_API_KEY["']\s*\])/.test(source)) return true;
+  if (USES_WRAPPER.test(source)) return true;
+  const readsKey =
+    /env\??\.ANTHROPIC_API_KEY\b|env(?:\?\.)?\[\s*["']ANTHROPIC_API_KEY["']\s*\]|\{[^}]*\bANTHROPIC_API_KEY\b[^}]*\}\s*=\s*process\.env\b/;
+  if (readsKey.test(source)) return true;
   const imports = source.matchAll(/["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)(db(?:\/[^"']*)?)["']/g);
   return [...imports].some((match) => !PURE_DB_MODULES.has(match[1]));
 }
@@ -94,9 +107,15 @@ describe("riskyFiles", () => {
   });
 
   // Local settings override the commit hook, a copied agent can take the
-  // reviewer's name, and Cursor's settings run the Grok review (JAS-13).
-  it("flags local settings, every agent and Cursor's settings", () => {
-    const paths = [".claude/settings.local.json", ".claude/agents/review-notes.md", ".cursor/settings.json"];
+  // reviewer's name, and Cursor's settings and rules set up the Grok review
+  // (JAS-13).
+  it("flags local settings, every agent, and Cursor's settings and rules", () => {
+    const paths = [
+      ".claude/settings.local.json",
+      ".claude/agents/helper.md",
+      ".cursor/settings.json",
+      ".cursor/rules/one-builder.mdc",
+    ];
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
@@ -130,7 +149,6 @@ describe("riskyFiles", () => {
         "src/lib/match-store.ts.bak",
         "src/components/theme-store.ts",
         "scripts/shot.ts",
-        ".cursor/rules/one-builder.mdc",
         ".cursor/skills/verify-turnpoint/SKILL.md",
       ]),
     ).toEqual([]);
@@ -145,7 +163,7 @@ describe("riskyFiles", () => {
   // Anyone can call a server action, and a store under a new name would
   // otherwise merge as normal code (JAS-12). Claude spending and sign-in stay
   // Jasper's too (JAS-13).
-  it("covers every entry point, server action, and database, Claude API or Supabase client", () => {
+  it("covers routes, the proxy, server actions, and database, Claude API or Supabase clients", () => {
     const unlisted = repoFiles.filter(
       (file) =>
         isSourceFile(file) &&
@@ -154,6 +172,12 @@ describe("riskyFiles", () => {
         mustBeListed(file, readFileSync(file, "utf8")),
     );
     expect(unlisted).toEqual([]);
+  });
+
+  // A renamed wrapper would quietly stop being checked.
+  it.each(WRAPPERS)("finds $name exported from $file, which is risky", ({ name, file }) => {
+    expect(readFileSync(file, "utf8")).toMatch(new RegExp(`export async function ${name}\\b`));
+    expect(riskyFiles([file])).toHaveLength(1);
   });
 
   it.each([
@@ -165,7 +189,7 @@ describe("riskyFiles", () => {
     ["src/app/notes/page.tsx", false],
     ["src/lib/reroute.ts", false],
     ["src/lib/supabase/proxy.ts", false],
-  ])("counts %s as a public entry point: %s", (file, entry) => {
+  ])("counts %s as a route or the proxy: %s", (file, entry) => {
     expect(mustBeListed(file, "")).toBe(entry);
   });
 
@@ -186,6 +210,12 @@ describe("riskyFiles", () => {
     'import { createServerClient } from "@supabase/ssr";',
     "const key = process.env.ANTHROPIC_API_KEY;",
     'const key = process.env["ANTHROPIC_API_KEY"];',
+    "const key = process.env?.ANTHROPIC_API_KEY;",
+    "const { ANTHROPIC_API_KEY } = process.env;",
+    'import { writeRecap } from "@/lib/recap";',
+    "const result = await answerQuestion(region, account, question);",
+    'import { createSupabaseClient } from "@/lib/supabase/server";',
+    "return refreshSession(request);",
   ])("spots %s as a server action or a database, Claude API or Supabase client", (source) => {
     expect(mustBeListed("src/lib/notes.ts", `// a file\n${source}\n`)).toBe(true);
   });
@@ -194,6 +224,9 @@ describe("riskyFiles", () => {
     'import { secondsUntilUpdate } from "@/db/freshness";',
     'import { supabaseConfig } from "@/lib/supabase/config";',
     'throw new Error("Ask is off here (needs ANTHROPIC_API_KEY)");',
+    'import { recapsEnabled } from "@/lib/recap";',
+    'import type { Recap } from "@/lib/recap";',
+    'import { askEnabled } from "@/lib/ask";',
   ])("lets a file use %s, which reaches no database, Claude API or sign-in", (source) => {
     expect(mustBeListed("src/lib/notes.ts", `${source}\n`)).toBe(false);
   });
