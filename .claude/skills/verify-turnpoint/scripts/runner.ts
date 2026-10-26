@@ -1,20 +1,20 @@
 // Shared harness for verify-turnpoint and verify-turnpoint-ux.
 // Drives Turnpoint in headless Chromium (Playwright) and writes evidence to
-// .cache/verify-turnpoint/<run id>/<journey>/ (git-ignored, never removed by cleanup.sh).
+// .cache/verify-turnpoint/<run id>/<journey>/ (git-ignored, never removed by cleanup.ts).
 //
 // Not a test runner: each journey is a list of user steps. Every step saves a
 // screenshot, an ARIA snapshot of <main>, the URL, and a line in steps.jsonl.
 // The first failing expectation stops the journey and is recorded as the result.
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { chromium, devices, expect, type Browser, type Page } from "@playwright/test";
 import { passPreviewLogin } from "../../../../e2e/preview-login";
+import { readInstance } from "./instance";
 
 export const LIVE = "https://league-web-app.vercel.app";
-export const STATE_FILE = "/tmp/verify-turnpoint/instance.json";
 export const SAMPLE_MATCH_PATH = "/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221";
 export const TEST_PLAYER = { riotId: "Hide on bush#KR1", region: "kr", path: "/player/kr/Hide%20on%20bush-KR1" };
 // The same strings scripts/shot-outcome.ts classifies on.
@@ -47,10 +47,9 @@ function sh(cmd: string, args: string[]): string {
   }
 }
 
-/** Default base: the instance launch.sh started, else nothing (you must pass --base). */
+/** Default base: the instance launch.ts started, else nothing (you must pass --base). */
 export function defaultBase(): string | undefined {
-  if (!existsSync(STATE_FILE)) return undefined;
-  return JSON.parse(readFileSync(STATE_FILE, "utf8")).base as string;
+  return readInstance()?.base;
 }
 
 export function evidenceRoot(): string {
@@ -103,7 +102,7 @@ export async function main(journeys: Journey[], usage: string) {
   }
   const base = (values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
   if (!base) {
-    console.log("No target. Run scripts/launch.sh first, or pass --base https://league-web-app.vercel.app");
+    console.log("No target. Run scripts/launch.ts first, or pass --base https://league-web-app.vercel.app");
     process.exitCode = 1;
     return;
   }

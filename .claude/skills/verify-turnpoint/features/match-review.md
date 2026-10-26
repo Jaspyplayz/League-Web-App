@@ -24,7 +24,7 @@ Preconditions:
 
 - **Open the game.** Go to `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221`. Tab `Summary` has `aria-selected="true"` and `Victory` is visible.
 - **Review moments.** Scroll the region `60-second review` into view. It holds 1–3 `listitem`s (3 on live, 2026-10-25; saved as `notes.moments`), the text `Think about`, and a `Watch in replay` button.
-- **Run.** `npx tsx .cursor/skills/verify-turnpoint/scripts/drive.ts [--base <url>] match-review`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] match-review`.
 - **Proof.** `02-60-second-review-has-moments.png` shows the review card with its moments; the `.aria.yml` lists them.
 
 ## Gotchas

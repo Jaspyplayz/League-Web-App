@@ -24,7 +24,7 @@ Preconditions:
 - **Open the view.** Go to `/player/kr/Hide%20on%20bush-KR1/insights?view=others`. In navigation `Insights views`, link `You vs others` has `aria-current="page"`.
 - **Card.** A region whose name starts with `You vs ` is visible (heading saved as `notes.heading`, `YOU VS CHALLENGER` on live). The text `Not enough games to spot trends yet` is absent.
 - **Forms.** The form `Compare with a rank` and the region `Compare with a player` are visible.
-- **Run.** `npx tsx .cursor/skills/verify-turnpoint/scripts/drive.ts [--base <url>] insights-others`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] insights-others`.
 - **Proof.** `02-rank-comparison-shows.png` and `.aria.yml`.
 
 ## Gotchas

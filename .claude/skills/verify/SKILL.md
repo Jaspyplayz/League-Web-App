@@ -19,7 +19,7 @@ In Git Bash, start every command with `MSYS_NO_PATHCONV=1`, or Git Bash turns `/
 
 Start your own server on a port nobody else uses, never 3000, which may be Jasper's: `npm run dev -- -p 3100`, in the background. It is ready when it prints `Ready in`.
 
-A worktree has no `.env.local`, so a server started there has no database or Riot key. The home page, Settings, How it works and the 404 page work. Pages with game data show the Riot key notice. Don't copy `.env.local` into a worktree; check those pages on the preview.
+A worktree needs its own `npm ci`. With `node_modules` linked to another checkout, Turbopack stops with "Could not find the Next.js package". A worktree also has no `.env.local`, so a server started there has no database or Riot key. The home page, Settings, How it works and the 404 page work. Pages with game data show the Riot key notice. Don't copy `.env.local` into a worktree; check those pages on the preview.
 
 ## Check before driving
 
@@ -42,7 +42,7 @@ npm run shot -- --pr 155 --tab "Deep dive" "/player/kr/Hide%20on%20bush-KR1/matc
 - `--expect <outcome>` saves a page that isn't `ok` on purpose, for a PR that changes one: `--expect not-found /no-such-page` for the 404 page.
 - Several paths in one run share the same options. Files are named after the site, the path and the options, such as `pr155-settings-light-phone.png`, or `league-web-app-…` for the live site and `localhost-…` for a dev server, so a before and an after don't overwrite each other. `--out <dir>` changes the folder.
 
-Search, profile sections and Insights views are plain URLs, so shoot the page an action leads to. A journey the flags can't reach, such as typing into a form, goes in a Playwright test in `e2e/` that imports `test` from `./fixtures`. Run it against your dev server with `BASE_URL=http://localhost:3100 npm run test:e2e`, and the smoke test runs it on the preview after you push. Don't run `test:e2e` against a preview yourself: it doesn't read `.env.local`, so it stops at Vercel's login.
+Search, profile sections and Insights views are plain URLs, so shoot the page an action leads to. For proof that needs a click or typing, such as a form, use the journeys in [`verify-turnpoint`](../verify-turnpoint/SKILL.md) and [`verify-turnpoint-ux`](../verify-turnpoint-ux/SKILL.md). A check that should run on every PR from then on goes in a Playwright test in `e2e/` that imports `test` from `./fixtures`. Run it against your dev server with `BASE_URL=http://localhost:3100 npm run test:e2e`, and the smoke test runs it on the preview after you push. Don't run `test:e2e` against a preview yourself: it doesn't read `.env.local`, so it stops at Vercel's login.
 
 The pages, with their paths, labels and traps, are in [features/README.md](features/README.md).
 

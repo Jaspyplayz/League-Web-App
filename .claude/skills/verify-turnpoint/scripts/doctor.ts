@@ -1,13 +1,14 @@
 // Read-only: is this Turnpoint instance worth driving, and which journeys can pass on it?
-//   npx tsx .cursor/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]
+//   npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]
 // Exit 0 = the home page is the app. Each capability line says which `needs:` it unlocks.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
 import { passPreviewLogin } from "../../../../e2e/preview-login";
-import { defaultBase, ERROR_TEXTS, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, STATE_FILE, TEST_PLAYER } from "./runner";
+import { isAlive, readInstance } from "./instance";
+import { defaultBase, ERROR_TEXTS, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, TEST_PLAYER } from "./runner";
 
 const { values } = parseArgs({ options: { base: { type: "string" } } });
 const base = (values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
@@ -22,29 +23,28 @@ function sh(cmd: string, args: string[]): string {
 
 async function run() {
   if (!base) {
-    console.log("target: none. Run launch.sh, or pass --base https://league-web-app.vercel.app");
+    console.log("target: none. Run launch.ts, or pass --base https://league-web-app.vercel.app");
     return 1;
   }
   console.log(`target: ${base}`);
   console.log(`checkout: ${sh("git", ["rev-parse", "--short", "HEAD"])} on ${sh("git", ["branch", "--show-current"])}`);
   const local = /^http:\/\/(127\.0\.0\.1|localhost)/.test(base);
   if (local) {
-    if (!existsSync(STATE_FILE)) {
-      console.log("instance: NOT OURS. No state file; launch.sh didn't start this server. Don't drive it.");
+    const instance = readInstance();
+    if (!instance) {
+      console.log("instance: NOT OURS. No state file; launch.ts didn't start this server. Don't drive it.");
       return 1;
     }
-    const st = JSON.parse(readFileSync(STATE_FILE, "utf8"));
-    if (st.base !== base) {
-      console.log(`instance: NOT OURS. Our instance is ${st.base}.`);
+    if (instance.base !== base) {
+      console.log(`instance: NOT OURS. Our instance is ${instance.base}.`);
       return 1;
     }
-    const alive = sh("ps", ["-o", "pid=", "-g", String(st.pgid)]) !== "";
-    const listener = sh("ss", ["-ltnpH", `sport = :${st.port}`]);
-    const pids = sh("ps", ["-o", "pid=", "-g", String(st.pgid)]).split(/\s+/).filter(Boolean);
-    const owned = pids.some((p) => listener.includes(`pid=${p},`));
-    console.log(`instance: pid ${st.pid} ${alive ? "alive" : "DEAD"}, port ${st.port} ${owned ? "owned by our process group" : "NOT owned by us"}`);
+    // next dev exits when its port is taken, so while our server's process is
+    // alive, the port is ours.
+    const alive = isAlive(instance.pid);
+    console.log(`instance: pid ${instance.pid} ${alive ? "alive, so the port is ours" : "DEAD"}, port ${instance.port}`);
     console.log(`env: .env.local ${existsSync(".env.local") ? "present" : "absent (no Riot key, database or Supabase)"}`);
-    if (!alive || !owned) return 1;
+    if (!alive) return 1;
   } else if (base === LIVE) {
     console.log("instance: live site (what main shows now). Read-only journeys only; each profile load spends Riot requests.");
   } else {

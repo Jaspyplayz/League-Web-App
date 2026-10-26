@@ -25,7 +25,7 @@ Preconditions:
 - **Open profile.** Go to `/player/kr/Hide%20on%20bush-KR1` (pasted link). Headings `Recent matches` and `Ranked Solo/Duo` are visible.
 - **Rows.** Inside the region `Recent matches`, count text `Victory` / `Defeat` / `Remake`. At least 1 (10 on live, 2026-10-25). The count is saved as `notes.resultLabels`.
 - **Filter.** Inside `Recent matches`, click the link `Ranked Solo/Duo` (exact). The URL gains `queue=` and the `Recent matches` heading is still there.
-- **Run.** `npx tsx .cursor/skills/verify-turnpoint/scripts/drive.ts [--base <url>] profile-matches`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] profile-matches`.
 - **Proof.** `02-match-list-has-rows.png` and `.aria.yml` show the rows; `03-…png` shows the filtered list.
 
 ## Gotchas
