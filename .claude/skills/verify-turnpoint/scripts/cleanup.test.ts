@@ -1,0 +1,131 @@
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, type AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { isAlive, portAnswers } from "./instance";
+
+const SCRIPTS = resolve(".claude/skills/verify-turnpoint/scripts");
+const TSX = resolve("node_modules/tsx/dist/cli.mjs");
+
+// Each test gets a checkout of its own, whose next binary is a stand-in that
+// serves the home page on its -p port and logs "Ready in", as next dev does.
+const FAKE_NEXT = `const port = Number(process.argv[process.argv.indexOf("-p") + 1]);
+require("node:http").createServer((_, res) => res.end("Find the minute")).listen(port, "127.0.0.1", () => console.log("Ready in 1ms"));
+`;
+
+const roots: string[] = [];
+const children: ChildProcess[] = [];
+
+function checkout() {
+  const root = mkdtempSync(join(tmpdir(), "verify-turnpoint-"));
+  const next = join(root, "node_modules/next/dist/bin/next");
+  mkdirSync(dirname(next), { recursive: true });
+  writeFileSync(next, FAKE_NEXT);
+  roots.push(root);
+  return { root, next };
+}
+
+const stateFile = (root: string) => join(root, ".cache/verify-turnpoint-server/instance.json");
+
+function record(root: string, pid: number, port: number) {
+  mkdirSync(dirname(stateFile(root)), { recursive: true });
+  const log = join(dirname(stateFile(root)), `dev-${port}.log`);
+  writeFileSync(stateFile(root), JSON.stringify({ pid, port, base: `http://127.0.0.1:${port}`, log, root }));
+}
+
+function run(script: string, root: string, ...args: string[]) {
+  const result = spawnSync(process.execPath, [TSX, join(SCRIPTS, script), ...args], { cwd: root, encoding: "utf8" });
+  return { code: result.status, out: `${result.stdout}${result.stderr}` };
+}
+
+async function freePort(): Promise<number> {
+  const server = createServer().listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address() as AddressInfo;
+  server.close();
+  return port;
+}
+
+function start(command: string[], cwd: string) {
+  const child = spawn(process.execPath, command, { cwd, stdio: "ignore", detached: true });
+  children.push(child);
+  return child;
+}
+
+async function listening(port: number) {
+  for (let tries = 0; tries < 50 && !(await portAnswers(port)); tries++) await new Promise((r) => setTimeout(r, 100));
+}
+
+afterEach(() => {
+  for (const root of roots) if (existsSync(stateFile(root))) run("cleanup.ts", root);
+  for (const child of children.splice(0)) child.kill();
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 5 });
+});
+
+describe("launch.ts and cleanup.ts", () => {
+  it("launch starts a server, refuses a second one, and cleanup stops it", async () => {
+    const { root } = checkout();
+    const port = await freePort();
+    const first = run("launch.ts", root, String(port));
+    expect(first.out).toContain(`ready: http://127.0.0.1:${port}`);
+    expect(first.code).toBe(0);
+
+    const second = run("launch.ts", root, String(await freePort()));
+    expect(second.out).toContain("an instance from an earlier run is still up");
+    expect(second.code).toBe(1);
+
+    const cleanup = run("cleanup.ts", root);
+    expect(cleanup.out).toMatch(new RegExp(`stopped pid \\d+ and its children, port ${port} free`));
+    expect(cleanup.code).toBe(0);
+    expect(await portAnswers(port)).toBe(false);
+    expect(existsSync(stateFile(root))).toBe(false);
+  });
+
+  // A state file outlives its server after a crash, a reboot or a session that
+  // ended first, and the OS hands the PID to a new process.
+  it("cleanup leaves alone a process that took over the recorded PID", async () => {
+    const { root } = checkout();
+    const other = start(["-e", "setInterval(() => {}, 1000)"], root);
+    record(root, other.pid!, await freePort());
+
+    const { code, out } = run("cleanup.ts", root);
+    expect(out).toContain(`nothing stopped: pid ${other.pid} no longer runs the server launch.ts started`);
+    expect(code).toBe(0);
+    expect(isAlive(other.pid!)).toBe(true);
+    expect(existsSync(stateFile(root))).toBe(false);
+  });
+
+  // Such as Jasper's own next dev, in the main checkout or in this one.
+  it.each([
+    { what: "another checkout's next dev", sameCheckout: false },
+    { what: "this checkout's next dev on another port", sameCheckout: true },
+  ])("cleanup leaves alone $what that took over the recorded PID", async ({ sameCheckout }) => {
+    const ours = checkout();
+    const theirs = sameCheckout ? ours : checkout();
+    const port = await freePort();
+    const server = start([theirs.next, "dev", "-p", String(port), "-H", "127.0.0.1"], theirs.root);
+    await listening(port);
+    record(ours.root, server.pid!, sameCheckout ? await freePort() : port);
+
+    const { code, out } = run("cleanup.ts", ours.root);
+    expect(out).toContain("nothing stopped");
+    expect(code).toBe(0);
+    expect(isAlive(server.pid!)).toBe(true);
+    expect(await portAnswers(port)).toBe(true);
+  });
+
+  it("launch starts a new server when the recorded PID belongs to another process", async () => {
+    const { root } = checkout();
+    const other = start(["-e", "setInterval(() => {}, 1000)"], root);
+    record(root, other.pid!, await freePort());
+
+    const port = await freePort();
+    const { code, out } = run("launch.ts", root, String(port));
+    expect(out).toContain(`ready: http://127.0.0.1:${port}`);
+    expect(code).toBe(0);
+    expect(isAlive(other.pid!)).toBe(true);
+  });
+}, 60_000);
