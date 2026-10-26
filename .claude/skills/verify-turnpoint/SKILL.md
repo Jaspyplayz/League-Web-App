@@ -29,7 +29,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts          # port 3100
 npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts 3101     # another port
 ```
 
-- Needs `node_modules`, so run `npm ci` once in a fresh checkout. A worktree needs its own install: with `node_modules` linked to another checkout, Turbopack stops with "Could not find the Next.js package" and the home page never renders. Starts `next dev -p <port> -H 127.0.0.1` in the background, in its own process group on Linux and macOS. It works the same on Windows, from PowerShell or Git Bash.
+- Needs `node_modules`, so run `npm ci` once in a fresh checkout. A worktree needs its own install: with `node_modules` linked to another checkout, Turbopack stops with "Could not find the Next.js package" and the home page never renders. Starts `next dev -p <port> -H 127.0.0.1` in the background, in its own process group on Linux and macOS. On Windows, from PowerShell or Git Bash, a small `node -e` keeper starts `next dev` with a hidden console, so no terminal window opens. The printed and recorded PID is then the keeper's, which Task Manager shows as `node.exe -e …`; it exits with `next dev`, and stopping it stops `next dev`.
 - Ready = the log says `Ready in` AND `GET /` returns HTML containing "Find the minute" (the first request compiles the page; ~10 s on the box). It prints `ready: http://127.0.0.1:3100 (pid …, log .cache/verify-turnpoint-server/dev-3100.log)`.
 - State goes to `.cache/verify-turnpoint-server/instance.json` in the checkout (git-ignored); `drive.ts` and `doctor.ts` use its `base` when you pass no `--base`.
 - Refuses port 3000 (may be Jasper's own server), a port someone else holds, and a second launch while the server it started earlier still runs.
@@ -109,7 +109,7 @@ Location (git-ignored, survives cleanup): `.cache/verify-turnpoint/<run id>/`
 npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts
 ```
 
-Stops only the server `launch.ts` recorded and its children: its process group on Linux and macOS (TERM, then KILL after 10 s), its process tree on Windows (`taskkill /T /F`). It first checks that the recorded PID still runs this checkout's `next dev` on the recorded port. When it doesn't, the server died without cleanup and the PID may belong to another process now, so it stops nothing and says `nothing stopped`. Then it removes the state file and dev log, checks the port is free, and lists the kept evidence folders. Never `pkill node` / kill by name: Jasper's server and other agents' servers are `node` too. It never touches `.cache/verify-turnpoint/`. Run it after every failed attempt as well. Remote targets need no cleanup.
+Stops only the server `launch.ts` recorded and its children: its process group on Linux and macOS (TERM, then KILL after 10 s), its process tree on Windows (`taskkill /T /F`). It first checks that the recorded PID still runs this checkout's `next dev` on the recorded port (on Windows, the keeper whose command line starts it). When it doesn't, the server died without cleanup and the PID may belong to another process now, so it stops nothing and says `nothing stopped`. Then it removes the state file and dev log, checks the port is free, and lists the kept evidence folders. Never `pkill node` / kill by name: Jasper's server and other agents' servers are `node` too. It never touches `.cache/verify-turnpoint/`. Run it after every failed attempt as well. Remote targets need no cleanup.
 
 ## Helpers
 

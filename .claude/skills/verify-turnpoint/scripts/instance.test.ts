@@ -79,9 +79,11 @@ function stopTree(pid: number) {
   }
 }
 
-// The visible windows that belong to pid or a process under it.
-function windowsOf(pid: number): string {
+// How many processes pid and those under it are, and which of them own a
+// visible window. Throws when it can't look, so a blocked Add-Type can't pass.
+function windowsOf(pid: number): { tree: number; owners: string } {
   const script = `
+$ErrorActionPreference = 'Stop'
 Add-Type -Namespace W -Name U -MemberDefinition '
   public delegate bool P(System.IntPtr h, System.IntPtr l);
   [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool EnumWindows(P p, System.IntPtr l);
@@ -92,8 +94,12 @@ $tree = @(${pid})
 do { $n = $tree.Count; $tree = @($tree + @($all | Where-Object { $tree -contains $_.ParentProcessId } | ForEach-Object ProcessId) | Sort-Object -Unique) } while ($tree.Count -gt $n)
 $owners = New-Object System.Collections.Generic.List[uint32]
 [void][W.U]::EnumWindows({ param($h) if ([W.U]::IsWindowVisible($h)) { $p = [uint32]0; [void][W.U]::GetWindowThreadProcessId($h, [ref]$p); $owners.Add($p) }; $true }, [IntPtr]::Zero)
+"tree $($tree.Count)"
 $owners | Where-Object { $tree -contains $_ }`;
-  return spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", windowsHide: true }).stdout.trim();
+  const { status, stdout, stderr } = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", windowsHide: true });
+  if (status !== 0 || stderr.trim()) throw new Error(`could not list windows (exit ${status}): ${stderr}`);
+  const [tree, ...owners] = stdout.trim().split(/\r?\n/);
+  return { tree: Number(tree.replace("tree ", "")), owners: owners.join(",") };
 }
 
 afterEach(() => {
@@ -128,7 +134,10 @@ describe("the state file launch.ts writes", () => {
     const port = await freePort();
     expect(run("launch.ts", root, String(port)).code).toBe(0);
     const { pid } = JSON.parse(readFileSync(stateFile(root), "utf8"));
-    expect(windowsOf(pid)).toBe("");
+    const { tree, owners } = windowsOf(pid);
+    // The keeper, the stand-in next and its worker at least.
+    expect(tree).toBeGreaterThanOrEqual(3);
+    expect(owners).toBe("");
   });
 
   // A state file outlives its server after a crash, a reboot or a session that
