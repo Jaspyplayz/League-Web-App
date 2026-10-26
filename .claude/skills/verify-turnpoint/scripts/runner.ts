@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { chromium, devices, expect, type Browser, type Page } from "@playwright/test";
 import { passPreviewLogin } from "../../../../e2e/preview-login";
-import { loadEnv } from "../../../../scripts/load-env";
+import { loadEnv, previewUrl } from "../../../../scripts/preview";
 import { readInstance } from "./instance";
 
 export const LIVE = "https://league-web-app.vercel.app";
@@ -57,20 +57,17 @@ export function evidenceRoot(): string {
   return resolve(process.cwd(), ".cache/verify-turnpoint");
 }
 
-async function newPage(browser: Browser, base: string, phone: boolean): Promise<Page> {
+async function newPage(browser: Browser, base: string, phone: boolean, preview: string | undefined): Promise<Page> {
   const context = await browser.newContext({
     ...devices[phone ? "Pixel 7" : "Desktop Chrome"],
     baseURL: base,
     // Same reduced-motion setting for every run so smooth scrolls finish before a screenshot.
     reducedMotion: "reduce",
   });
-  const origin = new URL(base).origin;
-  if (isPreview(origin)) await passPreviewLogin(context, origin);
+  // The bypass secret goes only to the preview --pr found, never to a --base URL.
+  if (preview) await passPreviewLogin(context, preview);
   return context.newPage();
 }
-
-// The bypass secret goes only to a preview's own origin, never the live site or localhost.
-export const isPreview = (origin: string) => origin.endsWith(".vercel.app") && origin !== LIVE;
 
 /** Fail fast with the page's own words when it is not the app working. */
 export async function assertAppPage(page: Page) {
@@ -86,6 +83,7 @@ export async function main(journeys: Journey[], usage: string) {
     allowPositionals: true,
     options: {
       base: { type: "string" },
+      pr: { type: "string" },
       run: { type: "string" },
       list: { type: "boolean", default: false },
     },
@@ -103,13 +101,14 @@ export async function main(journeys: Journey[], usage: string) {
     process.exitCode = 1;
     return;
   }
-  const base = (values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
+  const preview = values.pr ? new URL(previewUrl(values.pr)).origin : undefined;
+  const base = (preview ?? values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
   if (!base) {
-    console.log("No target. Run scripts/launch.ts first, or pass --base https://league-web-app.vercel.app");
+    console.log("No target. Run scripts/launch.ts first, or pass --pr <number> or --base https://league-web-app.vercel.app");
     process.exitCode = 1;
     return;
   }
-  if (isPreview(new URL(base).origin)) loadEnv();
+  if (preview) loadEnv();
   const runId = values.run ?? process.env.RUN_ID ?? new Date().toISOString().replace(/[:.]/g, "-");
   const runDir = join(evidenceRoot(), runId);
   mkdirSync(runDir, { recursive: true });
@@ -130,7 +129,7 @@ export async function main(journeys: Journey[], usage: string) {
       const dir = join(runDir, name);
       mkdirSync(dir, { recursive: true });
       const log = join(dir, "steps.jsonl");
-      const page = await newPage(browser, base, journey.phone ?? false);
+      const page = await newPage(browser, base, journey.phone ?? false, preview);
       const consoleErrors: string[] = [];
       page.on("pageerror", (e) => consoleErrors.push(String(e).slice(0, 300)));
       const notes: Record<string, unknown> = {};

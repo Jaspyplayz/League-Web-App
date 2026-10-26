@@ -1,6 +1,6 @@
 // Functional journeys for verify-turnpoint. Usage (from the repo root):
 //   npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts --list
-//   npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] [--run <id>] <journey...|all>
+//   npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey...|all>
 // Each journey maps to one file in ../features/.
 
 import { assertAppPage, expect, main, SAMPLE_MATCH_PATH, TEST_PLAYER, type Journey } from "./runner";
@@ -124,4 +124,4 @@ const journeys: Journey[] = [
   },
 ];
 
-main(journeys, "Usage: npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] [--run <id>] <journey...|all>\nJourneys:");
+main(journeys, "Usage: npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey...|all>\nJourneys:");

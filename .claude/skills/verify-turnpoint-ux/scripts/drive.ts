@@ -2,7 +2,7 @@
 // whether data shows. Shares the harness, launch, doctor and cleanup of the
 // sibling skill (../../verify-turnpoint/scripts/). Usage (from the repo root):
 //   npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --list
-//   npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] [--run <id>] <journey...|all>
+//   npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey...|all>
 
 import type { Page } from "@playwright/test";
 import {
@@ -210,4 +210,4 @@ const journeys: Journey[] = [
   },
 ];
 
-main(journeys, "Usage: npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] [--run <id>] <journey...|all>\nJourneys:");
+main(journeys, "Usage: npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey...|all>\nJourneys:");

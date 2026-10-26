@@ -20,7 +20,7 @@ Turnpoint's data pages need secrets a fresh checkout doesn't have. Pick the targ
 | Local dev server, no `.env.local` | `launch.ts` (default `http://127.0.0.1:3100`) | `needs: nothing` only: home page, search form validation, Settings. Every data page shows "The site's Riot API key isn't working". |
 | Local dev server with `.env.local` | same; `.env.local` must hold `RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY` (see `.env.example`) | everything. Never copy secrets into the repo or a worktree; Jasper owns `.env.local`. |
 | Live site | `--base https://league-web-app.vercel.app` | everything, as `main` shows it now. Read-only journeys only. A "before" for a change. |
-| PR preview | `--base https://<preview>.vercel.app` | everything, for that PR. The scripts read `VERCEL_AUTOMATION_BYPASS_SECRET` from the environment, else from `.env.local` (a worktree falls back to the main checkout's, as `npm run shot` does). The secret is sent only to the preview's own origin (`e2e/preview-login.ts`). Without it every page is `vercel-login`; only Jasper can add it. Find the preview URL with `gh pr view <n> --json statusCheckRollup` or the Vercel bot comment. |
+| PR preview | `--pr <number>` | everything, for that PR. Like `npm run shot`, the scripts find the preview through GitHub and get past Vercel's login with `VERCEL_AUTOMATION_BYPASS_SECRET`, read from the environment or else `.env.local` (a worktree falls back to the main checkout's). They send the secret only to the preview `--pr` found (`e2e/preview-login.ts`), never to a `--base` URL, so `--base <preview>` shows `vercel-login`. Without the secret every page is `vercel-login`; only Jasper can add it. |
 
 ## Launch
 
@@ -44,6 +44,7 @@ Read-only. Run it first, and again whenever anything looks off:
 ```bash
 npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts                                   # the launched instance
 npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts --base https://league-web-app.vercel.app
+npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts --pr 155                          # that PR's preview
 ```
 
 It prints the checkout commit, then for a local target whether the server in the state file is still running. While it runs, the port is ours, because `next dev` exits when its port is taken. "NOT OURS" means don't drive it. Then one line per capability:
@@ -61,7 +62,7 @@ Exit 0 = the home page is the app. A journey whose `needs:` line isn't `ok` will
 
 ```bash
 npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts --list
-npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] [--run <id>] <journey...|all>
+npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey...|all>
 # e.g.
 npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts --base https://league-web-app.vercel.app match-review
 ```
@@ -118,7 +119,7 @@ All under `.claude/skills/verify-turnpoint/scripts/`, run from the repo root:
 |---|---|---|
 | `launch.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts [port]` | starts and waits for our dev server |
 | `doctor.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]` | read-only health + capability check |
-| `drive.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] [--run <id>] <journey…\|all>` | runs functional journeys, writes evidence |
+| `drive.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey…\|all>` | runs functional journeys, writes evidence |
 | `runner.ts` | imported by both skills' `drive.ts` | browser, preview bypass, step recorder, evidence layout |
 | `cleanup.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts` | stops our dev server, keeps evidence |
 

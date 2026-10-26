@@ -20,7 +20,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts          # http://127.
 Pick the target from the journey's `needs:`:
 
 - `needs: nothing` (`ux-search-recovery`, `ux-phone-home`): the local dev server works with no `.env.local`.
-- `database`, `riot`, `supabase`: the local server needs `.env.local` (`RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`). Without it, use the live site (`--base https://league-web-app.vercel.app`, what `main` shows now) or a PR preview (`--base https://<preview>.vercel.app`, which needs `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment or `.env.local`; only Jasper can add it).
+- `database`, `riot`, `supabase`: the local server needs `.env.local` (`RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`). Without it, use the live site (`--base https://league-web-app.vercel.app`, what `main` shows now) or a PR preview (`--pr <number>`, which needs `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment or `.env.local`; only Jasper can add it). A `--base` URL never gets the secret, so a preview passed that way shows `vercel-login`.
 
 Launch details (port rules, `npm ci`, the state file `.cache/verify-turnpoint-server/instance.json`, one server per checkout) are in `.claude/skills/verify-turnpoint/SKILL.md` → Launch. No migrations or seed step; never run `npm run db:migrate`.
 
@@ -29,6 +29,7 @@ Launch details (port rules, `npm ci`, the state file `.cache/verify-turnpoint-se
 ```bash
 npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts                                   # launched instance
 npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts --base https://league-web-app.vercel.app
+npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts --pr 155                          # that PR's preview
 ```
 
 Require `home page ok`, `so the port is ours` for a local target, and `ok` on each capability the journey needs (`sample game` = database, `player profile` = riot, `signed-out Ask` = supabase). `riot-key` means the Riot key is missing or expired; drive that journey elsewhere rather than weakening it.
@@ -37,11 +38,13 @@ Require `home page ok`, `so the port is ours` for a local target, and `ok` on ea
 
 ```bash
 npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --list
-npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] [--run <id>] <journey...|all>
+npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey...|all>
 # e.g. on the launched local instance:
 npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts ux-search-recovery ux-phone-home
 # data journeys on the live site:
 npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --base https://league-web-app.vercel.app ux-review-path ux-signed-out-teasers ux-insights-peer-card
+# proof for a PR, on its preview:
+npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --pr 155 ux-search-recovery
 ```
 
 | Journey | needs | Device | Feature file |
@@ -80,7 +83,7 @@ Stops only the server `launch.ts` recorded and its children, removes the state f
 
 | Helper | Invocation | Does |
 |---|---|---|
-| `scripts/drive.ts` (this skill) | `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] [--run <id>] <journey…\|all>` | UX journeys; `expectCalm`, `panel(page, heading)`, `inViewport(page, heading)` helpers |
+| `scripts/drive.ts` (this skill) | `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey…\|all>` | UX journeys; `expectCalm`, `panel(page, heading)`, `inViewport(page, heading)` helpers |
 | `launch.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts [port]` | starts and waits for our dev server |
 | `doctor.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]` | read-only health and capability check |
 | `runner.ts` | imported from `../../verify-turnpoint/scripts/runner` | browser and device, preview bypass, step recorder, evidence layout |

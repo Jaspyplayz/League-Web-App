@@ -1,5 +1,5 @@
 // Read-only: is this Turnpoint instance worth driving, and which journeys can pass on it?
-//   npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]
+//   npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> | --pr <number>]
 // Exit 0 = the home page is the app. Each capability line says which `needs:` it unlocks.
 
 import { execFileSync } from "node:child_process";
@@ -7,12 +7,13 @@ import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
 import { passPreviewLogin } from "../../../../e2e/preview-login";
-import { loadEnv } from "../../../../scripts/load-env";
+import { loadEnv, previewUrl } from "../../../../scripts/preview";
 import { isOurs, readInstance } from "./instance";
-import { defaultBase, ERROR_TEXTS, isPreview, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, TEST_PLAYER } from "./runner";
+import { defaultBase, ERROR_TEXTS, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, TEST_PLAYER } from "./runner";
 
-const { values } = parseArgs({ options: { base: { type: "string" } } });
-const base = (values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
+const { values } = parseArgs({ options: { base: { type: "string" }, pr: { type: "string" } } });
+const preview = values.pr ? new URL(previewUrl(values.pr)).origin : undefined;
+const base = (preview ?? values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
 
 function sh(cmd: string, args: string[]): string {
   try {
@@ -24,7 +25,7 @@ function sh(cmd: string, args: string[]): string {
 
 async function run() {
   if (!base) {
-    console.log("target: none. Run launch.ts, or pass --base https://league-web-app.vercel.app");
+    console.log("target: none. Run launch.ts, or pass --pr <number> or --base https://league-web-app.vercel.app");
     return 1;
   }
   console.log(`target: ${base}`);
@@ -48,15 +49,16 @@ async function run() {
     if (!ours) return 1;
   } else if (base === LIVE) {
     console.log("instance: live site (what main shows now). Read-only journeys only; each profile load spends Riot requests.");
-  } else {
+  } else if (preview) {
     loadEnv();
-    console.log(`instance: preview. bypass secret ${process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? "set" : "NOT set (expect vercel-login)"}`);
+    console.log(`instance: preview of #${values.pr}. bypass secret ${process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? "set" : "NOT set (expect vercel-login)"}`);
+  } else {
+    console.log("instance: remote. No bypass secret goes to a --base URL, so a preview shows vercel-login; pass --pr <number> for one.");
   }
 
   const browser = await chromium.launch();
   const context = await browser.newContext({ baseURL: base });
-  const origin = new URL(base).origin;
-  if (isPreview(origin)) await passPreviewLogin(context, origin);
+  if (preview) await passPreviewLogin(context, preview);
   const page = await context.newPage();
   const probe = async (path: string, want: string) => {
     try {
