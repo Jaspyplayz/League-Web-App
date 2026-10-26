@@ -116,19 +116,8 @@
   }
 }
 
-/*
- * Soft square chrome for the home Riot ID bar and Ask prompts.
- * 20px stays under half the shorter side of those controls, so the
- * corner is round and the sides stay straight. A 52px Analyze or Ask
- * button would need 26px to become a pill. corner-shape: round is the
- * initial value, set here so it wins over hud-cut's bevel when both
- * classes are present, because this utility comes later in the file.
- */
 @utility soft-round {
   border-radius: 20px;
-  @supports (corner-shape: bevel) {
-    corner-shape: round;
-  }
 }
 
 /*
