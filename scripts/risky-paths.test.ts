@@ -42,6 +42,26 @@ describe("riskyFiles", () => {
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
+  // The stores and my-player.ts write and delete rows outside src/db/, and the
+  // MCP server caps how many Riot calls one request makes (JAS-12).
+  it("flags database code and the MCP server outside src/db/ and src/app/api/", () => {
+    const paths = [
+      "src/lib/match-note-store.ts",
+      "src/lib/profile-store.ts",
+      "src/lib/my-player.ts",
+      "scripts/remap-puuids-db.ts",
+      "scripts/collect-benchmarks.ts",
+      "src/lib/mcp/tools.ts",
+    ];
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // The reviewer agent loads these, so changing them changes the review.
+  it("flags the skills and rules the reviewer loads", () => {
+    const paths = [".claude/skills/code-review-and-quality/SKILL.md", ".claude/rules/database.md"];
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
   it("passes docs, pages and components outside the list", () => {
     expect(
       riskyFiles([
