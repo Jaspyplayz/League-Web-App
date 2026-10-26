@@ -22,7 +22,7 @@ Preconditions:
 - **Open home.** Go to `/`. The level-1 heading contains `Find the minute` (case-insensitive) and the page is calm.
 - **Fit.** `document.documentElement.scrollWidth` ≤ `clientWidth` + 1 (saved as `notes.scrollWidth` and `notes.clientWidth`). The `Analyze` button's box lies inside the width and is ≥ 44 px tall.
 - **Cards.** Scroll the region `Look at a game` into view. Link `See a sample analysis` is visible.
-- **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] ux-phone-home`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-phone-home`.
 - **Proof.** `01-open-home-on-a-phone.png` (top of the page) and `03-scroll-to-the-start-cards.png`.
 
 ## Gotchas

@@ -23,7 +23,7 @@ Preconditions:
 - **Open home.** Go to `/`. The `search` landmark `Player lookup` is visible and the page is calm.
 - **Submit without a tag.** Fill `Riot ID` with `Faker`, click `Analyze`. `#search-error` has role `alert` and text `Enter a Riot ID like Faker#KR1.`; the field has `aria-invalid="true"` and `aria-describedby="search-error"`.
 - **Nothing lost.** The URL still ends in `/`, the field still holds `Faker`, and `Analyze` is enabled.
-- **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] ux-search-recovery`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-search-recovery`.
 - **Proof.** `02-submit-a-riot-id-without-a-tag.png` shows the message under the field; its `.aria.yml` shows the alert and the invalid field.
 
 ## Gotchas

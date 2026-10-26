@@ -4,15 +4,15 @@ This directory is the maintained source for verifying that Turnpoint's player-fa
 
 ## Baseline preconditions
 
-- Pick the target from the journey's `needs:` (see the SKILL.md table): local dev server from `launch.ts` at `http://127.0.0.1:3100`, the live site `https://league-web-app.vercel.app`, or a PR preview with `VERCEL_AUTOMATION_BYPASS_SECRET` set.
-- Run `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]` and require `home page ok` plus `ok` on every capability the journey needs. For a local target also require `alive, so the port is ours`.
+- Pick the target from the journey's `needs:` (see the SKILL.md table): local dev server from `launch.ts` at `http://127.0.0.1:3100`, the live site `https://league-web-app.vercel.app`, or a PR's preview with `--pr <number>`, which needs `VERCEL_AUTOMATION_BYPASS_SECRET`. A `--base` URL never gets the secret, so a preview passed that way shows `vercel-login`.
+- Run `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> | --pr <number>]` and require `home page ok` plus `ok` on every capability the journey needs. For a local target also require `so the port is ours`.
 - Test player `Hide on bush#KR1` on region `kr` (profile `/player/kr/Hide%20on%20bush-KR1`). Sample game `KR_8416261221` (`/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221`), stored in the database, so it works even when the Riot key has expired.
 - Signed out. Every journey uses a fresh browser context (no cookies, no localStorage).
 - Never drive a local server that `launch.ts` didn't start, and never port 3000.
 
 ## Driving conventions
 
-- Drive through `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] [--run <id>] <journey>`. Each feature file names its journey.
+- Drive through `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey>`. Each feature file names its journey.
 - Prefer ARIA roles and accessible names (`getByRole`, `getByLabel`) over CSS classes or position. Turnpoint's visual style will change (Soft Rounded is planned); its labels and regions should not.
 - Headings render uppercase through CSS (`text-transform`), so `innerText` is uppercase. Match accessible names, or match text case-insensitively.
 - Type and click the way a player does. Go straight to a URL only when the recipe's entry point is a pasted link.

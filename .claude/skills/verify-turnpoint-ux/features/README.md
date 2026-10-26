@@ -4,15 +4,15 @@ This directory is the maintained source for verifying how Turnpoint's flows beha
 
 ## Baseline preconditions
 
-- Target picked from the journey's `needs:`: the local dev server from `npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts` (`http://127.0.0.1:3100`) for `needs: nothing`; otherwise a local server with `.env.local`, the live site `https://league-web-app.vercel.app`, or a PR preview with `VERCEL_AUTOMATION_BYPASS_SECRET`.
-- `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]` reports `home page ok` and `ok` for each capability the journey needs.
+- Target picked from the journey's `needs:`: the local dev server from `npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts` (`http://127.0.0.1:3100`) for `needs: nothing`; otherwise a local server with `.env.local`, the live site `https://league-web-app.vercel.app`, or a PR's preview with `--pr <number>`, which needs `VERCEL_AUTOMATION_BYPASS_SECRET`. A `--base` URL never gets the secret, so a preview passed that way shows `vercel-login`.
+- `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> | --pr <number>]` reports `home page ok` and `ok` for each capability the journey needs.
 - Test player `Hide on bush#KR1` on `kr`; sample game `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221` (stored, so it needs no Riot key).
 - Signed out, fresh browser context, `reducedMotion: "reduce"`.
 - The current UI, not Soft Rounded. Assert behavior, not colors or radii.
 
 ## Driving conventions
 
-- Drive through `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url>] [--run <id>] <journey>`.
+- Drive through `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey>`.
 - Arrive the way a player does: click the home card, the tab, the button. A direct URL is used only where the recipe says the player arrives from a pasted link.
 - Use roles and accessible names. Headings render uppercase through CSS; match names, or match text case-insensitively.
 - "Calm" = no `role=alert` with text (Next's `<next-route-announcer>` is skipped) and the page is the app. Check it after every navigation the player makes.

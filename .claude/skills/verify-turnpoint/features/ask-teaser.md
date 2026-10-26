@@ -25,7 +25,7 @@ Preconditions:
 
 - **Open Ask.** Go to `/player/kr/Hide%20on%20bush-KR1/ask`. Link `Ask` in `Profile sections` has `aria-current="page"`; "Ask isn't available right now." is absent.
 - **Teaser.** In `main`, link `Sign in` has `href` matching `/sign-in?next=%2Fplayer%2Fkr%2FHide%2520on%2520bush-KR1%2Fask`; `Illustration · not a real game` and `What do my losses have in common?` are visible; there are 0 `textbox`es.
-- **Run.** `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url>] ask-teaser`.
+- **Run.** `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] ask-teaser`.
 - **Proof.** `02-teaser-shows-sign-in-and-illustration.png` and `.aria.yml`.
 
 ## Gotchas

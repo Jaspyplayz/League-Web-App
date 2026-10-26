@@ -118,9 +118,11 @@ All under `.claude/skills/verify-turnpoint/scripts/`, run from the repo root:
 | Helper | Invocation | Does |
 |---|---|---|
 | `launch.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts [port]` | starts and waits for our dev server |
-| `doctor.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]` | read-only health + capability check |
-| `drive.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey…\|all>` | runs functional journeys, writes evidence |
-| `runner.ts` | imported by both skills' `drive.ts` | browser, preview bypass, step recorder, evidence layout |
+| `doctor.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> \| --pr <number>]` | read-only health + capability check |
+| `drive.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> \| --pr <number>] [--run <id>] <journey…\|all>` | runs functional journeys, writes evidence |
+| `runner.ts` | imported by both skills' `drive.ts` | browser, preview bypass and leak check, step recorder, evidence layout |
+| `target.ts` | imported by `runner.ts` and `doctor.ts` | picks the target; only `--pr` gets the bypass secret |
+| `instance.ts` | imported by the scripts above | the state file, and whether its PID is still our server |
 | `cleanup.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts` | stops our dev server, keeps evidence |
 
 Keep the map honest as the app changes with `/maintain-verification-skill`.

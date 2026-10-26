@@ -83,9 +83,9 @@ Stops only the server `launch.ts` recorded and its children, removes the state f
 
 | Helper | Invocation | Does |
 |---|---|---|
-| `scripts/drive.ts` (this skill) | `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey…\|all>` | UX journeys; `expectCalm`, `panel(page, heading)`, `inViewport(page, heading)` helpers |
+| `scripts/drive.ts` (this skill) | `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> \| --pr <number>] [--run <id>] <journey…\|all>` | UX journeys; `expectCalm`, `panel(page, heading)`, `inViewport(page, heading)` helpers |
 | `launch.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts [port]` | starts and waits for our dev server |
-| `doctor.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url>]` | read-only health and capability check |
+| `doctor.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> \| --pr <number>]` | read-only health and capability check |
 | `runner.ts` | imported from `../../verify-turnpoint/scripts/runner` | browser and device, preview bypass, step recorder, evidence layout |
 | `cleanup.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts` | stops our dev server, keeps evidence |
 
