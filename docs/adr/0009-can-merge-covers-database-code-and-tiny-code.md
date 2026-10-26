@@ -8,29 +8,34 @@ The reviewer agent reviewed #170, the PR behind 0008, after it merged. Its verdi
 
 The review found two more gaps. A PR's own tier line switched the reviewer off, whatever files the PR changed. The checkbox gate missed boxes in numbered and `+` lists, so an unticked criterion could pass.
 
+The review of the fix (#178) found that the tiny rule still let a PR change `CLAUDE.md`, `AGENTS.md` or `docs/workflow.md` with no review. Agents follow those files as rules. It also found three server actions off the list. Anyone can call a server action, and two of them spend Riot calls.
+
 ## Options considered
 
 1. Widen the risky list and keep trusting the tier line. A tiny PR labelled by mistake still skips all review.
-2. Widen the risky list, and let a tiny PR skip the reviewer only when every file it changes is a doc (`docs/` or a `.md` file).
+2. Widen the risky list, and let a tiny PR skip the reviewer only when every file it changes is a doc. The files agents follow as rules aren't docs.
 3. Make every PR that changes code normal. Each one would need a ticket and acceptance criteria, which is more than a one-line copy fix needs.
+4. Option 2, with `CLAUDE.md`, `AGENTS.md` and `docs/workflow.md` on the risky list too. `CLAUDE.md` changed in 50 of the last 60 merges to main, so almost every PR would be Jasper's to merge.
 
 ## Decision
 
 Option 2:
-- The risky list also covers `src/lib/*-store.ts`, `src/lib/my-player.ts`, `scripts/remap-puuids`, `scripts/collect-benchmarks`, `src/lib/mcp/`, `.claude/skills/` and `.claude/rules/`.
-- A tiny PR skips the reviewer only when it changes nothing but docs. A tiny PR that changes code needs the reviewer's "no blockers" line at its head commit.
-- Any box that isn't `[x]`, in any list GitHub renders, counts as unticked.
-- `can-merge` checks only that each criterion is ticked. The reviewer checks that each one has a screenshot or a test name, because a code check of free text would refuse good evidence or accept bad.
+- The risky list also covers `src/lib/*-store.ts`, `src/lib/my-player.ts`, `scripts/remap-puuids`, `scripts/collect-benchmarks`, `src/lib/mcp/`, the three server actions, `.claude/skills/` and `.claude/rules/`.
+- A test in `scripts/risky-paths.test.ts` fails when a server action or a file that imports `@/db` is off the list, unless the test names why it's safe. A store under a new name can't merge as normal code.
+- A tiny PR skips the reviewer only when it changes nothing but docs. `CLAUDE.md` and `AGENTS.md` in any folder, `docs/workflow.md`, and the files in `.claude/` and `.cursor/` aren't docs. A tiny PR that changes anything else needs the reviewer's "no blockers" line at its head commit.
+- Any box that isn't `[x]`, in any list GitHub renders, nested or quoted, counts as unticked.
+- `can-merge` checks only that each criterion is ticked. The reviewer checks that each one has a screenshot or a test name, because a code check of free text would refuse good evidence or accept bad. `.claude/agents/reviewer.md` asks it to.
 
 ## Consequences
 
 Good:
-- Database code, the MCP server's cap on Riot calls, and the reviewer's own instructions are Jasper's to merge again, whatever the tier says.
-- Claude Code merges no change to code without a second look.
+- Database code, server actions, the MCP server's cap on Riot calls, and the reviewer's agent file, skills and rules are Jasper's to merge again, whatever the tier says.
+- Claude Code merges no change to code, or to the rules agents follow, without a second look.
 
 Bad:
 - A tiny copy fix in a component waits for one reviewer run before it merges.
-- The risky list is still a list. A new folder that writes rows can merge until someone adds it. `.claude/rules/database.md` names the same database paths, so the two lists can drift apart.
+- An agent can still change `CLAUDE.md`, `AGENTS.md` or `docs/workflow.md` with only the reviewer's look, not Jasper's.
+- The risky list is still a list. The test catches server actions and database imports, not every kind of risk. Caps on Riot calls inside pages, such as the log page's `TIMELINES_PER_VIEW`, stay off it, and the rate limiter in `src/lib/riot/` still bounds the total. `.claude/rules/database.md` names the same database paths, so the two lists can drift apart.
 - A tier line that says "risky" anywhere, such as "nothing on the risky list", is refused as naming two tiers. That is safe, but the builder has to keep tier words out of the reason.
 
 ## In my words

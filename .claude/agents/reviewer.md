@@ -32,6 +32,8 @@ starts more agents.
 
 Check in this order:
 1. Each acceptance criterion: met, not met, or untestable, with file:line evidence.
+   Say whether the PR names a screenshot or a test for it, since `can-merge` checks
+   only that its box is ticked.
 2. Inputs that break it: remakes, games under 15 minutes, missing timeline frames,
    a player who left, ARAM or Arena, no lane opponent, an expired Riot key.
 3. Project rules that lint can't check: "server-only" on modules with secrets
