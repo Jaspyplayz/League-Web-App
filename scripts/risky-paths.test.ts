@@ -11,15 +11,20 @@ const repoFiles = execFileSync("git", ["ls-files", "--cached", "--others", "--ex
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
 
-// A "use server" directive, or an import of src/db/ by the @/ alias or a
-// relative path, in either quote, as a re-export or a dynamic import.
+// A "use server" directive, an import of the Postgres client or Drizzle, or an
+// import of src/db/ by the @/ alias or a relative path, in either quote, as a
+// re-export or a dynamic import.
 function talksToDatabaseOrCallers(source: string): boolean {
   if (/^\s*["']use server["']/m.test(source)) return true;
+  if (/["'](?:postgres|drizzle-orm(?:\/[^"']*)?)["']/.test(source)) return true;
   const imports = source.matchAll(/["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)(db(?:\/[^"']*)?)["']/g);
   return [...imports].some((match) => !PURE_DB_MODULES.has(match[1]));
 }
 
 const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !/\.test\./.test(file);
+
+// Next.js serves every route.ts as a public endpoint, like a server action.
+const isRoute = (file: string) => /(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$/.test(file);
 
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
@@ -80,6 +85,18 @@ describe("riskyFiles", () => {
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
+  // Windows ignores case, so on Jasper's PC these land on the risky files.
+  it("flags a risky path spelled with other capitals", () => {
+    const paths = [".claude/Settings.json", "src/DB/schema.ts", "scripts/Remap-puuids-db.ts"];
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // Claude Code and Cursor load skills and rules from these folders too (JAS-12).
+  it("flags agent skills and rules below the repo root", () => {
+    const paths = ["src/lib/.claude/rules/database.md", "docs/.claude/skills/x/SKILL.md", "src/.cursor/rules/x.mdc"];
+    expect(riskyFiles(paths)).toEqual(paths.map((path) => ({ path, why: "agent skills or rules below the repo root" })));
+  });
+
   it("passes docs, pages and components outside the list", () => {
     expect(
       riskyFiles([
@@ -104,15 +121,24 @@ describe("riskyFiles", () => {
 
   // Anyone can call a server action, and a store under a new name would
   // otherwise merge as normal code (JAS-12).
-  it("covers every server action and every file that imports the database", () => {
+  it("covers every route, every server action and every file that imports the database", () => {
     const unlisted = repoFiles.filter(
       (file) =>
         isSourceFile(file) &&
         existsSync(file) &&
         riskyFiles([file]).length === 0 &&
-        talksToDatabaseOrCallers(readFileSync(file, "utf8")),
+        (isRoute(file) || talksToDatabaseOrCallers(readFileSync(file, "utf8"))),
     );
     expect(unlisted).toEqual([]);
+  });
+
+  it.each([
+    ["src/app/notes/route.ts", true],
+    ["src/app/api/mcp/route.ts", true],
+    ["src/app/notes/page.tsx", false],
+    ["src/lib/reroute.ts", false],
+  ])("counts %s as a route: %s", (file, route) => {
+    expect(isRoute(file)).toBe(route);
   });
 
   it.each([
@@ -124,6 +150,9 @@ describe("riskyFiles", () => {
     'import { getDb } from "../src/db";',
     'export { getDb } from "@/db";',
     'const { getDb } = await import("@/db");',
+    'import postgres from "postgres";',
+    'import { eq } from "drizzle-orm";',
+    'import { drizzle } from "drizzle-orm/postgres-js";',
     'import { secondsUntilUpdate } from "@/db/freshness";\nimport { getDb } from "@/db";',
   ])("spots %s as a server action or database import", (source) => {
     expect(talksToDatabaseOrCallers(`// a file\n${source}\n`)).toBe(true);

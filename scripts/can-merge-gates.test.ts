@@ -116,6 +116,10 @@ describe("decide", () => {
     "src/components/docs/notes.md",
     "docs/notes.test.ts",
     "docs/run.ts",
+    "docs/.claude/skills/x/SKILL.md",
+    "docs/adr/.cursor/rules/x.md",
+    "docs/Workflow.md",
+    "Docs/workflow.md",
   ])("refuses a tiny PR that changes %s without the reviewer", (file) => {
     const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
     expect(failed(decide(pr({ body: tiny, files: ["docs/habits.md", file] }), main()))).toEqual([
