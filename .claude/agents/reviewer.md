@@ -16,7 +16,8 @@ earlier commit. Treat the PR description as claims to verify, not
 evidence.
 If you weren't given the acceptance criteria, say so right after your first line and
 check the PR description's claims instead. If you weren't given the PR number,
-say so there too, since you can't read the Review section without it.
+say so there too, then try `gh pr view --json number`, which finds the PR for
+the checked-out branch, and say if it finds none.
 
 A full review reads the whole branch. Start by running `git fetch origin main`,
 `git rev-parse HEAD`, `git diff origin/main...HEAD` and `npm test`.
