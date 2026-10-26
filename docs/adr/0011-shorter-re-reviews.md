@@ -22,12 +22,12 @@ Option 2:
 - Before it narrows anything, the reviewer checks all of these, and does a full review if any fails:
   - the earlier commit is an ancestor of the head, with no merge since;
   - it is the commit on the last "Reviewer agent at" line in the PR's Review section;
-  - the reviewer's report starts with that line, lists as many blockers as it counts, and has fewer than 7 findings, since a report at the cap may have left some out;
+  - the reviewer's report starts with that line and lists as many blockers as it counts, and every report has fewer than 7 findings, since a report at the cap may have left some out;
   - the Review section lists the same findings as the reports, none missing on either side, and answers each one;
   - the new commits only answer those findings.
-- Otherwise it reads `git diff <since>..HEAD`, the code that calls what changed, and the docs and rules a full review would read for those files. It judges each answer and still runs `npm test` at the head. It checks each acceptance criterion whose code, test or screenshot page the new commits touch, and every box as GitHub shows it now.
+- Otherwise it reads `git diff <since>..HEAD`, the code that calls what changed, and the docs and rules a full review would read for those files. It judges every file the branch changes by main's rules, so a branch that edits the review rules is judged by main's copy in every round. It judges each answer and still runs `npm test` at the head. It checks each acceptance criterion whose code, test or screenshot page the new commits touch, and every box as GitHub shows it now.
 - Its first line is `Reviewer agent at <sha>: no blockers (re-review since <first 7 characters of the earlier commit>)`. The gate in `scripts/can-merge-gates.ts` reads the head commit's verdict the same way whatever follows it, so the gate's code doesn't change. A test in `scripts/can-merge-gates.test.ts` holds that.
-- Claude starts every review pass it runs, the reviewer and any security or comment check, on the same head commit, so one fix round answers all of them. Their findings all go in the Review section, and only the reviewer agent's verdict starts with "Reviewer agent at". A security check runs again on the new head when the fix commits touch secrets, sign-in, `src/app/api/` or user input.
+- Claude starts every review pass it runs, the reviewer and any security or comment check, on the same head commit, so one fix round answers all of them. Their findings all go in the Review section. Only the reviewer agent's verdict says "Reviewer agent at", and `AGENTS.md` tells any other reviewer, such as Grok in Cursor, to start with "Second review (<model>) at <sha>:". A fix for something the builder found itself isn't in any report, so the next review after it is a full one. A security check runs again on the new head when the fix commits touch secrets, sign-in, `src/app/api/` or user input.
 - The exact checks live in `.claude/agents/reviewer.md`. `docs/workflow.md` summarizes them and links there, so the two can't disagree.
 
 ## Consequences
@@ -35,13 +35,13 @@ Option 2:
 Good:
 - A fix round should cost about half a full review. That's a guess from one focused review on JAS-16, which was a hand-written brief, not this exact procedure.
 - The first review still reads the whole branch. CI, the smoke test and `npm test` still run on every commit.
-- A finding missing from the brief or from the Review section's answers sends the re-review back to a full review, so a fix round can't quietly drop one by mistake.
+- A finding missing from either the brief or the Review section sends the re-review back to a full review.
 - The verdict line says what the review covered, so anyone reading the PR can tell a re-review from a full one.
 
 Bad:
 - A fix that breaks code far from what it changed gets a lighter look. The reviewer reads the callers of what changed and the tests run, but nothing reads the rest of the branch again.
 - The reviewer decides whether the new commits only answer findings. If a builder slips new work into a fix commit, only the reviewer can catch it.
-- The re-review trusts the builder to pass the reports and record the findings as they were. A builder set on hiding a finding could leave it out of both. The gate doesn't check that a full review came first. It's the same bar as 0010: it stops mistakes, not someone set on getting around it.
+- A finding missing from both the brief and the Review section isn't caught, whether by mistake, such as a forgotten security pass or a should-fix lost in copying, or on purpose. The gate doesn't check that a full review came first either. It's the same bar as 0010: it stops many mistakes, not someone set on getting around it. Putting the number of findings in the verdict line would catch a lost should-fix. It was left out because it changes the line every PR uses.
 - A security check runs again only when the fix commits touch secrets, sign-in, API routes or user input. A fix elsewhere that brings in a security problem relies on the re-review's security check.
 - A report at the 7-finding cap, a session that lost the earlier reports, and a PR another tool reviewed all get a full review, so they save nothing.
 
