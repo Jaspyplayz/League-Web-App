@@ -11,10 +11,12 @@ const repoFiles = execFileSync("git", ["ls-files", "--cached", "--others", "--ex
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
 
-// A "use server" directive, an import of the Postgres client or Drizzle, or an
-// import of src/db/ by the @/ alias or a relative path, in either quote, as a
-// re-export or a dynamic import.
-function talksToDatabaseOrCallers(source: string): boolean {
+// A file that belongs on the risky list: a route, which Next.js serves as a
+// public endpoint; a "use server" file; or one that imports the Postgres
+// client, Drizzle, or src/db/ by the @/ alias or a relative path, in either
+// quote, as a re-export or a dynamic import.
+function mustBeListed(file: string, source: string): boolean {
+  if (/(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$/.test(file)) return true;
   if (/^\s*["']use server["']/m.test(source)) return true;
   if (/["'](?:postgres|drizzle-orm(?:\/[^"']*)?)["']/.test(source)) return true;
   const imports = source.matchAll(/["'](?:@\/|(?:\.\.?\/)+(?:src\/)?)(db(?:\/[^"']*)?)["']/g);
@@ -22,9 +24,6 @@ function talksToDatabaseOrCallers(source: string): boolean {
 }
 
 const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !/\.test\./.test(file);
-
-// Next.js serves every route.ts as a public endpoint, like a server action.
-const isRoute = (file: string) => /(^|\/)route\.(?:[cm]?[jt]s|[jt]sx)$/.test(file);
 
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
@@ -127,7 +126,7 @@ describe("riskyFiles", () => {
         isSourceFile(file) &&
         existsSync(file) &&
         riskyFiles([file]).length === 0 &&
-        (isRoute(file) || talksToDatabaseOrCallers(readFileSync(file, "utf8"))),
+        mustBeListed(file, readFileSync(file, "utf8")),
     );
     expect(unlisted).toEqual([]);
   });
@@ -138,7 +137,7 @@ describe("riskyFiles", () => {
     ["src/app/notes/page.tsx", false],
     ["src/lib/reroute.ts", false],
   ])("counts %s as a route: %s", (file, route) => {
-    expect(isRoute(file)).toBe(route);
+    expect(mustBeListed(file, "")).toBe(route);
   });
 
   it.each([
@@ -155,11 +154,11 @@ describe("riskyFiles", () => {
     'import { drizzle } from "drizzle-orm/postgres-js";',
     'import { secondsUntilUpdate } from "@/db/freshness";\nimport { getDb } from "@/db";',
   ])("spots %s as a server action or database import", (source) => {
-    expect(talksToDatabaseOrCallers(`// a file\n${source}\n`)).toBe(true);
+    expect(mustBeListed("src/lib/notes.ts", `// a file\n${source}\n`)).toBe(true);
   });
 
   it("lets a file import a module in src/db/ that never touches the database", () => {
-    expect(talksToDatabaseOrCallers('import { secondsUntilUpdate } from "@/db/freshness";\n')).toBe(false);
+    expect(mustBeListed("src/lib/notes.ts", 'import { secondsUntilUpdate } from "@/db/freshness";\n')).toBe(false);
   });
 
   it.each([

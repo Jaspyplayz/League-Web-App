@@ -66,17 +66,24 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "scripts/risky-paths", why: "this list" },
 ];
 
+// Windows ignores case, so src/DB/schema.ts would land on src/db/schema.ts.
 export function matchesPattern(pattern: string, path: string): boolean {
-  const star = pattern.indexOf("*");
-  if (star === -1) return path.startsWith(pattern);
-  const head = pattern.slice(0, star);
-  const tail = pattern.slice(star + 1);
-  return path.length >= head.length + tail.length && path.startsWith(head) && path.endsWith(tail);
+  const [lowerPattern, lowerPath] = [pattern.toLowerCase(), path.toLowerCase()];
+  const star = lowerPattern.indexOf("*");
+  if (star === -1) return lowerPath.startsWith(lowerPattern);
+  const head = lowerPattern.slice(0, star);
+  const tail = lowerPattern.slice(star + 1);
+  return lowerPath.length >= head.length + tail.length && lowerPath.startsWith(head) && lowerPath.endsWith(tail);
 }
+
+// Claude Code and Cursor also load skills and rules from a .claude/ or
+// .cursor/ folder below the root.
+const NESTED_AGENT_CONFIG = /\/\.(claude|cursor)\//i;
 
 export function riskyFiles(paths: readonly string[]): { path: string; why: string }[] {
   return paths.flatMap((path) => {
     const match = RISKY_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
-    return match ? [{ path, why: match.why }] : [];
+    if (match) return [{ path, why: match.why }];
+    return NESTED_AGENT_CONFIG.test(path) ? [{ path, why: "agent skills or rules below the repo root" }] : [];
   });
 }

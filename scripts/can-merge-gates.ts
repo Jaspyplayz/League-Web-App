@@ -131,14 +131,19 @@ type Result = { pass: boolean; detail: string };
 
 // A PR names its own tier, so tiny skips the reviewer only when every file it
 // changes is a doc: a .md file or image in docs/, or the root README.md or
-// ARCHITECTURE.md. Agents follow docs/workflow.md and any CLAUDE or AGENTS
-// file as rules, so those aren't docs (JAS-12).
-const isDoc = (path: string) =>
-  path === "README.md" ||
-  path === "ARCHITECTURE.md" ||
-  (/^docs\/.*\.(md|png|jpe?g|gif|webp)$/i.test(path) &&
-    path !== "docs/workflow.md" &&
-    !/(^|\/)(claude|agents)[^/]*\.md$/i.test(path));
+// ARCHITECTURE.md. Agents follow docs/workflow.md, any CLAUDE or AGENTS file
+// and anything in a dot folder as rules, so those aren't docs. Windows ignores
+// case, so this does too (JAS-12).
+function isDoc(path: string): boolean {
+  const lower = path.toLowerCase();
+  if (lower === "readme.md" || lower === "architecture.md") return true;
+  return (
+    /^docs\/.*\.(md|png|jpe?g|gif|webp)$/.test(lower) &&
+    lower !== "docs/workflow.md" &&
+    !/(^|\/)\./.test(lower) &&
+    !/(^|\/)(claude|agents)[^/]*\.md$/.test(lower)
+  );
+}
 
 const pass = (detail: string): Result => ({ pass: true, detail });
 const fail = (detail: string): Result => ({ pass: false, detail });

@@ -116,8 +116,6 @@ describe("decide", () => {
     "src/components/docs/notes.md",
     "docs/notes.test.ts",
     "docs/run.ts",
-    "docs/.claude/skills/x/SKILL.md",
-    "docs/adr/.cursor/rules/x.md",
     "docs/Workflow.md",
     "Docs/workflow.md",
   ])("refuses a tiny PR that changes %s without the reviewer", (file) => {
@@ -126,6 +124,17 @@ describe("decide", () => {
       "Reviewer cleared the head commit",
     ]);
   });
+
+  it.each(["docs/.claude/skills/x/SKILL.md", "docs/adr/.cursor/rules/x.md"])(
+    "refuses a tiny PR that changes %s as risky and unreviewed",
+    (file) => {
+      const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
+      expect(failed(decide(pr({ body: tiny, files: [file] }), main()))).toEqual([
+        "No risky files",
+        "Reviewer cleared the head commit",
+      ]);
+    },
+  );
 
   // A PR names its own tier, so a tiny one that changes code still gets the reviewer (JAS-12).
   it("refuses a tiny PR that changes code without the reviewer, and names the file", () => {
