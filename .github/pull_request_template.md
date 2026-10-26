@@ -15,7 +15,7 @@ findings, each fixed (with the test that shows it) or rejected (with the
 evidence). Risky PRs: the Grok 4.7 review from the Cursor chat too, starting
 `Second review (Grok 4.7) at <sha>:`. Any other check gets its own line too,
 such as `Security check at <sha>: no findings`. Keep each review's findings
-under its line.
+under its line, and use that `<name> at <sha>:` shape only for reviews.
 
 ## Docs and decisions touched
 The docs/ or docs/adr/ files this changes, or "none".
