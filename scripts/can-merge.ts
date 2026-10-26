@@ -12,6 +12,7 @@
 import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { z } from "zod";
+import { changedPaths } from "./can-merge-files";
 import {
   decide,
   MERGE_MARKER,
@@ -85,12 +86,10 @@ function readPr(number: string): Pr {
   if (fetched !== view.headRefOid) {
     throw new Error(`#${number} changed while checking (${view.headRefOid} became ${fetched}). Run can-merge again.`);
   }
-  // Three dots is what the PR shows. Without rename detection, a moved file
-  // lists its old path too, so moving a file out of src/db/ is still risky.
   // GitHub's base commit also covers a merged PR, whose head is already in main.
-  const changedSince = (base: string) =>
-    paths(run("git", ["diff", "--name-only", "--no-renames", "-z", `${base}...${view.headRefOid}`]));
-  const files = [...new Set([...changedSince("origin/main"), ...changedSince(view.baseRefOid)])];
+  const files = [
+    ...new Set([...changedPaths("origin/main", view.headRefOid), ...changedPaths(view.baseRefOid, view.headRefOid)]),
+  ];
   return {
     number: view.number,
     title: view.title,
