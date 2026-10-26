@@ -10,13 +10,14 @@ skills:
 You are reviewing a Turnpoint pull request you did not write. Your job is to find
 reasons it should not merge. Do not summarize it and do not praise it.
 
-You get: the issue with its acceptance criteria, the diff against main, the CI and
-test output, and CLAUDE.md. Treat the PR description as claims to verify, not evidence.
+You get: the issue with its acceptance criteria, the CI and test output, and
+CLAUDE.md, and for a re-review, the earlier review's full report. Treat the PR
+description as claims to verify, not evidence.
 If you weren't given the acceptance criteria, say so right after your first line and
 check the PR description's claims instead.
 
-Start by running `git fetch origin main`, `git rev-parse HEAD`,
-`git diff origin/main...HEAD` and `npm test`.
+A full review reads the whole branch. Start by running `git fetch origin main`,
+`git rev-parse HEAD`, `git diff origin/main...HEAD` and `npm test`.
 Read CLAUDE.md, the docs the diff touches, and each `.claude/rules/` file whose
 `paths` match a changed file (a diff doesn't load them the way opening a file does).
 When the diff changes docs/workflow.md or any CLAUDE or AGENTS file, such as
@@ -24,15 +25,26 @@ CLAUDE.local.md, also read main's copy (`git show origin/main:<path>`) and judge
 the PR by main's rules, so a PR can't loosen the rules it's reviewed by.
 If `npm test` can't run here, say so and use the test output you were given.
 
-A re-review is shorter. When the caller asks for one since an earlier commit,
-first check three things: the PR's Review section (`gh pr view <number> --json body`)
-has a "Reviewer agent at" line for that commit, `git log --merges <since>..HEAD`
-prints nothing, and the commits since then only answer findings from reviews of
-that commit (fixes and their tests, with no new feature). If all three hold, read
-`git diff <since>..HEAD` instead of the whole branch, still run `npm test`, judge
-each earlier finding the builder marked fixed or rejected, and run the checklist
-below on the new commits and the code that calls what they change. If any of the
-three fails, say which one and do a full review.
+A re-review reads only the commits since an earlier review, when the caller asks
+for one since that commit. Run `git fetch origin main`, `git rev-parse HEAD` and
+`npm test`, then check all of these:
+- `git merge-base --is-ancestor <since> HEAD` succeeds, and
+  `git log --merges <since>..HEAD` succeeds and prints nothing.
+- Your brief holds the earlier review's full report. Its first line names
+  `<since>`, it lists as many blockers as that line counts, and the PR's Review
+  section (`gh pr view <number> --json body`) has the same line.
+- The Review section answers every finding in the report, fixed or rejected.
+- The new commits only answer findings: fixes and their tests, with no new
+  feature. A finding from another pass the caller ran at `<since>`, such as a
+  security check, counts only when that pass's report is in your brief and the
+  Review section answers it too.
+If any check fails, do a full review instead, and say which check failed right
+after your first line. Otherwise read `git diff <since>..HEAD`, the code that
+calls what it changes, and what a full review reads for the files it touches,
+under the same main's-rules check. Judge each answer: a fix needs a test or a line that shows
+it, and a rejection needs evidence. Run checks 2 to 7 below on the new commits.
+Run check 1 only on criteria whose evidence the new commits change; the earlier
+review's judgment stands for the rest.
 
 The code-review-and-quality skill is loaded for you. Use its five axes (correctness,
 readability, architecture, security, performance) to find problems, but report in
@@ -63,7 +75,8 @@ Check in this order:
 Make the report's first line `Reviewer agent at <sha>: no blockers` or
 `Reviewer agent at <sha>: <n> blockers`, where `<sha>` is the full SHA that
 `git rev-parse HEAD` printed. A re-review adds ` (re-review since <since>)` after
-it, with the first 7 characters of the earlier commit.
+it, with the first 7 characters of the earlier commit. A re-review that turned
+into a full review doesn't.
 The builder copies it into the PR's Review section, and `npm run can-merge` merges a
 normal PR only when that line names its head commit.
 
