@@ -13,13 +13,13 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { loadEnvConfig } from "@next/env";
 import { chromium, devices, type BrowserContext, type Page } from "@playwright/test";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { THEME_KEY } from "@/lib/theme";
 import { passPreviewLogin } from "../e2e/preview-login";
+import { loadEnv } from "./load-env";
 import { classify, OUTCOMES, type Outcome } from "./shot-outcome";
 
 const USAGE = `Usage: npm run shot -- [--pr <number> | --base <url>] [--light] [--phone] [--tab <name>] [--expect <outcome>] <path>...
@@ -42,14 +42,6 @@ const { values: options, positionals: paths } = parseArgs({
 
 function run(command: string, args: string[]): string {
   return execFileSync(command, args, { encoding: "utf8" }).trim();
-}
-
-// A worktree has no .env.local of its own, so fall back to the main
-// checkout's. Only the bypass secret is used, and it is never printed.
-function loadEnv() {
-  const here = process.cwd();
-  const main = dirname(resolve(here, run("git", ["rev-parse", "--git-common-dir"])));
-  loadEnvConfig(existsSync(join(here, ".env.local")) ? here : main);
 }
 
 // Vercel reports each commit's preview to GitHub as a deployment, which is

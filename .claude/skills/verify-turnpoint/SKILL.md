@@ -20,7 +20,7 @@ Turnpoint's data pages need secrets a fresh checkout doesn't have. Pick the targ
 | Local dev server, no `.env.local` | `launch.ts` (default `http://127.0.0.1:3100`) | `needs: nothing` only: home page, search form validation, Settings. Every data page shows "The site's Riot API key isn't working". |
 | Local dev server with `.env.local` | same; `.env.local` must hold `RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY` (see `.env.example`) | everything. Never copy secrets into the repo or a worktree; Jasper owns `.env.local`. |
 | Live site | `--base https://league-web-app.vercel.app` | everything, as `main` shows it now. Read-only journeys only. A "before" for a change. |
-| PR preview | `--base https://<preview>.vercel.app` with `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment | everything, for that PR. The secret is sent only to the preview's own origin (`e2e/preview-login.ts`). Without it every page is `vercel-login`; only Jasper can add it. Find the preview URL with `gh pr view <n> --json statusCheckRollup` or the Vercel bot comment. |
+| PR preview | `--base https://<preview>.vercel.app` | everything, for that PR. The scripts read `VERCEL_AUTOMATION_BYPASS_SECRET` from the environment, else from `.env.local` (a worktree falls back to the main checkout's, as `npm run shot` does). The secret is sent only to the preview's own origin (`e2e/preview-login.ts`). Without it every page is `vercel-login`; only Jasper can add it. Find the preview URL with `gh pr view <n> --json statusCheckRollup` or the Vercel bot comment. |
 
 ## Launch
 
@@ -32,7 +32,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts 3101     # another por
 - Needs `node_modules`, so run `npm ci` once in a fresh checkout. A worktree needs its own install: with `node_modules` linked to another checkout, Turbopack stops with "Could not find the Next.js package" and the home page never renders. Starts `next dev -p <port> -H 127.0.0.1` in the background, in its own process group on Linux and macOS. It works the same on Windows, from PowerShell or Git Bash.
 - Ready = the log says `Ready in` AND `GET /` returns HTML containing "Find the minute" (the first request compiles the page; ~10 s on the box). It prints `ready: http://127.0.0.1:3100 (pid …, log .cache/verify-turnpoint-server/dev-3100.log)`.
 - State goes to `.cache/verify-turnpoint-server/instance.json` in the checkout (git-ignored); `drive.ts` and `doctor.ts` use its `base` when you pass no `--base`.
-- Refuses port 3000 (may be Jasper's own server), a port someone else holds, and a second launch while an earlier instance is alive.
+- Refuses port 3000 (may be Jasper's own server), a port someone else holds, and a second launch while the server it started earlier still runs.
 - No database migrations or seed step: the app reads Supabase Postgres through `DATABASE_URL`; the sample game `KR_8416261221` already lives there. Never run `npm run db:migrate`.
 - Isolation: one dev server per checkout (`next dev` locks `.next/dev`). For two side-by-side instances use two git worktrees, each with its own port. Remote targets (live, preview) need no launch and can be driven in parallel.
 - Playwright's Chromium: if a run says the browser is missing, run `npx playwright install chromium` once.
@@ -108,7 +108,7 @@ Location (git-ignored, survives cleanup): `.cache/verify-turnpoint/<run id>/`
 npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts
 ```
 
-Stops only the server `launch.ts` recorded and its children: its process group on Linux and macOS (TERM, then KILL after 10 s), its process tree on Windows (`taskkill /T /F`). Then it removes the state file and dev log, checks the port is free, and lists the kept evidence folders. Never `pkill node` / kill by name: Jasper's server and other agents' servers are `node` too. It never touches `.cache/verify-turnpoint/`. Run it after every failed attempt as well. Remote targets need no cleanup.
+Stops only the server `launch.ts` recorded and its children: its process group on Linux and macOS (TERM, then KILL after 10 s), its process tree on Windows (`taskkill /T /F`). It first checks that the recorded PID still runs this checkout's `next dev` on the recorded port. When it doesn't, the server died without cleanup and the PID may belong to another process now, so it stops nothing and says `nothing stopped`. Then it removes the state file and dev log, checks the port is free, and lists the kept evidence folders. Never `pkill node` / kill by name: Jasper's server and other agents' servers are `node` too. It never touches `.cache/verify-turnpoint/`. Run it after every failed attempt as well. Remote targets need no cleanup.
 
 ## Helpers
 

@@ -6,7 +6,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { INSTANCE_DIR, isAlive, portAnswers, readInstance, sleep, STATE_FILE, type Instance } from "./instance";
+import { INSTANCE_DIR, isOurs, nextBin, portAnswers, readInstance, serverArgs, sleep, STATE_FILE, type Instance } from "./instance";
 
 const port = Number(process.argv[2] ?? process.env.PORT ?? 3100);
 const root = process.cwd();
@@ -27,11 +27,11 @@ async function homeRenders(): Promise<boolean> {
 async function launch(): Promise<number> {
   if (port === 3000) return refuse("refusing port 3000: it may be Jasper's own server");
   const earlier = readInstance();
-  if (earlier && isAlive(earlier.pid)) {
+  if (earlier && isOurs(earlier)) {
     return refuse(`an instance from an earlier run is still up (pid ${earlier.pid}, ${earlier.base}). Run cleanup.ts first, or drive it after doctor.ts.`);
   }
   if (await portAnswers(port)) return refuse(`port ${port} is already taken by someone else; pick another: launch.ts 3101`);
-  const next = join(root, "node_modules/next/dist/bin/next");
+  const next = nextBin(root);
   if (!existsSync(next)) return refuse("node_modules/next is missing: run npm ci first");
   if (!existsSync(join(root, ".env.local"))) {
     console.log("note: no .env.local, so no RIOT_API_KEY, DATABASE_URL or Supabase. Only journeys that need 'nothing' can pass here; drive the live site or a preview for the rest.");
@@ -42,7 +42,7 @@ async function launch(): Promise<number> {
   // detached gives the server its own process group on Linux and macOS, so
   // cleanup.ts stops it and its children and nothing else. On Windows,
   // cleanup.ts stops its process tree.
-  const server = spawn(process.execPath, [next, "dev", "-p", String(port), "-H", "127.0.0.1"], {
+  const server = spawn(process.execPath, [next, ...serverArgs(port)], {
     cwd: root,
     detached: true,
     stdio: ["ignore", out, out],

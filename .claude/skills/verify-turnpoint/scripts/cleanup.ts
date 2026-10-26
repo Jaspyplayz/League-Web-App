@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { isAlive, portAnswers, readInstance, sleep, STATE_FILE } from "./instance";
+import { isAlive, isOurs, portAnswers, readInstance, sleep, STATE_FILE } from "./instance";
 
 function stopGroup(pid: number, signal: NodeJS.Signals) {
   try {
@@ -22,9 +22,10 @@ async function cleanup(): Promise<number> {
     return 0;
   }
   const { pid, port, log, root } = instance;
-  if (process.platform === "win32") {
-    if (isAlive(pid)) execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
-  } else {
+  const ours = isOurs(instance);
+  if (ours && process.platform === "win32") {
+    execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+  } else if (ours) {
     stopGroup(pid, "SIGTERM");
     for (let second = 0; second < 10 && isAlive(pid); second++) await sleep(1_000);
     stopGroup(pid, "SIGKILL");
@@ -32,12 +33,16 @@ async function cleanup(): Promise<number> {
   rmSync(STATE_FILE, { force: true });
   rmSync(log, { force: true });
 
-  for (let second = 0; second < 5 && (await portAnswers(port)); second++) await sleep(1_000);
-  if (await portAnswers(port)) {
-    console.log(`WARNING: port ${port} still answers`);
-    return 1;
+  if (!ours) {
+    console.log(`nothing stopped: pid ${pid} no longer runs the server launch.ts started, so the state file was stale. Removed it.`);
+  } else {
+    for (let second = 0; second < 5 && (await portAnswers(port)); second++) await sleep(1_000);
+    if (await portAnswers(port)) {
+      console.log(`WARNING: port ${port} still answers`);
+      return 1;
+    }
+    console.log(`stopped pid ${pid} and its children, port ${port} free`);
   }
-  console.log(`stopped pid ${pid} and its children, port ${port} free`);
   const evidence = join(root, ".cache/verify-turnpoint");
   console.log(`evidence kept: ${evidence}`);
   try {

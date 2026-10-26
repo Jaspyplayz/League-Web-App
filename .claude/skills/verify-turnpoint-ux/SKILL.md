@@ -20,7 +20,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts          # http://127.
 Pick the target from the journey's `needs:`:
 
 - `needs: nothing` (`ux-search-recovery`, `ux-phone-home`): the local dev server works with no `.env.local`.
-- `database`, `riot`, `supabase`: the local server needs `.env.local` (`RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`). Without it, use the live site (`--base https://league-web-app.vercel.app`, what `main` shows now) or a PR preview (`--base https://<preview>.vercel.app` with `VERCEL_AUTOMATION_BYPASS_SECRET` set; only Jasper can add it).
+- `database`, `riot`, `supabase`: the local server needs `.env.local` (`RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`). Without it, use the live site (`--base https://league-web-app.vercel.app`, what `main` shows now) or a PR preview (`--base https://<preview>.vercel.app`, which needs `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment or `.env.local`; only Jasper can add it).
 
 Launch details (port rules, `npm ci`, the state file `.cache/verify-turnpoint-server/instance.json`, one server per checkout) are in `.claude/skills/verify-turnpoint/SKILL.md` → Launch. No migrations or seed step; never run `npm run db:migrate`.
 
@@ -31,7 +31,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts                       
 npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts --base https://league-web-app.vercel.app
 ```
 
-Require `home page ok`, `alive, so the port is ours` for a local target, and `ok` on each capability the journey needs (`sample game` = database, `player profile` = riot, `signed-out Ask` = supabase). `riot-key` means the Riot key is missing or expired; drive that journey elsewhere rather than weakening it.
+Require `home page ok`, `so the port is ours` for a local target, and `ok` on each capability the journey needs (`sample game` = database, `player profile` = riot, `signed-out Ask` = supabase). `riot-key` means the Riot key is missing or expired; drive that journey elsewhere rather than weakening it.
 
 ## Drive
 

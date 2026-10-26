@@ -12,6 +12,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { chromium, devices, expect, type Browser, type Page } from "@playwright/test";
 import { passPreviewLogin } from "../../../../e2e/preview-login";
+import { loadEnv } from "../../../../scripts/load-env";
 import { readInstance } from "./instance";
 
 export const LIVE = "https://league-web-app.vercel.app";
@@ -64,10 +65,12 @@ async function newPage(browser: Browser, base: string, phone: boolean): Promise<
     reducedMotion: "reduce",
   });
   const origin = new URL(base).origin;
-  // The bypass secret goes only to a preview's own origin, never the live site or localhost.
-  if (origin.endsWith(".vercel.app") && origin !== LIVE) await passPreviewLogin(context, origin);
+  if (isPreview(origin)) await passPreviewLogin(context, origin);
   return context.newPage();
 }
+
+// The bypass secret goes only to a preview's own origin, never the live site or localhost.
+export const isPreview = (origin: string) => origin.endsWith(".vercel.app") && origin !== LIVE;
 
 /** Fail fast with the page's own words when it is not the app working. */
 export async function assertAppPage(page: Page) {
@@ -106,6 +109,7 @@ export async function main(journeys: Journey[], usage: string) {
     process.exitCode = 1;
     return;
   }
+  if (isPreview(new URL(base).origin)) loadEnv();
   const runId = values.run ?? process.env.RUN_ID ?? new Date().toISOString().replace(/[:.]/g, "-");
   const runDir = join(evidenceRoot(), runId);
   mkdirSync(runDir, { recursive: true });

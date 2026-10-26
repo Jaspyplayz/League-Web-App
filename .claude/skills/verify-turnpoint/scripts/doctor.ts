@@ -7,8 +7,9 @@ import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
 import { passPreviewLogin } from "../../../../e2e/preview-login";
-import { isAlive, readInstance } from "./instance";
-import { defaultBase, ERROR_TEXTS, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, TEST_PLAYER } from "./runner";
+import { loadEnv } from "../../../../scripts/load-env";
+import { isOurs, readInstance } from "./instance";
+import { defaultBase, ERROR_TEXTS, isPreview, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, TEST_PLAYER } from "./runner";
 
 const { values } = parseArgs({ options: { base: { type: "string" } } });
 const base = (values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
@@ -39,22 +40,23 @@ async function run() {
       console.log(`instance: NOT OURS. Our instance is ${instance.base}.`);
       return 1;
     }
-    // next dev exits when its port is taken, so while our server's process is
-    // alive, the port is ours.
-    const alive = isAlive(instance.pid);
-    console.log(`instance: pid ${instance.pid} ${alive ? "alive, so the port is ours" : "DEAD"}, port ${instance.port}`);
+    // next dev exits when its port is taken, so while our server runs, the
+    // port is ours.
+    const ours = isOurs(instance);
+    console.log(`instance: pid ${instance.pid} ${ours ? "runs our next dev, so the port is ours" : "NOT OURS any more: our server exited. Run cleanup.ts"}, port ${instance.port}`);
     console.log(`env: .env.local ${existsSync(".env.local") ? "present" : "absent (no Riot key, database or Supabase)"}`);
-    if (!alive) return 1;
+    if (!ours) return 1;
   } else if (base === LIVE) {
     console.log("instance: live site (what main shows now). Read-only journeys only; each profile load spends Riot requests.");
   } else {
+    loadEnv();
     console.log(`instance: preview. bypass secret ${process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? "set" : "NOT set (expect vercel-login)"}`);
   }
 
   const browser = await chromium.launch();
   const context = await browser.newContext({ baseURL: base });
   const origin = new URL(base).origin;
-  if (origin.endsWith(".vercel.app") && origin !== LIVE) await passPreviewLogin(context, origin);
+  if (isPreview(origin)) await passPreviewLogin(context, origin);
   const page = await context.newPage();
   const probe = async (path: string, want: string) => {
     try {
