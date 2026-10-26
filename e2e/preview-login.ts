@@ -16,3 +16,29 @@ export async function passPreviewLogin(context: BrowserContext, origin: string) 
     return route.continue({ headers });
   });
 }
+
+type Sent = { origin: string; secret: boolean };
+
+// Headers a route adds show up only once the request has gone out, so read
+// them when it finishes, not when it starts.
+export function recordSent(context: BrowserContext): () => Promise<Sent[]> {
+  const sent: Promise<Sent>[] = [];
+  context.on("requestfinished", (request) => {
+    const url = new URL(request.url());
+    if (!url.protocol.startsWith("http")) return;
+    sent.push(
+      request
+        .allHeaders()
+        .then((headers) => ({ origin: url.origin, secret: "x-vercel-protection-bypass" in headers })),
+    );
+  });
+  return () => Promise.all(sent);
+}
+
+// Playwright also adds a route's headers to the redirects a request follows,
+// so a redirect to another site would carry the secret there. This lists the
+// sites other than `origin` that got it.
+export function recordLeaks(context: BrowserContext, origin: string): () => Promise<string[]> {
+  const sent = recordSent(context);
+  return async () => [...new Set((await sent()).filter((r) => r.secret && r.origin !== origin).map((r) => r.origin))];
+}

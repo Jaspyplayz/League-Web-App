@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { isAlive, isOurs, portAnswers, readInstance, sleep, STATE_FILE } from "./instance";
+import { INSTANCE_DIR, isAlive, isOurs, portAnswers, readInstance, sleep } from "./instance";
 
 function stopGroup(pid: number, signal: NodeJS.Signals) {
   try {
@@ -21,17 +21,21 @@ async function cleanup(): Promise<number> {
     console.log("nothing to clean: no instance started by launch.ts");
     return 0;
   }
-  const { pid, port, log, root } = instance;
+  const { pid, port, root } = instance;
   const ours = isOurs(instance);
   if (ours && process.platform === "win32") {
-    execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+    try {
+      execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+    } catch {
+      // It exited after isOurs looked; the port check below still runs.
+    }
   } else if (ours) {
     stopGroup(pid, "SIGTERM");
     for (let second = 0; second < 10 && isAlive(pid); second++) await sleep(1_000);
     stopGroup(pid, "SIGKILL");
   }
-  rmSync(STATE_FILE, { force: true });
-  rmSync(log, { force: true });
+  // Holds only the state file and dev logs, so no path from the file is trusted.
+  rmSync(INSTANCE_DIR, { recursive: true, force: true });
 
   if (!ours) {
     console.log(`nothing stopped: pid ${pid} no longer runs the server launch.ts started, so the state file was stale. Removed it.`);

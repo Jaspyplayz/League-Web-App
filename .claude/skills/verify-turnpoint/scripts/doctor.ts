@@ -6,14 +6,13 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
-import { passPreviewLogin } from "../../../../e2e/preview-login";
-import { loadEnv, previewUrl } from "../../../../scripts/preview";
+import { passPreviewLogin, recordLeaks } from "../../../../e2e/preview-login";
+import { loadEnv } from "../../../../scripts/preview";
 import { isOurs, readInstance } from "./instance";
-import { defaultBase, ERROR_TEXTS, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, TEST_PLAYER } from "./runner";
+import { ERROR_TEXTS, LIVE, RIOT_KEY_NOTICE, SAMPLE_MATCH_PATH, TEST_PLAYER } from "./runner";
+import { pickTarget } from "./target";
 
 const { values } = parseArgs({ options: { base: { type: "string" }, pr: { type: "string" } } });
-const preview = values.pr ? new URL(previewUrl(values.pr)).origin : undefined;
-const base = (preview ?? values.base ?? process.env.BASE_URL ?? defaultBase())?.replace(/\/$/, "");
 
 function sh(cmd: string, args: string[]): string {
   try {
@@ -24,10 +23,12 @@ function sh(cmd: string, args: string[]): string {
 }
 
 async function run() {
-  if (!base) {
-    console.log("target: none. Run launch.ts, or pass --pr <number> or --base https://league-web-app.vercel.app");
+  const target = pickTarget(values);
+  if ("error" in target) {
+    console.log(target.error);
     return 1;
   }
+  const { base, preview } = target;
   console.log(`target: ${base}`);
   console.log(`checkout: ${sh("git", ["rev-parse", "--short", "HEAD"])} on ${sh("git", ["branch", "--show-current"])}`);
   const local = /^http:\/\/(127\.0\.0\.1|localhost)/.test(base);
@@ -59,6 +60,7 @@ async function run() {
   const browser = await chromium.launch();
   const context = await browser.newContext({ baseURL: base });
   if (preview) await passPreviewLogin(context, preview);
+  const leaked = preview ? recordLeaks(context, preview) : async () => [];
   const page = await context.newPage();
   const probe = async (path: string, want: string) => {
     try {
@@ -81,12 +83,14 @@ async function run() {
   const riot = await probe(TEST_PLAYER.path, "Recent matches");
   let supa = await probe(`${TEST_PLAYER.path}/ask`, "to ask questions");
   if (supa !== "ok" && riot === "ok") supa = `${supa}; Ask is off here (needs ANTHROPIC_API_KEY + Supabase + DATABASE_URL)`;
+  const leaks = await leaked();
   await browser.close();
   console.log(`home page            [needs: nothing]  ${home}`);
   console.log(`sample game          [needs: database] ${db}`);
   console.log(`player profile       [needs: riot]     ${riot}`);
   console.log(`signed-out Ask       [needs: supabase] ${supa}`);
-  return home === "ok" ? 0 : 1;
+  if (leaks.length) console.log(`LEAK: the bypass secret went to other sites: ${leaks.join(", ")}`);
+  return home === "ok" && !leaks.length ? 0 : 1;
 }
 
 run().then((code) => (process.exitCode = code));

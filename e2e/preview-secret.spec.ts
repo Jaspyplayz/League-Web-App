@@ -1,4 +1,5 @@
-import { expect, recordSent, test } from "./fixtures";
+import { expect, test } from "./fixtures";
+import { recordSent } from "./preview-login";
 
 // The fixture fails any test whose requests took the secret to another site.
 // This test checks that check has something to catch: the preview got the

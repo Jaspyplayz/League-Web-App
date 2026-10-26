@@ -15,9 +15,14 @@ export type Instance = { pid: number; port: number; base: string; log: string; r
 export const nextBin = (root: string) => join(root, "node_modules/next/dist/bin/next");
 export const serverArgs = (port: number) => ["dev", "-p", String(port), "-H", "127.0.0.1"];
 
+// A file cut short by a crash counts as no file, and the next launch replaces it.
 export function readInstance(): Instance | undefined {
   if (!existsSync(STATE_FILE)) return undefined;
-  return JSON.parse(readFileSync(STATE_FILE, "utf8")) as Instance;
+  try {
+    return JSON.parse(readFileSync(STATE_FILE, "utf8")) as Instance;
+  } catch {
+    return undefined;
+  }
 }
 
 // The state file outlives its server after a crash, a reboot or a session that

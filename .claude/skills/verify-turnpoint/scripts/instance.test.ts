@@ -11,9 +11,13 @@ const SCRIPTS = resolve(".claude/skills/verify-turnpoint/scripts");
 const TSX = resolve("node_modules/tsx/dist/cli.mjs");
 
 // Each test gets a checkout of its own, whose next binary is a stand-in that
-// serves the home page on its -p port and logs "Ready in", as next dev does.
-const FAKE_NEXT = `const port = Number(process.argv[process.argv.indexOf("-p") + 1]);
-require("node:http").createServer((_, res) => res.end("Find the minute")).listen(port, "127.0.0.1", () => console.log("Ready in 1ms"));
+// works like next dev: it forks a child that serves the home page on the -p
+// port and logs "Ready in". So stopping only the parent leaves the port taken.
+const FAKE_NEXT = `if (process.argv[2] === "serve") {
+  require("node:http").createServer((_, res) => res.end("Find the minute")).listen(Number(process.argv[3]), "127.0.0.1", () => console.log("Ready in 1ms"));
+} else {
+  require("node:child_process").fork(__filename, ["serve", process.argv[process.argv.indexOf("-p") + 1]]);
+}
 `;
 
 const roots: string[] = [];
@@ -36,8 +40,10 @@ function record(root: string, pid: number, port: number) {
   writeFileSync(stateFile(root), JSON.stringify({ pid, port, base: `http://127.0.0.1:${port}`, log, root }));
 }
 
+// Vitest sets BASE_URL to "/", which would pick the target before the state file.
 function run(script: string, root: string, ...args: string[]) {
-  const result = spawnSync(process.execPath, [TSX, join(SCRIPTS, script), ...args], { cwd: root, encoding: "utf8" });
+  const env = { ...process.env, BASE_URL: undefined };
+  const result = spawnSync(process.execPath, [TSX, join(SCRIPTS, script), ...args], { cwd: root, encoding: "utf8", env });
   return { code: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
@@ -59,13 +65,25 @@ async function listening(port: number) {
   for (let tries = 0; tries < 50 && !(await portAnswers(port)); tries++) await new Promise((r) => setTimeout(r, 100));
 }
 
+function stopTree(pid: number) {
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+  } else {
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  }
+}
+
 afterEach(() => {
   for (const root of roots) if (existsSync(stateFile(root))) run("cleanup.ts", root);
-  for (const child of children.splice(0)) child.kill();
+  for (const child of children.splice(0)) stopTree(child.pid!);
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 5 });
 });
 
-describe("launch.ts and cleanup.ts", () => {
+describe("the state file launch.ts writes", () => {
   it("launch starts a server, refuses a second one, and cleanup stops it", async () => {
     const { root } = checkout();
     const port = await freePort();
@@ -115,6 +133,16 @@ describe("launch.ts and cleanup.ts", () => {
     expect(code).toBe(0);
     expect(isAlive(server.pid!)).toBe(true);
     expect(await portAnswers(port)).toBe(true);
+  });
+
+  it("drive.ts refuses a state file whose server is no longer ours", async () => {
+    const { root } = checkout();
+    const other = start(["-e", "setInterval(() => {}, 1000)"], root);
+    record(root, other.pid!, await freePort());
+
+    const { code, out } = run("drive.ts", root, "home-lookup");
+    expect(out).toContain("is no longer the one launch.ts started");
+    expect(code).toBe(1);
   });
 
   it("launch starts a new server when the recorded PID belongs to another process", async () => {
