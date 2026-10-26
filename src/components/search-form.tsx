@@ -6,7 +6,7 @@ import { isRegion, REGIONS } from "@/lib/regions";
 import { parseRiotId } from "@/lib/riot-id";
 import { ArrowRightIcon } from "./icons";
 import { noteSearch, SavedPlayersMenu } from "./saved-players";
-import { panelClass } from "@/components/ui/panel";
+import { softPanelClass } from "@/components/ui/panel";
 
 const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
 
@@ -43,7 +43,7 @@ export function SearchForm() {
       }}
       className="relative flex max-w-[600px] flex-col gap-2"
     >
-      <div className={`${panelClass} flex flex-wrap gap-2 p-2 focus-within:border-ahead`}>
+      <div className={`${softPanelClass} flex flex-wrap gap-2 p-2 focus-within:border-ahead`}>
         <div className="flex min-w-0 flex-[1_1_260px] flex-col px-3 py-1.5 max-sm:basis-full">
           <label htmlFor="riotId" className={fieldLabel}>
             Riot ID
@@ -85,7 +85,7 @@ export function SearchForm() {
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center gap-2 rounded-[10px] bg-ahead px-6 font-semibold text-page transition-colors hover:bg-ahead-soft disabled:opacity-60 max-sm:w-full"
+          className="soft-round inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center gap-2 bg-ahead px-6 font-semibold text-page transition-colors hover:bg-ahead-soft disabled:opacity-60 max-sm:w-full"
         >
           {pending ? "Looking up…" : "Analyze"}
           <ArrowRightIcon />

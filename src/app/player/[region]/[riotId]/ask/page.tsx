@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { SignInLink } from "@/components/sign-in-link";
-import { Panel, panelClass } from "@/components/ui/panel";
+import { softPanelClass } from "@/components/ui/panel";
 import { askEnabled } from "@/lib/ask";
 import { checkAllowance, readQuestions } from "@/lib/ask-store";
 import { getCurrentUser } from "@/lib/auth";
@@ -60,14 +60,14 @@ async function Ask({ params }: { params: Params }) {
         <span className="font-semibold text-placeholder">#{tagLine}</span>
       </h1>
       <ProfileTabs playerPath={playerPath} current="ask" />
-      <Panel className="flex flex-col gap-4 p-6">
+      <div className={`${softPanelClass} flex flex-col gap-4 p-6`}>
         <AskContent
           region={region}
           riotId={riotId}
           puuid={puuid}
           playerPath={playerPath}
         />
-      </Panel>
+      </div>
     </>
   );
 }
@@ -83,7 +83,7 @@ function AskIllustration() {
   return (
     <>
       <span className="font-mono text-[13px] text-faint">{ASK_ILLUSTRATION.label}</span>
-      <div className={`${panelClass} flex flex-col gap-3 p-6`}>
+      <div className={`${softPanelClass} flex flex-col gap-3 p-6`}>
         <p className="font-semibold text-ink">{ASK_ILLUSTRATION.question}</p>
         <p className="whitespace-pre-line text-body">{ASK_ILLUSTRATION.answer}</p>
       </div>

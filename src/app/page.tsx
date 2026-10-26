@@ -3,7 +3,7 @@ import { HomeBrief } from "@/components/home-brief";
 import { HomeOpener } from "@/components/home-opener";
 import { SearchForm } from "@/components/search-form";
 import { Eyebrow } from "@/components/ui/eyebrow";
-import { Panel } from "@/components/ui/panel";
+import { softPanelClass } from "@/components/ui/panel";
 import { SectionHeading } from "@/components/ui/section-heading";
 import type { DiffPoint } from "@/lib/diff-chart";
 import { staticBriefs } from "@/lib/home-ledger";
@@ -39,7 +39,7 @@ export default function Home() {
           <SearchForm />
         </div>
 
-        <Panel className="flex min-w-0 flex-[1_1_440px] flex-col gap-4 p-6">
+        <div className={`${softPanelClass} flex min-w-0 flex-[1_1_440px] flex-col gap-4 p-6`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-display text-[22px] font-semibold uppercase tracking-[0.02em]">
               Gold vs your opponent
@@ -68,7 +68,7 @@ export default function Home() {
               </p>
             </div>
           </div>
-        </Panel>
+        </div>
       </section>
 
       <section

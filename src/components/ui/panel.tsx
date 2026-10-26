@@ -6,6 +6,8 @@ import type { ComponentProps } from "react";
 // border (hud-cut is defined in globals.css).
 export const panelClass = "hud-cut border border-frame bg-surface";
 
+export const softPanelClass = "soft-round border border-frame bg-surface";
+
 // The raised dark card used for every box of content: charts, stats,
 // match rows. Pass extra classes to set padding and layout. Use this instead
 // of copying its classes, so every card on the site has the same corners.

@@ -116,6 +116,10 @@
   }
 }
 
+@utility soft-round {
+  border-radius: 20px;
+}
+
 /*
  * dark: and light: utilities follow the theme picked in Settings, not the
  * visitor's OS setting (System handles that in src/lib/theme.ts).

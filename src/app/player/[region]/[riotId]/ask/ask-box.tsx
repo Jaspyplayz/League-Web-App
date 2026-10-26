@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition, type FormEvent } from "react";
 import { askAction } from "@/app/account/actions";
-import { panelClass } from "@/components/ui/panel";
+import { softPanelClass } from "@/components/ui/panel";
 import { MAX_QUESTION_LENGTH } from "@/lib/ask-rules";
 import type { AskedQuestion } from "@/lib/ask-store";
 
@@ -65,7 +65,7 @@ export function AskBox({ region, riotId, playerPath, history, left }: Props) {
           maxLength={MAX_QUESTION_LENGTH}
           rows={3}
           placeholder="e.g. Why do I lose games on Viego?"
-          className="w-full resize-y rounded-lg border border-line-strong bg-page px-4 py-3 text-ink placeholder:text-placeholder focus:border-ahead"
+          className="soft-round w-full resize-y border border-line-strong bg-page px-4 py-3 text-ink placeholder:text-placeholder focus:border-ahead"
         />
         <div className="flex flex-wrap gap-2">
           {EXAMPLES.map((example) => (
@@ -83,7 +83,7 @@ export function AskBox({ region, riotId, playerPath, history, left }: Props) {
           <button
             type="submit"
             disabled={isPending || text.trim() === "" || remaining <= 0}
-            className="min-h-10 rounded-lg bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
+            className="soft-round min-h-[52px] bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? "Thinking…" : "Ask"}
           </button>
@@ -108,7 +108,7 @@ export function AskBox({ region, riotId, playerPath, history, left }: Props) {
       {answers.length > 0 && (
         <ol className="flex flex-col gap-4">
           {answers.map((item) => (
-            <li key={item.id} className={`${panelClass} flex flex-col gap-3 p-6`}>
+            <li key={item.id} className={`${softPanelClass} flex flex-col gap-3 p-6`}>
               <p className="font-semibold text-ink">{item.question}</p>
               <p className="whitespace-pre-line text-body">{item.answer}</p>
               {item.games.length > 0 && (
