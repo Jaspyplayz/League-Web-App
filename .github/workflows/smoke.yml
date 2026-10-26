@@ -34,7 +34,12 @@ jobs:
             exit 1
           fi
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # GitHub's Ubuntu runner already has the libraries Chromium needs, since it
+      # ships Google Chrome. --with-deps only added fonts for other alphabets and
+      # package upgrades with apt, which sometimes took 10 minutes (JAS-18). If
+      # the runner ever lacks a library, every test fails at launch with "error
+      # while loading shared libraries". Then put --with-deps back.
+      - run: npx playwright install chromium
       - run: npm run test:e2e
         env:
           BASE_URL: ${{ github.event.deployment_status.environment_url }}
