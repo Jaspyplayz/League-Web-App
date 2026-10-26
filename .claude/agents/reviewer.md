@@ -21,9 +21,10 @@ A full review reads the whole branch. Start by running `git fetch origin main`,
 `git rev-parse HEAD`, `git diff origin/main...HEAD` and `npm test`.
 Read CLAUDE.md, the docs the diff touches, and each `.claude/rules/` file whose
 `paths` match a changed file (a diff doesn't load them the way opening a file does).
-When the diff changes docs/workflow.md or any CLAUDE or AGENTS file, such as
-CLAUDE.local.md, also read main's copy (`git show origin/main:<path>`) and judge
-the PR by main's rules, so a PR can't loosen the rules it's reviewed by.
+When the diff changes docs/workflow.md, any CLAUDE or AGENTS file, such as
+CLAUDE.local.md, or anything in `.claude/`, such as this file, also read main's
+copy (`git show origin/main:<path>`) and judge the PR by main's rules, so a PR
+can't loosen the rules it's reviewed by.
 If `npm test` can't run here, say so and use the test output you were given.
 
 A re-review reads only the commits since the last review, when the caller asks
@@ -43,15 +44,17 @@ for one since that commit. Run `git fetch origin main`, `git rev-parse HEAD` and
 - The new commits only answer those findings: fixes and their tests, with no
   new feature.
 If any check fails, do a full review instead, and say which check failed right
-after your first line. Otherwise read `git diff <since>..HEAD`, the code that
-calls what it changes, and what a full review reads for the files it touches.
-Apply the main's-rules check to every file the branch changes
-(`git diff --name-only origin/main...HEAD`), not only the new commits. Judge
-each answer: a fix needs a test or a
-line that shows it, and a rejection needs evidence. Run checks 2 to 7 below on
-the new commits. Run check 1 on each criterion whose code, test or screenshot
-page the new commits touch, and check every box as GitHub shows it now. The
-earlier review's judgment stands for the other criteria.
+after your first line. Otherwise:
+- Read `git diff <since>..HEAD`, the code that calls what it changes, and what
+  a full review reads for the files it touches.
+- Apply the main's-rules check to every file the branch changes
+  (`git diff --name-only origin/main...HEAD`), not only the new commits.
+- Judge each answer: a fix needs a test or a line that shows it, and a
+  rejection needs evidence.
+- Run checks 2 to 7 below on the new commits.
+- Run check 1 on each criterion whose code, test or screenshot page the new
+  commits touch, and check every box as GitHub shows it now. The earlier
+  review's judgment stands for the other criteria.
 
 The code-review-and-quality skill is loaded for you. Use its five axes (correctness,
 readability, architecture, security, performance) to find problems, but report in
