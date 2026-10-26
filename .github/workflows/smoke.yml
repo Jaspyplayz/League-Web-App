@@ -34,7 +34,10 @@ jobs:
             exit 1
           fi
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # GitHub's Ubuntu runner already has the system libraries Chromium needs,
+      # since it ships Google Chrome. --with-deps downloads them again with apt,
+      # which sometimes stalled for 10 minutes (JAS-18).
+      - run: npx playwright install chromium
       - run: npm run test:e2e
         env:
           BASE_URL: ${{ github.event.deployment_status.environment_url }}
