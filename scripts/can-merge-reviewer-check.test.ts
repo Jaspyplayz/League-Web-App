@@ -113,6 +113,13 @@ describe(WORKFLOW, () => {
   // Text from the PR inside a run step would run as shell code.
   it("never puts the PR's text into the workflow", () => {
     expect(workflow()).not.toMatch(/github\.event\.pull_request\.(body|title|head\.ref)/);
+    expect(workflow().split(/^ {4}steps:$/m)[1]).not.toContain("${{");
+  });
+
+  // Without the base commit, the check can't list the PR's files and fails
+  // every PR.
+  it("checks out the whole history", () => {
+    expect(workflow()).toMatch(/- uses: actions\/checkout@\S+\n {8}with:\n {10}fetch-depth: 0\n/);
   });
 
   // GitHub counts a skipped job as passing a required check, and a paths
