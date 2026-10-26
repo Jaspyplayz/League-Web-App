@@ -4,6 +4,7 @@ import {
   decide,
   parseAgentMerge,
   parseReverts,
+  reviewerCleared,
   toCheck,
   type AgentMerge,
   type Check,
@@ -300,6 +301,21 @@ describe("decide", () => {
   it("refuses a normal PR with no reviewer line in the new format", () => {
     const decision = decide(pr({ body: body({ review: ["Reviewer agent: no blockers."] }) }), main());
     expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
+  });
+
+  // GitHub's required reviewer check runs reviewerCleared (JAS-15).
+  it.each<[string, Partial<PrSnapshot>]>([
+    ["a verdict at the head commit", {}],
+    ["no verdict", { body: body({ review: [] }) }],
+    ["a verdict on an older commit", { body: body({ review: [`Reviewer agent at ${OLDER}: no blockers`] }) }],
+    ["blockers at the head commit", { body: body({ review: [`Reviewer agent at ${HEAD}: 1 blockers`] }) }],
+    ["a risky PR", { body: body({ tier: "risky. Sign-in.", review: [] }) }],
+    ["a docs-only tiny PR", { body: body({ tier: "tiny. Docs only.", criteria: [], review: [] }), files: ["docs/habits.md"] }],
+    ["a tiny PR that changes code", { body: body({ tier: "tiny. A copy fix.", criteria: [], review: [] }), files: ["src/x.ts"] }],
+  ])("gives GitHub's reviewer check the same answer for %s", (_, overrides) => {
+    const snapshot = pr(overrides);
+    const gate = decide(snapshot, main()).gates.find(({ name }) => name === "Reviewer cleared the head commit");
+    expect(reviewerCleared(snapshot)).toEqual(gate);
   });
 
   it("refuses an unticked acceptance criterion", () => {
