@@ -118,6 +118,8 @@ describe("decide", () => {
     "src/components/docs/notes.md",
     "docs/notes.test.ts",
     "docs/run.ts",
+    "docs/diagram.svg",
+    "docs/photo.jpeg",
     "docs/Workflow.md",
     "Docs/workflow.md",
   ])("refuses a tiny PR that changes %s without the reviewer", (file) => {
@@ -307,7 +309,7 @@ describe("decide", () => {
     expect(detail(decision, "Acceptance criteria ticked")).toContain("It works on phones");
   });
 
-  it.each(["1. [ ] B", "2) [ ] B", "+ [ ] B", "* [ ] B", "- [  ] B", "- [ x ] B", "  - [ ] B", "> - [ ] B"])("counts %s as an unticked criterion", (line) => {
+  it.each(["1. [ ] B", "2) [ ] B", "+ [ ] B", "* [ ] B", "- [  ] B", "- [ x ] B", "-  [ ] B", "  - [ ] B", "> - [ ] B"])("counts %s as an unticked criterion", (line) => {
     const criteria = ['- [x] A: test "a"', line];
     expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
   });

@@ -20,8 +20,8 @@ The review of the fix (#178) found that the tiny rule still let a PR change `CLA
 ## Decision
 
 Option 2:
-- The risky list also covers `src/lib/*-store.ts`, `src/lib/my-player.ts`, `scripts/remap-puuids`, `scripts/collect-benchmarks`, `scripts/check-score`, `src/lib/mcp/`, the three server actions, `.claude/skills/` and `.claude/rules/`, and any `.claude/` or `.cursor/` folder below the root. A path matches in any case, because Windows ignores case.
-- A test in `scripts/risky-paths.test.ts` fails when a route (in `src/app/` or `pages/api/`), a server action, or a file that imports the Postgres client, Drizzle or `src/db/` by any path is off the list. It allows only imports of modules in `src/db/` that never touch the database, such as `freshness.ts`. A store under a new name can't merge as normal code.
+- The risky list also covers `src/lib/*-store.ts`, `src/lib/my-player.ts`, `scripts/remap-puuids`, `scripts/collect-benchmarks`, `scripts/check-score`, `src/lib/mcp/`, the three server actions, `.claude/skills/` and `.claude/rules/`, and any `.claude/` or `.cursor/` folder below the root. JAS-13 added `.claude/settings.local.json`, every file in `.claude/agents/`, and `.cursor/settings.json`, which runs the Grok review. `.cursor/rules/` and `.cursor/skills/` get the reviewer, like `AGENTS.md`. A path matches in any case, because Windows ignores case.
+- A test in `scripts/risky-paths.test.ts` fails when one of these is off the list: a route (in `src/app/` or `pages/api/`), the proxy, a server action, a file that imports the Claude API or the Supabase client or reads the Claude API key, or a file that imports the Postgres client, Drizzle or `src/db/` by any path. It allows only imports of modules in `src/db/` that never touch the database, such as `freshness.ts`. A store under a new name can't merge as normal code.
 - A tiny PR skips the reviewer only when it changes nothing but docs. Docs here means the `.md`, `.png`, `.jpg`, `.gif` and `.webp` files in `docs/` and the root `README.md` and `ARCHITECTURE.md`. `docs/workflow.md`, any `CLAUDE` or `AGENTS` file, and anything in a dot folder aren't docs in any case, because agents follow them as rules. A tiny PR that changes anything else, such as `CLAUDE.local.md` or a fixtures README, needs the reviewer's "no blockers" line at its head commit.
 - Any box that isn't `[x]`, in any list GitHub renders, nested or quoted, counts as unticked. A `## ` line inside a code block doesn't end the section.
 - `can-merge` checks only that each criterion is ticked. The reviewer checks that each one has a screenshot or a test name, because a code check of free text would refuse good evidence or accept bad. `.claude/agents/reviewer.md` asks it to.
@@ -29,14 +29,14 @@ Option 2:
 ## Consequences
 
 Good:
-- Database code, server actions, the MCP server's cap on Riot calls, and the reviewer's agent file, skills and rules are Jasper's to merge again, whatever the tier says.
+- Database code, server actions, the MCP server's cap on Riot calls, the reviewer's agent file, skills and rules, Claude's local settings, and the Grok review's settings are Jasper's to merge again, whatever the tier says.
 - Claude Code merges no change without a second look, unless it touches only the `.md`, `.png`, `.jpg`, `.gif` and `.webp` files in `docs/`, `README.md` or `ARCHITECTURE.md`.
 
 Bad:
 - A tiny copy fix in a component waits for one reviewer run before it merges.
 - An agent can still change `CLAUDE.md`, `AGENTS.md` or `docs/workflow.md` with only the reviewer's look, not Jasper's. The reviewer judges such a PR by main's copy of those files, so the PR can't loosen the rules it's reviewed by.
-- The risky list is still a list. The test catches routes, server actions and database imports, not every kind of risk. Caps on Riot calls inside pages, such as the log page's `TIMELINES_PER_VIEW`, stay off it, and the rate limiter in `src/lib/riot/` still bounds the total. `.claude/rules/database.md` names the same database paths, so the two lists can drift apart.
-- `can-merge` reads the PR body line by line, not as GitHub renders it. A box inside an HTML comment or a four-backtick code block can still be misread, so the reviewer's check of each criterion still matters.
+- The risky list is still a list. The test catches routes, the proxy, server actions, and database, Claude API and Supabase clients, not every kind of risk. Caps on Riot calls inside pages, such as the log page's `TIMELINES_PER_VIEW`, stay off it, and the rate limiter in `src/lib/riot/` still bounds the total. `.claude/rules/database.md` names the same database paths, so the two lists can drift apart.
+- `can-merge` reads the PR body line by line, not as GitHub renders it. A `## ` line inside an HTML comment ends the criteria section early. So does one inside a four-backtick block that holds a three-backtick line, because `can-merge` takes that line as the block's end. A box after it isn't read, so the gate can pass with that box unticked. A box inside a comment or a code block is still counted, which only refuses more. The reviewer's check of each criterion covers both cases.
 - A tier line that says "risky" anywhere, such as "nothing on the risky list", is refused as naming two tiers. That is safe, but the builder has to keep tier words out of the reason.
 
 ## In my words

@@ -19,9 +19,9 @@ Start by running `git fetch origin main`, `git rev-parse HEAD`,
 `git diff origin/main...HEAD` and `npm test`.
 Read CLAUDE.md, the docs the diff touches, and each `.claude/rules/` file whose
 `paths` match a changed file (a diff doesn't load them the way opening a file does).
-When the diff changes CLAUDE.md, AGENTS.md or docs/workflow.md, also read main's
-copy (`git show origin/main:CLAUDE.md`) and judge the PR by main's rules, so a PR
-can't loosen the rules it's reviewed by.
+When the diff changes docs/workflow.md or any CLAUDE.md or AGENTS.md file, also
+read main's copy (`git show origin/main:CLAUDE.md`) and judge the PR by main's
+rules, so a PR can't loosen the rules it's reviewed by.
 If `npm test` can't run here, say so and use the test output you were given.
 
 The code-review-and-quality skill is loaded for you. Use its five axes (correctness,
