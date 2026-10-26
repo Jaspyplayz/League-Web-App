@@ -73,7 +73,7 @@ export function SearchForm() {
             id="region"
             name="region"
             defaultValue="na"
-            className="bg-surface py-0.5 text-lg text-ink"
+            className="bg-surface py-0.5 text-lg text-ink outline-none focus-visible:outline-none"
           >
             {Object.entries(REGIONS).map(([key, { label }]) => (
               <option key={key} value={key} title={label}>

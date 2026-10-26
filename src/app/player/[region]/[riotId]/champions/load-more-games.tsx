@@ -22,7 +22,7 @@ export function LoadMoreGames({ count, busy }: { count: number; busy: boolean })
         type="button"
         disabled={pending}
         onClick={() => startTransition(() => router.refresh())}
-        className="hud-cut-sm border border-frame bg-surface px-3 py-1.5 text-note font-medium text-ink-soft transition-colors hover:bg-surface-hover hover:text-ink disabled:opacity-60"
+        className="soft-round-sm border border-frame bg-surface px-3 py-1.5 text-note font-medium text-ink-soft transition-colors hover:bg-surface-hover hover:text-ink disabled:opacity-60"
       >
         {pending ? "Loading…" : `Load ${count} more games`}
       </button>

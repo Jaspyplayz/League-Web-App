@@ -270,7 +270,7 @@ export function ReplayPlays({
         <div
           role="group"
           aria-label="Which plays"
-          className="inline-flex overflow-hidden rounded-lg border border-line-strong text-note"
+          className="soft-round-sm inline-flex overflow-hidden border border-line-strong text-note"
         >
           {[false, true].map((mineOnly) => (
             <button
@@ -302,7 +302,7 @@ export function ReplayPlays({
                   type="button"
                   aria-current={isCurrent ? "true" : undefined}
                   onClick={() => onPick(playStart(play))}
-                  className={`grid min-h-11 w-full grid-cols-[2.75rem_1.125rem_minmax(0,1fr)] items-start gap-2 rounded-[10px] border px-2.5 py-2 text-left hover:bg-surface-hover ${
+                  className={`soft-round grid min-h-11 w-full grid-cols-[2.75rem_1.125rem_minmax(0,1fr)] items-start gap-2 border px-2.5 py-2 text-left hover:bg-surface-hover ${
                     isCurrent ? "border-line-strong bg-surface-hover" : "border-transparent"
                   }`}
                 >

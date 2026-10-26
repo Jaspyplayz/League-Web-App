@@ -38,7 +38,7 @@ export function Weaknesses({
   return (
     <section
       aria-labelledby="weaknesses-heading"
-      className="flex flex-col gap-4 rounded-2xl border border-behind/30 bg-behind/[0.07] p-[22px]"
+      className="soft-round flex flex-col gap-4 border border-behind/30 bg-behind/[0.07] p-[22px]"
     >
       <div className="flex items-center gap-2.5">
         <WarningIcon />

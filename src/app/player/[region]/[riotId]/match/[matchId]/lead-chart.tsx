@@ -55,7 +55,7 @@ export function LeadChart({ series, markers, opponentName, domain, below }: Prop
         <div
           role="group"
           aria-label="Stat"
-          className="flex gap-1 rounded-[10px] border border-line-strong bg-page p-1"
+          className="soft-round-sm flex gap-1 border border-line-strong bg-page p-1"
         >
           {METRICS.map((m) => (
             <button
@@ -63,7 +63,7 @@ export function LeadChart({ series, markers, opponentName, domain, below }: Prop
               type="button"
               aria-pressed={m === metric}
               onClick={() => setMetric(m)}
-              className={`min-h-9 rounded-[7px] px-3.5 text-sm transition-colors ${
+              className={`min-h-9 rounded-lg px-3.5 text-sm transition-colors ${
                 m === metric ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
               }`}
             >

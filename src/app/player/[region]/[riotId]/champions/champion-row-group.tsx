@@ -41,7 +41,7 @@ export function ChampionRowGroup({
             type="button"
             aria-expanded={open}
             aria-label={`${open ? "Hide" : "Show"} ${label}`}
-            className="rounded-md p-1 text-placeholder hover:text-ink"
+            className="soft-round-sm p-1 text-placeholder hover:text-ink"
           >
             <Chevron open={open} />
           </button>
@@ -62,7 +62,7 @@ export function ChampionRowGroup({
             <button
               type="button"
               onClick={() => setShown((n) => n + STEP)}
-              className="hud-cut-sm sticky left-3 w-full max-w-[calc(100vw-4rem)] border border-ahead/50 bg-ahead/10 py-2 text-note font-medium text-ahead-soft transition-colors hover:bg-ahead/20"
+              className="soft-round-sm sticky left-3 w-full max-w-[calc(100vw-4rem)] border border-ahead/50 bg-ahead/10 py-2 text-note font-medium text-ahead-soft transition-colors hover:bg-ahead/20"
             >
               Show more ({opponents.length - shown} left)
             </button>

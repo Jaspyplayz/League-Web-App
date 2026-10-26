@@ -163,7 +163,7 @@ export async function RecentMatches({
           <Link
             // Lands on the first new game, where the list left off.
             href={matchListHref(playerPath, queue, count + GAMES_STEP, `game-${games.length + 1}`)}
-            className="self-center rounded-lg border border-line-strong bg-surface px-5 py-2 text-sm font-semibold text-ink transition-colors hover:border-ahead"
+            className="soft-round-sm self-center border border-line-strong bg-surface px-5 py-2 text-sm font-semibold text-ink transition-colors hover:border-ahead"
           >
             Show 10 more games
           </Link>

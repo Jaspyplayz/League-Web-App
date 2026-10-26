@@ -51,7 +51,7 @@ export default function Home() {
             markers={SAMPLE_MARKERS}
             description="Illustration, not a real game. Gold difference against the opponent in the same role over 31 minutes: slightly ahead until 8 minutes, then behind, briefly ahead at 22 minutes, and 2,900 gold behind at the end."
           />
-          <div className="flex items-start gap-3.5 rounded-xl bg-page px-4 py-3.5">
+          <div className="soft-round-sm flex items-start gap-3.5 bg-page px-4 py-3.5">
             <div
               aria-hidden="true"
               className="flex size-7 flex-none items-center justify-center rounded-full border-2 border-behind font-mono text-[13px] font-medium text-behind"

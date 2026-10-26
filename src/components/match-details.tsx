@@ -65,7 +65,7 @@ export function MatchDetails({
         ally: p.teamId === me?.teamId,
         won: p.win,
         label: [championName(dd, p.championName), p.riotIdGameName].filter(Boolean).join(", "),
-        icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="rounded-md" />,
+        icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="soft-round-sm" />,
       }))}
       defaultPlayerId={me?.participantId ?? 1}
       analysisHref={isAnalyzable(match) ? analysisHref : null}
@@ -205,7 +205,7 @@ function PlayerRow({
     <>
       {/* Champion with their final level in the corner, like in the game. */}
       <span className="relative shrink-0">
-        <ChampionIcon dd={dd} name={p.championName} size={28} className="rounded-md" />
+        <ChampionIcon dd={dd} name={p.championName} size={28} className="soft-round-sm" />
         <span className="absolute -right-1 -bottom-1 rounded bg-page px-0.5 font-mono text-[9px] leading-tight text-ink-soft">
           {p.champLevel}
         </span>
@@ -247,7 +247,7 @@ function PlayerRow({
           <Link
             href={`/player/${region}/${toSlug(riotId)}`}
             title={`${riotId.gameName}#${riotId.tagLine} · ${championName(dd, p.championName)}`}
-            className="group flex items-center gap-1.5 rounded-md text-ink-soft"
+            className="soft-round-sm group flex items-center gap-1.5 text-ink-soft"
           >
             {who}
           </Link>

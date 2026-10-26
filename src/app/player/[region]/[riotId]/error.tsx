@@ -13,7 +13,7 @@ export default function PlayerError({ retry }: { error: Error; retry: () => void
       <button
         type="button"
         onClick={retry}
-        className="h-11 w-fit rounded-lg bg-foreground px-5 font-medium text-background hover:opacity-90"
+        className="soft-round-sm h-11 w-fit bg-foreground px-5 font-medium text-background hover:opacity-90"
       >
         Try again
       </button>

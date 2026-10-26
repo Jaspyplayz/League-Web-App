@@ -69,7 +69,7 @@ export async function DeathRecapSection({
                       dd={dd}
                       name={threat.championName}
                       size={40}
-                      className="rounded-lg"
+                      className="soft-round-sm"
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                       <p className="text-sm">
@@ -83,7 +83,7 @@ export async function DeathRecapSection({
                         {threat.abilities.slice(0, 3).map((a) => (
                           <li
                             key={`${a.ability}:${a.spellName}`}
-                            className="rounded-sm border border-line px-2 py-0.5 text-xs text-ink-soft"
+                            className="rounded-lg border border-line px-2 py-0.5 text-xs text-ink-soft"
                           >
                             {abilityName(threat.championName, a.ability, a.spellName)}{" "}
                             <span className="font-mono text-faint">

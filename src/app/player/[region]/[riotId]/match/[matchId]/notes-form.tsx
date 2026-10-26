@@ -54,13 +54,13 @@ export function NotesForm({ region, matchId, savedText }: Props) {
         maxLength={MAX_NOTE_LENGTH}
         rows={4}
         placeholder="What would you do differently? e.g. ward river before 3:15, back on the cannon wave"
-        className="w-full resize-y rounded-lg border border-line-strong bg-page px-4 py-3 text-ink placeholder:text-placeholder focus:border-ahead"
+        className="soft-round w-full resize-y border border-line-strong bg-page px-4 py-3 text-ink placeholder:text-placeholder focus:border-ahead"
       />
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={isPending || unchanged}
-          className="min-h-10 rounded-lg bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
+          className="soft-round-sm min-h-10 bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? "Saving…" : "Save note"}
         </button>

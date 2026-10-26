@@ -60,7 +60,7 @@ export function InsightsFilterBar({
       </div>
       <button
         type="submit"
-        className="min-h-10 rounded-lg border border-line-strong px-4 text-sm font-semibold hover:bg-line"
+        className="soft-round-sm min-h-10 border border-line-strong px-4 text-sm font-semibold hover:bg-line"
       >
         Apply
       </button>

@@ -81,7 +81,7 @@ async function SignInOptions({ searchParams }: { searchParams: SearchParams }) {
             <input type="hidden" name="next" value={safeNextPath(next)} />
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line-strong px-5 py-3 font-semibold text-ink transition-colors hover:border-ahead hover:bg-page"
+              className="soft-round flex w-full items-center justify-center gap-3 border border-line-strong px-5 py-3 font-semibold text-ink transition-colors hover:border-ahead hover:bg-page"
             >
               <Logo />
               Continue with {PROVIDERS[provider]}

@@ -39,7 +39,7 @@ export function RecapButton({ region, matchId, puuid }: Props) {
           type="button"
           onClick={write}
           disabled={isPending}
-          className="min-h-10 rounded-lg bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
+          className="soft-round-sm min-h-10 bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? "Writing…" : "Write recap"}
         </button>

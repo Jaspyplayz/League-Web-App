@@ -237,7 +237,7 @@ export function Replay({
           aria-expanded={help}
           aria-controls="replay-help"
           onClick={() => setHelp((open) => !open)}
-          className="flex min-h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-note text-muted hover:text-ink"
+          className="soft-round-sm flex min-h-9 items-center gap-1.5 border border-line-strong px-3 py-1.5 text-note text-muted hover:text-ink"
         >
           How to read this
           <svg
@@ -262,7 +262,7 @@ export function Replay({
       <div
         id="replay-help"
         hidden={!help}
-        className="flex flex-col gap-3 rounded-[12px] border border-line p-4 text-note text-muted"
+        className="soft-round flex flex-col gap-3 border border-line p-4 text-note text-muted"
       >
         <p className="text-sm">
           The whole game, second by second. Drag along the timeline or press play, and the map
@@ -342,7 +342,7 @@ export function Replay({
                 if (e.currentTarget.hasPointerCapture(e.pointerId)) seek(e.clientX);
               }}
               onKeyDown={onKeyDown}
-              className="relative flex cursor-ew-resize touch-pan-y select-none flex-col gap-1 rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ahead-soft"
+              className="relative flex cursor-ew-resize touch-pan-y select-none flex-col gap-1 soft-round-sm"
             >
               {chances && (
                 <>
@@ -384,7 +384,7 @@ export function Replay({
 
         {/* The play bar: the controls, the play the replay is on and your
             team's chance to win, with what happened in the play under it. */}
-        <div className="flex flex-col rounded-[12px] border border-line-strong bg-surface-hover">
+        <div className="soft-round flex flex-col border border-line-strong bg-surface-hover">
           <div className="flex flex-wrap items-center gap-x-[18px] gap-y-3 px-3.5 py-3">
             <div className="flex items-center gap-1.5">
               <StepButton
@@ -439,7 +439,7 @@ export function Replay({
               <div
                 role="group"
                 aria-label="Playback speed"
-                className="inline-flex overflow-hidden rounded-lg border border-line-strong text-note"
+                className="soft-round-sm inline-flex overflow-hidden border border-line-strong text-note"
               >
                 {SPEEDS.map((x) => (
                   <button

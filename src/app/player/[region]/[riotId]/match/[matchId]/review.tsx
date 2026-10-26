@@ -42,7 +42,7 @@ export function Review({ moments, notes }: { moments: Moment[]; notes: boolean }
             return (
               <li
                 key={m.at}
-                className="flex flex-col gap-3 rounded-[10px] border border-line-strong p-4"
+                className="soft-round flex flex-col gap-3 border border-line-strong p-4"
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-mono text-note text-faint">{m.clock}</span>
@@ -68,7 +68,7 @@ export function Review({ moments, notes }: { moments: Moment[]; notes: boolean }
                     <button
                       type="button"
                       onClick={() => links.watch(m.at)}
-                      className="min-h-10 rounded-lg border border-ahead px-4 text-sm font-semibold text-ahead-soft hover:bg-line"
+                      className="soft-round-sm min-h-10 border border-ahead px-4 text-sm font-semibold text-ahead-soft hover:bg-line"
                     >
                       Watch in replay
                     </button>
@@ -76,7 +76,7 @@ export function Review({ moments, notes }: { moments: Moment[]; notes: boolean }
                       <button
                         type="button"
                         onClick={() => links.addNote(m.noteLine)}
-                        className="min-h-10 rounded-lg border border-line-strong px-4 text-sm font-semibold text-muted hover:bg-line hover:text-ink"
+                        className="soft-round-sm min-h-10 border border-line-strong px-4 text-sm font-semibold text-muted hover:bg-line hover:text-ink"
                       >
                         Add to notes
                       </button>

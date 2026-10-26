@@ -8,9 +8,10 @@ import { navTabClass } from "./nav-tab-style";
 
 export const REPO_URL = "https://github.com/Jaspyplayz/League-Web-App";
 
-// Square icon buttons with cut corners, for search and settings.
+// Soft square icon buttons for search and settings. 12px on a 40px
+// button stays a square, which a 20px radius would turn into a circle.
 const iconButton =
-  "hud-cut-sm flex size-10 items-center justify-center border border-frame text-ink-soft transition-colors hover:bg-surface hover:text-ink";
+  "soft-round-sm flex size-10 items-center justify-center border border-frame text-ink-soft transition-colors hover:bg-surface hover:text-ink";
 
 // The "client bar": like the top of the League client. The logo (which also
 // takes you home) and a How it works tab on the left; search, settings and

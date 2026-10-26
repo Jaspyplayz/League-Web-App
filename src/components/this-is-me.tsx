@@ -8,7 +8,7 @@ import { supabaseConfig } from "@/lib/supabase/config";
 
 type Props = { region: string; puuid: string; gameName: string; tagLine: string };
 
-const button = "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors";
+const button = "soft-round-sm inline-flex h-9 items-center gap-1.5 border px-3 text-sm transition-colors";
 const off = "border-line-strong text-faint hover:border-ahead hover:text-ink";
 const on = "border-ahead bg-ahead/15 text-ahead-soft";
 

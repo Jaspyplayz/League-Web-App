@@ -33,7 +33,7 @@ export function ExpandableRow({
           if (event.target instanceof Element && event.target.closest("a")) return;
           setOpen((wasOpen) => !wasOpen);
         }}
-        className={`${rowClassName} flex cursor-pointer items-center gap-3 transition-colors hover:bg-surface-hover ${open ? "rounded-b-none" : ""}`}
+        className={`${rowClassName} flex cursor-pointer items-center gap-3 transition-colors hover:bg-surface-hover ${open ? "rounded-t-soft rounded-b-none" : "soft-round"}`}
       >
         {row}
         <button
@@ -41,7 +41,7 @@ export function ExpandableRow({
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
           aria-label={`${open ? "Hide" : "Show"} ${label}`}
-          className="shrink-0 rounded-md p-1 text-placeholder hover:text-ink"
+          className="soft-round-sm shrink-0 p-1 text-placeholder hover:text-ink"
         >
           <Chevron open={open} />
         </button>
@@ -51,7 +51,7 @@ export function ExpandableRow({
       {open && (
         <div
           id={panelId}
-          className="rounded-b-[14px] border border-t-0 border-line-strong bg-page/60 px-[18px] py-4"
+          className="rounded-b-soft border border-t-0 border-line-strong bg-page/60 px-[18px] py-4"
         >
           {children}
         </div>

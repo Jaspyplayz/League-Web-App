@@ -34,7 +34,7 @@ export async function AccountMenu() {
     return (
       <>
         {divider}
-        <SignInLink className="hud-cut-sm flex min-h-10 items-center bg-ahead px-4 font-mono text-xs font-semibold tracking-[0.12em] text-page uppercase transition-colors hover:bg-ahead-soft" />
+        <SignInLink className="soft-round-sm flex min-h-10 items-center bg-ahead px-4 font-mono text-xs font-semibold tracking-[0.12em] text-page uppercase transition-colors hover:bg-ahead-soft" />
       </>
     );
   }

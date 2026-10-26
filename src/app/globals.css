@@ -53,6 +53,16 @@
   --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
   --font-sans: var(--font-plex-sans), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  /*
+   * Soft Rounded radii. Cards, composers and tall primary buttons use
+   * --radius-soft (rounded-soft / soft-round). Icon buttons, portraits and
+   * shorter controls use --radius-soft-sm (rounded-soft-sm / soft-round-sm),
+   * so a 40px control stays a soft square instead of a circle.
+   * A full pill (rounded-full) is only for a control that is already a pill.
+   */
+  --radius-soft: 20px;
+  --radius-soft-sm: 12px;
 }
 
 /*
@@ -92,32 +102,16 @@
 }
 
 /*
- * Cut corners, the "Clean HUD" look: the top-left and bottom-right corners
- * are sliced off at 45 degrees, like the panels in League's in-game HUD.
- * corner-shape: bevel draws the border along the cut, so nothing inside the
- * card gets clipped (tooltips and focus rings still show). Browsers without
- * corner-shape yet (Safari and Firefox in 2026) get slightly rounded
- * corners instead, which still looks fine.
+ * Soft Rounded chrome, the same language as the home Riot ID bar and the
+ * Ask composer. Names match the classes already used there (soft-round)
+ * and point at the radius tokens above, so a later change is one number.
  */
-@utility hud-cut {
-  border-radius: 4px;
-  @supports (corner-shape: bevel) {
-    border-radius: 14px 0;
-    corner-shape: bevel;
-  }
-}
-
-/* The same cut, smaller, for buttons, icons and other small pieces. */
-@utility hud-cut-sm {
-  border-radius: 3px;
-  @supports (corner-shape: bevel) {
-    border-radius: 8px 0;
-    corner-shape: bevel;
-  }
-}
-
 @utility soft-round {
-  border-radius: 20px;
+  border-radius: var(--radius-soft);
+}
+
+@utility soft-round-sm {
+  border-radius: var(--radius-soft-sm);
 }
 
 /*
@@ -136,10 +130,48 @@ body {
   color: var(--color-ink);
 }
 
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--color-ahead-soft);
-  outline-offset: 2px;
+/*
+ * Focus and press live in the base layer so a utility can still turn them
+ * off (the Riot ID field hides its own ring; the search shell shows focus).
+ * The ring is a translucent outline with room around the control, not a
+ * hard 2px stroke on the edge. Press darkens a button slightly.
+ */
+@layer base {
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--color-ahead) 45%, transparent);
+    outline-offset: 3px;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  summary,
+  label {
+    transition-property: color, background-color, border-color, filter, outline-color;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
+  }
+
+  button:not(:disabled):active {
+    filter: brightness(0.96);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button,
+    a,
+    input,
+    select,
+    textarea,
+    summary,
+    label {
+      transition: none;
+    }
+  }
 }

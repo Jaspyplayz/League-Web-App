@@ -81,7 +81,7 @@ export function ChampionTable({ stats, dd }: { stats: ChampionStats; dd: DataDra
           <tr className="group">
             <th scope="row" className={`${PINNED} py-2.5 pr-2 pl-4 text-left`}>
               <span className="flex items-center gap-3">
-                <span className="hud-cut-sm flex size-9 shrink-0 items-center justify-center bg-line-strong font-display text-label font-bold text-ink-soft">
+                <span className="soft-round-sm flex size-9 shrink-0 items-center justify-center bg-line-strong font-display text-label font-bold text-ink-soft">
                   ALL
                 </span>
                 <span className="font-display text-body font-semibold tracking-[0.04em] uppercase">
@@ -111,7 +111,7 @@ export function ChampionTable({ stats, dd }: { stats: ChampionStats; dd: DataDra
                         dd={dd}
                         name={champion.championName}
                         size={36}
-                        className="hud-cut-sm"
+                        className="soft-round-sm"
                       />
                       <span className="max-w-32 truncate font-display text-body font-semibold tracking-[0.04em] uppercase max-sm:max-w-20">
                         {name}
@@ -133,7 +133,7 @@ export function ChampionTable({ stats, dd }: { stats: ChampionStats; dd: DataDra
                         dd={dd}
                         name={opponent.championName}
                         size={28}
-                        className="hud-cut-sm"
+                        className="soft-round-sm"
                       />
                       <span className="max-w-28 truncate font-medium text-ink-soft max-sm:max-w-20">
                         {championName(dd, opponent.championName)}
@@ -241,7 +241,7 @@ function WinLossBar({ wins, losses }: { wins: number; losses: number }) {
     <div
       role="img"
       aria-label={`${wins} wins, ${losses} losses`}
-      className="hud-cut-sm flex h-5 w-20 overflow-hidden font-mono text-label font-semibold text-page"
+      className="flex h-5 w-20 overflow-hidden rounded-md font-mono text-label font-semibold text-page"
     >
       {wins > 0 && (
         <span

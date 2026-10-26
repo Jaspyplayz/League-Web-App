@@ -54,7 +54,7 @@ export function ReplayMap({
       <div
         role="img"
         aria-label={label}
-        className="relative aspect-square w-full overflow-hidden rounded-[14px] border border-line bg-page"
+        className="soft-round relative aspect-square w-full overflow-hidden border border-line bg-page"
       >
         <MapBackground pictureUrl={mapUrl} />
         {recent.map((k, i) =>
