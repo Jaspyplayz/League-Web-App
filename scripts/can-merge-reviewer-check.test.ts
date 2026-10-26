@@ -114,4 +114,16 @@ describe(WORKFLOW, () => {
   it("never puts the PR's text into the workflow", () => {
     expect(workflow()).not.toMatch(/github\.event\.pull_request\.(body|title|head\.ref)/);
   });
+
+  // GitHub counts a skipped job as passing a required check, and a paths
+  // filter leaves the check waiting forever on the PRs it skips.
+  it("runs the job on every PR", () => {
+    expect(workflow()).not.toMatch(/^\s*if:/m);
+    expect(workflow()).not.toMatch(/^\s*paths(-ignore)?:/m);
+  });
+
+  it("fails the job whenever the check fails", () => {
+    expect(workflow()).not.toMatch(/continue-on-error/);
+    expect(workflow()).toMatch(/\n {6}- run: npx tsx scripts\/can-merge-reviewer-check\.ts\n?$/);
+  });
 });
