@@ -97,7 +97,7 @@ e2e/              Playwright smoke test and accessibility scan, run against each
                   fixtures.ts gets past the preview login (shot uses preview-login.ts too)
 eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/, "server-only"
                   on files that read secrets, no green classes), run by npm run lint, tested in npm test
-.github/          CI, smoke test and dependency review workflows, Dependabot, PR and issue templates
+.github/          CI, smoke test, dependency review and reviewer workflows, Dependabot, PR and issue templates
 .claude/          Claude Code settings, hooks/ (lint and typecheck before commits), agents/reviewer.md,
                   agent-merge.json (the switch for npm run can-merge, read from main),
                   rules/ (rules for one area, loaded when Claude opens a file there),

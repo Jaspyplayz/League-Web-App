@@ -20,7 +20,7 @@ import {
   parseAgentMerge,
   parseReverts,
   SWITCH_FILE,
-  toCheck,
+  toChecks,
   type AgentMerge,
   type ClaudeMerge,
   type Decision,
@@ -61,6 +61,7 @@ const PrView = z.object({
         workflowName: z.string(),
         status: z.string(),
         conclusion: z.string().nullable(),
+        startedAt: z.iso.datetime().nullable(),
       }),
       z.object({
         __typename: z.literal("StatusContext"),
@@ -103,7 +104,7 @@ function readPr(number: string): Pr {
     author: { login: view.author.login, isBot: view.author.is_bot },
     body: view.body,
     files,
-    checks: view.statusCheckRollup.map(toCheck),
+    checks: toChecks(view.statusCheckRollup),
   };
 }
 

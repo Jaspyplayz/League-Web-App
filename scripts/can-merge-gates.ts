@@ -29,10 +29,44 @@ const REQUIRED_CHECKS: { name: string; where: string; counts: (check: Check) => 
 // gh's statusCheckRollup: GitHub Actions and app checks are CheckRuns, and
 // Vercel's deployment check is a commit status.
 export type RollupEntry =
-  | { __typename: "CheckRun"; name: string; workflowName: string; status: string; conclusion: string | null }
+  | {
+      __typename: "CheckRun";
+      name: string;
+      workflowName: string;
+      status: string;
+      conclusion: string | null;
+      startedAt: string | null;
+    }
   | { __typename: "StatusContext"; context: string; targetUrl: string | null; state: string };
 
-export function toCheck(entry: RollupEntry): Check {
+type RollupRun = Extract<RollupEntry, { __typename: "CheckRun" }>;
+
+// GitHub runs a check again on each push, description edit and re-run, and
+// the rollup lists every run. The merge box counts only the latest run of
+// each, so the gates do too. Runs that started in the same second all count.
+export function toChecks(rollup: RollupEntry[]): Check[] {
+  const key = (run: RollupRun) => JSON.stringify([run.workflowName, run.name]);
+  const latest = new Map<string, number>();
+  for (const entry of rollup) {
+    if (entry.__typename === "CheckRun") {
+      latest.set(key(entry), Math.max(latest.get(key(entry)) ?? -Infinity, started(entry)));
+    }
+  }
+  return rollup
+    .filter((entry) => entry.__typename === "StatusContext" || started(entry) === latest.get(key(entry)))
+    .map(toCheck);
+}
+
+// gh prints Go's zero time for a run that hasn't started.
+const NOT_STARTED = "0001-01-01T00:00:00Z";
+
+// A queued run is the newest, and a run cancelled before it started never ran.
+function started(run: RollupRun): number {
+  if (run.startedAt !== null && run.startedAt !== NOT_STARTED) return Date.parse(run.startedAt);
+  return run.status === "COMPLETED" ? -Infinity : Infinity;
+}
+
+function toCheck(entry: RollupEntry): Check {
   if (entry.__typename === "StatusContext") {
     return { kind: "status", name: entry.context, url: entry.targetUrl ?? "", state: statusState(entry.state) };
   }
@@ -155,6 +189,8 @@ const SAID: Record<CheckState, string> = {
   skipped: "skipped",
 };
 
+const REVIEWER_GATE = "Reviewer cleared the head commit";
+
 const GATES: { name: string; check: (context: Context) => Result }[] = [
   {
     name: "Gate code matches main",
@@ -241,29 +277,7 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
       return pass("check, smoke and Vercel passed, and no other check failed or is still running");
     },
   },
-  {
-    name: "Reviewer cleared the head commit",
-    check: ({ pr, tier }) => {
-      const tiny = tier.ok && tier.tier === "tiny";
-      const code = pr.files.filter((path) => !isDoc(path));
-      if (tiny && code.length === 0) return pass("a tiny PR that changes only docs skips the reviewer");
-      const verdicts = section(pr.body, "Review").flatMap((line) => {
-        const match = line.replace(/[*_`]/g, "").match(/Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
-        return match ? [{ sha: match[1].toLowerCase(), verdict: match[2].trim(), line: match[0].trim() }] : [];
-      });
-      if (verdicts.length === 0) {
-        const missing = 'the Review section has no "Reviewer agent at <sha>: no blockers" line';
-        return fail(tiny ? `${missing}, which a tiny PR needs once it changes ${code.join(", ")}` : missing);
-      }
-      const atHead = verdicts.filter(({ sha }) => pr.headRefOid.startsWith(sha));
-      if (atHead.length === 0) {
-        const shas = verdicts.map(({ sha }) => sha.slice(0, 7)).join(", ");
-        return fail(`the reviewer saw ${shas}, not the head commit ${pr.headRefOid.slice(0, 7)}`);
-      }
-      const blocked = atHead.find(({ verdict }) => !/^no blockers\b/i.test(verdict));
-      return blocked ? fail(`blockers at the head commit: "${blocked.line}"`) : pass(atHead[0].line);
-    },
-  },
+  { name: REVIEWER_GATE, check: ({ pr, tier }) => reviewerResult(pr, tier) },
   {
     name: "Acceptance criteria ticked",
     check: ({ pr, tier }) => {
@@ -290,6 +304,36 @@ export function decide(pr: PrSnapshot, main: MainState): Decision {
   const context: Context = { pr, main, tier: readTier(pr.body) };
   const gates = GATES.map(({ name, check }) => ({ name, ...check(context) }));
   return { ok: gates.every((gate) => gate.pass), gates };
+}
+
+type ReviewInput = Pick<PrSnapshot, "body" | "headRefOid" | "files">;
+
+// The reviewer gate on its own. GitHub's required `reviewer` check runs it too
+// (scripts/can-merge-reviewer-check.ts), so GitHub and can-merge can't
+// disagree about whether a PR was reviewed (JAS-15).
+export function reviewerCleared(pr: ReviewInput): Gate {
+  return { name: REVIEWER_GATE, ...reviewerResult(pr, readTier(pr.body)) };
+}
+
+function reviewerResult(pr: ReviewInput, tier: Tier): Result {
+  const tiny = tier.ok && tier.tier === "tiny";
+  const code = pr.files.filter((path) => !isDoc(path));
+  if (tiny && code.length === 0) return pass("a tiny PR that changes only docs skips the reviewer");
+  const verdicts = section(pr.body, "Review").flatMap((line) => {
+    const match = line.replace(/[*_`]/g, "").match(/Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
+    return match ? [{ sha: match[1].toLowerCase(), verdict: match[2].trim(), line: match[0].trim() }] : [];
+  });
+  if (verdicts.length === 0) {
+    const missing = 'the Review section has no "Reviewer agent at <sha>: no blockers" line';
+    return fail(tiny ? `${missing}, which a tiny PR needs once it changes ${code.join(", ")}` : missing);
+  }
+  const atHead = verdicts.filter(({ sha }) => pr.headRefOid.startsWith(sha));
+  if (atHead.length === 0) {
+    const shas = verdicts.map(({ sha }) => sha.slice(0, 7)).join(", ");
+    return fail(`the reviewer saw ${shas}, not the head commit ${pr.headRefOid.slice(0, 7)}`);
+  }
+  const blocked = atHead.find(({ verdict }) => !/^no blockers\b/i.test(verdict));
+  return blocked ? fail(`blockers at the head commit: "${blocked.line}"`) : pass(atHead[0].line);
 }
 
 // The template's placeholder, "tiny, normal or risky", names all three, so a
