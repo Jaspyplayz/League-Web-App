@@ -45,6 +45,13 @@ jobs:
           BASE_URL: ${{ github.event.deployment_status.environment_url }}
           # Only needed if Vercel's preview protection is on (see docs/SETUP.md).
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      # JAS-20 needs a picture of every data page. The spec stays skipped
+      # unless this flag is set, and the pngs do not include request headers.
+      - run: npx playwright test e2e/jas20-surfaces.spec.ts --workers=1
+        env:
+          BASE_URL: ${{ github.event.deployment_status.environment_url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          JAS20_SHOTS: "1"
       # Screenshots only: traces would carry the bypass secret, and anyone
       # signed in to GitHub can download a public repo's artifacts.
       - uses: actions/upload-artifact@v7
@@ -53,3 +60,10 @@ jobs:
           name: playwright-screenshots
           path: test-results/**/*.png
           retention-days: 7
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: jas20-surfaces
+          path: test-results/jas20-surfaces/*.png
+          if-no-files-found: ignore
+          retention-days: 14
