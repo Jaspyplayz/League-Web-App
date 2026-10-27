@@ -3,9 +3,10 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
-// Key surfaces for JAS-20. The smoke job turns this on with JAS20_SHOTS=1
-// and uploads the pngs. A normal smoke run skips it, so other PRs do not
-// pay for a second pass over every data page.
+// Key surfaces for JAS-20. Skipped unless JAS20_SHOTS=1, so a normal smoke
+// run does not pay for a second pass over every data page. The preview
+// shots for this ticket were taken with that flag on, then the flag was
+// taken back out of the smoke job.
 //
 // These shots are the proof. A Riot-key notice or the "sign-in isn't set
 // up" panel is a failure, not a stand-in for the page.
