@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { expect, test, type Page } from "./fixtures";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 // Key surfaces for JAS-20. The smoke job turns this on with JAS20_SHOTS=1
 // and uploads the pngs. A normal smoke run skips it, so other PRs do not
