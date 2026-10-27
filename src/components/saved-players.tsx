@@ -142,7 +142,7 @@ export function PinButton(player: SavedPlayer) {
             ? "Unpin this player"
             : "Pin this player to the home page"
       }
-      className={`inline-flex size-9 items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`soft-round-sm inline-flex size-9 items-center justify-center border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         isPinned
           ? "border-ahead bg-ahead/15 text-ahead"
           : "border-line-strong text-faint hover:border-ahead hover:text-ink"
@@ -279,7 +279,7 @@ function MenuRow({
         onClick={onPick}
         className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-ink-soft hover:text-ink"
       >
-        <span className="hud-cut-sm w-10 flex-none border border-frame py-0.5 text-center font-mono text-[11px] text-faint">
+        <span className="soft-round-sm w-10 flex-none border border-frame py-0.5 text-center font-mono text-[11px] text-faint">
           {p.region.toUpperCase()}
         </span>
         <span className="truncate">

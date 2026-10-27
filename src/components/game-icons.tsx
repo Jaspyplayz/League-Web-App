@@ -24,7 +24,7 @@ export function ChampionIcon({
   dd,
   name,
   size,
-  className = "rounded-xl",
+  className = "soft-round-sm",
 }: {
   dd: DataDragon | null;
   name: string; // championName from match data
@@ -49,7 +49,7 @@ export function ItemIcon({
   dd,
   itemId,
   size,
-  className = "rounded-md",
+  className = "rounded-lg",
 }: {
   dd: DataDragon | null;
   itemId: number; // 0 = empty slot
@@ -100,7 +100,7 @@ export function SummonerSpellIcon({
   dd,
   spellId,
   size,
-  className = "rounded-md",
+  className = "rounded-lg",
 }: {
   dd: DataDragon | null;
   spellId: number; // summoner1Id or summoner2Id from match data
@@ -161,7 +161,8 @@ export function ProfileIcon({
   name: string;
   size?: number;
 }) {
-  const frame = "hud-cut border-2 border-frame";
+  // 12px, not 20px: the header uses this icon at 40px, and 20px would circle it.
+  const frame = "soft-round-sm border-2 border-frame";
   return (
     // Spans rather than divs, so the icon can sit inside a button (the
     // header's account menu).
@@ -179,7 +180,7 @@ export function ProfileIcon({
         </Placeholder>
       )}
       {level !== null && (
-        <span className="hud-cut-sm absolute -bottom-2.5 left-1/2 -translate-x-1/2 border border-frame bg-page px-2.5 font-mono text-xs text-ink-soft">
+        <span className="soft-round-sm absolute -bottom-2.5 left-1/2 -translate-x-1/2 border border-frame bg-page px-2.5 font-mono text-xs text-ink-soft">
           {level}
         </span>
       )}

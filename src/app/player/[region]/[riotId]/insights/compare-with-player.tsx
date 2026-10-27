@@ -81,7 +81,7 @@ function PlayerForm({
             id="vsRegion"
             name="vsRegion"
             defaultValue={choice?.region ?? "kr"}
-            className="bg-surface py-0.5 text-lg text-ink"
+            className="bg-surface py-0.5 text-lg text-ink outline-none focus-visible:outline-none"
           >
             {Object.entries(REGIONS).map(([key, { label }]) => (
               <option key={key} value={key} title={label}>
@@ -92,7 +92,7 @@ function PlayerForm({
         </div>
         <button
           type="submit"
-          className="inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center rounded-[10px] bg-ahead px-6 font-semibold text-page transition-colors hover:bg-ahead-soft max-sm:w-full"
+          className="soft-round inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center bg-ahead px-6 font-semibold text-page transition-colors hover:bg-ahead-soft max-sm:w-full"
         >
           Compare
         </button>

@@ -19,7 +19,7 @@ export function HowToRead({ heading, children }: { heading: ReactNode; children:
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen((o) => !o)}
-          className="flex min-h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-note text-muted hover:text-ink"
+          className="soft-round-sm flex min-h-9 items-center gap-1.5 border border-line-strong px-3 py-1.5 text-note text-muted hover:text-ink"
         >
           How to read this
           <svg

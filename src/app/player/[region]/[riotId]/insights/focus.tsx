@@ -97,7 +97,7 @@ export function FocusPanel({
   return (
     <section
       aria-labelledby="focus-heading"
-      className="flex flex-col gap-3.5 rounded-2xl border border-ahead/30 bg-ahead/[0.07] p-[22px]"
+      className="soft-round flex flex-col gap-3.5 border border-ahead/30 bg-ahead/[0.07] p-[22px]"
     >
       <div className="flex items-center justify-between gap-4">
         <h2

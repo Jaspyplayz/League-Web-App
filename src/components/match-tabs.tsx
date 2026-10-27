@@ -95,7 +95,7 @@ export function MatchTabs({
           // Expanding to the full page: the same match analysis page as before.
           <Link
             href={analysisHref}
-            className="mb-1.5 rounded-lg border border-ahead/40 px-3 py-1 text-[13px] font-semibold text-ahead-soft transition-colors hover:bg-ahead/10"
+            className="soft-round-sm mb-1.5 border border-ahead/40 px-3 py-1 text-[13px] font-semibold text-ahead-soft transition-colors hover:bg-ahead/10"
           >
             Full analysis →
           </Link>
@@ -159,7 +159,7 @@ function PlayerPicker({
                 aria-label={p.label}
                 title={p.label}
                 onClick={() => onSelect(p.participantId)}
-                className={`rounded-lg p-0.5 transition-opacity ${p.participantId === selected ? (p.won ? "ring-2 ring-ahead" : "ring-2 ring-behind") : "opacity-50 hover:opacity-100"}`}
+                className={`soft-round-sm p-0.5 transition-opacity ${p.participantId === selected ? (p.won ? "ring-2 ring-ahead" : "ring-2 ring-behind") : "opacity-50 hover:opacity-100"}`}
               >
                 {p.icon}
               </button>

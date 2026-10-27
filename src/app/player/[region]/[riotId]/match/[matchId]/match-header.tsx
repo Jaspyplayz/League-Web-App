@@ -160,7 +160,7 @@ function PlayerSide({
         dd={dd}
         name={p.championName}
         size={56}
-        className={`flex-none rounded-2xl border-2 ${isYou ? "border-ahead" : "border-behind"}`}
+        className={`soft-round-sm flex-none border-2 ${isYou ? "border-ahead" : "border-behind"}`}
       />
       <div className="min-w-0">
         <p

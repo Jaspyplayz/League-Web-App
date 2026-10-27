@@ -87,7 +87,7 @@ function StatCard({
         return (
           <li
             key={p.participantId}
-            className={`flex items-center gap-1.5 rounded-md border p-px ${mark}`}
+            className={`soft-round-sm flex items-center gap-1.5 border p-px ${mark}`}
           >
             <ChampionIcon dd={dd} name={p.championName} size={20} className="rounded" />
             <span className="sr-only">
@@ -109,7 +109,7 @@ function StatCard({
   );
 
   return (
-    <section className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface/60 p-3">
+    <section className="soft-round flex flex-col gap-3 border border-line bg-surface/60 p-4">
       <h4 className="text-center text-[13px] font-semibold text-ink-soft">{stat.label}</h4>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         {column(left)}

@@ -48,7 +48,7 @@ function MasteryColumn({ mastery, dd }: { mastery: ChampionMastery; dd: DataDrag
   return (
     <li className="flex min-w-0 flex-col items-center gap-1.5 text-center">
       <div className="relative pb-3">
-        <ChampionIcon dd={dd} name={id} size={52} className="hud-cut-sm border border-frame" />
+        <ChampionIcon dd={dd} name={id} size={52} className="soft-round-sm border border-frame" />
         <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2">
           <LevelCrest level={mastery.championLevel} />
         </div>

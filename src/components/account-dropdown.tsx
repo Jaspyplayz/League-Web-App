@@ -54,7 +54,7 @@ export function AccountDropdown({
         <ChevronDownIcon />
       </button>
       {open && (
-        <div className="hud-cut absolute top-full right-0 z-20 mt-2 flex w-56 flex-col border border-frame bg-surface py-1.5 shadow-lg">
+        <div className="soft-round absolute top-full right-0 z-20 mt-2 flex w-56 flex-col border border-frame bg-surface py-1.5 shadow-lg">
           {children}
         </div>
       )}

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ChartPlaceholders, InsightsSkeleton } from "@/components/loading-skeleton";
+import { panelClass } from "@/components/ui/panel";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
@@ -329,7 +330,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
 
 function NotEnoughGames({ window, skipped }: { window: number; skipped: number }) {
   return (
-    <p className="hud-cut border border-frame bg-surface px-5 py-4 text-muted">
+    <p className={`${panelClass} px-5 py-4 text-muted`}>
       Not enough games to spot trends yet. Insights need at least {MIN_GAMES} recent games on
       Summoner&apos;s Rift that lasted 15 minutes or more
       {skipped > 0 && ` (${skipped} of the last ${window} were ARAM, Arena, remakes or similar)`}.
@@ -348,7 +349,7 @@ function TooFewOnChampion({
 }) {
   const name = championName(dd, filters.champion ?? "");
   return (
-    <p className="hud-cut border border-frame bg-surface px-5 py-4 text-muted">
+    <p className={`${panelClass} px-5 py-4 text-muted`}>
       {games === 0
         ? `No ${name} games in your last ${filters.games}.`
         : `Only ${games} ${name} ${games === 1 ? "game" : "games"} in your last ${filters.games}, and trends need at least ${MIN_GAMES}.`}{" "}

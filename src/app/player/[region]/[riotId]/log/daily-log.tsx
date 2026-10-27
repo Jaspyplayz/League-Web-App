@@ -240,7 +240,7 @@ function ViewSwitch({ view }: { view: View }) {
     <div
       role="group"
       aria-label="Card size"
-      className="inline-flex overflow-hidden rounded-lg border border-line-strong text-note"
+      className="soft-round-sm inline-flex overflow-hidden border border-line-strong text-note"
     >
       {(["short", "detailed"] as const).map((option) => (
         <button
@@ -437,7 +437,7 @@ function DayNote({ day, savedText }: { day: string; savedText: string }) {
 
   if (!editing) {
     return (
-      <div className="flex items-start justify-between gap-3 rounded-lg border border-line bg-page px-3 py-2 text-note">
+      <div className="soft-round-sm flex items-start justify-between gap-3 border border-line bg-page px-3 py-2 text-note">
         {saved ? (
           <p className="min-w-0 whitespace-pre-line text-ink">{saved}</p>
         ) : (
@@ -487,13 +487,13 @@ function DayNote({ day, savedText }: { day: string; savedText: string }) {
         maxLength={MAX_NOTE_LENGTH}
         rows={2}
         placeholder="How did today go? e.g. practiced full clears on Viego, stopped after two losses"
-        className="w-full resize-y rounded-lg border border-line-strong bg-page px-3 py-2 text-note text-ink placeholder:text-placeholder focus:border-ahead"
+        className="soft-round w-full resize-y border border-line-strong bg-page px-3 py-2 text-note text-ink placeholder:text-placeholder focus:border-ahead"
       />
       <div className="flex flex-wrap items-center gap-3 text-note">
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-lg bg-ahead px-4 py-1.5 font-semibold text-page hover:bg-ahead-soft disabled:opacity-60"
+          className="soft-round-sm bg-ahead px-4 py-1.5 font-semibold text-page hover:bg-ahead-soft disabled:opacity-60"
         >
           {isPending ? "Saving…" : "Save"}
         </button>

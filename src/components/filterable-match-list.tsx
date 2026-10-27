@@ -19,7 +19,7 @@ export function FilterableMatchList({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 self-start rounded-lg border border-line-strong bg-surface px-3 focus-within:border-ahead">
+      <div className="soft-round-sm flex items-center gap-2 self-start border border-line-strong bg-surface px-3 focus-within:border-ahead">
         <SearchIcon />
         <label htmlFor="champion-search" className="sr-only">
           Search a champion
@@ -35,7 +35,7 @@ export function FilterableMatchList({
         />
       </div>
       {shown.length > 0 ? (
-        <ul className="flex flex-col gap-2">{shown.map((g) => g.row)}</ul>
+        <ul className="flex flex-col gap-3">{shown.map((g) => g.row)}</ul>
       ) : (
         <p className="text-muted">No games on &ldquo;{query}&rdquo; here.</p>
       )}

@@ -51,7 +51,7 @@ export function MatchRow({
     : m.win
       ? "border-ahead/50 bg-ahead/10"
       : "border-behind/50 bg-behind/10";
-  const box = `hud-cut border ${tint} px-[18px] py-3.5`;
+  const box = `border ${tint} px-[18px] py-3.5`;
 
   const content = (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[18px] gap-y-3.5">
@@ -71,7 +71,7 @@ export function MatchRow({
             dd={dd}
             name={m.championName}
             size={48}
-            className={`hud-cut-sm border-2 ${portraitFrame}`}
+            className={`soft-round-sm border-2 ${portraitFrame}`}
           />
           <div className="flex flex-col gap-1">
             <SummonerSpellIcon dd={dd} spellId={m.spells[0]} size={22} />
@@ -94,7 +94,7 @@ export function MatchRow({
             {badges.map((badge) => (
               <li
                 key={badge}
-                className="hud-cut-sm border border-ahead-soft px-1.5 text-[10px] whitespace-nowrap text-ahead-soft"
+                className="soft-round-sm border border-ahead-soft px-1.5 text-[10px] whitespace-nowrap text-ahead-soft"
               >
                 {badge}
               </li>
@@ -140,7 +140,7 @@ export function MatchRow({
           {details}
         </ExpandableRow>
       ) : (
-        <div className={box}>{content}</div>
+        <div className={`soft-round ${box}`}>{content}</div>
       )}
     </li>
   );

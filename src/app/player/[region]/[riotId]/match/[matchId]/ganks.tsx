@@ -48,7 +48,7 @@ function GankList({ title, ganks, yours }: { title: string; ganks: Gank[]; yours
       {ganks.length === 0 ? (
         <p className="text-sm text-muted">None before 14:00.</p>
       ) : (
-        <ol className="flex flex-col divide-y divide-line rounded-[10px] border border-line">
+        <ol className="soft-round flex flex-col divide-y divide-line border border-line">
           {ganks.map((g) => (
             <li
               key={`${g.timestamp}-${g.lane}`}

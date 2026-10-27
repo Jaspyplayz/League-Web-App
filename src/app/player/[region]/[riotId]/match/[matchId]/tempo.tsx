@@ -86,7 +86,7 @@ export function TempoBar({
   width: (from: number, to: number) => string;
 }) {
   return (
-    <div aria-hidden="true" className="relative h-9 overflow-hidden rounded-[3px] bg-line-strong">
+    <div aria-hidden="true" className="soft-round-sm relative h-9 overflow-hidden bg-line-strong">
       {runs.map((r) => (
         <span
           key={r.from}
@@ -282,7 +282,7 @@ function MonstersUp({ windows, at }: { windows: ObjectiveWindow[]; at: number })
 }
 
 const chipClass =
-  "rounded-[10px] border border-line-strong bg-page px-3 py-1.5 text-sm text-ink-soft";
+  "soft-round-sm border border-line-strong bg-page px-3 py-1.5 text-sm text-ink-soft";
 
 function DidList({
   title,

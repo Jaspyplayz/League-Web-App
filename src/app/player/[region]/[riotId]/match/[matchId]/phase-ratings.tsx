@@ -78,7 +78,7 @@ function Tile({
   const bar = score >= 50 ? "bg-ahead" : "bg-behind";
   return (
     <li
-      className={`flex min-w-0 flex-col gap-2 rounded-[10px] border px-4 py-3.5 ${outlined ? "border-ahead bg-ahead/10" : "border-line-strong"}`}
+      className={`soft-round flex min-w-0 flex-col gap-2 border px-4 py-3.5 ${outlined ? "border-ahead bg-ahead/10" : "border-line-strong"}`}
     >
       <span className="flex flex-col">
         <span className="font-mono text-label uppercase tracking-[0.12em] text-muted">{label}</span>

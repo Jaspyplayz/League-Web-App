@@ -35,7 +35,7 @@ export function RiotErrorNotice({ error, region }: { error: RiotApiError; region
   return (
     <div
       role="alert"
-      className="flex flex-col gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-5"
+      className="soft-round flex flex-col gap-1 border border-amber-500/40 bg-amber-500/10 p-5"
     >
       <p className="font-semibold">{title}</p>
       <p className="text-muted">{body(error)}</p>

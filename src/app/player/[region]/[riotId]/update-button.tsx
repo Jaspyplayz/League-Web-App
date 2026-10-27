@@ -50,7 +50,7 @@ export function UpdateButton({ region, puuid, updatedLabel, secondsUntilReady }:
         onClick={update}
         disabled={isPending || coolingDown}
         title={coolingDown ? "You can update again a couple of minutes after the last update" : undefined}
-        className="hud-cut-sm min-h-10 bg-ahead px-5 font-mono text-xs font-semibold tracking-[0.12em] text-page uppercase transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
+        className="soft-round-sm min-h-10 bg-ahead px-5 font-mono text-xs font-semibold tracking-[0.12em] text-page uppercase transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? "Updating…" : "Update"}
       </button>

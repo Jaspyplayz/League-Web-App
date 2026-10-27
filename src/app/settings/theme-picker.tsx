@@ -40,7 +40,7 @@ export function ThemePicker() {
         {OPTIONS.map((option) => (
           <label
             key={option.value}
-            className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-strong bg-page p-4 transition-colors hover:border-ahead-soft has-[:checked]:border-ahead has-[:checked]:bg-ahead/10"
+            className="soft-round flex cursor-pointer items-start gap-3 border border-line-strong bg-page p-4 transition-colors hover:border-ahead-soft has-[:checked]:border-ahead has-[:checked]:bg-ahead/10"
           >
             <input
               type="radio"

@@ -84,7 +84,7 @@ function ChampionBox({
         <ul className="flex flex-col gap-2">
           {champions.slice(0, SHOWN).map((c) => (
             <li key={c.championName} className="flex items-center gap-3 text-sm">
-              <ChampionIcon dd={dd} name={c.championName} size={36} className="rounded-[9px]" />
+              <ChampionIcon dd={dd} name={c.championName} size={36} className="soft-round-sm" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{championName(dd, c.championName)}</p>
                 <p className="font-mono text-xs text-faint">{c.games} games</p>

@@ -125,7 +125,7 @@ function Row({
 
   const who = (
     <>
-      <ChampionIcon dd={dd} name={p.championName} size={36} className="rounded-[9px]" />
+      <ChampionIcon dd={dd} name={p.championName} size={36} className="soft-round-sm" />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold">{championName(dd, p.championName)}</span>
@@ -156,7 +156,7 @@ function Row({
           // easy target; the name underlines on hover to show it's clickable.
           <Link
             href={`/player/${region}/${toSlug(riotId)}`}
-            className="group flex items-center gap-3 rounded-lg"
+            className="soft-round-sm group flex items-center gap-3"
           >
             {who}
           </Link>

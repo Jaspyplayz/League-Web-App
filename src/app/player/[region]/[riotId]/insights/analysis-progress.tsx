@@ -104,7 +104,7 @@ export function AnalysisProgress({
               setHoldMs(0);
               setAttempt((n) => n + 1);
             }}
-            className="min-h-10 rounded-lg border border-line-strong px-3.5 text-sm hover:bg-line"
+            className="soft-round-sm min-h-10 border border-line-strong px-3.5 text-sm hover:bg-line"
           >
             Try again
           </button>
