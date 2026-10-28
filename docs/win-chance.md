@@ -179,6 +179,6 @@ On Windows PowerShell, use `npm.cmd` when passing options after `--`.
 
 The current model came from `--players 40` on 2026-10-16: about 7.5 hours on one dev key, taking the table from 4,077 to 18,114 games. Low ranks end up with fewer games than high ones because their players play less often, so more of their last 20 games are older than 60 days and get deleted. Training took about 2 minutes.
 
-The script prints the accuracy and weights, then the per-rank table above. If they look right, commit the new `win-chance-model.json`. Showing the win chance on the site costs nothing: the model is a JSON file bundled with the code (about 70 KB with every rank's test results; only the weights reach the browser).
+The script prints the accuracy and weights, then the per-rank table above. If they look right, commit the new `win-chance-model.json`, and update the game count in the README (its "At a glance" list and models table) in the same commit. Showing the win chance on the site costs nothing: the model is a JSON file bundled with the code (about 70 KB with every rank's test results; only the weights reach the browser).
 
 If you change `WIN_CHANCE_FEATURES`, retrain before deploying. A saved model trained on a different list is ignored. If you change `TEAM_STATS`, the saved `win_chance_games` rows no longer match, so empty the table and collect again.

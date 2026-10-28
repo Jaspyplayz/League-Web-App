@@ -66,7 +66,7 @@
 ### Accounts and AI
 
 - Sign in with Google or Discord, mark a profile as **This is me**, pin players and keep private notes on any game.
-- **Ask:** signed-in players ask Claude questions like "What do my losses have in common?". Claude reads the games with Turnpoint's own tools and links the games it used. Daily and monthly spending caps keep the cost bounded.
+- **Ask:** signed-in players ask Claude questions like "What do my losses have in common?". Claude reads the games with Turnpoint's own tools and links the games it used. A daily question limit and monthly spending caps keep the cost bounded.
 - **MCP server** at `/api/mcp`: Claude and other AI apps can look players up and read the analyzer's results ([docs/mcp.md](docs/mcp.md)).
 
 ## How it works
@@ -89,9 +89,9 @@ All three are logistic regression trained offline on saved games, written from s
 
 | Model | Reads | Gives | Checked on |
 |---|---|---|---|
-| **Win chance** ([docs](docs/win-chance.md)) | Both teams' gold, XP, kills, towers, inhibitors, dragons, Baron and Elder at each minute | Each team's chance to win at that minute | 18,178 ranked games, Iron to Challenger. Well calibrated: when it says 90 to 100%, that team wins 96% of the time. A fairer evaluation that leaves out each game's final minutes is planned ([why](docs/win-chance.md#how-good-is-it)) |
+| **Win chance** ([docs](docs/win-chance.md)) | Both teams' gold, XP, kills, towers, inhibitors, dragons, grubs, Herald, Atakhan, Baron and Elder at each minute | Each team's chance to win at that minute | Trained on 18,178 ranked games, Iron to Challenger. Today's accuracy figures include each game's final minutes, when the winner is nearly certain, so they flatter the model; a fairer evaluation is planned and the site quotes no accuracy until then ([why](docs/win-chance.md#how-good-is-it)) |
 | **Game score** ([docs](docs/game-score.md)) | Ten stats per player (KDA, kill participation, damage share, CS, vision...), compared with the player's role | A 0 to 100 percentile among players in that role | Picks the winning side from stats alone 81% of the time on 35,326 games it didn't train on |
-| **Phase ratings** ([docs](docs/phase-ratings.md)) | The same recipe, on each player's stats in one phase of the game | Early, mid and late game ratings | Picks the winner 62% of the time from the early game alone, 73% from mid and 81% from late, on games it didn't train on |
+| **Phase ratings** ([docs](docs/phase-ratings.md)) | The same recipe, on each player's stats in one phase of the game | Early, mid and late game ratings | On 1,923 ranked games, picks the winner 62% of the time from the early game alone, 73% from mid and 81% from late, on games it didn't train on |
 
 The win chance's learned weights are worth a look: kills and towers are worth almost nothing on their own, because the gold they pay is already in the gold lead. [docs/win-chance.md](docs/win-chance.md) walks through one real minute of a game by hand. Win chance only ever runs on finished games, since Riot's policy doesn't allow predictions during a live game.
 
@@ -111,7 +111,7 @@ The win chance's learned weights are worth a look: kills and towers are worth al
 | [Sentry](https://sentry.io) | Error tracking | Reports crashes on the live site with the exact error and stack trace. |
 | Hand-written SVG | Charts | The curves are simple enough that a chart library wasn't worth the extra JavaScript. |
 
-Everything runs on free tiers.
+Everything runs on free tiers except the Claude API, which is pay per use and capped: Ask stops at $20 a month for the whole site, and each account can write 20 recaps a day.
 
 ## Architecture
 
