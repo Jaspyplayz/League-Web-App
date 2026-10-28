@@ -65,7 +65,7 @@ npm run tempo-games          # optional, downloads more games (slow, needs RIOT_
 npm run train-phase-score    # reads .cache/tempo-study, plus the site's games when DATABASE_URL is set
 ```
 
-`--folder` points it at another copy of the tempo study's games. It makes no Riot calls. It prints each phase's accuracy and weights; if they look right, commit the new `phase-score-model.json`. If you change `PHASE_FEATURES`, retrain before deploying: a model trained on a different list is ignored, and the panel hides until it's retrained.
+`--folder` points it at another copy of the tempo study's games. It makes no Riot calls. It prints each phase's accuracy and weights; if they look right, commit the new `phase-score-model.json`, and update the phase ratings row in the README's models table in the same commit. If you change `PHASE_FEATURES`, retrain before deploying: a model trained on a different list is ignored, and the panel hides until it's retrained.
 
 ## What's not rated
 
