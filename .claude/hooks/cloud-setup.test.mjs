@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -162,6 +162,22 @@ describe("packagesCurrent and markPackagesCurrent", () => {
 });
 
 describe("the hook as Claude Code runs it", () => {
+  // An empty folder has no package-lock.json, so npm ci fails at once on every
+  // system, which shows the entry script runs the steps and prints the line.
+  it("prints the failure line from a cloud start in a folder npm ci can't install", () => {
+    const root = mkdtempSync(join(tmpdir(), "cloud-setup-entry-"));
+    try {
+      const env = { ...process.env, CLAUDE_CODE_REMOTE: "true", CLAUDE_PROJECT_DIR: root };
+      const hook = fileURLToPath(new URL("./cloud-setup.mjs", import.meta.url));
+      const result = spawnSync(process.execPath, [hook], { env, encoding: "utf8", timeout: 60_000 });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/^Cloud setup: `npm ci` failed, so lint, typecheck, the tests and the build won't work/);
+      expect(existsSync(join(root, "node_modules", ".cloud-setup-lock-hash"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("exits at once and prints nothing outside the cloud", () => {
     const env = { ...process.env };
     delete env.CLAUDE_CODE_REMOTE;
