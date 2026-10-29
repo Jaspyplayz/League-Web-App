@@ -10,7 +10,7 @@ new to the codebase.
 - [ ] Criterion: screenshot or test name
 
 ## Tested
-Each command you ran and its result, such as `npm test`: `Tests 1274 passed`.
+Each command you ran and its result, such as `npm test`: `Tests <n> passed`.
 A test count must not fall; if tests were removed, say which and why.
 
 ## Not tested
