@@ -12,14 +12,11 @@ import {
   type MainState,
   type PrSnapshot,
 } from "./can-merge-gates";
-import { toChecks, type CheckRun } from "./can-merge-rest";
 
 const HEAD = "2ee7e1dc85217494c55a3dd20022b87184b8d675";
 const OLDER = "85e30eb0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6";
 const ON: AgentMerge = { on: true, since: "2026-10-25" };
 const VERCEL = "https://vercel.com/jaspy-s-team/league-web-app/Bth8tZWfPTqkq34tGX4qgjxz2ry3";
-const STARTED = "2026-10-26T05:59:13Z";
-const RAN_AGAIN = "2026-10-26T06:02:40Z";
 
 function main(overrides: Partial<MainState> = {}): MainState {
   return { agentMerge: ON, changedGateCode: [], reverts: [], claudeMerges: [], ...overrides };
@@ -287,32 +284,6 @@ describe("decide", () => {
     const decision = decide(pr({ checks }), main());
     expect(failed(decision)).toEqual(["Checks pass at the head commit"]);
     expect(detail(decision, "Checks pass at the head commit")).toBe(expected);
-  });
-
-  // Each description edit runs the reviewer check again, and GitHub's merge
-  // box counts only the latest run.
-  it.each<[string, string, string, string[]]>([
-    ["passes once a failed reviewer run passes when run again", "failure", "success", []],
-    ["refuses when the latest reviewer run failed", "success", "failure", ["Checks pass at the head commit"]],
-  ])("%s", (_, first, again, failures) => {
-    // Each edit starts a new workflow run, so each run has its own check suite.
-    const reviewer = (conclusion: string, started_at: string, suite: number): CheckRun => ({
-      name: "reviewer",
-      status: "completed",
-      conclusion,
-      started_at,
-      check_suite: { id: suite },
-    });
-    const ran = toChecks({
-      checkRuns: [reviewer(first, STARTED, 1), reviewer(again, RAN_AGAIN, 2)],
-      workflowRuns: [
-        { name: "Reviewer", check_suite_id: 1 },
-        { name: "Reviewer", check_suite_id: 2 },
-      ],
-      statuses: [],
-    });
-    const checks = [...passing, ...ran];
-    expect(failed(decide(pr({ checks }), main()))).toEqual(failures);
   });
 
   // The gate counts check and smoke only from these workflows, so renaming one

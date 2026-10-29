@@ -29,27 +29,28 @@ export const Pull = z.object({
 export type Pull = z.infer<typeof Pull>;
 
 // GET repos/{owner}/{repo}/commits/{sha}/check-runs: GitHub Actions jobs and
-// other apps' checks, such as CodeQL and Vercel Preview Comments.
+// other apps' checks, such as CodeQL and Vercel Preview Comments. GitHub's
+// API description allows a null check suite, and a null workflow name below.
 const CheckRun = z.object({
   name: z.string(),
   status: z.string(),
   conclusion: z.string().nullable(),
   started_at: z.iso.datetime().nullable(),
-  check_suite: z.object({ id: z.number() }),
+  check_suite: z.object({ id: z.number() }).nullable(),
 });
 export type CheckRun = z.infer<typeof CheckRun>;
 export const CheckRunPage = z.object({ total_count: z.number(), check_runs: z.array(CheckRun) });
 
 // GET repos/{owner}/{repo}/actions/runs?head_sha={sha}. `name` is the
 // workflow's name, such as "CI".
-const WorkflowRun = z.object({ name: z.string(), check_suite_id: z.number() });
-export type WorkflowRun = z.infer<typeof WorkflowRun>;
+const WorkflowRun = z.object({ name: z.string().nullable(), check_suite_id: z.number() });
+type WorkflowRun = z.infer<typeof WorkflowRun>;
 export const WorkflowRunPage = z.object({ total_count: z.number(), workflow_runs: z.array(WorkflowRun) });
 
 // GET repos/{owner}/{repo}/commits/{sha}/status: the latest commit status of
 // each name. Vercel's deployment check is one.
 const CommitStatus = z.object({ context: z.string(), state: z.string(), target_url: z.string().nullable() });
-export type CommitStatus = z.infer<typeof CommitStatus>;
+type CommitStatus = z.infer<typeof CommitStatus>;
 export const StatusPage = z.object({ total_count: z.number(), statuses: z.array(CommitStatus) });
 
 /** Every REST answer can-merge reads about one PR, at its head commit. */
@@ -90,8 +91,9 @@ export function toPrSnapshot({ pull, ...checks }: RestAnswers, files: string[]):
 // and lists every run. The merge box counts only the latest run of each, so
 // the gates do too. Runs that started in the same second all count.
 export function toChecks({ checkRuns, workflowRuns, statuses }: Omit<RestAnswers, "pull">): Check[] {
-  const workflowOf = new Map(workflowRuns.map((run) => [run.check_suite_id, run.name]));
-  const runs = checkRuns.map((run) => ({ run, workflow: workflowOf.get(run.check_suite.id) ?? "" }));
+  const workflowOf = new Map(workflowRuns.map((run) => [run.check_suite_id, run.name ?? ""]));
+  const workflow = (run: CheckRun) => (run.check_suite ? workflowOf.get(run.check_suite.id) : undefined) ?? "";
+  const runs = checkRuns.map((run) => ({ run, workflow: workflow(run) }));
   const key = ({ run, workflow }: (typeof runs)[number]) => JSON.stringify([workflow, run.name]);
   const latest = new Map<string, number>();
   for (const entry of runs) latest.set(key(entry), Math.max(latest.get(key(entry)) ?? -Infinity, started(entry.run)));
@@ -137,7 +139,10 @@ function checkRunState(status: string, conclusion: string | null): CheckState {
 // PUT repos/{owner}/{repo}/pulls/{n}/merge. GitHub refuses it if the head
 // moved past `sha`, so only the commit the gates checked can merge. The
 // subject is GitHub's usual one, and the marker is what the revert gate finds.
-export function mergeRequest(pr: Pr): { path: string; body: Record<string, string> } {
+export function mergeRequest(pr: Pr): {
+  path: string;
+  body: { sha: string; merge_method: "merge"; commit_title: string; commit_message: string };
+} {
   return {
     path: `repos/{owner}/{repo}/pulls/${pr.number}/merge`,
     body: {

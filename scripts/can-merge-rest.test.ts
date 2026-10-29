@@ -79,6 +79,25 @@ describe("toPrSnapshot", () => {
     expect(gate(decision, "Open and ready")).toMatchObject({ pass: false, detail: "the PR is merged" });
   });
 
+  // Each description edit runs the reviewer check again in a new workflow run,
+  // and GitHub's merge box counts only the latest run. #195 already has a
+  // failed reviewer run followed by passed ones.
+  it.each<[string, string, boolean]>([
+    ["passes once a failed reviewer run passes when run again", "success", true],
+    ["refuses when the latest reviewer run failed", "failure", false],
+  ])("%s", (_, conclusion, passes) => {
+    const reviewer = CHECKS_195.checkRuns.find((run) => run.name === "reviewer")!;
+    const again = { ...reviewer, conclusion, started_at: "2026-10-29T05:00:00Z", check_suite: { id: 2 } };
+    const pr = toPrSnapshot(
+      answers({
+        checkRuns: [...CHECKS_195.checkRuns, again],
+        workflowRuns: [...CHECKS_195.workflowRuns, { name: "Reviewer", check_suite_id: 2 }],
+      }),
+      FILES,
+    );
+    expect(gate(decide(pr, MAIN), "Checks pass at the head commit")?.pass).toBe(passes);
+  });
+
   it("reads a draft", () => {
     const pr = toPrSnapshot(answers({ pull: Pull.parse(fixture("pull-cli-14783-draft.json")) }), FILES);
     expect(pr).toMatchObject({ state: "OPEN", isDraft: true, baseRefName: "trunk" });
@@ -175,6 +194,18 @@ describe("toChecks", () => {
     ["an errored status", "error", "failure"],
   ])("reads %s as %s", (_, state, expected) => {
     expect(states([], [status(state)])).toEqual([expected]);
+  });
+
+  // GitHub's API description allows both to be null.
+  it("gives a check run with no check suite no workflow", () => {
+    const parsed = CheckRunPage.parse({ total_count: 1, check_runs: [{ ...run("completed", "success"), check_suite: null }] });
+    expect(toChecks({ checkRuns: parsed.check_runs, workflowRuns, statuses: [] })[0]).toMatchObject({ workflow: "" });
+  });
+
+  it("gives a check run whose workflow run has no name no workflow", () => {
+    const parsed = WorkflowRunPage.parse({ total_count: 1, workflow_runs: [{ name: null, check_suite_id: 1 }] });
+    const checks = toChecks({ checkRuns: [run("completed", "success")], workflowRuns: parsed.workflow_runs, statuses: [] });
+    expect(checks[0]).toMatchObject({ workflow: "" });
   });
 
   it("keeps where each check came from", () => {
