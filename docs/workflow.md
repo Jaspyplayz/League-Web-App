@@ -51,15 +51,16 @@ Every session has these, local or cloud: pstack's are copied into the repo ([bel
 
 | Step | Skill | When |
 |---|---|---|
-| 1. Frame | `grilling` (Matt Pocock) | The problem or the criteria are unclear. Jasper answers the questions |
+| 1. Frame | `grilling` (Matt Pocock) | The problem or the criteria are unclear, in a local session where Jasper can answer. A cloud session posts its questions on the ticket as blocked instead |
 | 2. Inspect | `how` (pstack) | Before changing a part you haven't read |
 | 3. Plan | `architect` (pstack) or `codebase-design` (Matt Pocock) | A design choice, or where a module's boundary should go |
-| 3. Plan | `domain-modeling` (Matt Pocock) | The change adds or renames a word in [`GLOSSARY.md`](../GLOSSARY.md) |
+| 3. Plan | `domain-modeling` (Matt Pocock) | The change adds or renames a word in [`GLOSSARY.md`](../GLOSSARY.md), or records a decision about those words |
 | 4. Test first | `tdd` (pstack) | Pure logic, and any bug fix with a cheap test |
 | 5. Implement | `poteto-mode` (pstack) | Several files, a design choice, or a bug or slowdown whose cause isn't known. It picks a playbook |
-| 5. Implement | `why` (pstack) | Finding a bug's cause |
+| 5. Implement | `why` (pstack) | Why code works the way it does, or when it broke. `poteto-mode`'s bug playbook calls it for you |
 | 7. Self-check | `verify`, `verify-turnpoint`, `verify-turnpoint-ux` | As in step 7 |
 | 8. Review | the reviewer agent, plus `interrogate` (pstack) on risky PRs | As in step 8 |
+| 11. Close out | `documentation-and-adrs` (copied in) | A decision record, such as a risky PR's draft, or a doc the change makes wrong |
 | PR text | `unslop` (pstack) | Before opening the PR |
 
 Outside a ticket: Jasper types `/improve-codebase-architecture` (Matt Pocock) to scan the code for modules worth deepening, then picks one to go through; what comes out becomes tickets. For slow code, `poteto-mode` has a playbook for one measured slowdown and one for improving a number step by step, and `benchmark-checklist` (pstack) checks a measurement before anyone acts on it.
