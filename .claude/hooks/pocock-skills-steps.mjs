@@ -4,7 +4,7 @@
 import { execFile, spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 // Anthropic's official marketplace, the file Claude Code reads to install and
 // update `mattpocock-skills@claude-plugins-official` on Jasper's PC.
@@ -82,18 +82,20 @@ export function skillsToInstall(pluginText, taken) {
 
 const lastLine = (text) => text.trim().split("\n").pop();
 
+// Git variables that point it at a repo other than the one in `-C dir`. If the
+// session had one set, `git checkout` would move that repo instead.
+const GIT_REPO_VARIABLES = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"];
+
 // Checks out exactly `sha` from `url` into the empty folder `dir`: a fetch of
 // that one commit, never a branch. A cloud session's GitHub proxy lets git
 // fetch a public repo the session didn't clone, though it answers 403 for its
 // archive downloads (decision record 0015). The steps share GIT_BUDGET_MS.
 export function fetchCommit(url, sha, dir, budgetMs = GIT_BUDGET_MS) {
   const end = Date.now() + budgetMs;
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
+  for (const name of GIT_REPO_VARIABLES) delete env[name];
   const git = (...args) => {
-    const result = spawnSync("git", ["-C", dir, ...args], {
-      encoding: "utf8",
-      timeout: Math.max(1, end - Date.now()),
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-    });
+    const result = spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", timeout: Math.max(1, end - Date.now()), env });
     if (result.status !== 0) {
       const why = result.error?.message ?? lastLine(result.stderr || `exit code ${result.status}`);
       throw new Refusal(`\`git ${args[0]}\` failed (${why})`);
@@ -130,15 +132,17 @@ export function readSkill(checkout, skill) {
 // the hook never replaces or deletes a folder without one.
 export const OWNER_FILE = ".mattpocock-skills";
 
-const folders = (dir) => (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name) : []);
+const entries = (dir) => (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : []);
+const folders = (dir) => entries(dir).filter((e) => e.isDirectory()).map((e) => e.name);
 const ownedFolders = (skillsDir) => folders(skillsDir).filter((name) => existsSync(join(skillsDir, name, OWNER_FILE)));
 
 // The names Pocock's skills must not take: every folder in the repo's
-// .claude/skills/, and every folder in the install folder this hook didn't
-// write, such as the cloud's own `session-start-hook` and `synced`.
+// .claude/skills/, and everything in the install folder this hook didn't
+// write, such as the cloud's own `session-start-hook` and `synced`, and any
+// file or link there.
 export function takenNames(repoSkillsDir, skillsDir) {
   const owned = ownedFolders(skillsDir);
-  return new Set([...folders(repoSkillsDir), ...folders(skillsDir).filter((name) => !owned.includes(name))]);
+  return new Set([...folders(repoSkillsDir), ...entries(skillsDir).map((e) => e.name).filter((name) => !owned.includes(name))]);
 }
 
 // The marker records the installed commit and skill names, only so an
@@ -175,13 +179,29 @@ function writeWhole(file, text) {
   renameSync(temporary, file);
 }
 
+const STAGING_PREFIX = ".mattpocock-skills-staging-";
+
+// A hook stopped at its timeout can leave a staging folder or a marker copy
+// behind. One older than LEFTOVER_MS can't belong to a hook still running.
+const LEFTOVER_MS = 10 * 60_000;
+function removeLeftovers(skillsDir, markerFile) {
+  const leftovers = [
+    ...entries(dirname(skillsDir)).filter((e) => e.name.startsWith(STAGING_PREFIX)).map((e) => join(dirname(skillsDir), e.name)),
+    ...entries(dirname(markerFile)).filter((e) => e.name.startsWith(`${basename(markerFile)}.`) && e.name.endsWith(".tmp")).map((e) => join(dirname(markerFile), e.name)),
+  ];
+  for (const path of leftovers) {
+    if (Date.now() - lstatSync(path).mtimeMs > LEFTOVER_MS) rmSync(path, { recursive: true, force: true });
+  }
+}
+
 // Swaps the old install for the new one. Every skill is written in full to a
 // staging folder beside the install folder first, then each is renamed into
 // place, so Claude Code's folder watcher never sees half a skill. Only the
 // hook's own folders are deleted or replaced. The marker is written last.
 export function replaceSkills(skillsDir, markerFile, sha, installed) {
   mkdirSync(skillsDir, { recursive: true });
-  const staging = mkdtempSync(join(dirname(skillsDir), ".mattpocock-skills-staging-"));
+  removeLeftovers(skillsDir, markerFile);
+  const staging = mkdtempSync(join(dirname(skillsDir), STAGING_PREFIX));
   try {
     for (const [name, files] of installed) {
       for (const [file, body] of [...files, [OWNER_FILE, `${sha}\n`]]) {

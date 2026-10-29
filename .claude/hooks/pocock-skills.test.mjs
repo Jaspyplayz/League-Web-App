@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -183,6 +183,23 @@ describe("fetchCommit, with real git", () => {
     expect(() => fetchCommit(url, NEXT_SHA, tempDir("pocock-skills-checkout-"))).toThrow(/^`git fetch` failed \(/);
   });
 
+  it("works in its own folder even when GIT_DIR points at another repo", () => {
+    const { url, first } = upstream();
+    const other = upstream();
+    const otherDir = fileURLToPath(other.url);
+    const dir = tempDir("pocock-skills-checkout-");
+    const before = process.env.GIT_DIR;
+    process.env.GIT_DIR = join(otherDir, ".git");
+    try {
+      fetchCommit(url, first, dir);
+    } finally {
+      if (before === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = before;
+    }
+    expect(readFileSync(join(dir, "skills", "productivity", "grilling", "SKILL.md"), "utf8")).toBe("first");
+    expect(git(otherDir, "rev-parse", "HEAD").stdout.trim()).toBe(other.second);
+  });
+
   it("gives up when its time runs out", () => {
     const { url, second } = upstream();
     expect(() => fetchCommit(url, second, tempDir("pocock-skills-checkout-"), 1)).toThrow(/^`git init` failed \(.*ETIMEDOUT/);
@@ -276,6 +293,34 @@ describe("installPocockSkills", () => {
     expect(line).toMatch(/installed 21 from commit 49dd158/);
     expect(line).toMatch(/Skipped tdd, grilling, teach \(a skill with that name is already here\)/);
     expect(readFileSync(join(where.skillsDir, "grilling", "SKILL.md"), "utf8")).toBe("someone else's");
+  });
+
+  // A junction needs no extra rights on Windows; elsewhere it's a plain symlink.
+  it("never replaces a file or a link that has a skill's name", async () => {
+    const where = home();
+    writeFileSync(join(where.skillsDir, "retro"), "a file");
+    const target = tempDir("pocock-skills-link-");
+    symlinkSync(target, join(where.skillsDir, "wizard"), "junction");
+    const line = await run(where);
+    expect(line).toMatch(/installed 20 from commit 49dd158/);
+    expect(line).toMatch(/Skipped tdd, retro, wizard, teach \(a skill with that name is already here\)/);
+    expect(readFileSync(join(where.skillsDir, "retro"), "utf8")).toBe("a file");
+    expect(lstatSync(join(where.skillsDir, "wizard")).isSymbolicLink()).toBe(true);
+  });
+
+  it("clears staging folders and marker copies an earlier, stopped run left behind", async () => {
+    const where = home();
+    const config = join(where.skillsDir, "..");
+    const old = [join(config, ".mattpocock-skills-staging-old"), join(config, "mattpocock-skills.json.123.tmp")];
+    write(join(old[0], "grilling", "SKILL.md"), "half");
+    write(old[1], "{");
+    const hourAgo = new Date(Date.now() - 60 * 60_000);
+    old.forEach((path) => utimesSync(path, hourAgo, hourAgo));
+    const fresh = join(config, ".mattpocock-skills-staging-running");
+    mkdirSync(fresh);
+    await run(where);
+    expect(old.filter((path) => existsSync(path))).toEqual([]);
+    expect(existsSync(fresh)).toBe(true);
   });
 
   it.each([
