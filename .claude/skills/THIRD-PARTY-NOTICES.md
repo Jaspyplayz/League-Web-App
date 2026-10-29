@@ -1,6 +1,6 @@
 # Third-party skills
 
-Eight skills in this folder come from other people's open-source repos. Jasper installed them on his computer with `npx skills add`, and they were copied here unchanged so that project threads in the Claude app, subagents such as the [reviewer](../agents/reviewer.md), and Claude Code on any computer can load them. Each folder still matches the `computedHash` recorded for it in the `skills-lock.json` on Jasper's computer, except that the Supabase skill's line endings were changed from Windows ones (CRLF) back to the LF its source repo uses, which makes it identical to the source file for file. `explain-back` is Turnpoint's own.
+Most skills in this folder come from other people's open-source repos. Jasper installed the first eight in the table on his computer with `npx skills add`, and they were copied here unchanged so that project threads in the Claude app, subagents such as the [reviewer](../agents/reviewer.md), and Claude Code on any computer can load them. Each folder still matches the `computedHash` recorded for it in the `skills-lock.json` on Jasper's computer, except that the Supabase skill's line endings were changed from Windows ones (CRLF) back to the LF its source repo uses, which makes it identical to the source file for file. `explain-back` is Turnpoint's own.
 
 | Skill | Source | License |
 |---|---|---|
@@ -12,12 +12,16 @@ Eight skills in this folder come from other people's open-source repos. Jasper i
 | security-and-hardening | addyosmani/agent-skills | MIT, Addy Osmani |
 | test-driven-development | addyosmani/agent-skills | MIT, Addy Osmani |
 | supabase-postgres-best-practices | [supabase/agent-skills](https://github.com/supabase/agent-skills) | MIT, Supabase |
+| pstack 0.9.102: its 65 skills (`poteto-mode`, `how`, `why`, `interrogate`, the `principle-*` skills and the rest) and its 4 agents in [`../agents/`](../agents/) (`poteto-agent`, `comment-sicko` and the two `thermo-nuclear` reviewers) | [michael-denyer/pstack-claude](https://github.com/michael-denyer/pstack-claude), commit `356c6e0`, the folder `plugins/pstack/` | MIT, Lauren Tan and Michael Denyer; some skills and agents MIT, Cursor |
+
+pstack came in differently from the eight above: it was a Claude Code plugin on Jasper's computer, and its `skills/` and `agents/` folders were copied from the installed plugin (decision record [0014](../../docs/adr/0014-pstack-lives-in-the-repo.md)). Git stores them with the same bytes as pstack's repo at that commit. Its startup text is copied too, as [`../hooks/pstack-session-start-context.md`](../hooks/pstack-session-start-context.md). Its license texts stay where pstack keeps them, in [`poteto-mode/references/licenses/`](poteto-mode/references/licenses/): `LICENSE` (Lauren Tan and Michael Denyer), `LICENSE-cursor-team-kit` and `LICENSE-thermos` (Cursor), and `NOTICE.md`, which says which skills and agents each one covers.
 
 ## How they fit this repo
 
 - They are general advice. Where one disagrees with [CLAUDE.md](../../CLAUDE.md) or [docs/workflow.md](../../docs/workflow.md), the repo's rules win: Claude merges only its own tiny and normal PRs, through `npm run can-merge`, migrations come from `npm run db:generate`, decision records use the sections in docs/workflow.md, and colors come from the tokens in `src/app/globals.css`.
 - Some link to `../../references/*.md`. Those files live in the source repo and aren't installed by `npx skills add`, so the links lead nowhere here; skip them.
-- Edit nothing inside these folders, so they stay identical to their source. To update one, copy the newer folder from its source repo in a PR of its own.
+- Edit nothing inside these folders, so they stay identical to their source. To update one, copy the newer folder from its source repo in a PR of its own. pstack's steps are in [docs/workflow.md](../../docs/workflow.md#pstack).
+- pstack's code (`poteto-mode/scripts/` and `reflect/scripts/`) is tested with Bun in pstack's own repo, so `npm run lint`, `npm run typecheck` and `npm test` skip those two folders.
 
 ## Licenses
 

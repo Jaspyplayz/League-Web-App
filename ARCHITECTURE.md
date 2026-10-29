@@ -101,11 +101,12 @@ e2e/              Playwright smoke test and accessibility scan, run against each
 eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/, "server-only"
                   on files that read secrets, no green classes), run by npm run lint, tested in npm test
 .github/          CI, smoke test, dependency review and reviewer workflows, Dependabot, PR and issue templates
-.claude/          Claude Code settings, hooks/ (lint and typecheck before commits, and installs when
-                  a cloud session starts), agents/reviewer.md,
-                  agent-merge.json (the switch for npm run can-merge, read from main),
+.claude/          Claude Code settings, hooks/ (lint and typecheck before commits, installs when
+                  a cloud session starts, and pstack's startup instruction), agents/ (reviewer.md,
+                  plus pstack's four), agent-merge.json (the switch for npm run can-merge, read from main),
                   rules/ (rules for one area, loaded when Claude opens a file there),
-                  skills/ (explain-back, the three verify skills and soft-rounded-ux, plus eight copied from other repos)
+                  skills/ (explain-back, the three verify skills and soft-rounded-ux, plus eight copied
+                  from other repos and pstack's 65, see docs/workflow.md#pstack)
 ```
 
 ## What happens when you open a match

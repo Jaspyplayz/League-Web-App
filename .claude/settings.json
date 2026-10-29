@@ -1,4 +1,7 @@
 {
+  "enabledPlugins": {
+    "pstack@pstack-claude": false
+  },
   "permissions": {
     "deny": [
       "Read(.env.local)",
@@ -26,6 +29,16 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/cloud-setup.mjs\"",
             "timeout": 600
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pstack-context.mjs\"",
+            "timeout": 10
           }
         ]
       }
