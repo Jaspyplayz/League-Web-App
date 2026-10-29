@@ -63,9 +63,10 @@ Steps:
 10. Write the pull request's description to .cache/wellness/pr-body.md (git-ignored), in the sections of .github/pull_request_template.md:
    - First line `**Tier:** tiny: one Runs row in docs/wellness.md.`, second line `**Builder:** Claude Code on Opus 5.5, in a cloud session.` Write both lines exactly as given: can-merge refuses any other tier or builder wording.
    - Summary: the report: the script's output, check 1's findings (most serious first), check 3's judgment, check 4's judgment, and the tickets made (or "Tickets to file").
+   - Evidence: "Before: the last Runs row." and "After: this run's row."
    - Acceptance criteria: "None: a tiny PR."
-   - Merge Danger: "Door: two-way. Blast radius: low: one Runs row in docs/wellness.md."
    - Tested: the script's command and its result. Not tested: what you couldn't run.
+   - Merge Danger: `**Door:** two-way: one Runs row in docs/wellness.md.` and `**Blast radius:** low: no player sees it.`
    - Review: "A tiny PR that changes only docs skips the reviewer."
    - Docs and decisions touched: docs/wellness.md (the Runs row).
    - Last line: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
