@@ -19,7 +19,7 @@ Work lives in Linear ([linear.app/jaspy](https://linear.app/jaspy), team JAS, pr
 - **Up to 4 branches at once**, each touching different files. A file another open PR already changes waits for that PR, or the change goes into it.
 - **Branch:** `claude/jas-<n>-<short-name>`. Linear links a PR by its branch name, not its description, and `npm run can-merge` takes only branches that start with `claude/`. Tiny changes need no ticket.
 - **Comments:** the builder comments on its ticket when it starts (branch and plan), when it opens the PR (link), and at the end of each session (done, next, blocked). After posting its start comment and moving the ticket to In Progress, a builder reads the ticket again; if an earlier start comment is there, that builder owns it, so this one deletes its own comment and stops.
-- **A cloud session** starts from a pushed branch, usually `origin/main`, and can't see uncommitted work on Jasper's PC. Its startup hook ([`cloud-setup.mjs`](../.claude/hooks/cloud-setup.mjs)) runs `npm ci` and `npx playwright install chromium`, and does nothing in a local session. GitHub's GraphQL API is blocked there, so no `gh pr` or `gh issue` command works: until JAS-26, a cloud session pushes its branch and stops, and a local session opens the PR, runs the reviews and merges.
+- **A cloud session** starts from a pushed branch, usually `origin/main`, and can't see uncommitted work on Jasper's PC. Its startup hook ([`cloud-setup.mjs`](../.claude/hooks/cloud-setup.mjs)) runs `npm ci` and `npx playwright install chromium`, and does nothing in a local session. GitHub's GraphQL API is blocked there, so no `gh pr` or `gh issue` command works. `npm run can-merge` and `npm run shot -- --pr` use GitHub's REST API instead, so that block doesn't stop them ([0013](adr/0013-can-merge-uses-github-rest.md)), but opening a PR and writing its Review section still need GraphQL. So a cloud session pushes its branch and stops, and a local session opens the PR, runs the reviews and merges.
 
 ## Review tiers
 
@@ -63,13 +63,13 @@ pstack is a Claude Code plugin on Jasper's PC, not a file in this repo, so a clo
 | 2 to 5, 7 | Feature: `how` maps the code, `architect` compares designs, a subagent writes the code in its own worktree, then the result is checked. Bug fix: reproduce, rule out causes with evidence, land the failing test before the fix | The code that lands is written on Opus 5.5, whatever pstack's role map says |
 | 8 | `interrogate` on risky PRs | Its line goes in the Review section |
 | Opening the PR | Small ordered commits, `/deslop` and `/no-comments` on the diff, PR opened ready | The description follows the [PR template](../.github/pull_request_template.md) |
-| 9 and 10 | Babysit (conflicts, then review threads, then CI, until the PR can merge), then Shipping | The merge is `npm run can-merge`, since the deny rules block `gh pr merge` |
+| 9 and 10 | Babysit (conflicts, then review threads, then CI, until the PR can merge), then Shipping | The merge is `npm run can-merge`, since the deny rules block `gh pr merge` and the REST merge request |
 | Any | Autonomous run ("keep going until X"), woken by `/loop` | The tiers still hold, so a risky plan waits for Jasper |
 
 ## Jobs on Jasper's PC and guard rails
 
 - **Jobs:** every 30 minutes a scheduled task pulls `main`, only when that folder is on `main` with nothing uncommitted, and then deletes local branches already merged except ones a worktree has open. After each pull, a git hook rebuilds the notes in his private Obsidian vault from the merged PRs. Daily, a task copies new unresolved Sentry issues into the error inbox in the vault's Bug Log.
-- **GitHub is the lock:** `main` takes only PRs, needs `check`, `Vercel` and `reviewer` to pass from the apps that run them, and blocks force pushes, with nobody on the bypass list. Claude's deny rules ([`.claude/settings.json`](../.claude/settings.json)) block reading `.env.local`, force pushes, `gh pr merge` and editing the merge switch; they catch mistakes and aren't a security boundary.
+- **GitHub is the lock:** `main` takes only PRs, needs `check`, `Vercel` and `reviewer` to pass from the apps that run them, and blocks force pushes, with nobody on the bypass list. Claude's deny rules ([`.claude/settings.json`](../.claude/settings.json)) block reading `.env.local`, force pushes, `gh pr merge`, sending GitHub's REST merge request with `gh api`, and editing the merge switch; they catch mistakes and aren't a security boundary.
 - **Checks in code:** the commit hook runs lint and typecheck before Claude's commits. The [project lint rules](../eslint-rules/turnpoint.mjs) keep Riot hosts in `src/lib/riot/`, `"server-only"` on files that read secrets, and green out of the UI. The golden tests fail CI when the analyzer's results on four real games move. A mistake caught twice becomes a check like these, not another line of instructions.
 
 ## Decision records and done

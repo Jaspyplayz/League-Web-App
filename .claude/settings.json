@@ -6,6 +6,7 @@
       "Write(.claude/agent-merge.json)",
       "Bash(gh pr merge)",
       "Bash(gh pr merge*)",
+      "Bash(gh api *pulls/*/merge*)",
       "Bash(git push *--force*)",
       "Bash(git push -f*)",
       "Bash(git push * -f*)",

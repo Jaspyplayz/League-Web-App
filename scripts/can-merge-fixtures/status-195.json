@@ -1,0 +1,14 @@
+{
+  "state": "success",
+  "sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027",
+  "total_count": 1,
+  "statuses": [
+    {
+      "context": "Vercel",
+      "state": "success",
+      "target_url": "https://vercel.com/jaspy-s-team/league-web-app/3SCMwZ9eicHYo7PXABLx2mgQUL3h",
+      "description": "Deployment has completed",
+      "created_at": "2026-10-29T04:18:22Z"
+    }
+  ]
+}

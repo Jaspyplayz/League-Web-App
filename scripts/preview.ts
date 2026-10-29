@@ -19,8 +19,12 @@ export function loadEnv() {
 // also how the smoke test finds it (.github/workflows/smoke.yml). Only
 // Vercel's own entries are trusted, since the bypass secret goes to the URL
 // they name.
+// It asks GitHub's REST API, not `gh pr view`, because a cloud session's GitHub
+// proxy refuses the GraphQL API that `gh pr` uses (JAS-26).
 export function previewUrl(pr: string): string {
-  const sha = run("gh", ["pr", "view", pr, "--json", "headRefOid", "--jq", ".headRefOid"]);
+  // The number goes into an API path, so nothing but digits gets that far.
+  if (!/^\d+$/.test(pr)) throw new Error(`--pr takes a PR number, not "${pr}".`);
+  const sha = run("gh", ["api", `repos/{owner}/{repo}/pulls/${pr}`, "--jq", ".head.sha"]);
   const statuses = run("gh", [
     "api",
     `repos/{owner}/{repo}/deployments?sha=${sha}&environment=Preview`,

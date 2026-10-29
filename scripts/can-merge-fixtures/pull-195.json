@@ -1,0 +1,41 @@
+{
+  "number": 195,
+  "title": "docs(workflow): Claude-only workflow, up to 4 builders, Ready queue, Cursor removed (JAS-27)",
+  "state": "closed",
+  "draft": false,
+  "merged": true,
+  "merged_at": "2026-10-29T04:33:04Z",
+  "user": {
+    "login": "Jaspyplayz",
+    "type": "User"
+  },
+  "body": "**Tier:** risky. It changes `.claude/agents/`, `.claude/settings.json`, `.claude/hooks/`, `.claude/skills/` and `scripts/risky-paths.ts`, which are all on the risky list, and it changes the rules every builder follows.\n**Builder:** Claude Code on Opus 5.5, in a local session.\nLinear: JAS-27 (closes on merge from the branch name). Replaces #191 (JAS-21), now closed.",
+  "head": {
+    "ref": "claude/jas-27-claude-only-workflow",
+    "sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027",
+    "user": {
+      "login": "Jaspyplayz"
+    },
+    "repo": {
+      "id": 1417131473,
+      "full_name": "Jaspyplayz/League-Web-App",
+      "owner": {
+        "login": "Jaspyplayz"
+      }
+    }
+  },
+  "base": {
+    "ref": "main",
+    "sha": "4e920ab0fd47539a188816e8e07a23f343452f2b",
+    "user": {
+      "login": "Jaspyplayz"
+    },
+    "repo": {
+      "id": 1417131473,
+      "full_name": "Jaspyplayz/League-Web-App",
+      "owner": {
+        "login": "Jaspyplayz"
+      }
+    }
+  }
+}

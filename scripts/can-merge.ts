@@ -1,6 +1,8 @@
 // `npm run can-merge -- <pr> [--merge]`: may Claude Code merge its own PR?
 // (issue #158, docs/workflow.md). The gates are in scripts/can-merge-gates.ts.
-// This file reads what they check through git and gh, and does the merge.
+// This file reads what they check through git and GitHub's REST API, and does
+// the merge. It calls GitHub only with `gh api`, never `gh pr`, because a cloud
+// session's GitHub proxy refuses the GraphQL API that `gh pr` uses (JAS-26).
 // Run it from an up-to-date main checkout, since it refuses when its own code
 // differs from origin/main's.
 //
@@ -20,19 +22,27 @@ import {
   parseAgentMerge,
   parseReverts,
   SWITCH_FILE,
-  toChecks,
   type AgentMerge,
   type ClaudeMerge,
   type Decision,
   type MainState,
-  type PrSnapshot,
 } from "./can-merge-gates";
+import {
+  CheckRunPage,
+  mergeRequest,
+  Pull,
+  StatusPage,
+  toPrSnapshot,
+  WorkflowRunPage,
+  type Pr,
+} from "./can-merge-rest";
 
 const USAGE = "Usage: npm run can-merge -- <pr number> [--merge]";
 const GATE_CODE = ["scripts/can-merge*", "scripts/risky-paths*", "package.json"];
 
-function run(command: string, args: string[]): string {
-  return execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+function run(command: string, args: string[], input?: string): string {
+  const stdin = input === undefined ? "ignore" : "pipe";
+  return execFileSync(command, args, { encoding: "utf8", input, stdio: [stdin, "pipe", "pipe"] }).trim();
 }
 
 // -z lists paths unquoted, so a name with unusual characters still matches.
@@ -40,72 +50,52 @@ function paths(output: string): string[] {
   return output.split("\0").filter(Boolean);
 }
 
-const PrView = z.object({
-  number: z.number(),
-  title: z.string(),
-  state: z.enum(["OPEN", "CLOSED", "MERGED"]),
-  isDraft: z.boolean(),
-  isCrossRepository: z.boolean(),
-  baseRefName: z.string(),
-  baseRefOid: z.string(),
-  headRefName: z.string(),
-  headRefOid: z.string(),
-  headRepositoryOwner: z.object({ login: z.string() }),
-  author: z.object({ login: z.string(), is_bot: z.boolean() }),
-  body: z.string(),
-  statusCheckRollup: z.array(
-    z.discriminatedUnion("__typename", [
-      z.object({
-        __typename: z.literal("CheckRun"),
-        name: z.string(),
-        workflowName: z.string(),
-        status: z.string(),
-        conclusion: z.string().nullable(),
-        startedAt: z.iso.datetime().nullable(),
-      }),
-      z.object({
-        __typename: z.literal("StatusContext"),
-        context: z.string(),
-        targetUrl: z.string().nullable(),
-        state: z.string(),
-      }),
-    ]),
-  ),
-});
+// gh fills in {owner}/{repo} from this checkout's GitHub remote.
+function api(path: string): unknown {
+  return JSON.parse(run("gh", ["api", path]));
+}
 
-/** The PR as the gates see it, plus what the merge commit's message needs. */
-type Pr = PrSnapshot & { title: string; headOwner: string };
+// The body goes in as JSON on stdin, so a PR title or comment never passes
+// through gh's own field parsing.
+function send(method: "PUT" | "POST", path: string, body: object): unknown {
+  return JSON.parse(run("gh", ["api", "--method", method, path, "--input", "-"], JSON.stringify(body)));
+}
+
+// can-merge reads one page of up to 100 items from each list; #195 had 12
+// check runs. A longer list stops the run rather than leaving checks unread.
+function wholeList<T>(what: string, total: number, items: T[]): T[] {
+  if (items.length < total) {
+    throw new Error(`GitHub has ${total} ${what} for this commit, but can-merge reads only the first 100.`);
+  }
+  return items;
+}
 
 function readPr(number: string): Pr {
-  const view = PrView.parse(
-    JSON.parse(run("gh", ["pr", "view", number, "--json", Object.keys(PrView.shape).join(",")])),
-  );
+  const pull = Pull.parse(api(`repos/{owner}/{repo}/pulls/${number}`));
+  const sha = pull.head.sha;
   // The files come from the exact commit the checks ran on, so a push after
-  // `gh pr view` can't swap in files nobody checked.
+  // reading the PR can't swap in files nobody checked.
   run("git", ["fetch", "--quiet", "origin", `pull/${number}/head`]);
   const fetched = run("git", ["rev-parse", "FETCH_HEAD"]);
-  if (fetched !== view.headRefOid) {
-    throw new Error(`#${number} changed while checking (${view.headRefOid} became ${fetched}). Run can-merge again.`);
+  if (fetched !== sha) {
+    throw new Error(`#${number} changed while checking (${sha} became ${fetched}). Run can-merge again.`);
   }
   // GitHub's base commit also covers a merged PR, whose head is already in main.
-  const files = [
-    ...new Set([...changedPaths("origin/main", view.headRefOid), ...changedPaths(view.baseRefOid, view.headRefOid)]),
-  ];
-  return {
-    number: view.number,
-    title: view.title,
-    state: view.state,
-    isDraft: view.isDraft,
-    isCrossRepository: view.isCrossRepository,
-    baseRefName: view.baseRefName,
-    headRefName: view.headRefName,
-    headRefOid: view.headRefOid,
-    headOwner: view.headRepositoryOwner.login,
-    author: { login: view.author.login, isBot: view.author.is_bot },
-    body: view.body,
+  const files = [...new Set([...changedPaths("origin/main", sha), ...changedPaths(pull.base.sha, sha)])];
+  // Every run of every check, not only GitHub's latest of each name, since
+  // toChecks picks the latest of each workflow and name itself.
+  const runs = CheckRunPage.parse(api(`repos/{owner}/{repo}/commits/${sha}/check-runs?filter=all&per_page=100`));
+  const workflows = WorkflowRunPage.parse(api(`repos/{owner}/{repo}/actions/runs?head_sha=${sha}&per_page=100`));
+  const status = StatusPage.parse(api(`repos/{owner}/{repo}/commits/${sha}/status?per_page=100`));
+  return toPrSnapshot(
+    {
+      pull,
+      checkRuns: wholeList("check runs", runs.total_count, runs.check_runs),
+      workflowRuns: wholeList("workflow runs", workflows.total_count, workflows.workflow_runs),
+      statuses: wholeList("commit statuses", status.total_count, status.statuses),
+    },
     files,
-    checks: toChecks(view.statusCheckRollup),
-  };
+  );
 }
 
 function readMain(): MainState {
@@ -167,49 +157,57 @@ function gateLines(decision: Decision): string[] {
 function merge(pr: Pr, decision: Decision) {
   const number = String(pr.number);
   console.log(`\nMerging #${number} at ${pr.headRefOid}`);
-  run("gh", [
-    "pr",
-    "merge",
-    number,
-    "--merge",
-    "--match-head-commit",
-    pr.headRefOid,
-    "--subject",
-    `Merge pull request #${number} from ${pr.headOwner}/${pr.headRefName}`,
-    "--body",
-    `${pr.title}\n\n${MERGE_MARKER}`,
-  ]);
-  const mergeCommit = run("gh", ["pr", "view", number, "--json", "mergeCommit", "--jq", ".mergeCommit.oid"]);
-  const message = run("gh", ["api", `repos/{owner}/{repo}/commits/${mergeCommit}`, "--jq", ".commit.message"]);
-  if (!message.includes(MERGE_MARKER)) {
-    throw new Error(`Merge commit ${mergeCommit} is missing "${MERGE_MARKER}", so the revert gate can't see it.`);
-  }
-  console.log(`Merge commit ${mergeCommit} carries the marker`);
+  const request = mergeRequest(pr);
+  const { sha: mergeCommit } = MergeResult.parse(send("PUT", request.path, request.body));
+  console.log(`Merged #${number}: merge commit ${mergeCommit}`);
 
-  const labels = run("gh", ["label", "list", "--search", MERGED_BY_CLAUDE, "--json", "name", "--jq", ".[].name"]);
-  if (!labels.split("\n").includes(MERGED_BY_CLAUDE)) {
-    console.log(`Creating the ${MERGED_BY_CLAUDE} label`);
-    run("gh", [
-      "label",
-      "create",
-      MERGED_BY_CLAUDE,
-      "--description",
-      "Claude Code merged this with npm run can-merge",
-      "--color",
-      "5319E7",
-    ]);
+  // The PR is merged now, and nothing below can undo that. So each step that
+  // fails says so and the rest still run; the run then ends with an error
+  // naming what failed.
+  const unfinished: string[] = [];
+  const step = (what: string, action: () => void) => {
+    try {
+      action();
+    } catch (error) {
+      unfinished.push(what);
+      console.error(`Couldn't ${what}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  step("check the merge commit's marker", () => {
+    const message = run("gh", ["api", `repos/{owner}/{repo}/commits/${mergeCommit}`, "--jq", ".commit.message"]);
+    if (!message.includes(MERGE_MARKER)) throw new Error(`"${MERGE_MARKER}" is missing, so the revert gate can't see it`);
+    console.log("The merge commit carries the marker");
+  });
+  step("comment with the gates", () => {
+    const comment = [
+      `Claude Code merged this at ${pr.headRefOid} with \`npm run can-merge -- ${number} --merge\`.`,
+      "",
+      ...gateLines(decision).map((line) => `- ${line}`),
+    ].join("\n");
+    send("POST", `repos/{owner}/{repo}/issues/${number}/comments`, { body: comment });
+    console.log("Commented with the gates");
+  });
+  // can-merge never creates the label, so a typo or a deleted label can't make
+  // a new one. Jasper creates it once; the marker is the record that counts.
+  step(`add the ${MERGED_BY_CLAUDE} label`, () => {
+    const labels = run("gh", ["api", "--paginate", "repos/{owner}/{repo}/labels", "--jq", ".[].name"]).split("\n");
+    if (!labels.includes(MERGED_BY_CLAUDE)) {
+      console.log(`Skipped the ${MERGED_BY_CLAUDE} label, which doesn't exist on GitHub yet`);
+      return;
+    }
+    send("POST", `repos/{owner}/{repo}/issues/${number}/labels`, { labels: [MERGED_BY_CLAUDE] });
+    console.log(`Added the ${MERGED_BY_CLAUDE} label`);
+  });
+  if (unfinished.length > 0) {
+    throw new Error(
+      `#${number} is merged, but these steps failed (errors above): ${unfinished.join("; ")}. Tell Jasper. ` +
+        "A comment or label can be added by hand; a merge commit missing the marker can only be reverted.",
+    );
   }
-  console.log(`Adding the ${MERGED_BY_CLAUDE} label`);
-  run("gh", ["pr", "edit", number, "--add-label", MERGED_BY_CLAUDE]);
-  console.log("Commenting with the gates");
-  const comment = [
-    `Claude Code merged this at ${pr.headRefOid} with \`npm run can-merge -- ${number} --merge\`.`,
-    "",
-    ...gateLines(decision).map((line) => `- ${line}`),
-  ].join("\n");
-  run("gh", ["pr", "comment", number, "--body", comment]);
-  console.log(`Merged #${number}.`);
 }
+
+// GitHub answers a merge with the merge commit's sha, or an error if it refused.
+const MergeResult = z.object({ merged: z.literal(true), sha: z.string() });
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
