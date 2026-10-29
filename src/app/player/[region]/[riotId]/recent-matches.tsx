@@ -20,15 +20,18 @@ import {
 import { loadMatches } from "@/lib/match-store";
 import {
   GAMES_STEP,
-  hasMoreGames,
+  HISTORY_DAYS,
   isPlainProfilePage,
+  listEnd,
   matchListHref,
+  MAX_GAMES,
+  MISSING_PER_VIEW,
   readGameCount,
 } from "@/lib/more-games";
 import type { Profile } from "@/lib/profile-store";
 import type { QueueFilter } from "@/lib/queue-filters";
 import type { Region } from "@/lib/regions";
-import { getMatchIds } from "@/lib/riot/api";
+import { getManyMatchIds } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
 import { QueueTabs } from "./queue-tabs";
@@ -72,16 +75,18 @@ export async function RecentMatches({
   const [ids, dd] = await Promise.all([
     // The All tab's first 10 games are the snapshot's, for free. The other
     // tabs, and longer lists after "Show 10 more games", ask Riot for the
-    // IDs: one call per view.
+    // IDs: one call per 100 games listed.
     plainPage
       ? { ok: true as const, value: profile.matchIds }
-      : settle(getMatchIds(region, puuid, count, queue.filter)),
+      : settle(getManyMatchIds(region, puuid, count, queue.filter)),
     getDataDragon().catch(() => null),
   ]);
-  // Stored matches come from the database; only new ones cost a Riot call.
+  // Stored matches come from the database; only new ones cost a Riot call,
+  // and at most MISSING_PER_VIEW of them per view (see src/lib/more-games.ts).
+  // `waiting` counts the games left for a refresh.
   const result = ids.ok
-    ? await loadMatches(region, ids.value, ids.value.length)
-    : { matches: [], error: ids.error };
+    ? await loadMatches(region, ids.value, MISSING_PER_VIEW)
+    : { matches: [], waiting: 0, error: ids.error };
 
   // Keep each full match next to its summary: the row shows the summary, and
   // the panel under it needs every player's numbers.
@@ -92,7 +97,8 @@ export async function RecentMatches({
 
   const record = summarizeRecord(matches);
 
-  const showMore = ids.ok && hasMoreGames(ids.value.length, count);
+  const oldest = matches.length > 0 ? Math.min(...matches.map((m) => m.startedAt)) : null;
+  const end = ids.ok ? listEnd(ids.value.length, count, oldest, now) : "end";
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -159,7 +165,21 @@ export async function RecentMatches({
             }))}
           />
         )}
-        {showMore && (
+        {matches.length > 0 && result.waiting > 0 && (
+          <p className="text-sm text-faint">
+            {result.waiting} more {result.waiting === 1 ? "game" : "games"} didn&rsquo;t load yet.
+            Refresh in a minute to see {result.waiting === 1 ? "it" : "them"}.
+          </p>
+        )}
+        {end === "two-months" && (
+          <p className="self-center text-sm text-faint">
+            That&rsquo;s every game from the last {HISTORY_DAYS / 30} months.
+          </p>
+        )}
+        {end === "max" && (
+          <p className="self-center text-sm text-faint">The list stops at {MAX_GAMES} games.</p>
+        )}
+        {end === "more" && (
           <Link
             // Lands on the first new game, where the list left off.
             href={matchListHref(playerPath, queue, count + GAMES_STEP, `game-${games.length + 1}`)}
