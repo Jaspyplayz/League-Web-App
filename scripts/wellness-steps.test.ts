@@ -23,6 +23,16 @@ describe("lastRun", () => {
     expect(run).toEqual({ date: "2026-11-15", ranIn: "local", commit: "0e705c7", testSeconds: 44, buildSeconds: null });
   });
 
+  it("finds the last run from one place, skipping rows from the other", () => {
+    const doc = page([
+      "| 2026-11-01 | cloud | `6c38dce` | none | 41 s | 95 s | |",
+      "| 2026-11-05 | local | `0e705c7` | none | 17 s | 7 s | |",
+    ]);
+    expect(lastRun(doc, "cloud")).toEqual({ date: "2026-11-01", ranIn: "cloud", commit: "6c38dce", testSeconds: 41, buildSeconds: 95 });
+    expect(lastRun(doc)?.commit).toBe("0e705c7");
+    expect(lastRun(page(["| 2026-11-05 | local | `0e705c7` | none | 17 s | 7 s | |"]), "cloud")).toBeNull();
+  });
+
   it("refuses a row whose commit isn't one, so a run never diffs from the wrong place", () => {
     expect(() => lastRun(page(["| 2026-11-01 | cloud | last week | none | 41 s | 95 s | |"]))).toThrow(/commit/);
   });

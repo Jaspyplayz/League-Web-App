@@ -30,8 +30,11 @@ export type TscResult = {
 // import, every destructured name, every type parameter).
 const UNUSED_CODES = new Set(["6133", "6138", "6192", "6196", "6198", "6199", "6205"]);
 
-/** The last row of the Runs table, or null before the first run. */
-export function lastRun(markdown: string): LastRun | null {
+/**
+ * The last row of the Runs table, or null before the first run. Given a place,
+ * the last row from that place, since times are only compared like with like.
+ */
+export function lastRun(markdown: string, place?: LastRun["ranIn"]): LastRun | null {
   const lines = markdown.split(/\r?\n/);
   const header = lines.indexOf(RUNS_HEADER);
   if (header === -1) throw new Error("docs/wellness.md has no Runs table with the expected header");
@@ -42,18 +45,7 @@ export function lastRun(markdown: string): LastRun | null {
     if (!line.startsWith("|")) break;
     rows.push(line);
   }
-  const last = rows.at(-1);
-  if (!last) return null;
-
-  const [date, ranIn, commit, , test, build] = cells(last);
-  if (ranIn !== "cloud" && ranIn !== "local") {
-    throw new Error(`The last Runs row's "Ran in" must be cloud or local: ${ranIn}`);
-  }
-  const sha = commit.replaceAll("`", "");
-  if (!/^[0-9a-f]{7,40}$/.test(sha)) {
-    throw new Error(`The last Runs row's "Checked up to" isn't a commit: ${commit}`);
-  }
-  return { date, ranIn, commit: sha, testSeconds: seconds(test), buildSeconds: seconds(build) };
+  return rows.map(parseRow).filter((run) => !place || run.ranIn === place).at(-1) ?? null;
 }
 
 /** The Runs table row for a finished run. */
@@ -77,6 +69,18 @@ export function parseTsc(output: string): TscResult {
     else result.otherErrors += 1;
   }
   return result;
+}
+
+function parseRow(row: string): LastRun {
+  const [date, ranIn, commit, , test, build] = cells(row);
+  if (ranIn !== "cloud" && ranIn !== "local") {
+    throw new Error(`A Runs row's "Ran in" must be cloud or local: ${ranIn}`);
+  }
+  const sha = commit.replaceAll("`", "");
+  if (!/^[0-9a-f]{7,40}$/.test(sha)) {
+    throw new Error(`A Runs row's "Checked up to" isn't a commit: ${commit}`);
+  }
+  return { date, ranIn, commit: sha, testSeconds: seconds(test), buildSeconds: seconds(build) };
 }
 
 // A table row's cells, without the outer pipes. An escaped \| stays in its cell.

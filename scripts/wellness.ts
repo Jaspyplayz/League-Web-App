@@ -36,7 +36,9 @@ const date = new Date().toLocaleDateString("en-CA");
 const ranIn = process.env.CLAUDE_CODE_REMOTE === "true" ? "cloud" : "local";
 git("fetch", "--quiet", "origin");
 const head = git("rev-parse", "--short", "origin/main");
-const last = lastRun(readFileSync("docs/wellness.md", "utf8"));
+const doc = readFileSync("docs/wellness.md", "utf8");
+// The range starts where the last run stopped, wherever it ran.
+const last = lastRun(doc);
 // Before the first run there's no row to start from, so look back 14 days.
 const base = last?.commit ?? git("rev-list", "-1", "--before=14 days ago", "origin/main").slice(0, 7);
 const commits = git("rev-list", "--count", `${base}..${head}`);
@@ -53,7 +55,7 @@ const tsc = parseTsc(timed("npx tsc --noEmit --noUnusedLocals --noUnusedParamete
 
 const time = (r: { seconds: number; ok: boolean }) => (r.ok ? `${Math.round(r.seconds)} s` : "failed");
 // Only a run from the same place is a fair comparison: a cloud machine starts with no build cache.
-const comparable = last?.ranIn === ranIn ? last : undefined;
+const comparable = lastRun(doc, ranIn) ?? undefined;
 const before = (s: number | null | undefined) =>
   s === undefined ? `no earlier ${ranIn} run` : s === null ? "failed" : `${s} s`;
 
