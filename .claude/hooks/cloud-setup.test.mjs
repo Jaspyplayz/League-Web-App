@@ -18,6 +18,20 @@ function fakeRun(failing = []) {
   return { ran, run };
 }
 
+// A stand-in for the lockfile mark: says whether packages are `current`, and
+// counts how often they're marked.
+function fakePackages(current = false) {
+  const packages = { asked: false, marked: 0 };
+  packages.current = () => {
+    packages.asked = true;
+    return current;
+  };
+  packages.markCurrent = () => {
+    packages.marked += 1;
+  };
+  return packages;
+}
+
 describe("cloudSetup", () => {
   it.each([
     ["unset", {}],
@@ -25,37 +39,39 @@ describe("cloudSetup", () => {
     ["1", { CLAUDE_CODE_REMOTE: "1" }],
   ])("runs and checks nothing when CLAUDE_CODE_REMOTE is %s", (_, env) => {
     const { ran, run } = fakeRun();
-    let asked = false;
-    expect(
-      cloudSetup(env, run, () => {
-        asked = true;
-        return false;
-      }),
-    ).toBe("");
+    const packages = fakePackages();
+    expect(cloudSetup(env, run, packages)).toBe("");
     expect(ran).toEqual([]);
-    expect(asked).toBe(false);
+    expect(packages.asked).toBe(false);
+    expect(packages.marked).toBe(0);
   });
 
-  it("installs the packages, then Chromium, in a cloud session", () => {
+  it("installs the packages, marks them current, then installs Chromium, in a cloud session", () => {
     const { ran, run } = fakeRun();
-    expect(cloudSetup(CLOUD, run)).toBe("Cloud setup: ran `npm ci` and `npx playwright install chromium`.");
+    const packages = fakePackages();
+    expect(cloudSetup(CLOUD, run, packages)).toBe("Cloud setup: ran `npm ci` and `npx playwright install chromium`.");
     expect(ran).toEqual(["npm ci", "npx playwright install chromium"]);
+    expect(packages.marked).toBe(1);
   });
 
   it("skips npm ci when node_modules already matches the lockfile", () => {
     const { ran, run } = fakeRun();
-    expect(cloudSetup(CLOUD, run, () => true)).toBe(
+    const packages = fakePackages(true);
+    expect(cloudSetup(CLOUD, run, packages)).toBe(
       "Cloud setup: ran `npx playwright install chromium` (node_modules already matched package-lock.json).",
     );
     expect(ran).toEqual(["npx playwright install chromium"]);
+    expect(packages.marked).toBe(0);
   });
 
-  it("stops after a failed npm ci, and says what won't work and how it ended", () => {
+  it("stops after a failed npm ci, marks nothing, and says what won't work and how it ended", () => {
     const { ran, run } = fakeRun(["npm ci"]);
-    expect(cloudSetup(CLOUD, run)).toBe(
+    const packages = fakePackages();
+    expect(cloudSetup(CLOUD, run, packages)).toBe(
       "Cloud setup: `npm ci` failed, so lint, typecheck, the tests and the build won't work until it's run again. Its last lines:\nlast lines of npm ci",
     );
     expect(ran).toEqual(["npm ci"]);
+    expect(packages.marked).toBe(0);
   });
 
   it("says screenshots won't work when only Chromium fails", () => {

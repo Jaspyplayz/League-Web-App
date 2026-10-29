@@ -38,19 +38,21 @@ const NEEDED_FOR = {
 
 // Runs the steps in order and stops at the first one that fails. `run` takes a
 // command and returns { ok, tail }: whether it worked, and its last lines of
-// output. `packagesCurrent` says whether node_modules already matches
+// output. `packages.current` says whether node_modules already matches
 // package-lock.json, as in a resumed session on the same machine, so npm ci
-// can be skipped; it's only asked in the cloud. Returns the line to print, or
-// "" outside the cloud, where nothing runs.
-export function cloudSetup(env, run, packagesCurrent = () => false) {
+// can be skipped; it's only asked in the cloud. `packages.markCurrent` is
+// called only after npm ci works, so a failed install is never skipped next
+// time. Returns the line to print, or "" outside the cloud, where nothing runs.
+export function cloudSetup(env, run, packages = { current: () => false, markCurrent: () => {} }) {
   if (env.CLAUDE_CODE_REMOTE !== "true") return "";
-  const skipInstall = packagesCurrent();
+  const skipInstall = packages.current();
   const steps = skipInstall ? [BROWSER] : [INSTALL, BROWSER];
   for (const step of steps) {
     const { ok, tail } = run(step);
     if (!ok) {
       return `Cloud setup: \`${step}\` failed, so ${NEEDED_FOR[step]} won't work until it's run again. Its last lines:\n${tail}`;
     }
+    if (step === INSTALL) packages.markCurrent();
   }
   const ran = steps.map((step) => `\`${step}\``).join(" and ");
   return `Cloud setup: ran ${ran}${skipInstall ? " (node_modules already matched package-lock.json)" : ""}.`;

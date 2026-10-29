@@ -14,7 +14,7 @@
 // with the last lines of output when a step fails.
 
 import { spawnSync } from "node:child_process";
-import { cloudSetup, INSTALL, markPackagesCurrent, packagesCurrent } from "./cloud-setup-steps.mjs";
+import { cloudSetup, markPackagesCurrent, packagesCurrent } from "./cloud-setup-steps.mjs";
 
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
@@ -34,11 +34,13 @@ function run(command) {
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   process.stderr.write(output);
   const ok = result.status === 0;
-  if (ok && command === INSTALL) markPackagesCurrent(root);
   const lines = output.trimEnd().split("\n").slice(-5);
   if (result.error) lines.push(result.error.message);
   return { ok, tail: lines.join("\n") };
 }
 
-const line = cloudSetup(process.env, run, () => packagesCurrent(root));
+const line = cloudSetup(process.env, run, {
+  current: () => packagesCurrent(root),
+  markCurrent: () => markPackagesCurrent(root),
+});
 if (line) console.log(line);
