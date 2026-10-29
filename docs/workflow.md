@@ -51,7 +51,9 @@ Every session has these, local or cloud: pstack's are copied into the repo ([bel
 
 | Step | Skill | When |
 |---|---|---|
+| Before a ticket | `grill-with-docs`, then `to-spec`, then `to-tickets` (Matt Pocock) | Work too big for one PR, in a local session with Jasper. Jasper types each one, in the order [below the table](#work-too-big-for-one-pr) |
 | 1. Frame | `grilling` (Matt Pocock) | The problem or the criteria are unclear, in a local session where Jasper can answer. A cloud session posts its questions on the ticket as blocked instead |
+| 1. Frame | `to-tickets` (Matt Pocock) | The ticket is bigger than one PR. The builder stops before coding, comments a proposed split on the ticket, deletes its own start comment so it no longer owns the ticket, moves it back to Todo, and asks Jasper to run `/to-tickets` on it, as [below the table](#work-too-big-for-one-pr) |
 | 2. Inspect | `how` (pstack) | Before changing a part you haven't read |
 | 3. Plan | `architect` (pstack) or `codebase-design` (Matt Pocock) | A design choice, or where a module's boundary should go |
 | 3. Plan | `domain-modeling` (Matt Pocock) | The change adds or renames a word in [`GLOSSARY.md`](../GLOSSARY.md), or records a decision about those words, in this repo's [record format](#decision-records-and-done) |
@@ -63,6 +65,16 @@ Every session has these, local or cloud: pstack's are copied into the repo ([bel
 | 9. Triage, 10. Merge | `fix-merge-conflicts`, then `fix-ci` (pstack) | A conflict with `main` (GitHub won't run the checks until it's gone), then a failing check. `fix-ci` reads checks with `gh pr`, so it works only in a local session |
 | 11. Close out | `documentation-and-adrs` (copied in) | A decision record in this repo's [format](#decision-records-and-done), such as a risky PR's draft, or a doc the change makes wrong |
 | PR text | `unslop` (pstack) | Before opening the PR |
+
+#### Work too big for one PR
+
+Three of Matt Pocock's skills turn it into tickets before any builder starts. Claude can't start them itself, so Jasper types each one, in a local session:
+
+1. **`/grill-with-docs`** questions Jasper until the plan is settled. It writes new words into [`GLOSSARY.md`](../GLOSSARY.md) and decisions into [decision records](#decision-records-and-done) as they settle, since it runs `grilling` and `domain-modeling` together.
+2. **`/to-spec`** writes what was decided up as one parent ticket. Its only question is whether the places it plans to test match what Jasper expects. The parent keeps the skill's own sections instead of the Feature or fix ones, because it's a plan for the sub-tickets and no PR builds it.
+3. **`/to-tickets JAS-<n>`**, given that ticket, splits it into slices, checks the split with Jasper, and saves each slice as a sub-ticket, joined by Linear's blocking links. Two of this repo's rules override the skill's: each slice fits one PR (the skill sizes them to one Claude session), and each sub-ticket has the [Feature or fix](../.github/ISSUE_TEMPLATE/feature.md) sections, so it counts as written up in Todo.
+
+Every ticket they make stays in Todo for Jasper to move to Ready ([triage roles](agents/triage-labels.md)). Each sub-ticket is then built like any other, but only after the tickets that block it are Done. The parent ticket stays in Todo until the last sub-ticket's PR merges; whoever merges that PR moves the parent to Done: the builder after `can-merge`, or Jasper when the PR is his to merge.
 
 Outside a ticket: Jasper types `/improve-codebase-architecture` (Matt Pocock) to scan the code for modules worth deepening, then picks one to go through; what comes out becomes tickets. For slow code, `poteto-mode` has a playbook for one measured slowdown and one for improving a number step by step, and `benchmark-checklist` (pstack) checks a measurement before anyone acts on it.
 
@@ -102,6 +114,7 @@ pstack lives in this repo, pinned to version 0.9.102 ([0014](adr/0014-pstack-liv
 On Jasper's PC, Matt Pocock's skills (`grilling`, `to-tickets`, `domain-modeling` and more) come from the plugin `mattpocock-skills@claude-plugins-official`, which updates itself from Anthropic's official marketplace. Cloud sessions can't install plugins, so the startup hook [`pocock-skills.mjs`](../.claude/hooks/pocock-skills.mjs) downloads them instead, only in the cloud ([0015](adr/0015-cloud-sessions-get-pocock-skills-at-anthropics-pin.md)). It reads the commit Anthropic's marketplace pins for the plugin, not the newest one on GitHub, so cloud and local sessions run the same commit, and the cloud copy updates when Anthropic moves that pin. Nothing is committed: the hook fetches that one commit with git and puts the skills in the cloud machine's `~/.claude/skills/`, next to the folders the cloud keeps there, and `~/.claude/mattpocock-skills.json` records the commit so a resumed session skips the download. Their setup for this repo (the Linear tracker, triage roles as statuses, the domain docs) is in [`docs/agents/`](agents/issue-tracker.md).
 
 - **Skipped:** any name the repo already has (today pstack's `tdd` and `teach`), and `diagnosing-bugs`, `code-review` and `pr`, which Jasper's rules replace with pstack's `why`, the reviewer agent and the PR template. The list is `SKIPPED_BY_RULE` in [`pocock-skills-steps.mjs`](../.claude/hooks/pocock-skills-steps.mjs).
+- **Not used:** `implement` and `implement-spec`, which build tickets with Matt Pocock's own `tdd` and `code-review`. A builder follows [the steps above](#the-steps-for-a-normal-change) instead, one sub-ticket per PR.
 - **When they appear:** on a fresh cloud machine the skills should arrive after the session's first tool call, because Claude Code reads its skill list before startup hooks finish. That order was seen on Jasper's PC; the cloud check on JAS-37 confirms it there. A resumed session has them from the start. Claude can start 7 of them itself; the other 15, such as `to-tickets`, run only when someone types the slash command, as on Jasper's PC.
 - **If it fails,** the session starts anyway, and the hook's one line in Claude's context says why the skills are missing.
 
