@@ -19,7 +19,3 @@ under its line, and use that `<name> at <sha>:` shape only for reviews.
 
 ## Docs and decisions touched
 The docs/ or docs/adr/ files this changes, or "none".
-
-## My read (Jasper)
-Three to five sentences in my own words, written when I choose. It doesn't
-hold up the merge. Tiny PRs skip this.
