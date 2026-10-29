@@ -1,6 +1,6 @@
 # Turnpoint
 
-Turnpoint analyzes a player's League of Legends games against their lane opponent, then looks across many games for habits and weaknesses worth working on. These are the words the app and its docs use for what it shows.
+Turnpoint analyzes a player's League of Legends games against their lane opponent, then looks across many games for habits and weaknesses worth working on. This glossary sets the words to use for what it shows, even where a screen still uses an older one.
 
 ## Language
 
@@ -56,8 +56,20 @@ _Avoid_: Match, except in the Matches tab, Match analysis, and Riot names like `
 A game Turnpoint can analyze: a 5v5 game on Summoner's Rift that lasted long enough.
 _Avoid_: Valid game, supported game
 
+**Game mode**:
+The kind of game, such as Ranked Solo/Duo or ARAM.
+_Avoid_: Queue, except in Riot names like `queueId`
+
+**Remake**:
+A game that ended right at the start and counts as neither a win nor a loss.
+_Avoid_: Dodge, cancelled game
+
+**Role**:
+The position a player plays in a game: Top, Jungle, Mid, Bot or Support.
+_Avoid_: Position, lane (for the role)
+
 **Lane opponent**:
-The enemy player in your position in a game.
+The enemy player in your role in a game.
 _Avoid_: Opponent (on its own), enemy laner
 
 **Matchup**:
@@ -85,7 +97,7 @@ How you did in one phase of a game, shown under Game by phase.
 _Avoid_: Phase score, phase grade
 
 **Early**:
-During the early phase. A label that means a different cutoff names its own clock time instead.
+During the early phase. A label that means a different cutoff should name its clock time instead.
 _Avoid_: Using "early" for any other cutoff
 
 **Turning point**:
@@ -129,8 +141,12 @@ The time advantage that lets one jungler make the next play while the other has 
 _Avoid_: Initiative, pressure
 
 **Gank**:
-A jungler coming to a lane early to get a takedown there.
-_Avoid_: Roam (for a jungler), lane visit
+A jungler coming to a lane early to make a play there, whether or not anyone dies.
+_Avoid_: Roam (for a jungler)
+
+**Takedown**:
+A kill or an assist on an enemy champion.
+_Avoid_: Kill (when assists count too)
 
 **Death label**:
 The kind of death Turnpoint gives each of your deaths, such as Solo killed, Ganked or Caught out.
@@ -141,7 +157,7 @@ A death during the early phase.
 _Avoid_: Early-game death, feed
 
 **Game score**:
-A rating of how well each of the ten players played a game.
+A rating of how well each player in a game played it.
 _Avoid_: Performance score, OP score, rating
 
 **MVP**:
@@ -171,7 +187,7 @@ The profile tab that looks across many of a player's games for patterns.
 _Avoid_: Stats, trends page
 
 **Habit**:
-Something a player tends to do in their games, such as Level 6 first or Lane takedown before 6:00.
+Something a player tends to do in their games, such as "Level 6 first" or "Lane takedown before 6:00".
 _Avoid_: Tendency, pattern
 
 **Recurring weakness**:
@@ -179,7 +195,7 @@ A pattern that keeps showing up in a player's recent games and costs them.
 _Avoid_: Problem, mistake, leak
 
 **Skill to improve**:
-The one stat or habit where a player trails players at their rank the most.
+The one stat or habit where a player trails the rank picked in "You vs [rank]" the most.
 _Avoid_: Focus, focus goal
 
 **Benchmark games**:
@@ -191,7 +207,7 @@ A run of games a player played back to back.
 _Avoid_: Session (on its own), streak
 
 **Ask**:
-The profile tab where a signed-in player asks Claude questions about their games.
+The profile tab where a signed-in person asks Claude questions about that profile's games.
 _Avoid_: Chat, assistant, AI coach
 
 ### Your notes
