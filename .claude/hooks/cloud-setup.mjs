@@ -1,46 +1,54 @@
 // Claude Code hook: install the app's packages and Playwright's Chromium when
-// a cloud session starts.
+// a cloud session starts or is reopened.
 //
-// A cloud session starts on a fresh machine with only the repo cloned, so lint,
-// the tests and `npm run shot` can't run until these are installed. On Jasper's
-// computer they already are, and `npm ci` would delete node_modules and start
-// over, so the hook does nothing unless Claude Code says it's running in the
-// cloud: it sets CLAUDE_CODE_REMOTE to "true" there and never locally
-// (https://code.claude.com/docs/en/hooks).
+// A cloud session starts on a fresh machine with only the repo cloned, and a
+// session reopened after its machine expired gets a fresh one too, so lint,
+// the tests and `npm run shot` can't run until these are installed. On
+// Jasper's computer they already are, and `npm ci` would delete node_modules
+// and start over, so the hook does nothing unless Claude Code says it's
+// running in the cloud: it sets CLAUDE_CODE_REMOTE to "true" there and never
+// locally (https://code.claude.com/docs/en/hooks).
 //
 // Claude Code adds what a SessionStart hook prints to Claude's context, so the
-// installs' own output goes to stderr and only one summary line is printed.
+// installs' own output goes to stderr and only one summary line is printed,
+// with the last lines of output when a step fails.
 
 import { spawnSync } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { cloudSetup, INSTALL } from "./cloud-setup-steps.mjs";
 
-export const STEPS = ["npm ci", "npx playwright install chromium"];
+const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
-// Runs each step in order and stops at the first one that fails. `run` takes a
-// command and returns whether it succeeded. Returns the line to print, or ""
-// outside the cloud, where nothing runs.
-export function cloudSetup(env, run) {
-  if (env.CLAUDE_CODE_REMOTE !== "true") return "";
-  for (const step of STEPS) {
-    if (!run(step)) {
-      return `Cloud setup: \`${step}\` failed (its output is in the hook's stderr). Run it again before lint, tests or npm run shot.`;
-    }
-  }
-  return `Cloud setup: ran ${STEPS.map((step) => `\`${step}\``).join(" and ")}.`;
-}
+// After a good npm ci, the lockfile's hash goes in node_modules, so a resumed
+// session on the same machine skips the reinstall. npm ci deletes
+// node_modules first, so a failed install leaves no mark and runs again.
+const mark = join(root, "node_modules", ".cloud-setup-lock-hash");
+const lockHash = () => createHash("sha256").update(readFileSync(join(root, "package-lock.json"))).digest("hex");
+const packagesCurrent = () => existsSync(mark) && readFileSync(mark, "utf8") === lockHash();
 
-function runStep(command) {
+// Each step gets under half of the hook's 600-second timeout, so a stalled
+// download still ends in a line Claude can read.
+const STEP_TIMEOUT_MS = 280_000;
+
+function run(command) {
   const result = spawnSync(command, {
     shell: true,
-    cwd: process.env.CLAUDE_PROJECT_DIR || process.cwd(),
-    // The child's stdout and stderr both go to our stderr (file descriptor 2).
-    stdio: ["ignore", 2, 2],
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 64 * 1024 * 1024,
+    timeout: STEP_TIMEOUT_MS,
   });
-  return result.status === 0;
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  process.stderr.write(output);
+  const ok = result.status === 0;
+  if (ok && command === INSTALL) writeFileSync(mark, lockHash());
+  const lines = output.trimEnd().split("\n").slice(-5);
+  if (result.error) lines.push(result.error.message);
+  return { ok, tail: lines.join("\n") };
 }
 
-// Run only when Claude Code starts this file, not when the test imports it.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const line = cloudSetup(process.env, runStep);
-  if (line) console.log(line);
-}
+const line = cloudSetup(process.env, run, packagesCurrent);
+if (line) console.log(line);
