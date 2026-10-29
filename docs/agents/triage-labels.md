@@ -1,6 +1,6 @@
 # Triage Labels
 
-Matt Pocock's skills speak in terms of five triage roles, plus "never triaged". Turnpoint tracks them as Linear statuses, not labels, so this file maps each role to the status (or assignee) a skill should use.
+Matt Pocock's skills speak in terms of five triage roles, plus "never triaged". Turnpoint tracks them as Linear statuses, not labels, so this file maps each role to the status (or assignee) a skill should use. A "triage comment" below means one headed `## Triage Notes`, which `triage` writes; an ordinary comment doesn't count.
 
 | Role in mattpocock/skills   | In Turnpoint's Linear                         | Meaning                                                      |
 | --------------------------- | --------------------------------------------- | ------------------------------------------------------------ |
