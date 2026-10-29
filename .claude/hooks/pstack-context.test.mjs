@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,15 +8,17 @@ import { afterAll, describe, expect, it } from "vitest";
 const hook = fileURLToPath(new URL("./pstack-context.mjs", import.meta.url));
 const context = readFileSync(new URL("./pstack-session-start-context.md", import.meta.url), "utf8");
 const settings = JSON.parse(readFileSync(new URL("../settings.json", import.meta.url), "utf8"));
+const projectDir = fileURLToPath(new URL("../..", import.meta.url)).replace(/[\\/]$/, "");
 
-// Runs the hook the way Claude Code does, with CLAUDE_CONFIG_DIR pointing at a
-// fresh folder that holds `sheet` as pstack-models.md, or no sheet at all.
+// Runs the hook the way Claude Code does, from this checkout, with
+// CLAUDE_CONFIG_DIR pointing at a fresh folder that holds `sheet` as
+// pstack-models.md, or no sheet at all.
 const configDirs = [];
 function runHook(sheet) {
   const configDir = mkdtempSync(join(tmpdir(), "pstack-context-"));
   configDirs.push(configDir);
   if (sheet !== undefined) writeFileSync(join(configDir, "pstack-models.md"), sheet);
-  const env = { ...process.env, CLAUDE_CONFIG_DIR: configDir };
+  const env = { ...process.env, CLAUDE_CONFIG_DIR: configDir, CLAUDE_PROJECT_DIR: projectDir };
   return spawnSync(process.execPath, [hook], { env, encoding: "utf8", timeout: 10_000 });
 }
 afterAll(() => configDirs.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
@@ -27,7 +29,26 @@ describe("the pstack startup hook", () => {
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
     expect(result.stdout.startsWith(context)).toBe(true);
-    expect(result.stdout.slice(context.length)).toMatch(/^\nIn this repo pstack is copied into .*`poteto-mode` skill/);
+    expect(result.stdout.slice(context.length)).toMatch(/^\npstack in this repo: .*`pstack:poteto-mode` is the `poteto-mode` skill/);
+  });
+
+  // A fresh session here, asked to start both, got "Agent type
+  // 'pstack:poteto-agent' not found" and a working `poteto-agent`.
+  it("says the bare agent names are the ones that work here, against poteto-mode's own text", () => {
+    const note = runHook().stdout.slice(context.length);
+    expect(note).toContain("says the bare name `poteto-agent` errors, but here the `pstack:` agent names are the ones that don't exist");
+    for (const agent of ["poteto-agent", "comment-sicko", "thermo-nuclear-review-subagent", "thermo-nuclear-code-quality-review-subagent"]) {
+      expect(note).toContain(`\`${agent}\``);
+    }
+  });
+
+  // Without a path, poteto-agent looks for poteto-mode in the plugin cache,
+  // which a cloud session doesn't have.
+  it("gives the path a poteto-agent should read, under the project folder", () => {
+    const note = runHook().stdout.slice(context.length);
+    const path = note.match(/poteto-mode's SKILL\.md, because without one it searches the plugin cache: (.+)/)[1].trim();
+    expect(path).toBe(join(projectDir, ".claude", "skills", "poteto-mode", "SKILL.md"));
+    expect(existsSync(path)).toBe(true);
   });
 
   // Git turns the file's line endings into Windows ones on Jasper's computer.
@@ -43,8 +64,8 @@ describe("the pstack startup hook", () => {
   it.each([
     ["plain", "default effort: session\nsession hook: off\n"],
     ["with Windows line endings", "default effort: session\r\nsession hook: off\r\n"],
-    ["with a byte-order mark", "﻿session hook: off\n"],
-    ["saved as UTF-16 by PowerShell", Buffer.from("﻿session hook: off\r\n", "utf16le")],
+    ["with a byte-order mark", "\uFEFFsession hook: off\n"],
+    ["saved as UTF-16 by PowerShell", Buffer.from("\uFEFFsession hook: off\r\n", "utf16le")],
   ])("prints nothing when the sheet says `session hook: off` (%s)", (_, sheet) => {
     const result = runHook(sheet);
     expect(result.status).toBe(0);
@@ -76,6 +97,6 @@ describe("the pstack startup hook", () => {
   // With the plugin on as well, every pstack skill would load twice, once from
   // the plugin and once from .claude/skills/.
   it("comes with the pstack plugin switched off for this project", () => {
-    expect(settings.enabledPlugins).toEqual({ "pstack@pstack-claude": false });
+    expect(settings.enabledPlugins["pstack@pstack-claude"]).toBe(false);
   });
 });

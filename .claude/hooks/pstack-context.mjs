@@ -10,8 +10,11 @@
 // Claude's context (https://code.claude.com/docs/en/hooks).
 //
 // pstack's text names things the plugin way, `pstack:poteto-mode`, and so do
-// some of its skills. Copied into the repo they have no `pstack:` prefix, so one
-// line after the text says how the names map.
+// some of its skills. poteto-mode even says the bare agent name errors, which is
+// true only for the plugin: here `pstack:poteto-agent` is the one Claude Code
+// can't find. Its poteto-agent also looks for poteto-mode in the plugin cache,
+// which a cloud session doesn't have. pstack's files stay unchanged, so a note
+// after the text overrides both, with the path a poteto-agent should read.
 //
 // Like the plugin's hook, it prints nothing when the pstack-models.md sheet has
 // the line `session hook: off`, so that switch still works in this project.
@@ -20,8 +23,15 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const NAMES_NOTE =
-  "In this repo pstack is copied into `.claude/skills/` and `.claude/agents/`, so its skills and agents have no `pstack:` prefix: `pstack:poteto-mode` is the `poteto-mode` skill, `pstack:interrogate` is `interrogate`, and `pstack:poteto-agent` is the `poteto-agent` agent.";
+const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+
+const namesNote = (potetoModePath) =>
+  [
+    "pstack in this repo: its skills and agents are copied into `.claude/skills/` and `.claude/agents/`, so they have no `pstack:` prefix. `pstack:poteto-mode` is the `poteto-mode` skill, and `pstack:how`, `pstack:why`, `pstack:tdd`, `pstack:architect`, `pstack:arena` and `pstack:interrogate` are `how`, `why`, `tdd`, `architect`, `arena` and `interrogate`.",
+    "This overrides pstack's own files: poteto-mode's Subagents section says the bare name `poteto-agent` errors, but here the `pstack:` agent names are the ones that don't exist. As `subagent_type`, use `poteto-agent`, `comment-sicko`, `thermo-nuclear-review-subagent` and `thermo-nuclear-code-quality-review-subagent`.",
+    `When you start a \`poteto-agent\`, give it this path to poteto-mode's SKILL.md, because without one it searches the plugin cache: ${potetoModePath}`,
+    "Where a pstack skill says to run a script from the installed plugin, run it from `.claude/skills/` instead.",
+  ].join("\n");
 
 // Read the sheet the way the plugin's hook does: Windows PowerShell may save it
 // as UTF-16 (it starts with the bytes FF FE), other editors add a byte-order
@@ -31,7 +41,7 @@ function sessionHookOff() {
   try {
     const bytes = readFileSync(sheet);
     const utf16 = bytes[0] === 0xff && bytes[1] === 0xfe;
-    const text = bytes.toString(utf16 ? "utf16le" : "utf8").replace(/^﻿/, "");
+    const text = bytes.toString(utf16 ? "utf16le" : "utf8").replace(/^\uFEFF/, "");
     return text.split(/\r?\n/).includes("session hook: off");
   } catch {
     return false;
@@ -40,5 +50,5 @@ function sessionHookOff() {
 
 if (!sessionHookOff()) {
   const context = readFileSync(new URL("./pstack-session-start-context.md", import.meta.url), "utf8");
-  process.stdout.write(`${context}\n${NAMES_NOTE}\n`);
+  process.stdout.write(`${context}\n${namesNote(join(root, ".claude", "skills", "poteto-mode", "SKILL.md"))}\n`);
 }

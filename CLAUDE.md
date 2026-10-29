@@ -59,7 +59,7 @@ Routes live in `src/app/`, React components in `src/components/` and helpers in 
 | `npm run tempo-games` / `study-tempo` | Download games for the tempo study into the git-ignored `.cache/tempo-study`, then print its report ([docs/tempo.md](docs/tempo.md)) |
 | `npm run tempo-games -- --items` / `check-items` / `check-positions` / `rift-map` | Download games into `.cache/item-check`, then check the replay's rebuilt items against Riot's, or its map positions against Riot's snapshots, or learn the Rift's walls from them ([docs/replay.md](docs/replay.md#running-the-checks)) |
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR, and [dependency review](.github/workflows/dependency-review.yml) checks new packages for known vulnerabilities. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass, another runs `npm ci` and `npx playwright install chromium` when a cloud session starts (only when `CLAUDE_CODE_REMOTE=true`), and a third gives every session pstack's startup instruction.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, test and build on every PR, and [dependency review](.github/workflows/dependency-review.yml) checks new packages for known vulnerabilities. **Run all four locally before pushing.** A Claude Code hook ([.claude/settings.json](.claude/settings.json)) blocks Claude's commits until lint and typecheck pass, another runs `npm ci` and `npx playwright install chromium` when a cloud session starts (only when `CLAUDE_CODE_REMOTE=true`), and a third gives each session opened on the repo pstack's startup instruction.
 
 ## Environment
 
