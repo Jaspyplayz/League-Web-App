@@ -176,8 +176,9 @@ export const matchParticipants = pgTable(
 
 // Every match ID a player played this season, for the season champion stats
 // on their profile. Riot lists 100 IDs per call, so the list is refreshed
-// only when the profile snapshot is (see src/lib/season-store.ts). The games
-// themselves are loaded a few per visit into matches.
+// only when the profile snapshot is, or by the daily sync (see
+// src/lib/season-store.ts). The games themselves are loaded a few per visit,
+// and by the sync, into season_games.
 export const playerSeasons = pgTable(
   "player_seasons",
   {
@@ -191,6 +192,35 @@ export const playerSeasons = pgTable(
     fetchedAt: timestamptz("fetched_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.puuid, t.season] })],
+).enableRLS();
+
+// One player's line in one season game: just what the Season box adds up.
+// Games loaded only to count toward a season are saved here instead of in
+// matches, because a whole match (about 90 KB with its scoreboard rows)
+// is wasted on a box that needs a champion and a K/D/A. A full season of
+// these is under 100 KB per player. Games already in matches count too, so
+// they're never fetched twice. See src/lib/season-store.ts.
+export const seasonGames = pgTable(
+  "season_games",
+  {
+    // Deleting the player, as the Riot key move does with old PUUIDs,
+    // deletes these too; the daily sync loads them again under the new one.
+    puuid: text("puuid")
+      .notNull()
+      .references(() => players.puuid, { onDelete: "cascade" }),
+    matchId: text("match_id").notNull(),
+    gameStartAt: timestamptz("game_start_at").notNull(),
+    queueId: integer("queue_id").notNull(),
+    durationS: integer("duration_s").notNull(),
+    championName: text("champion_name").notNull(),
+    win: boolean("win").notNull(),
+    kills: smallint("kills").notNull(),
+    deaths: smallint("deaths").notNull(),
+    assists: smallint("assists").notNull(),
+    // totalMinionsKilled + neutralMinionsKilled, as in match_participants.
+    cs: integer("cs").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.puuid, t.matchId] })],
 ).enableRLS();
 
 // A trimmed match-v5 timeline, fetched only when someone opens the match.

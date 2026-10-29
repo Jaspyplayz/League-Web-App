@@ -59,6 +59,8 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   champion (src/lib/champion-stats.ts);
                   settings/ holds preferences saved in the browser (theme);
                   api/mcp/ is the MCP server, with its tools in src/lib/mcp/;
+                  api/cron/season-sync/ the daily job that saves "This is me"
+                  players' new games (docs/database.md);
                   robots.ts keeps crawlers off player pages and the API
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them

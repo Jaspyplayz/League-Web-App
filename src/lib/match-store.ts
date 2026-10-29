@@ -237,7 +237,9 @@ function saveLater(write: (db: Db) => Promise<void>) {
   });
 }
 
-async function remember(timing: SaveTiming, write: (db: Db) => Promise<void>) {
+// Saves with `write` at the time `timing` picks. Failures go to Sentry; the
+// page or job carries on without the row.
+export async function remember(timing: SaveTiming, write: (db: Db) => Promise<void>) {
   if (timing === "after") {
     saveLater(write);
     return;

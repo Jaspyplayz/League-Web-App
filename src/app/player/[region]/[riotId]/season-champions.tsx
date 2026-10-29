@@ -12,7 +12,8 @@ import { panelClass } from "@/components/ui/panel";
 const SHOWN = 7;
 
 // The "Season 2026" box in the profile's sidebar: the season's most played
-// champions, for the game mode picked in the match list's tabs. Loads in its
+// champions, with each one's games, win rate, KDA and CS per minute, for the
+// game mode picked in the match list's tabs. Loads in its
 // own Suspense boundary, so the match list doesn't wait for it.
 export async function SeasonChampions({
   region,
@@ -72,7 +73,8 @@ function ChampionBox({
 }: {
   title: string;
   dd: DataDragon | null;
-  champions: { championName: string; games: number; wins: number; kda: number }[];
+  // csPerMin is missing for the recent-games fallback, which doesn't count it.
+  champions: { championName: string; games: number; wins: number; kda: number; csPerMin?: number }[];
   children: React.ReactNode;
 }) {
   return (
@@ -87,7 +89,10 @@ function ChampionBox({
               <ChampionIcon dd={dd} name={c.championName} size={36} className="soft-round-sm" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{championName(dd, c.championName)}</p>
-                <p className="font-mono text-xs text-faint">{c.games} games</p>
+                <p className="font-mono text-xs text-faint">
+                  {c.games} games
+                  {c.csPerMin !== undefined && ` · ${c.csPerMin.toFixed(1)} CS/min`}
+                </p>
               </div>
               <div className="text-right font-mono text-xs">
                 <p className={c.wins / c.games >= 0.5 ? "text-ahead" : "text-behind"}>

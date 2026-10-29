@@ -42,10 +42,12 @@ export default function PrivacyPage() {
         and win chance.
       </p>
       <p>
-        Finished matches never change, so they are kept. A player&apos;s rank and lists of recent
-        and this season&apos;s matches are refreshed from Riot after a day, or sooner when
-        someone clicks Update. The data is stored in a Postgres database hosted by Supabase in the
-        United States.
+        Finished matches never change, so they are kept. For the season&apos;s champion stats,
+        Turnpoint also keeps each player&apos;s champion, result, kills, deaths, assists and CS in
+        every game of the season. A player&apos;s rank and lists of recent and this season&apos;s
+        matches are refreshed from Riot after a day, or sooner when someone clicks Update. Once a
+        day, Turnpoint also saves the new games of players someone marked with This is me. The
+        data is stored in a Postgres database hosted by Supabase in the United States.
       </p>
 
       <h2>If you sign in</h2>
@@ -66,8 +68,9 @@ export default function PrivacyPage() {
       </ul>
       <p>
         If you click This is me on a player&apos;s profile, Turnpoint saves which player you
-        picked next to your account, so the header can link to it. Only you see it. Click the
-        button again to remove it.
+        picked next to your account, so the header can link to it, and saves that player&apos;s
+        new games once a day so their season stats stay complete. Only you see which player you
+        picked. Click the button again to remove it.
       </p>
       <p>
         If you write notes on a match, Turnpoint saves them with your account. Only you see

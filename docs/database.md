@@ -9,7 +9,8 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 | `players` | searched player (by PUUID), with their latest match IDs | the whole profile after 24 h, or on "Update" (2 min cooldown) |
 | `ranked_entries` | player × ranked queue | with the player's profile |
 | `rank_history` | player × ranked queue × change, a dated copy of the rank | never; a row is added whenever a profile save finds the rank, LP or games played changed ([`src/lib/rank-history.ts`](../src/lib/rank-history.ts)), for the LP graph |
-| `player_seasons` | player × season, every match ID they played that season | with the player's profile; the games fill into `matches` 10 per visit to the plain profile page (All tab, first 10 games) or the Champions tab |
+| `player_seasons` | player × season, every match ID they played that season | with the player's profile, and by the [daily season sync](#the-daily-season-sync); the games fill into `season_games` 10 per visit to the plain profile page (All tab, first 10 games), and into `matches` 10 per visit to the Champions tab |
+| `season_games` | player × game, only the champion, result, K/D/A, CS and length the Season box adds up (about 100 bytes, against about 90 KB for a whole match) | never; filled by the profile and the daily season sync. Games already in `matches` count too, so none is fetched twice. Deleted with the player |
 | `matches` | game, with the full match-v5 JSON in `raw` | never |
 | `match_participants` | player × game (the scoreboard, plus the wards, multikills and CS at 10 the Champions tab adds up) | never (filled from `matches.raw`; migration 0015 filled the 0014 columns for older games) |
 | `match_timelines` | game, trimmed timeline | never, fetched only when the match is opened |
@@ -105,6 +106,12 @@ Pages don't call Riot for cached data directly; they go through a thin layer tha
 - **Profile** ([`src/lib/profile-store.ts`](../src/lib/profile-store.ts)): the icon, level, rank and latest 10 match IDs are one saved snapshot, like op.gg's. `loadProfile` fetches a new one (`summoner-v4`, `league-v4` and the `match-v5` ID list) when there's none, it's older than `TTL_MS.profile`, or it was saved for another region. The Update button calls `updateProfile`, which refetches it unless `match_ids_fetched_at` is within `TTL_MS.updateCooldown`. The player row and its `ranked_entries` are replaced in one transaction. The Riot ID lookup (`account-v1`) still runs on every visit, since it's how the page finds the PUUID.
 - **Matches** ([`src/lib/match-store.ts`](../src/lib/match-store.ts)): fetch `match-v5` only for IDs not already in `matches`.
 - **Timeline:** fetch when a match is opened and there's no `match_timelines` row; store the trimmed version with a `trim_version`.
+
+## The daily season sync
+
+Once a day at 09:00 UTC, Vercel calls `/api/cron/season-sync` (the schedule is in [`vercel.json`](../vercel.json), the route in [`src/app/api/cron/season-sync/route.ts`](../src/app/api/cron/season-sync/route.ts)). For every player someone marked "This is me" (`user_players`), it asks Riot for the season's match list again and saves the missing games to `season_games`, newest first, up to 60 games a run across all players (`SYNC_GAMES` in [`src/lib/season-store.ts`](../src/lib/season-store.ts)). That's a day of games for anyone, and a new player's backlog finishes over a few days. It leaves room in the key's 100 calls per 2 minutes for people using the site.
+
+Vercel sends the `CRON_SECRET` environment variable as a bearer token, and the route refuses any call without it, so nobody else can make the site spend its Riot calls. Set `CRON_SECRET` in Vercel (Production) to any long random string; without it the sync never runs. Each run's answer lists every player with the games it saved, the games still missing and any Riot error, in the function's logs on Vercel.
 
 ## Benchmark games
 

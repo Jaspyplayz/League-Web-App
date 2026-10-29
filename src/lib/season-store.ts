@@ -2,22 +2,31 @@ import "server-only";
 
 import * as Sentry from "@sentry/nextjs";
 import { and, eq, gte, inArray } from "drizzle-orm";
-import { tables } from "@/db";
-import { database, loadMatches, readCache } from "@/lib/match-store";
-import { gameDurationSeconds } from "@/lib/match-summary";
-import type { Region } from "@/lib/regions";
-import { getMatchIds } from "@/lib/riot/api";
-import { settle } from "@/lib/riot/client";
+import { tables, type Db } from "@/db";
+import { seasonGameRow } from "@/db/rows";
+import { mapWithLimit } from "@/lib/concurrency";
+import { database, readCache, remember, type SaveTiming } from "@/lib/match-store";
+import { isRegion, type Region } from "@/lib/regions";
+import { getMatch, getMatchIds } from "@/lib/riot/api";
+import { settle, type RiotApiError } from "@/lib/riot/client";
 import { SEASON, seasonChampions, type SeasonChampion, type SeasonGame } from "@/lib/season";
 
 // The season's most played champions, over every game of the season, not
 // just the 10 on the profile.
 //
 // A season can be hundreds of games, each one Riot call the first time, and
-// the dev key allows 100 calls per 2 minutes. So the games fill in over time:
-// every visit to the plain profile page loads up to GAMES_PER_VIEW more and
-// saves them, and the panel says how many are in so far. Saved games never
-// cost a call again.
+// the key allows 100 calls per 2 minutes. So the games fill in over time:
+// - every visit to the plain profile page loads up to GAMES_PER_VIEW more,
+// - and once a day a scheduled job (src/app/api/cron/season-sync/route.ts)
+//   loads up to SYNC_GAMES for the players someone marked "This is me", so
+//   their season stays complete without anyone opening the page.
+// The panel says how many are in so far.
+//
+// The box needs only each game's champion, result, K/D/A, CS and length, so
+// a game loaded for it is saved as one small season_games row (about 100
+// bytes) instead of the whole match (about 90 KB). Games already saved in
+// matches, by the match list or a match page, count too, so no game costs a
+// Riot call twice.
 //
 // Only the plain page loads more (the caller passes { loadMore: true }; see
 // isPlainProfilePage in src/lib/more-games.ts). Its game-mode
@@ -32,6 +41,8 @@ const GAMES_PER_VIEW = 10;
 // more than almost anyone plays in a season.
 const IDS_PER_PAGE = 100;
 const MAX_PAGES = 10;
+// Riot allows 20 requests a second, so ask for at most 5 games at a time.
+const MATCH_CONCURRENCY = 5;
 
 export type SeasonStats = {
   champions: SeasonChampion[];
@@ -55,31 +66,129 @@ export async function loadSeasonStats(
   if (!ids) return null;
 
   const games = await savedGames(puuid, ids);
-  // Load a few of the missing games. Like the match list, loadMatches saves
-  // them after the page is sent, so they're counted here from memory.
-  const saved = new Set(games.map((g) => g.matchId));
-  const missing = loadMore ? ids.filter((id) => !saved.has(id)).slice(0, GAMES_PER_VIEW) : [];
-  const { matches } = await loadMatches(region, missing, GAMES_PER_VIEW);
-  for (const match of matches) {
-    const me = match.info.participants.find((p) => p.puuid === puuid);
-    if (!me) continue;
-    games.push({
-      matchId: match.metadata.matchId,
-      queueId: match.info.queueId,
-      durationS: gameDurationSeconds(match.info),
-      championName: me.championName,
-      win: me.win,
-      kills: me.kills,
-      deaths: me.deaths,
-      assists: me.assists,
-      cs: me.totalMinionsKilled + me.neutralMinionsKilled,
-    });
-  }
+  // Load a few of the missing games. They're saved after the page is sent,
+  // so they're counted here from memory.
+  const missing = loadMore ? missingIds(ids, games).slice(0, GAMES_PER_VIEW) : [];
+  const fetched = await fetchSeasonGames(region, puuid, missing, "after");
+  games.push(...fetched.games);
 
   return {
     champions: seasonChampions(games, queueIds),
     loaded: games.length,
     total: ids.length,
+  };
+}
+
+// Games the daily job may ask Riot for in one run, across every player.
+// Leaves room in the 100 calls per 2 minutes for the job's match ID lists
+// (one call per 100 games) and for anyone using the site at the time.
+export const SYNC_GAMES = 60;
+
+export type SyncResult = {
+  player: string; // "Name#TAG", for the job's log
+  saved: number; // games loaded and saved this run
+  left: number; // season games still missing after this run
+  error: string | null; // why some games couldn't be loaded this run
+};
+
+// The daily job: refresh the season's match list for every player someone
+// marked "This is me", then save their missing games, newest first, until
+// SYNC_GAMES are used up. A long backlog finishes over the next days.
+export async function syncSeasons(): Promise<SyncResult[]> {
+  const db = database();
+  if (!db) return [];
+  const { players, userPlayers } = tables;
+  // Two accounts can pick the same player; one sync each is enough.
+  const tracked = await db
+    .selectDistinct({
+      puuid: players.puuid,
+      region: players.region,
+      name: players.gameName,
+      tag: players.tagLine,
+    })
+    .from(userPlayers)
+    .innerJoin(players, eq(players.puuid, userPlayers.puuid));
+
+  const results: SyncResult[] = [];
+  let budget = SYNC_GAMES;
+  for (const player of tracked) {
+    if (budget <= 0 || !isRegion(player.region)) continue;
+    const result = await syncSeason(player.region, player.puuid, budget);
+    budget -= result.tried;
+    results.push({
+      player: `${player.name}#${player.tag}`,
+      saved: result.saved,
+      left: result.left,
+      error: result.error,
+    });
+  }
+  return results;
+}
+
+async function syncSeason(region: Region, puuid: string, budget: number) {
+  // Passing now makes the saved list count as stale, so Riot is asked for a
+  // fresh one with the games played since yesterday.
+  const ids = await seasonMatchIds(region, puuid, new Date());
+  if (!ids) return { tried: 0, saved: 0, left: 0, error: "Couldn't list the season's games" };
+
+  const missing = missingIds(ids, await savedGames(puuid, ids));
+  const batch = missing.slice(0, budget);
+  // "now", so the rows are written before the job reports what it saved.
+  const fetched = await fetchSeasonGames(region, puuid, batch, "now");
+  return {
+    tried: batch.length,
+    saved: fetched.games.length,
+    left: missing.length - fetched.games.length,
+    error: fetched.error?.message ?? null,
+  };
+}
+
+// The season's IDs not counted yet, newest first.
+function missingIds(ids: string[], games: SeasonGame[]): string[] {
+  const saved = new Set(games.map((g) => g.matchId));
+  return ids.filter((id) => !saved.has(id));
+}
+
+// Asks Riot for each game, keeps the player's line and saves it to
+// season_games. A game Riot can't send right now is left for next time;
+// `error` says why.
+async function fetchSeasonGames(
+  region: Region,
+  puuid: string,
+  ids: string[],
+  timing: SaveTiming,
+): Promise<{ games: SeasonGame[]; error: RiotApiError | null }> {
+  const fetched = await mapWithLimit(ids, MATCH_CONCURRENCY, (id) => settle(getMatch(region, id)));
+  const rows: (typeof tables.seasonGames.$inferInsert)[] = [];
+  let error: RiotApiError | null = null;
+  for (const result of fetched) {
+    if (!result.ok) {
+      error ??= result.error;
+      continue;
+    }
+    const row = seasonGameRow(result.value, puuid);
+    // The ID list starts at the season, so this only skips odd games.
+    if (row && row.gameStartAt.getTime() >= SEASON.start) rows.push(row);
+  }
+  if (rows.length > 0) {
+    await remember(timing, async (db: Db) => {
+      await db.insert(tables.seasonGames).values(rows).onConflictDoNothing();
+    });
+  }
+  return { games: rows.map(toSeasonGame), error };
+}
+
+function toSeasonGame(row: typeof tables.seasonGames.$inferInsert): SeasonGame {
+  return {
+    matchId: row.matchId,
+    queueId: row.queueId,
+    durationS: row.durationS,
+    championName: row.championName,
+    win: row.win,
+    kills: row.kills,
+    deaths: row.deaths,
+    assists: row.assists,
+    cs: row.cs,
   };
 }
 
@@ -140,33 +249,51 @@ async function saveSeasonMatchIds(puuid: string, matchIds: string[]) {
   }
 }
 
-// The player's line of the scoreboard in each saved season game. One query,
-// and only the few numbers the stats need, not the whole match JSON.
+// The player's line in each season game saved so far: from season_games,
+// and from matches for games saved whole by the match list or a match page.
+// Two small queries for just the few numbers the stats need, not the whole
+// match JSON.
 async function savedGames(puuid: string, ids: string[]): Promise<SeasonGame[]> {
   if (ids.length === 0) return [];
-  const { matches, matchParticipants: mp } = tables;
-  const rows = await readCache((db) =>
-    db
-      .select({
-        matchId: mp.matchId,
-        queueId: matches.queueId,
-        durationS: matches.durationS,
-        championName: mp.championName,
-        win: mp.win,
-        kills: mp.kills,
-        deaths: mp.deaths,
-        assists: mp.assists,
-        cs: mp.cs,
-      })
-      .from(mp)
-      .innerJoin(matches, eq(matches.matchId, mp.matchId))
-      .where(
-        and(
-          eq(mp.puuid, puuid),
-          inArray(mp.matchId, ids),
-          gte(matches.gameStartAt, new Date(SEASON.start)),
-        ),
-      ),
-  );
-  return rows ?? [];
+  const since = new Date(SEASON.start);
+  const { matches, matchParticipants: mp, seasonGames: sg } = tables;
+  const [slim, whole] = await Promise.all([
+    readCache((db) =>
+      db
+        .select({
+          matchId: sg.matchId,
+          queueId: sg.queueId,
+          durationS: sg.durationS,
+          championName: sg.championName,
+          win: sg.win,
+          kills: sg.kills,
+          deaths: sg.deaths,
+          assists: sg.assists,
+          cs: sg.cs,
+        })
+        .from(sg)
+        .where(and(eq(sg.puuid, puuid), inArray(sg.matchId, ids), gte(sg.gameStartAt, since))),
+    ),
+    readCache((db) =>
+      db
+        .select({
+          matchId: mp.matchId,
+          queueId: matches.queueId,
+          durationS: matches.durationS,
+          championName: mp.championName,
+          win: mp.win,
+          kills: mp.kills,
+          deaths: mp.deaths,
+          assists: mp.assists,
+          cs: mp.cs,
+        })
+        .from(mp)
+        .innerJoin(matches, eq(matches.matchId, mp.matchId))
+        .where(and(eq(mp.puuid, puuid), inArray(mp.matchId, ids), gte(matches.gameStartAt, since))),
+    ),
+  ]);
+  // A game in both tables counts once.
+  const games = new Map<string, SeasonGame>();
+  for (const game of [...(slim ?? []), ...(whole ?? [])]) games.set(game.matchId, game);
+  return [...games.values()];
 }

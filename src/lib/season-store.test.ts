@@ -1,35 +1,49 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { tables } from "@/db";
 import { participants, match } from "@/lib/analyzer/test-fixtures";
-import { getMatchIds } from "@/lib/riot/api";
+import { getMatch, getMatchIds } from "@/lib/riot/api";
 import { RiotApiError } from "@/lib/riot/client";
-import { loadMatches } from "@/lib/match-store";
 import type { SeasonGame } from "./season";
-import { loadSeasonStats } from "./season-store";
+import { loadSeasonStats, SYNC_GAMES, syncSeasons } from "./season-store";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
-vi.mock("@/lib/riot/api", () => ({ getMatchIds: vi.fn() }));
+vi.mock("@/lib/riot/api", () => ({ getMatchIds: vi.fn(), getMatch: vi.fn() }));
 
-// A pretend database: the saved season list, the player's saved games, and
-// a record of what was written.
+// A pretend database: the saved season list, the player's saved games (slim
+// rows in season_games, whole games in matches), the "This is me" players,
+// and a record of what was written.
 let savedList: { matchIds: string[]; fetchedAt: Date } | undefined;
-let savedGames: SeasonGame[];
-let written: string[][];
+let slimGames: SeasonGame[];
+let wholeGames: SeasonGame[];
+let tracked: { puuid: string; region: string; name: string; tag: string }[];
+let writtenLists: string[][];
+let writtenGames: { puuid: string; matchId: string }[];
 let hasDatabase: boolean;
 const fakeDb = {
   query: { playerSeasons: { findFirst: async () => savedList } },
-  select: () => ({ from: () => ({ innerJoin: () => ({ where: async () => savedGames }) }) }),
-  insert: () => ({
-    values: (row: { matchIds: string[] }) => {
-      written.push(row.matchIds);
-      return { onConflictDoUpdate: async () => {} };
+  select: () => ({
+    from: (table: unknown) =>
+      table === tables.seasonGames
+        ? { where: async () => slimGames }
+        : { innerJoin: () => ({ where: async () => wholeGames }) },
+  }),
+  selectDistinct: () => ({ from: () => ({ innerJoin: async () => tracked }) }),
+  insert: (table: unknown) => ({
+    values: (row: { matchIds: string[] } | { puuid: string; matchId: string }[]) => {
+      if (table === tables.seasonGames) {
+        writtenGames.push(...(row as { puuid: string; matchId: string }[]));
+      } else {
+        writtenLists.push((row as { matchIds: string[] }).matchIds);
+      }
+      return { onConflictDoUpdate: async () => {}, onConflictDoNothing: async () => {} };
     },
   }),
 };
 vi.mock("@/lib/match-store", () => ({
   database: () => (hasDatabase ? fakeDb : null),
   readCache: (read: (db: typeof fakeDb) => unknown) => read(fakeDb),
-  loadMatches: vi.fn(),
+  remember: (_timing: string, write: (db: typeof fakeDb) => Promise<void>) => write(fakeDb),
 }));
 
 const profileUpdatedAt = new Date("2026-03-01T12:00:00Z");
@@ -48,57 +62,100 @@ function saved(matchId: string, championName = "Vi"): SeasonGame {
   };
 }
 
-// A new game where player-2 (blue jungle in the fixtures) played Vi.
+// A game this season where player-2 (blue jungle in the fixtures) played Vi.
 function newMatch(matchId: string) {
-  return { ...match(participants()), metadata: { matchId } };
+  const m = match(participants());
+  return {
+    ...m,
+    metadata: { matchId },
+    info: { ...m.info, gameStartTimestamp: Date.UTC(2026, 1, 1) },
+  };
 }
 
 beforeEach(() => {
   hasDatabase = true;
   savedList = undefined;
-  savedGames = [];
-  written = [];
+  slimGames = [];
+  wholeGames = [];
+  tracked = [];
+  writtenLists = [];
+  writtenGames = [];
   vi.mocked(getMatchIds).mockReset();
-  vi.mocked(loadMatches)
+  vi.mocked(getMatch)
     .mockReset()
-    .mockImplementation(async (_region, ids) => ({
-      matches: ids.map(newMatch),
-      waiting: 0,
-      error: null,
-    }));
+    .mockImplementation(async (_region, id) => newMatch(id));
 });
 
 describe("loadSeasonStats", () => {
   // What the plain profile page passes; every other view passes false.
   const plainPage = { loadMore: true };
 
-  it("uses the saved season list and loads a few missing games", async () => {
-    savedList = { matchIds: ["NA1_3", "NA1_2", "NA1_1"], fetchedAt: profileUpdatedAt };
-    savedGames = [saved("NA1_1", "LeeSin")];
+  it("counts slim and whole saved games, and saves a few missing ones as slim rows", async () => {
+    savedList = { matchIds: ["NA1_4", "NA1_3", "NA1_2", "NA1_1"], fetchedAt: profileUpdatedAt };
+    slimGames = [saved("NA1_2", "LeeSin")];
+    wholeGames = [saved("NA1_1", "LeeSin")];
 
     const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
 
     expect(getMatchIds).not.toHaveBeenCalled();
-    expect(loadMatches).toHaveBeenCalledWith("na", ["NA1_3", "NA1_2"], 10);
-    expect(stats).toMatchObject({ loaded: 3, total: 3 });
-    expect(stats?.champions.map((c) => [c.championName, c.games])).toEqual([
-      ["Vi", 2],
-      ["LeeSin", 1],
+    expect(vi.mocked(getMatch).mock.calls.map(([, id]) => id)).toEqual(["NA1_4", "NA1_3"]);
+    expect(writtenGames.map((g) => [g.puuid, g.matchId])).toEqual([
+      ["player-2", "NA1_4"],
+      ["player-2", "NA1_3"],
     ]);
+    expect(stats).toMatchObject({ loaded: 4, total: 4 });
+    expect(stats?.champions.map((c) => [c.championName, c.games])).toEqual([
+      ["LeeSin", 2],
+      ["Vi", 2],
+    ]);
+  });
+
+  it("counts a game saved both ways once", async () => {
+    savedList = { matchIds: ["NA1_1"], fetchedAt: profileUpdatedAt };
+    slimGames = [saved("NA1_1")];
+    wholeGames = [saved("NA1_1")];
+
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
+
+    expect(getMatch).not.toHaveBeenCalled();
+    expect(stats).toMatchObject({ loaded: 1, total: 1 });
+  });
+
+  it("loads at most 10 missing games per view", async () => {
+    const ids = Array.from({ length: 30 }, (_, i) => `NA1_${i}`);
+    savedList = { matchIds: ids, fetchedAt: profileUpdatedAt };
+
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
+
+    expect(getMatch).toHaveBeenCalledTimes(10);
+    expect(stats).toMatchObject({ loaded: 10, total: 30 });
   });
 
   it("asks Riot for no new games when the view may not load more", async () => {
     savedList = { matchIds: ["NA1_3", "NA1_2", "NA1_1"], fetchedAt: profileUpdatedAt };
-    savedGames = [saved("NA1_1", "LeeSin")];
+    wholeGames = [saved("NA1_1", "LeeSin")];
 
     const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, {
       loadMore: false,
     });
 
     // A tab or "Show 10 more games" URL shows the saved games only.
-    expect(vi.mocked(loadMatches).mock.calls.flatMap(([, ids]) => ids)).toEqual([]);
+    expect(getMatch).not.toHaveBeenCalled();
     expect(stats).toMatchObject({ loaded: 1, total: 3 });
     expect(stats?.champions.map((c) => c.championName)).toEqual(["LeeSin"]);
+  });
+
+  it("leaves a game Riot can't send for next time", async () => {
+    savedList = { matchIds: ["NA1_2", "NA1_1"], fetchedAt: profileUpdatedAt };
+    vi.mocked(getMatch).mockImplementation(async (_region, id) => {
+      if (id === "NA1_2") throw new RiotApiError("unavailable", "down");
+      return newMatch(id);
+    });
+
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
+
+    expect(writtenGames.map((g) => g.matchId)).toEqual(["NA1_1"]);
+    expect(stats).toMatchObject({ loaded: 1, total: 2 });
   });
 
   it("lists the season again, page by page, once the profile is newer", async () => {
@@ -110,13 +167,13 @@ describe("loadSeasonStats", () => {
 
     expect(getMatchIds).toHaveBeenCalledTimes(2);
     expect(vi.mocked(getMatchIds).mock.calls[1][3]).toMatchObject({ start: 100 });
-    expect(written).toEqual([[...fullPage, "NA1_1"]]);
+    expect(writtenLists).toEqual([[...fullPage, "NA1_1"]]);
     expect(stats?.total).toBe(101);
   });
 
   it("keeps the old list when Riot can't be reached", async () => {
     savedList = { matchIds: ["NA1_1"], fetchedAt: new Date("2026-02-01T00:00:00Z") };
-    savedGames = [saved("NA1_1")];
+    wholeGames = [saved("NA1_1")];
     vi.mocked(getMatchIds).mockRejectedValue(new RiotApiError("unavailable", "down"));
 
     const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
@@ -128,5 +185,61 @@ describe("loadSeasonStats", () => {
     hasDatabase = false;
     expect(await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage)).toBeNull();
     expect(getMatchIds).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncSeasons", () => {
+  const jaspy = { puuid: "player-2", region: "na", name: "Jaspy", tag: "CA1" };
+
+  it("lists the season again and saves the newest missing games", async () => {
+    tracked = [jaspy];
+    // A list saved earlier; the sync always asks Riot for a fresh one.
+    savedList = { matchIds: ["NA1_1"], fetchedAt: new Date(Date.now() - 1000) };
+    wholeGames = [saved("NA1_1")];
+    vi.mocked(getMatchIds).mockResolvedValueOnce(["NA1_3", "NA1_2", "NA1_1"]);
+
+    const results = await syncSeasons();
+
+    expect(getMatchIds).toHaveBeenCalledTimes(1);
+    expect(writtenGames.map((g) => g.matchId)).toEqual(["NA1_3", "NA1_2"]);
+    expect(results).toEqual([{ player: "Jaspy#CA1", saved: 2, left: 0, error: null }]);
+  });
+
+  it("stops at SYNC_GAMES Riot calls for games, across every player", async () => {
+    const friend = { puuid: "player-3", region: "na", name: "Friend", tag: "NA1" };
+    tracked = [jaspy, friend];
+    const ids = Array.from({ length: SYNC_GAMES + 15 }, (_, i) => `NA1_${i}`);
+    vi.mocked(getMatchIds).mockResolvedValue(ids);
+
+    const results = await syncSeasons();
+
+    expect(getMatch).toHaveBeenCalledTimes(SYNC_GAMES);
+    // Nothing left for the second player this run; it waits for tomorrow.
+    expect(results).toEqual([{ player: "Jaspy#CA1", saved: SYNC_GAMES, left: 15, error: null }]);
+  });
+
+  it("says why games were left when Riot stops answering", async () => {
+    tracked = [jaspy];
+    vi.mocked(getMatchIds).mockResolvedValue(["NA1_2", "NA1_1"]);
+    vi.mocked(getMatch).mockRejectedValue(
+      new RiotApiError("rate-limited", "Rate limited by Riot", 60),
+    );
+
+    const results = await syncSeasons();
+
+    expect(results).toEqual([
+      { player: "Jaspy#CA1", saved: 0, left: 2, error: "Rate limited by Riot" },
+    ]);
+  });
+
+  it("skips a player saved with an unknown region", async () => {
+    tracked = [{ ...jaspy, region: "moon" }];
+    expect(await syncSeasons()).toEqual([]);
+    expect(getMatchIds).not.toHaveBeenCalled();
+  });
+
+  it("does nothing without a database", async () => {
+    hasDatabase = false;
+    expect(await syncSeasons()).toEqual([]);
   });
 });
