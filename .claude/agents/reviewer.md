@@ -40,7 +40,7 @@ for one since that commit. Run `git fetch origin main`, `git rev-parse HEAD` and
   `git log --merges <since>..HEAD` succeeds and prints nothing.
 - Your review at `<since>` is the only review there or after it. Every review
   in the PR's first Review section (`gh pr view <number> --json body`), this
-  reviewer's or any other such as a second review, a security check or a
+  reviewer's or any other such as the `interrogate` panel, a security check or a
   comment check, has its own line naming the commit it saw, as
   `<name> at <sha>:`. Each of those commits is `<since>` or an earlier one
   (`git merge-base --is-ancestor <sha> <since>`), and the only line at

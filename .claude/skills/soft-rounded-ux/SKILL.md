@@ -71,7 +71,7 @@ If a ticket only lists corner radius, still treat spacing, hierarchy, and intera
 
 - Jasper Yes before merge on Soft Rounded or UI-direction work, via Chief of Staff. Do not auto-merge a UI fidelity PR.
 - Reject Done if screenshots still look like the pre-Soft-Rounded slice with new labels, or if only one surface is rounded.
-- One coding surface per PR (Cloud Agent or Claude Code, never both).
+- One builder per PR: Claude Code, in one local or cloud session.
 
 ## Encode after a miss
 

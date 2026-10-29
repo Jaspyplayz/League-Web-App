@@ -16,7 +16,7 @@ If another open pull request already edits a file, leave that file alone.
 
 ## Cloud sessions
 
-A Claude Code cloud session starts from a pushed branch, usually `origin/main`, and its startup hook (`.claude/hooks/cloud-setup.mjs`) runs `npm ci` and `npx playwright install chromium`. Node 22. Before pushing, run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. `npm run test:e2e` runs against the Vercel preview, not in this machine. Do not run `npm run db:migrate`. Secrets come from the cloud environment, never from a file in the repo.
+A Claude Code cloud session starts from a pushed branch, usually `origin/main`, and its startup hook (`.claude/hooks/cloud-setup.mjs`) runs `npm ci` and `npx playwright install chromium`. GitHub's GraphQL API is blocked there, so no `gh pr` or `gh issue` command works: until JAS-26, push the branch and stop, and a local session opens the pull request, runs the reviews and merges. Node 22. Before pushing, run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. `npm run test:e2e` runs against the Vercel preview, not in this machine. Do not run `npm run db:migrate`. Secrets come from the cloud environment, never from a file in the repo.
 
 ## Code Review Rules
 

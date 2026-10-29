@@ -161,7 +161,8 @@ describe("riskyFiles", () => {
   // A folder renamed without updating the list would quietly stop being risky.
   // The Cursor patterns are the exception: .cursor/ was deleted when Cursor
   // stopped being used (decision record 0012), so they match no file, but
-  // they stay so a Cursor file added later still goes to Jasper.
+  // they stay so a Cursor settings or rules file added later still goes to
+  // Jasper.
   it("names only paths that exist in the repo, except the kept Cursor patterns", () => {
     const missing = RISKY_PATHS.filter(
       ({ pattern }) => !KEPT_WITHOUT_FILES.includes(pattern) && !repoFiles.some((file) => matchesPattern(pattern, file)),
@@ -169,7 +170,7 @@ describe("riskyFiles", () => {
     expect(missing).toEqual([]);
   });
 
-  it("keeps the Cursor patterns, and they still flag a Cursor file added later", () => {
+  it("keeps the Cursor patterns, and they still flag a Cursor settings or rules file added later", () => {
     expect(RISKY_PATHS.map(({ pattern }) => pattern)).toEqual(expect.arrayContaining(KEPT_WITHOUT_FILES));
     expect(riskyFiles([".cursor/settings.json", ".cursor/rules/x.mdc"])).toEqual([
       {
