@@ -94,6 +94,13 @@ describe("getManyMatchIds", () => {
     expect(String(fetchMock.mock.calls[1][0])).toContain("start=100&count=50&queue=420");
   });
 
+  it("drops an ID repeated when a game ends between two calls", async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify(ids(0, 100))))
+      .mockResolvedValueOnce(new Response(JSON.stringify(ids(99, 50))));
+    await expect(getManyMatchIds("na", "abc", 150)).resolves.toEqual(ids(0, 149));
+  });
+
   it("stops when Riot runs out of games", async () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(ids(0, 40))));
     await expect(getManyMatchIds("na", "abc", 200)).resolves.toHaveLength(40);

@@ -78,7 +78,8 @@ export const MATCH_IDS_PER_CALL = 100;
 
 // Like getMatchIds, but for any `count`: past 100 it asks again for the next
 // 100 (with `start`), one call per 100 IDs, and stops early when Riot runs
-// out of games.
+// out of games. A game that ends between two calls shifts the list by one,
+// so the second page can repeat an ID; repeats are dropped.
 export async function getManyMatchIds(
   region: Region,
   puuid: string,
@@ -93,7 +94,7 @@ export async function getManyMatchIds(
     // A short page is the last one.
     if (batch.length < asked) break;
   }
-  return ids;
+  return [...new Set(ids)];
 }
 
 // The whole Master, Grandmaster or Challenger ladder of ranked solo/duo on

@@ -98,7 +98,7 @@ export async function RecentMatches({
   const record = summarizeRecord(matches);
 
   const oldest = matches.length > 0 ? Math.min(...matches.map((m) => m.startedAt)) : null;
-  const end = ids.ok ? listEnd(ids.value.length, count, oldest, now) : "end";
+  const end = ids.ok ? listEnd(ids.value.length, count, oldest, now, result.waiting) : "end";
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -165,10 +165,17 @@ export async function RecentMatches({
             }))}
           />
         )}
-        {matches.length > 0 && result.waiting > 0 && (
-          <p className="text-sm text-faint">
-            {result.waiting} more {result.waiting === 1 ? "game" : "games"} didn&rsquo;t load yet.
-            Refresh in a minute to see {result.waiting === 1 ? "it" : "them"}.
+        {end === "waiting" && matches.length > 0 && (
+          <p className="self-center text-sm text-faint">
+            {result.waiting} more {result.waiting === 1 ? "game hasn't" : "games haven't"} loaded
+            from Riot yet.{" "}
+            <Link
+              href={matchListHref(playerPath, queue, count, `game-${games.length + 1}`)}
+              className="text-ink underline hover:text-ahead"
+            >
+              Refresh
+            </Link>{" "}
+            to load the next {Math.min(result.waiting, MISSING_PER_VIEW)}.
           </p>
         )}
         {end === "two-months" && (

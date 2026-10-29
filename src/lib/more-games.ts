@@ -6,12 +6,14 @@ import type { QueueFilter } from "@/lib/queue-filters";
 // the page. The URL carries how many games to show (?games=20), so a
 // refresh or a shared link shows the same list.
 //
-// It keeps going until the list reaches back two months, so every game of
-// the last two months can be shown. MAX_GAMES stops a list of someone who
-// plays all day from growing past what one page can show quickly: each view
-// reads every listed game from the database again.
+// Anyone can go back ALWAYS_GAMES games, as before. Past that it keeps going
+// while the list is within two months, so every game of the last two months
+// can be shown. MAX_GAMES stops a list of someone who plays all day from
+// growing past what one page can show quickly: each view reads every listed
+// game from the database again.
 
 export const GAMES_STEP = 10;
+export const ALWAYS_GAMES = 50;
 export const HISTORY_DAYS = 60;
 export const MAX_GAMES = 200;
 
@@ -34,25 +36,34 @@ export function readGameCount(value: string | string[] | undefined): number {
 }
 
 // What goes under the list:
+// - "waiting": some listed games aren't loaded yet (MISSING_PER_VIEW per
+//   view), so a refresh link instead of the button. Saying the list is
+//   complete would be wrong while games are missing from it.
 // - "more": the "Show 10 more games" button.
-// - "two-months": the oldest game shown is over two months old, so the list
-//   already covers the last two months.
+// - "two-months": past ALWAYS_GAMES, the oldest game shown is over two
+//   months old, so the list already covers the last two months.
 // - "max": the list is MAX_GAMES long and stops there.
 // - "end": Riot has no older games (a short list), so nothing.
-export type ListEnd = "more" | "two-months" | "max" | "end";
+export type ListEnd = "waiting" | "more" | "two-months" | "max" | "end";
 
-// `idsShown` is how many match IDs Riot gave for a list of `count`, and
+// `idsShown` is how many match IDs Riot gave for a list of `count`,
 // `oldestStartedAt` when the oldest game shown started (ms since 1970), or
-// null when none loaded.
+// null when none loaded, and `waiting` how many listed games didn't load.
 export function listEnd(
   idsShown: number,
   count: number,
   oldestStartedAt: number | null,
   now: number,
+  waiting: number,
 ): ListEnd {
+  if (waiting > 0) return "waiting";
   // A short list means Riot ran out of games.
   if (idsShown < count) return "end";
-  if (oldestStartedAt !== null && oldestStartedAt < now - HISTORY_DAYS * DAY_MS) {
+  if (
+    count >= ALWAYS_GAMES &&
+    oldestStartedAt !== null &&
+    oldestStartedAt < now - HISTORY_DAYS * DAY_MS
+  ) {
     return "two-months";
   }
   if (count >= MAX_GAMES) return "max";

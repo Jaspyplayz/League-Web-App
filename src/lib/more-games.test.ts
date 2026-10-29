@@ -24,26 +24,37 @@ describe("listEnd", () => {
   const daysAgo = (days: number) => now - days * 24 * 60 * 60 * 1000;
 
   it("offers more while the list is under two months", () => {
-    expect(listEnd(50, 50, daysAgo(20), now)).toBe("more");
-    expect(listEnd(60, 60, daysAgo(59), now)).toBe("more");
+    expect(listEnd(50, 50, daysAgo(20), now, 0)).toBe("more");
+    expect(listEnd(60, 60, daysAgo(59), now, 0)).toBe("more");
   });
 
-  it("stops once the oldest game shown is over two months old", () => {
-    expect(listEnd(120, 120, daysAgo(61), now)).toBe("two-months");
-    // Even on the first page, for a player who rarely plays.
-    expect(listEnd(10, 10, daysAgo(90), now)).toBe("two-months");
+  it("stops past 50 games once the oldest game shown is over two months old", () => {
+    expect(listEnd(120, 120, daysAgo(61), now, 0)).toBe("two-months");
+    expect(listEnd(50, 50, daysAgo(90), now, 0)).toBe("two-months");
+  });
+
+  it("still goes back 50 games for a player who rarely plays, as before", () => {
+    expect(listEnd(10, 10, daysAgo(90), now, 0)).toBe("more");
+    expect(listEnd(40, 40, daysAgo(200), now, 0)).toBe("more");
+  });
+
+  it("asks for a refresh while listed games are still loading", () => {
+    // Even when the loaded games already reach past two months, or the list
+    // is at its longest: the missing ones would make either note wrong.
+    expect(listEnd(200, 200, daysAgo(61), now, 180)).toBe("waiting");
+    expect(listEnd(30, 30, daysAgo(5), now, 10)).toBe("waiting");
   });
 
   it("stops when Riot ran out of games", () => {
-    expect(listEnd(14, 20, daysAgo(5), now)).toBe("end");
+    expect(listEnd(14, 20, daysAgo(5), now, 0)).toBe("end");
   });
 
   it("stops at the longest list", () => {
-    expect(listEnd(MAX_GAMES, MAX_GAMES, daysAgo(30), now)).toBe("max");
+    expect(listEnd(MAX_GAMES, MAX_GAMES, daysAgo(30), now, 0)).toBe("max");
   });
 
-  it("offers more when no game loaded yet", () => {
-    expect(listEnd(20, 20, null, now)).toBe("more");
+  it("offers more when no game loaded", () => {
+    expect(listEnd(20, 20, null, now, 0)).toBe("more");
   });
 });
 
