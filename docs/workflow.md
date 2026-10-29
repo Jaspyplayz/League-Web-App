@@ -51,9 +51,9 @@ Every session has these, local or cloud: pstack's are copied into the repo ([bel
 
 | Step | Skill | When |
 |---|---|---|
-| Before a ticket | `grill-with-docs`, then `to-spec`, then `to-tickets` (Matt Pocock) | Work too big for one PR, in a local session with Jasper; Claude can't start these three itself, so Jasper types each one. `/grill-with-docs` questions him until the plan is settled, writing new words into [`GLOSSARY.md`](../GLOSSARY.md) and decisions into [decision records](#decision-records-and-done) as they settle (it runs `grilling` and `domain-modeling` together). `/to-spec` then writes what was decided up as one parent ticket, without asking anything new. `/to-tickets JAS-<n>`, given that ticket, splits it into thin slices that each fit one PR, checks the split with Jasper, and saves each slice as a sub-ticket, joined by Linear's blocking links. All of them stay in Todo for Jasper to move to Ready ([triage roles](agents/triage-labels.md)) |
+| Before a ticket | `grill-with-docs`, then `to-spec`, then `to-tickets` (Matt Pocock) | Work too big for one PR, in a local session with Jasper. Jasper types each one, in the order [below the table](#work-too-big-for-one-pr) |
 | 1. Frame | `grilling` (Matt Pocock) | The problem or the criteria are unclear, in a local session where Jasper can answer. A cloud session posts its questions on the ticket as blocked instead |
-| 1. Frame | `to-tickets` (Matt Pocock) | The ticket is bigger than one PR. The builder stops before coding, comments a proposed split on the ticket, and asks Jasper to run `/to-tickets` on it. Each sub-ticket is built like any other once it's Ready, but only after the tickets that block it are Done |
+| 1. Frame | `to-tickets` (Matt Pocock) | The ticket is bigger than one PR. The builder stops before coding, comments a proposed split on the ticket, moves it back to Todo (which ends its claim on it), and asks Jasper to run `/to-tickets` on it, as [below the table](#work-too-big-for-one-pr) |
 | 2. Inspect | `how` (pstack) | Before changing a part you haven't read |
 | 3. Plan | `architect` (pstack) or `codebase-design` (Matt Pocock) | A design choice, or where a module's boundary should go |
 | 3. Plan | `domain-modeling` (Matt Pocock) | The change adds or renames a word in [`GLOSSARY.md`](../GLOSSARY.md), or records a decision about those words, in this repo's [record format](#decision-records-and-done) |
@@ -65,6 +65,16 @@ Every session has these, local or cloud: pstack's are copied into the repo ([bel
 | 9. Triage, 10. Merge | `fix-merge-conflicts`, then `fix-ci` (pstack) | A conflict with `main` (GitHub won't run the checks until it's gone), then a failing check. `fix-ci` reads checks with `gh pr`, so it works only in a local session |
 | 11. Close out | `documentation-and-adrs` (copied in) | A decision record in this repo's [format](#decision-records-and-done), such as a risky PR's draft, or a doc the change makes wrong |
 | PR text | `unslop` (pstack) | Before opening the PR |
+
+#### Work too big for one PR
+
+Three of Matt Pocock's skills turn it into tickets before any builder starts. Claude can't start them itself, so Jasper types each one, in a local session:
+
+1. **`/grill-with-docs`** questions Jasper until the plan is settled. It writes new words into [`GLOSSARY.md`](../GLOSSARY.md) and decisions into [decision records](#decision-records-and-done) as they settle, since it runs `grilling` and `domain-modeling` together.
+2. **`/to-spec`** writes what was decided up as one parent ticket. Its only question is whether the places it plans to test match what Jasper expects.
+3. **`/to-tickets JAS-<n>`**, given that ticket, splits it into slices, checks the split with Jasper, and saves each slice as a sub-ticket, joined by Linear's blocking links. Two of this repo's rules override the skill's: each slice fits one PR (the skill sizes them to one Claude session), and each sub-ticket has the [Feature or fix](../.github/ISSUE_TEMPLATE/feature.md) sections, so it counts as written up in Todo.
+
+Every ticket they make stays in Todo for Jasper to move to Ready ([triage roles](agents/triage-labels.md)). Each sub-ticket is then built like any other, but only after the tickets that block it are Done. The parent ticket stays in Todo, since no PR builds it, and the builder whose PR finishes the last sub-ticket moves it to Done.
 
 Outside a ticket: Jasper types `/improve-codebase-architecture` (Matt Pocock) to scan the code for modules worth deepening, then picks one to go through; what comes out becomes tickets. For slow code, `poteto-mode` has a playbook for one measured slowdown and one for improving a number step by step, and `benchmark-checklist` (pstack) checks a measurement before anyone acts on it.
 
