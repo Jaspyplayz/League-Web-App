@@ -1,0 +1,41 @@
+{
+  "number": 14689,
+  "title": "docs(skills): clarify that skill update replaces directory contents and discards local files",
+  "state": "open",
+  "draft": false,
+  "merged": false,
+  "merged_at": null,
+  "user": {
+    "login": "rajpreetcodes",
+    "type": "User"
+  },
+  "body": null,
+  "head": {
+    "ref": "fix/skill-update-help-extra-files",
+    "sha": "9a10c69b5e76659991861592d4c775def1112805",
+    "user": {
+      "login": "rajpreetcodes"
+    },
+    "repo": {
+      "id": 1419123495,
+      "full_name": "rajpreetcodes/cli",
+      "owner": {
+        "login": "rajpreetcodes"
+      }
+    }
+  },
+  "base": {
+    "ref": "trunk",
+    "sha": "ff67d7622da2503223b8437e8cfaa39e1f6bf0e2",
+    "user": {
+      "login": "cli"
+    },
+    "repo": {
+      "id": 212613049,
+      "full_name": "cli/cli",
+      "owner": {
+        "login": "cli"
+      }
+    }
+  }
+}

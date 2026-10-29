@@ -1,0 +1,41 @@
+{
+  "number": 14783,
+  "title": "release download: add --verify to check immutability and build provenance before downloading",
+  "state": "open",
+  "draft": true,
+  "merged": false,
+  "merged_at": null,
+  "user": {
+    "login": "mrecachinas",
+    "type": "User"
+  },
+  "body": null,
+  "head": {
+    "ref": "release-download-verify",
+    "sha": "654d851d8145b2912fe474ceb0a47681854b37e2",
+    "user": {
+      "login": "mrecachinas"
+    },
+    "repo": {
+      "id": 1428672089,
+      "full_name": "mrecachinas/cli",
+      "owner": {
+        "login": "mrecachinas"
+      }
+    }
+  },
+  "base": {
+    "ref": "trunk",
+    "sha": "7948e8056e45ac3c729b829e0eafe2d0797a95c6",
+    "user": {
+      "login": "cli"
+    },
+    "repo": {
+      "id": 212613049,
+      "full_name": "cli/cli",
+      "owner": {
+        "login": "cli"
+      }
+    }
+  }
+}

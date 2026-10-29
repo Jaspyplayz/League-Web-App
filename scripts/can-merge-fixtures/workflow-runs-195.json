@@ -1,0 +1,85 @@
+{
+  "total_count": 8,
+  "workflow_runs": [
+    {
+      "id": 40818046428,
+      "name": "Reviewer",
+      "display_title": "docs(workflow): Claude-only workflow, up to 4 builders, Ready queue, Cursor removed (JAS-27)",
+      "path": ".github/workflows/reviewer.yml",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "check_suite_id": 110641571023,
+      "head_sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027"
+    },
+    {
+      "id": 40817367130,
+      "name": "Reviewer",
+      "display_title": "docs(workflow): Claude-only workflow, up to 4 builders, Ready queue, Cursor removed (JAS-27)",
+      "path": ".github/workflows/reviewer.yml",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "check_suite_id": 110639762588,
+      "head_sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027"
+    },
+    {
+      "id": 40817000027,
+      "name": "Smoke test",
+      "display_title": "Smoke test",
+      "path": ".github/workflows/smoke.yml",
+      "event": "deployment_status",
+      "run_attempt": 1,
+      "check_suite_id": 110638801615,
+      "head_sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027"
+    },
+    {
+      "id": 40816985580,
+      "name": "Reviewer",
+      "display_title": "docs(workflow): Claude-only workflow, up to 4 builders, Ready queue, Cursor removed (JAS-27)",
+      "path": ".github/workflows/reviewer.yml",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "check_suite_id": 110638763716,
+      "head_sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027"
+    },
+    {
+      "id": 40816951895,
+      "name": "Dependency review",
+      "display_title": "docs(workflow): Claude-only workflow, up to 4 builders, Ready queue, Cursor removed (JAS-27)",
+      "path": ".github/workflows/dependency-review.yml",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "check_suite_id": 110638673199,
+      "head_sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027"
+    },
+    {
+      "id": 40816952578,
+      "name": "Reviewer",
+      "display_title": "docs(workflow): Claude-only workflow, up to 4 builders, Ready queue, Cursor removed (JAS-27)",
+      "path": ".github/workflows/reviewer.yml",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "check_suite_id": 110638674751,
+      "head_sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027"
+    },
+    {
+      "id": 40816951899,
+      "name": "CI",
+      "display_title": "docs(workflow): Claude-only workflow, up to 4 builders, Ready queue, Cursor removed (JAS-27)",
+      "path": ".github/workflows/ci.yml",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "check_suite_id": 110638673214,
+      "head_sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027"
+    },
+    {
+      "id": 40816949126,
+      "name": "PR #195",
+      "display_title": "PR #195",
+      "path": "dynamic/github-code-scanning/codeql",
+      "event": "dynamic",
+      "run_attempt": 1,
+      "check_suite_id": 110638665800,
+      "head_sha": "a18e2fcea10f2374e3a120d94192d6997b4ce027"
+    }
+  ]
+}

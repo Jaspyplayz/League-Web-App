@@ -1,7 +1,7 @@
 // The gates `npm run can-merge` checks before Claude Code merges its own PR
 // (issue #158, docs/adr/0008-agents-merge-two-way-doors.md). Everything here
 // is pure, so each gate is tested without GitHub. scripts/can-merge.ts reads
-// the PR and main through gh and git, and passes them in.
+// the PR and main through `gh api` and git, and passes them in.
 
 import { z } from "zod";
 import { riskyFiles } from "./risky-paths";
@@ -26,71 +26,7 @@ const REQUIRED_CHECKS: { name: string; where: string; counts: (check: Check) => 
   { name: "Vercel", where: "Vercel", counts: (c) => c.kind === "status" && c.url.startsWith("https://vercel.com/") },
 ];
 
-// gh's statusCheckRollup: GitHub Actions and app checks are CheckRuns, and
-// Vercel's deployment check is a commit status.
-export type RollupEntry =
-  | {
-      __typename: "CheckRun";
-      name: string;
-      workflowName: string;
-      status: string;
-      conclusion: string | null;
-      startedAt: string | null;
-    }
-  | { __typename: "StatusContext"; context: string; targetUrl: string | null; state: string };
-
-type RollupRun = Extract<RollupEntry, { __typename: "CheckRun" }>;
-
-// GitHub runs a check again on each push, description edit and re-run, and
-// the rollup lists every run. The merge box counts only the latest run of
-// each, so the gates do too. Runs that started in the same second all count.
-export function toChecks(rollup: RollupEntry[]): Check[] {
-  const key = (run: RollupRun) => JSON.stringify([run.workflowName, run.name]);
-  const latest = new Map<string, number>();
-  for (const entry of rollup) {
-    if (entry.__typename === "CheckRun") {
-      latest.set(key(entry), Math.max(latest.get(key(entry)) ?? -Infinity, started(entry)));
-    }
-  }
-  return rollup
-    .filter((entry) => entry.__typename === "StatusContext" || started(entry) === latest.get(key(entry)))
-    .map(toCheck);
-}
-
-// gh prints Go's zero time for a run that hasn't started.
-const NOT_STARTED = "0001-01-01T00:00:00Z";
-
-// A queued run is the newest, and a run cancelled before it started never ran.
-function started(run: RollupRun): number {
-  if (run.startedAt !== null && run.startedAt !== NOT_STARTED) return Date.parse(run.startedAt);
-  return run.status === "COMPLETED" ? -Infinity : Infinity;
-}
-
-function toCheck(entry: RollupEntry): Check {
-  if (entry.__typename === "StatusContext") {
-    return { kind: "status", name: entry.context, url: entry.targetUrl ?? "", state: statusState(entry.state) };
-  }
-  return {
-    kind: "run",
-    name: entry.name,
-    workflow: entry.workflowName,
-    state: checkRunState(entry.status, entry.conclusion),
-  };
-}
-
-function statusState(state: string): CheckState {
-  if (state === "SUCCESS") return "success";
-  if (state === "PENDING" || state === "EXPECTED") return "pending";
-  return "failure";
-}
-
-function checkRunState(status: string, conclusion: string | null): CheckState {
-  if (status !== "COMPLETED") return "pending";
-  if (conclusion === "SUCCESS") return "success";
-  if (conclusion === "NEUTRAL" || conclusion === "SKIPPED") return "skipped";
-  return "failure";
-}
-
+// scripts/can-merge-rest.ts builds this from GitHub's REST answers.
 export type PrSnapshot = {
   number: number;
   state: "OPEN" | "CLOSED" | "MERGED";
