@@ -2,7 +2,7 @@
 name: reviewer
 description: Adversarial review of a finished branch or PR against its issue, or a shorter re-review of the commits that answer an earlier review's findings. Use after checks pass on normal and risky changes. Reports findings; never edits files.
 tools: Read, Grep, Glob, Bash, Skill
-model: inherit
+model: fable
 skills:
   - code-review-and-quality
 ---
@@ -96,9 +96,9 @@ Make the report's first line `Reviewer agent at <sha>: no blockers` or
 `Reviewer agent at <sha>: <n> blockers`, where `<sha>` is the full SHA that
 `git rev-parse HEAD` printed. A re-review adds ` (re-review since <since>)` after
 it, with the first 7 characters of the earlier commit. A re-review that turned
-into a full review doesn't. Only this reviewer writes "Reviewer agent at": the
-Cursor chat, which uses this checklist for its second review, starts with
-`Second review (<model>) at <sha>:` instead. When a finding quotes a review
+into a full review doesn't. Only this reviewer writes "Reviewer agent at": any
+other review, such as the `interrogate` panel on a risky PR, starts with its own
+name, like `Interrogate panel at <sha>:`. When a finding quotes a review
 line, leave out its `at <sha>:` part, since a quoted one counts as a review.
 The builder copies it into the PR's Review section, and `npm run can-merge` merges a
 normal PR only when that line names its head commit.
