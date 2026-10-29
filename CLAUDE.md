@@ -49,6 +49,7 @@ Routes live in `src/app/`, React components in `src/components/` and helpers in 
 | `npm run test:e2e` | Playwright smoke test and accessibility scan (`e2e/`); runs on each Vercel preview ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test)) |
 | `npm run shot -- --pr <number> <path>` | Screenshot a page on a PR's preview (or `--base` the live site or a dev server) into `.cache/verify/`, for a PR's evidence. Agents use it through the `verify` skill ([.claude/skills/verify/SKILL.md](.claude/skills/verify/SKILL.md)) |
 | `npm run can-merge -- <pr> [--merge]` | Print each gate a PR must pass before Claude Code merges it; `--merge` merges it only if all pass ([docs/workflow.md](docs/workflow.md#the-steps-for-a-normal-change), step 10) |
+| `npx tsx scripts/wellness.ts` | The automatic part of the biweekly wellness check: times the tests and build, lists unused variables, prints the next Runs row ([docs/wellness.md](docs/wellness.md)) |
 | `npm run build` | Production build |
 | `npm run db:generate` / `db:migrate` | Create / apply a migration after editing `src/db/schema.ts` |
 | `npm run benchmarks` | Collect games from every rank for Insights' comparisons ([docs/database.md](docs/database.md#benchmark-games)) |
