@@ -59,6 +59,8 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   champion (src/lib/champion-stats.ts);
                   settings/ holds preferences saved in the browser (theme);
                   api/mcp/ is the MCP server, with its tools in src/lib/mcp/;
+                  api/cron/season-sync/ the daily job that saves "This is me"
+                  players' new games (docs/database.md);
                   robots.ts keeps crawlers off player pages and the API
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
@@ -85,7 +87,8 @@ src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back 
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
-src/lib/season-store.ts Season champion stats; loads 10 more season games per plain profile visit
+src/lib/season-store.ts Season champion stats from slim season_games rows; loads 10 more per plain profile visit,
+                  and syncSeasons fills in "This is me" players once a day (api/cron/season-sync)
 src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
 src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves each question before Claude answers, ask-rules.ts the caps
 src/db/           Drizzle schema, connection, and cache freshness rules
@@ -148,7 +151,7 @@ The rules live in `src/db/freshness.ts`.
 A development key allows 20 requests a second and 100 every 2 minutes, per region, and a brand new player can take 20 or more. Four things keep Turnpoint inside that:
 
 1. **The cache.** Most visits cost zero Riot calls.
-2. **A budget per page.** Insights and season stats fetch only a few missing games per visit and fill in the rest over the next few loads, so a 100-game view can't use the whole allowance at once.
+2. **A budget per page.** Insights and season stats fetch only a few missing games per visit and fill in the rest over the next few loads, so a 100-game view can't use the whole allowance at once. The daily season sync spends about 60 calls a run, lists included (70 at worst).
 3. **Counting before calling, shared by every server.** Vercel runs several copies of the app at once, and none of them can see the others' memory. So the count lives in Postgres: one row per Riot region in `riot_rate_limits`, holding how many requests each of Riot's windows has used. Before every request the client locks that row, asks a pure function (`takeTurn` in `src/lib/riot/rate-limit.ts`) whether one more fits, and saves the new count. Locking the row means two servers asking at the same moment take turns, so they can't both spend the last request in a window. A short wait (the per-second limit) is slept through; a long one (the 2 minute window is used up) fails right away with "try again in N seconds".
 4. **Backing off.** After a "too many requests" answer, the client refuses to call that region again until Riot's `Retry-After` time has passed, and saves that time in the same row so every server waits. Riot can disable keys that keep calling after being told to stop.
 

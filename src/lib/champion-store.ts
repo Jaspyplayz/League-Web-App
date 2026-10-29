@@ -19,8 +19,10 @@ import { seasonMatchIds } from "@/lib/season-store";
 
 // The Champions tab's games: every game of the season that's saved so far,
 // plus a few more from Riot on each visit. It shares the season's match list
-// and saved games with the Season box on the profile (src/lib/season-store.ts),
-// so games loaded by either count for both.
+// with the Season box on the profile (src/lib/season-store.ts), and the Season
+// box counts the whole games saved here. Not the other way round: the Season
+// box and the daily sync save only the player's own line (season_games),
+// and this table needs all ten players, so it loads those games again.
 //
 // The table needs all ten players of each game (for kill participation,
 // damage share, the lane opponent and the game score), read from

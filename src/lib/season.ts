@@ -10,6 +10,9 @@ export const SEASON = { id: "2026", label: "Season 2026", start: Date.UTC(2026, 
 // Games shorter than this are remakes, which don't count, as elsewhere.
 export const REMAKE_SECONDS = 5 * 60;
 
+// Arena has no minions, so its games would pull CS per minute toward zero.
+const ARENA_QUEUE = 1700;
+
 // One of the player's games, as stored in match_participants and matches.
 export type SeasonGame = {
   matchId: string;
@@ -28,7 +31,7 @@ export type SeasonChampion = {
   games: number;
   wins: number;
   kda: number;
-  csPerMin: number;
+  csPerMin?: number; // missing when every game was in Arena
 };
 
 // Each champion's record over these games, most played first. `queueIds`
@@ -40,8 +43,10 @@ export function seasonChampions(games: SeasonGame[], queueIds: number[] | null):
   const byChampion = Map.groupBy(counted, (g) => g.championName);
   return [...byChampion]
     .map(([championName, played]) => {
-      const sum = (pick: (g: SeasonGame) => number) => played.reduce((t, g) => t + pick(g), 0);
-      const minutes = sum((g) => g.durationS) / 60;
+      const sum = (pick: (g: SeasonGame) => number, from = played) =>
+        from.reduce((t, g) => t + pick(g), 0);
+      const farmed = played.filter((g) => g.queueId !== ARENA_QUEUE);
+      const minutes = sum((g) => g.durationS, farmed) / 60;
       return {
         championName,
         games: played.length,
@@ -52,7 +57,7 @@ export function seasonChampions(games: SeasonGame[], queueIds: number[] | null):
           sum((g) => g.deaths),
           sum((g) => g.assists),
         ),
-        csPerMin: minutes > 0 ? sum((g) => g.cs) / minutes : 0,
+        csPerMin: minutes > 0 ? sum((g) => g.cs, farmed) / minutes : undefined,
       };
     })
     .sort((a, b) => b.games - a.games || b.wins - a.wins);

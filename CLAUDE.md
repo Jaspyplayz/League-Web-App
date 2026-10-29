@@ -71,6 +71,7 @@ Copy `.env.example` to `.env.local` (git-ignored); production values live in Ver
 - `DATABASE_URL` (transaction pooler, port 6543), `DATABASE_URL_DIRECT` (session pooler, port 5432, migrations only)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: sign-in; without them "Sign in" is hidden ([docs/sign-in.md](docs/sign-in.md))
 - `ANTHROPIC_API_KEY`: AI match recaps; without it "Write recap" is hidden ([docs/match-recap.md](docs/match-recap.md))
+- `CRON_SECRET`: only in Vercel; Vercel sends it with the daily season sync, and without it the sync never runs ([docs/database.md](docs/database.md#the-daily-season-sync))
 - `VERCEL_AUTOMATION_BYPASS_SECRET`: only in `.env.local` and GitHub's secrets; lets `npm run shot -- --pr` and the journey skills' `--pr` past a preview's Vercel login, and the smoke test in CI uses GitHub's copy ([docs/SETUP.md](docs/SETUP.md#the-browser-smoke-test))
 
 ## Design

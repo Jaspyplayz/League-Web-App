@@ -148,6 +148,13 @@
       "when": 1792583157481,
       "tag": "0020_backfill_ask_spend",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793236336368,
+      "tag": "0021_season_games",
+      "breakpoints": true
     }
   ]
 }

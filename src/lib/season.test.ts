@@ -37,6 +37,12 @@ describe("seasonChampions", () => {
     expect(seasonChampions(games, [450]).map((c) => c.championName)).toEqual(["Jinx"]);
   });
 
+  it("leaves Arena games, which have no minions, out of CS per minute", () => {
+    const games = [game({ cs: 240 }), game({ queueId: 1700, cs: 0 })];
+    expect(seasonChampions(games, null)[0]).toMatchObject({ games: 2, csPerMin: 8 });
+    expect(seasonChampions([game({ queueId: 1700, cs: 0 })], null)[0].csPerMin).toBeUndefined();
+  });
+
   it("leaves remakes out", () => {
     expect(seasonChampions([game({ durationS: 200 })], null)).toEqual([]);
   });

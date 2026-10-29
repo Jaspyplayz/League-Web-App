@@ -8,7 +8,13 @@ import { gameDurationSeconds } from "../lib/match-summary";
 import type { Region } from "../lib/regions";
 import type { Match, Participant } from "../lib/riot/types";
 import type { Tier } from "../lib/tiers";
-import type { benchmarkGames, matches, matchParticipants, winChanceGames } from "./schema";
+import type {
+  benchmarkGames,
+  matches,
+  matchParticipants,
+  seasonGames,
+  winChanceGames,
+} from "./schema";
 
 export function matchRow(match: Match): typeof matches.$inferInsert {
   const { info } = match;
@@ -20,6 +26,26 @@ export function matchRow(match: Match): typeof matches.$inferInsert {
     gameStartAt: new Date(info.gameStartTimestamp),
     durationS: gameDurationSeconds(info),
     raw: match,
+  };
+}
+
+// One player's line in a game for season_games: only what the Season box
+// adds up. Null if the player isn't in the game.
+export function seasonGameRow(match: Match, puuid: string): typeof seasonGames.$inferInsert | null {
+  const me = match.info.participants.find((p) => p.puuid === puuid);
+  if (!me) return null;
+  return {
+    puuid,
+    matchId: match.metadata.matchId,
+    gameStartAt: new Date(match.info.gameStartTimestamp),
+    queueId: match.info.queueId,
+    durationS: gameDurationSeconds(match.info),
+    championName: me.championName,
+    win: me.win,
+    kills: me.kills,
+    deaths: me.deaths,
+    assists: me.assists,
+    cs: me.totalMinionsKilled + me.neutralMinionsKilled,
   };
 }
 

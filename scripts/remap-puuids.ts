@@ -168,6 +168,7 @@ function printDryRun(path: string, file: MapFile, counts: Counts) {
     ["ranked_entries old", "13", count(counts.rankedOld)],
     ["rank_history old", "12", count(counts.rankHistoryOld)],
     ["player_seasons old", "4", count(counts.seasonsOld)],
+    ["season_games old", "(new table)", count(counts.seasonGamesOld)],
     ["user_players old", "0", count(counts.userPlayersOld)],
     ["match_recaps old", "2", count(counts.recapsOld)],
     ["match_insights old", "0", count(counts.insightsOld)],
