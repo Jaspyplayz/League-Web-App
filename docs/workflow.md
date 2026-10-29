@@ -45,6 +45,27 @@ The builder picks a tier when it starts and names it in the PR. Every tier gets 
 10. **Merge.** Claude merges its own tiny and normal PRs with `npm run can-merge -- <pr> --merge`, run from an up-to-date main checkout. It merges only when every gate in [`scripts/can-merge-gates.ts`](../scripts/can-merge-gates.ts) passes at the head commit ([0008](adr/0008-agents-merge-two-way-doors.md), [0009](adr/0009-can-merge-covers-database-code-and-tiny-code.md)); a normal PR also needs every criterion ticked. Wait for the `reviewer` check to finish first, since `can-merge` refuses while any check runs. GitHub doesn't run that check while the PR has a merge conflict. Jasper merges the rest.
 11. **Close out in the same PR.** Docs and decision records change with the code; a doc the PR leaves wrong gets fixed in it. The branch's ticket ID closes the ticket on merge.
 
+### Skills for each step
+
+Every session has these, local or cloud: pstack's are copied into the repo ([below](#pstack)), and Matt Pocock's come from the plugin or the cloud hook ([below](#matt-pococks-skills)). Where a skill disagrees with this page, this page wins.
+
+| Step | Skill | When |
+|---|---|---|
+| 1. Frame | `grilling` (Matt Pocock) | The problem or the criteria are unclear, in a local session where Jasper can answer. A cloud session posts its questions on the ticket as blocked instead |
+| 2. Inspect | `how` (pstack) | Before changing a part you haven't read |
+| 3. Plan | `architect` (pstack) or `codebase-design` (Matt Pocock) | A design choice, or where a module's boundary should go |
+| 3. Plan | `domain-modeling` (Matt Pocock) | The change adds or renames a word in [`GLOSSARY.md`](../GLOSSARY.md), or records a decision about those words, in this repo's [record format](#decision-records-and-done) |
+| 4. Test first | `tdd` (pstack) | Pure logic, and any bug fix with a cheap test |
+| 5. Implement | `poteto-mode` (pstack) | Several files, a design choice, or a bug or slowdown whose cause isn't known. It picks a playbook |
+| 5. Implement | `why` (pstack) | Why code works the way it does, or when it broke. `poteto-mode`'s bug playbook calls it for you |
+| 7. Self-check | `verify`, `verify-turnpoint`, `verify-turnpoint-ux` | As in step 7 |
+| 8. Review | the reviewer agent, plus `interrogate` (pstack) on risky PRs | As in step 8 |
+| 9. Triage, 10. Merge | `fix-merge-conflicts`, then `fix-ci` (pstack) | A conflict with `main` (GitHub won't run the checks until it's gone), then a failing check. `fix-ci` reads checks with `gh pr`, so it works only in a local session |
+| 11. Close out | `documentation-and-adrs` (copied in) | A decision record in this repo's [format](#decision-records-and-done), such as a risky PR's draft, or a doc the change makes wrong |
+| PR text | `unslop` (pstack) | Before opening the PR |
+
+Outside a ticket: Jasper types `/improve-codebase-architecture` (Matt Pocock) to scan the code for modules worth deepening, then picks one to go through; what comes out becomes tickets. For slow code, `poteto-mode` has a playbook for one measured slowdown and one for improving a number step by step, and `benchmark-checklist` (pstack) checks a measurement before anyone acts on it.
+
 ## Reviews
 
 - **The reviewer agent** ([`reviewer.md`](../.claude/agents/reviewer.md)) is a fresh Claude on Fable with no Edit or Write tool, told never to change files. It gets the criteria, the test output and the PR number, never the builder's reasoning. Its first line, `Reviewer agent at <sha>: no blockers` or `<n> blockers`, goes into the PR's first `## Review` section, where `can-merge` and GitHub's required `reviewer` check read it ([0010](adr/0010-github-requires-the-reviewer.md)). On a PR Claude didn't build, Claude runs the reviewer and writes that section itself.
