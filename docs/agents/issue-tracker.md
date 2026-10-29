@@ -1,6 +1,8 @@
 # Issue tracker: Linear
 
-Turnpoint's tickets live in Linear: workspace [linear.app/jaspy](https://linear.app/jaspy), team **JAS**, project **Turnpoint**. Not GitHub issues; GitHub issues opened before 2026-10-25 stay open until they're done. The full rules are in [docs/workflow.md](../workflow.md#tickets-and-builders); this page is what Matt Pocock's skills (`to-tickets`, `to-spec`, `triage`, `wayfinder`, `implement`) need to know.
+Turnpoint's tickets live in Linear: workspace [linear.app/jaspy](https://linear.app/jaspy), team **JAS**, project **Turnpoint**. Not GitHub issues; GitHub issues opened before 2026-10-25 stay open until they're done. The full rules are in [docs/workflow.md](../workflow.md#tickets-and-builders); this page is what Matt Pocock's skills (`to-tickets`, `to-spec`, `triage`, `implement`) need to know.
+
+`wayfinder` isn't set up here: it needs `wayfinder:map` and `wayfinder:<type>` labels and its own operations section, which Turnpoint doesn't have. Don't run it until this page has them.
 
 ## This repo's rules (override anything a skill says)
 

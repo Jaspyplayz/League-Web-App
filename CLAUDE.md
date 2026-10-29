@@ -103,11 +103,7 @@ Dark "scouting report" style with a light theme. **Blue = you / ahead / win, red
 
 ## Agent skills
 
-Matt Pocock's skills read their setup from `docs/agents/`:
-
-- **Issue tracker:** Linear, team JAS, project Turnpoint. See `docs/agents/issue-tracker.md`.
-- **Triage labels:** the five roles map to Linear statuses; only Jasper moves a ticket to Ready. See `docs/agents/triage-labels.md`.
-- **Domain docs:** single-context, `GLOSSARY.md` at the root and decision records in `docs/adr/`. See `docs/agents/domain.md`.
+Matt Pocock's skills read their setup from `docs/agents/`: the issue tracker (Linear) in `issue-tracker.md`, triage roles as Linear statuses in `triage-labels.md`, and the single-context domain docs in `domain.md`.
 
 ## Keeping this file current
 
