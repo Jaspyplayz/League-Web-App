@@ -20,9 +20,9 @@ import { participantRiotId, toSlug } from "@/lib/riot-id";
 // tabs: Overview (both teams' scoreboard, with each player's game score),
 // Team analysis, Build and Runes, plus a link out to the full analysis page.
 //
-// Overview, Team analysis and Runes come from the match the profile already loaded, so
-// opening a row costs no Riot calls. Only the Build tab needs more data; see
-// MatchTabs.
+// It's rendered when a row first opens (match-details-action.tsx), from the
+// match the profile already saved, so opening a row costs no Riot calls.
+// Only the Build tab needs more data; see MatchTabs.
 export function MatchDetails({
   region,
   dd,

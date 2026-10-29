@@ -31,6 +31,7 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "src/lib/mcp/", why: "the MCP server's cap on Riot calls" },
   { pattern: "src/app/actions.ts", why: "a server action anyone can call" },
   { pattern: "src/app/player/[region]/[riotId]/actions.ts", why: "server actions anyone can call, which spend Riot calls" },
+  { pattern: "src/app/player/[region]/[riotId]/match-details-action.tsx", why: "a server action anyone can call, which can spend a Riot call" },
   { pattern: "src/app/player/[region]/[riotId]/insights/advance.ts", why: "a server action anyone can call, which spends Riot calls" },
   { pattern: "src/lib/ask", why: "Ask spends Claude API money" },
   { pattern: "src/lib/recap", why: "AI recaps spend Claude API money" },

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { FilterableMatchList } from "@/components/filterable-match-list";
 import { PanelSkeleton } from "@/components/loading-skeleton";
-import { MatchDetails } from "@/components/match-details";
 import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { findPlayer } from "@/lib/analyzer";
@@ -34,6 +33,7 @@ import type { Region } from "@/lib/regions";
 import { getManyMatchIds } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
+import { loadMatchDetailsAction } from "./match-details-action";
 import { QueueTabs } from "./queue-tabs";
 import { RecentSummary } from "./recent-summary";
 import { SeasonChampions } from "./season-champions";
@@ -44,7 +44,7 @@ import { MasteryCard } from "./mastery-card";
 // URL's ?games=, how many games to show after "Show 10 more games" (see
 // src/lib/more-games.ts); missing means the first 10. playerPath is this
 // player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with both teams' scoreboard
-// and a link to the match analysis under that path.
+// and a link to the match analysis under that path, loaded when it opens.
 type Props = {
   region: Region;
   puuid: string;
@@ -83,13 +83,16 @@ export async function RecentMatches({
   ]);
   // Stored matches come from the database; only new ones cost a Riot call,
   // and at most MISSING_PER_VIEW of them per view (see src/lib/more-games.ts).
-  // `waiting` counts the games left for a refresh.
   const result = ids.ok
     ? await loadMatches(region, ids.value, MISSING_PER_VIEW)
     : { matches: [], waiting: 0, error: ids.error };
+  // The games left for a refresh. When Riot refused some, `waiting` counts
+  // those too and a refresh may not help, so the list says Riot failed
+  // instead and keeps its button.
+  const waiting = result.error ? 0 : result.waiting;
 
   // Keep each full match next to its summary: the row shows the summary, and
-  // the panel under it needs every player's numbers.
+  // its score, teams and badges need every player's numbers.
   const games = result.matches
     .map((match) => ({ match, summary: summarizeMatch(match, puuid) }))
     .filter((g): g is { match: Match; summary: MatchSummary } => g.summary !== null);
@@ -98,7 +101,7 @@ export async function RecentMatches({
   const record = summarizeRecord(matches);
 
   const oldest = matches.length > 0 ? Math.min(...matches.map((m) => m.startedAt)) : null;
-  const end = ids.ok ? listEnd(ids.value.length, count, oldest, now, result.waiting) : "end";
+  const end = ids.ok ? listEnd(ids.value.length, count, oldest, now, waiting) : "end";
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -151,15 +154,15 @@ export async function RecentMatches({
                   score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
                   teams={{ region, players: matchTeams(match, puuid) }}
                   badges={matchBadges(match, puuid)}
-                  details={
-                    <MatchDetails
-                      region={region}
-                      dd={dd}
-                      match={match}
-                      puuid={puuid}
-                      analysisHref={`${playerPath}/match/${m.matchId}`}
-                    />
-                  }
+                  // The panel is rendered when the row first opens, not sent
+                  // with the page (see src/components/expandable-row.tsx).
+                  loadDetails={loadMatchDetailsAction.bind(
+                    null,
+                    region,
+                    m.matchId,
+                    puuid,
+                    playerPath,
+                  )}
                 />
               ),
             }))}
@@ -167,15 +170,21 @@ export async function RecentMatches({
         )}
         {end === "waiting" && matches.length > 0 && (
           <p className="self-center text-sm text-faint">
-            {result.waiting} more {result.waiting === 1 ? "game hasn't" : "games haven't"} loaded
-            from Riot yet.{" "}
-            <Link
+            {waiting} more {waiting === 1 ? "game hasn't" : "games haven't"} loaded from Riot yet.{" "}
+            {/* A plain link, not next/link: a Link to this same URL reuses
+                the page it already has instead of asking the server again. */}
+            <a
               href={matchListHref(playerPath, queue, count, `game-${games.length + 1}`)}
               className="text-ink underline hover:text-ahead"
             >
               Refresh
-            </Link>{" "}
-            to load the next {Math.min(result.waiting, MISSING_PER_VIEW)}.
+            </a>{" "}
+            to load the next {Math.min(waiting, MISSING_PER_VIEW)}.
+          </p>
+        )}
+        {result.error && matches.length > 0 && (
+          <p className="self-center text-sm text-faint">
+            Some games couldn&rsquo;t be loaded from Riot just now.
           </p>
         )}
         {end === "two-months" && (
