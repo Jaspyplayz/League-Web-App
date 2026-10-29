@@ -91,9 +91,16 @@ export async function RecentMatches({
   // instead and keeps its button.
   const waiting = result.error ? 0 : result.waiting;
 
+  // While some games are still to load, the list stops before the first of
+  // them. Saved games further down would otherwise show under a gap, and
+  // "Last 80 games" would count games that aren't the last 80.
+  const loaded = new Set(result.matches.map((m) => m.metadata.matchId));
+  const firstMissing = ids.ok ? ids.value.findIndex((id) => !loaded.has(id)) : -1;
+  const listed = waiting > 0 && firstMissing >= 0 ? result.matches.slice(0, firstMissing) : result.matches;
+
   // Keep each full match next to its summary: the row shows the summary, and
   // its score, teams and badges need every player's numbers.
-  const games = result.matches
+  const games = listed
     .map((match) => ({ match, summary: summarizeMatch(match, puuid) }))
     .filter((g): g is { match: Match; summary: MatchSummary } => g.summary !== null);
   const matches = games.map((g) => g.summary);
@@ -101,7 +108,16 @@ export async function RecentMatches({
   const record = summarizeRecord(matches);
 
   const oldest = matches.length > 0 ? Math.min(...matches.map((m) => m.startedAt)) : null;
-  const end = ids.ok ? listEnd(ids.value.length, count, oldest, now, waiting) : "end";
+  const end = ids.ok
+    ? listEnd({
+        idsShown: ids.value.length,
+        count,
+        oldestStartedAt: oldest,
+        now,
+        waiting,
+        riotFailed: result.error !== null,
+      })
+    : "end";
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">

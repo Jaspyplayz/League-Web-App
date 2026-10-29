@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useTransition, type ReactNode } from "react";
+import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 
 // A row that opens a panel underneath it when clicked, like the match list
 // on op.gg. The row is rendered on the server and passed in. The panel is
@@ -27,17 +27,30 @@ export function ExpandableRow({
   const [failed, setFailed] = useState(false);
   const [loading, startLoading] = useTransition();
   const panelId = useId();
+  const toggle = useRef<HTMLButtonElement>(null);
 
   function load() {
     setFailed(false);
     startLoading(async () => {
       try {
-        setPanel(await loadPanel());
+        const loaded = await loadPanel();
+        // A state change after an await isn't part of the transition unless
+        // it's wrapped again. Unwrapped, a panel still fetching its code
+        // would swap the whole match list for its loading skeleton.
+        startLoading(() => setPanel(loaded));
       } catch {
-        // Riot or the database didn't answer; the panel offers a retry.
-        setFailed(true);
+        // Riot or the database didn't answer, or the site was updated since
+        // this page loaded; the panel offers a retry.
+        startLoading(() => setFailed(true));
       }
     });
+  }
+
+  function retry() {
+    // The "Try again" button disappears while loading, so keyboard focus
+    // goes back to the row's toggle instead of being lost.
+    toggle.current?.focus();
+    load();
   }
 
   return (
@@ -56,6 +69,7 @@ export function ExpandableRow({
       >
         {row}
         <button
+          ref={toggle}
           type="button"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
@@ -76,17 +90,28 @@ export function ExpandableRow({
             (failed ? (
               <p className="text-sm text-muted">
                 Couldn&rsquo;t load this game&rsquo;s details.{" "}
-                <button type="button" onClick={load} className="text-ink underline hover:text-ahead">
+                <button type="button" onClick={retry} className="text-ink underline hover:text-ahead">
                   Try again
                 </button>
+                , or refresh the page if it keeps failing.
               </p>
             ) : (
-              <p role="status" className="text-sm text-faint">
+              <p aria-hidden="true" className="text-sm text-faint">
                 Loading details…
               </p>
             ))}
         </div>
       )}
+      {/* Always on the page, so screen readers announce what goes into it:
+          a live region that appears with its text already inside is often
+          skipped. */}
+      <p role="status" className="sr-only">
+        {open && panel === null
+          ? failed
+            ? "Couldn't load this game's details."
+            : "Loading details…"
+          : ""}
+      </p>
     </>
   );
 }

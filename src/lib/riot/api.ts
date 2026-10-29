@@ -89,7 +89,9 @@ export async function getManyMatchIds(
 ): Promise<string[]> {
   const ids = new Set<string>();
   let start = 0;
-  while (ids.size < count) {
+  // Two extra calls are plenty for repeats; this stops a Riot that keeps
+  // sending IDs it already sent from spending calls forever.
+  for (let call = 0; ids.size < count && call < Math.ceil(count / MATCH_IDS_PER_CALL) + 2; call++) {
     const asked = Math.min(MATCH_IDS_PER_CALL, count - ids.size);
     const batch = await getMatchIds(region, puuid, asked, { ...filter, start });
     start += batch.length;

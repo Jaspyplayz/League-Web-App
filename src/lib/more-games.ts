@@ -46,19 +46,29 @@ export function readGameCount(value: string | string[] | undefined): number {
 // - "end": Riot has no older games (a short list), so nothing.
 export type ListEnd = "waiting" | "more" | "two-months" | "max" | "end";
 
-// `idsShown` is how many match IDs Riot gave for a list of `count`,
-// `oldestStartedAt` when the oldest game shown started (ms since 1970), or
-// null when none loaded, and `waiting` how many listed games didn't load.
-export function listEnd(
-  idsShown: number,
-  count: number,
-  oldestStartedAt: number | null,
-  now: number,
-  waiting: number,
-): ListEnd {
+export type ListState = {
+  idsShown: number; // how many match IDs Riot gave for the list
+  count: number; // how many the list asked for, from ?games=
+  oldestStartedAt: number | null; // the oldest game shown (ms since 1970), null when none
+  now: number;
+  waiting: number; // listed games left for a refresh (over this view's budget)
+  riotFailed: boolean; // Riot refused some games this view
+};
+
+export function listEnd({
+  idsShown,
+  count,
+  oldestStartedAt,
+  now,
+  waiting,
+  riotFailed,
+}: ListState): ListEnd {
   if (waiting > 0) return "waiting";
   // A short list means Riot ran out of games.
   if (idsShown < count) return "end";
+  // Games Riot refused could be the recent ones, so the games that did load
+  // can't say the list covers two months; keep the button.
+  if (riotFailed) return count >= MAX_GAMES ? "max" : "more";
   if (
     count >= ALWAYS_GAMES &&
     oldestStartedAt !== null &&
