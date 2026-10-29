@@ -27,11 +27,12 @@ What you didn't run or couldn't check, in plain words, or "nothing".
 
 ## Merge Danger
 **Door:** one-way or two-way. Two-way means a revert undoes it completely.
-One-way means something stays after a revert: a migration, rows, files or
-browser storage the new code writes while it's live, money spent on Claude
-calls, a message sent, or a setting changed outside this repo (Vercel,
-GitHub, Supabase, Linear). A one-way door is Jasper's to merge, so it takes
-the risky tier (decision record 0008).
+One-way means something stays after a revert: a migration, database rows
+the new code writes while it's live, money spent on Claude calls, a message
+sent, or a setting changed outside this repo (Vercel, GitHub, Supabase,
+Linear). Files or browser storage the new code writes are two-way, since the
+reverted code stops reading them. A one-way door is Jasper's to merge, so it
+takes the risky tier (decision record 0008).
 
 **Blast radius:** low, medium or high, then what could break and for whom if
 this is wrong. High: sign-in, saved data, money, or a page most players open

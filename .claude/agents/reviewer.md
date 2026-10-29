@@ -91,11 +91,12 @@ Check in this order:
 6. Security and cost: secrets, unvalidated input, unauthenticated routes, Claude
    calls without a cap.
 7. Docs drift: which doc or decision record does this PR make untrue?
-8. Merge Danger: does the PR's section match the whole diff, by the PR
-   template's definitions? Whatever the PR says, it's a one-way door if the
-   diff adds a migration, code that writes rows, files or browser storage,
-   new paid Claude calls, a sent message, or a setting changed outside the
-   repo; a setting changed in code is two-way. These are blockers: a one-way
+8. Merge Danger: does the PR's section match the whole diff, by the
+   definitions in `.github/pull_request_template.md` (read it, even when the
+   diff doesn't touch it)? Whatever the PR says, it's a one-way door if the
+   diff adds a migration, code that writes database rows, new paid Claude
+   calls, a sent message, or a setting changed outside the repo; files,
+   browser storage and a setting changed in code are two-way. These are blockers: a one-way
    door on a tiny or normal PR, a door or blast radius the diff contradicts,
    or no Merge Danger section on a PR Claude Code built. On a PR Claude Code
    didn't build, such as Dependabot's, write the door and blast radius in your
