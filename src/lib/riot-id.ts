@@ -32,6 +32,14 @@ export function toSlug({ gameName, tagLine }: RiotId): string {
   return encodeURIComponent(`${gameName}-${tagLine}`);
 }
 
+// Whether `path` is a player's page in `region`, as the profile writes it:
+// "/player/na/" and then toSlug's encoded Riot ID. Encoding leaves no "/",
+// "?" or "#", so a link built on it can't point anywhere else.
+export function isPlayerPath(region: string, path: string): boolean {
+  const prefix = `/player/${region}/`;
+  return path.startsWith(prefix) && /^[^/?#\s]+$/.test(path.slice(prefix.length));
+}
+
 export function fromSlug(slug: string): RiotId | null {
   let decoded: string;
   try {
