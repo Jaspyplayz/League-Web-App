@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { cloudSetup, markPackagesCurrent, packagesCurrent, runStep } from "./cloud-setup-steps.mjs";
+import { cloudSetup, markPackagesCurrent, packagesCurrent, runStep, STEP_TIMEOUT_MS } from "./cloud-setup-steps.mjs";
 
 const CLOUD = { CLAUDE_CODE_REMOTE: "true" };
 
@@ -170,6 +170,14 @@ describe("the hook as Claude Code runs it", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toBe("");
     expect(result.stderr).toBe("");
+  });
+
+  // Two steps that each use their whole limit must still end before Claude Code
+  // stops the hook, or the summary line never prints.
+  it("gives both steps together less time than the hook's timeout", () => {
+    const settings = JSON.parse(readFileSync(new URL("../settings.json", import.meta.url), "utf8"));
+    const entry = settings.hooks.SessionStart.find(({ hooks }) => hooks.some(({ command }) => command.includes("cloud-setup.mjs")));
+    expect(2 * STEP_TIMEOUT_MS).toBeLessThan(entry.hooks[0].timeout * 1000);
   });
 
   // Without this entry the hook never runs, and every other test still passes.

@@ -13,13 +13,9 @@
 // installs' own output goes to stderr and only one summary line is printed,
 // with the last lines of output when a step fails.
 
-import { cloudSetup, markPackagesCurrent, packagesCurrent, runStep } from "./cloud-setup-steps.mjs";
+import { cloudSetup, markPackagesCurrent, packagesCurrent, runStep, STEP_TIMEOUT_MS } from "./cloud-setup-steps.mjs";
 
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-
-// Each step gets under half of the hook's 600-second timeout, so a stalled
-// download still ends in a line Claude can read.
-const STEP_TIMEOUT_MS = 280_000;
 
 const line = cloudSetup(process.env, (command) => runStep(command.split(" "), root, STEP_TIMEOUT_MS), {
   current: () => packagesCurrent(root),

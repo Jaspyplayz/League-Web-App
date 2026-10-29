@@ -42,6 +42,10 @@ export function markPackagesCurrent(root) {
   }
 }
 
+// Each step gets under half of the hook's 600-second timeout, so a stalled
+// download still ends in a line Claude can read.
+export const STEP_TIMEOUT_MS = 280_000;
+
 export const INSTALL = "npm ci";
 export const BROWSER = "npx playwright install chromium";
 
