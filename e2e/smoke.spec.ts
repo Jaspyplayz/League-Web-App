@@ -41,6 +41,11 @@ test("search a player and see their profile", async ({ page }) => {
   // The rank cards sit in the side column, next to the match list.
   await expect(page.getByRole("heading", { name: "Ranked Solo/Duo" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible();
+
+  // A match row's panel is rendered by a Server Action when the row first
+  // opens, not sent with the page, so open one and wait for its tabs.
+  await page.getByRole("button", { name: /^Show details for this/ }).first().click();
+  await expect(page.getByRole("tab", { name: "Overview" }).first()).toBeVisible(FIRST_LOAD);
 });
 
 // The sample game is served from the database, so unlike the search above it

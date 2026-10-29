@@ -16,9 +16,9 @@ import type { Region } from "@/lib/regions";
 import { toSlug } from "@/lib/riot-id";
 
 // One game in the player's match list: result, champion and spells, KDA, CS,
-// items, game score and both teams' players (each linking to their profile). Render it inside a <ul>. Pass `details` (for example both
-// teams' scoreboard) to make the row open a panel with it when clicked;
-// without it the row is plain content.
+// items, game score and both teams' players (each linking to their profile). Render it inside a <ul>. Pass `loadDetails` (a Server
+// Action that renders, for example, both teams' scoreboard) to make the row
+// open a panel with it when clicked; without it the row is plain content.
 export function MatchRow({
   match: m,
   dd,
@@ -26,7 +26,7 @@ export function MatchRow({
   score,
   teams,
   badges = [],
-  details,
+  loadDetails,
   id,
 }: {
   match: MatchSummary;
@@ -35,7 +35,7 @@ export function MatchRow({
   score?: PlayerScore; // missing for games that aren't scored, like ARAM
   teams?: { region: Region; players: [TeamPlayer[], TeamPlayer[]] };
   badges?: string[]; // highlights like "Double kill", from matchBadges()
-  details?: ReactNode;
+  loadDetails?: () => Promise<ReactNode>; // asked for when the row first opens
   id?: string; // so "Show 10 more games" can scroll to the first new row
 }) {
   // VICTORY and DEFEAT, like the game's own end screen.
@@ -131,14 +131,13 @@ export function MatchRow({
 
   return (
     <li id={id} className="scroll-mt-4">
-      {details ? (
+      {loadDetails ? (
         <ExpandableRow
           row={content}
           rowClassName={box}
           label={`details for this ${championName(dd, m.championName)} game`}
-        >
-          {details}
-        </ExpandableRow>
+          loadPanel={loadDetails}
+        />
       ) : (
         <div className={`soft-round ${box}`}>{content}</div>
       )}

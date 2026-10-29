@@ -6,15 +6,28 @@ import type { QueueFilter } from "@/lib/queue-filters";
 // the page. The URL carries how many games to show (?games=20), so a
 // refresh or a shared link shows the same list.
 //
-// It stops at 50: every game not yet in the database costs a Riot call the
-// first time, and 50 is more than anyone scrolls through on a profile.
+// Anyone can go back ALWAYS_GAMES games, as before. Past that it keeps going
+// while the list is within two months, so every game of the last two months
+// can be shown. MAX_GAMES stops a list of someone who plays all day from
+// growing past what one page can show quickly: each view reads every listed
+// game from the database again.
 
 export const GAMES_STEP = 10;
-export const MAX_GAMES = 50;
+export const ALWAYS_GAMES = 50;
+export const HISTORY_DAYS = 60;
+export const MAX_GAMES = 200;
+
+// Riot calls one view of the list may spend on games that aren't saved yet.
+// A click needs 10; a link straight to ?games=200 gets the rest over a few
+// refreshes instead of spending the whole dev key allowance (100 calls per 2
+// minutes) at once.
+export const MISSING_PER_VIEW = 2 * GAMES_STEP;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ?games= from the URL. Anything that isn't a multiple of 10 between 10 and
-// 50 means the first 10, so a mistyped link still shows a page instead of an
-// error.
+// MAX_GAMES means the first 10, so a mistyped link still shows a page
+// instead of an error.
 export function readGameCount(value: string | string[] | undefined): number {
   if (typeof value !== "string" || !/^\d+$/.test(value)) return GAMES_STEP;
   const games = Number(value);
@@ -22,10 +35,49 @@ export function readGameCount(value: string | string[] | undefined): number {
   return games;
 }
 
-// Whether to offer the button. A full list means Riot may have more (a short
-// one means it doesn't), and the list stops growing at MAX_GAMES.
-export function hasMoreGames(idsShown: number, count: number): boolean {
-  return idsShown === count && count < MAX_GAMES;
+// What goes under the list:
+// - "waiting": some listed games aren't loaded yet (MISSING_PER_VIEW per
+//   view), so a refresh link instead of the button. Saying the list is
+//   complete would be wrong while games are missing from it.
+// - "more": the "Show 10 more games" button.
+// - "two-months": past ALWAYS_GAMES, the oldest game shown is over two
+//   months old, so the list already covers the last two months.
+// - "max": the list is MAX_GAMES long and stops there.
+// - "end": Riot has no older games (a short list), so nothing.
+export type ListEnd = "waiting" | "more" | "two-months" | "max" | "end";
+
+export type ListState = {
+  idsShown: number; // how many match IDs Riot gave for the list
+  count: number; // how many the list asked for, from ?games=
+  oldestStartedAt: number | null; // the oldest game shown (ms since 1970), null when none
+  now: number;
+  waiting: number; // listed games left for a refresh (over this view's budget)
+  riotFailed: boolean; // Riot refused some games this view
+};
+
+export function listEnd({
+  idsShown,
+  count,
+  oldestStartedAt,
+  now,
+  waiting,
+  riotFailed,
+}: ListState): ListEnd {
+  if (waiting > 0) return "waiting";
+  // A short list means Riot ran out of games.
+  if (idsShown < count) return "end";
+  // Games Riot refused could be the recent ones, so the games that did load
+  // can't say the list covers two months; keep the button.
+  if (riotFailed) return count >= MAX_GAMES ? "max" : "more";
+  if (
+    count >= ALWAYS_GAMES &&
+    oldestStartedAt !== null &&
+    oldestStartedAt < now - HISTORY_DAYS * DAY_MS
+  ) {
+    return "two-months";
+  }
+  if (count >= MAX_GAMES) return "max";
+  return "more";
 }
 
 // Whether this is the profile's plain URL, with no ?queue= or ?games= (the
