@@ -5,7 +5,7 @@ import { formatRow, lastRun, parseTsc, RUNS_HEADER } from "./wellness-steps";
 const DOC = readFileSync(new URL("../docs/wellness.md", import.meta.url), "utf8");
 
 function page(rows: string[]): string {
-  return ["# Codebase wellness check", "", "## Runs", "", RUNS_HEADER, "|---|---|---|---|---|---|", ...rows, ""].join("\n");
+  return ["# Codebase wellness check", "", "## Runs", "", RUNS_HEADER, "|---|---|---|---|---|---|---|", ...rows, ""].join("\n");
 }
 
 describe("lastRun", () => {
@@ -16,15 +16,19 @@ describe("lastRun", () => {
   it("reads the last row, not the first", () => {
     const run = lastRun(
       page([
-        "| 2026-11-01 | `6c38dce` | JAS-40 | 41 s | 95 s | |",
-        "| 2026-11-15 | `0e705c7` | none | 44 s | failed | build broke on a type error |",
+        "| 2026-11-01 | cloud | `6c38dce` | JAS-40 | 41 s | 95 s | |",
+        "| 2026-11-15 | local | `0e705c7` | none | 44 s | failed | build broke on a type error |",
       ]),
     );
-    expect(run).toEqual({ date: "2026-11-15", commit: "0e705c7", testSeconds: 44, buildSeconds: null });
+    expect(run).toEqual({ date: "2026-11-15", ranIn: "local", commit: "0e705c7", testSeconds: 44, buildSeconds: null });
   });
 
   it("refuses a row whose commit isn't one, so a run never diffs from the wrong place", () => {
-    expect(() => lastRun(page(["| 2026-11-01 | last week | none | 41 s | 95 s | |"]))).toThrow(/commit/);
+    expect(() => lastRun(page(["| 2026-11-01 | cloud | last week | none | 41 s | 95 s | |"]))).toThrow(/commit/);
+  });
+
+  it("refuses a row that doesn't say where it ran, so times are only compared like with like", () => {
+    expect(() => lastRun(page(["| 2026-11-01 | my PC | `6c38dce` | none | 41 s | 95 s | |"]))).toThrow(/cloud or local/);
   });
 
   it("reads the real page without throwing", () => {
@@ -36,24 +40,25 @@ describe("formatRow", () => {
   it("writes a row lastRun reads back", () => {
     const row = formatRow({
       date: "2026-11-01",
+      ranIn: "cloud",
       commit: "6c38dce",
       tickets: ["JAS-40", "JAS-41"],
       testSeconds: 41.4,
       buildSeconds: null,
       notes: "build failed | see JAS-41",
     });
-    expect(row).toBe("| 2026-11-01 | `6c38dce` | JAS-40, JAS-41 | 41 s | failed | build failed \\| see JAS-41 |");
-    expect(lastRun(page([row]))).toEqual({ date: "2026-11-01", commit: "6c38dce", testSeconds: 41, buildSeconds: null });
+    expect(row).toBe("| 2026-11-01 | cloud | `6c38dce` | JAS-40, JAS-41 | 41 s | failed | build failed \\| see JAS-41 |");
+    expect(lastRun(page([row]))).toEqual({ date: "2026-11-01", ranIn: "cloud", commit: "6c38dce", testSeconds: 41, buildSeconds: null });
   });
 
   it("says none when a run made no tickets", () => {
-    const row = formatRow({ date: "2026-11-01", commit: "6c38dce", tickets: [], testSeconds: 1, buildSeconds: 2, notes: "" });
-    expect(row).toBe("| 2026-11-01 | `6c38dce` | none | 1 s | 2 s |  |");
+    const row = formatRow({ date: "2026-11-01", ranIn: "local", commit: "6c38dce", tickets: [], testSeconds: 1, buildSeconds: 2, notes: "" });
+    expect(row).toBe("| 2026-11-01 | local | `6c38dce` | none | 1 s | 2 s |  |");
   });
 
   it("has as many columns as the real page's Runs table", () => {
     expect(DOC).toContain(RUNS_HEADER);
-    const row = formatRow({ date: "2026-11-01", commit: "6c38dce", tickets: [], testSeconds: 1, buildSeconds: 2, notes: "" });
+    const row = formatRow({ date: "2026-11-01", ranIn: "local", commit: "6c38dce", tickets: [], testSeconds: 1, buildSeconds: 2, notes: "" });
     expect(row.split(" | ").length).toBe(RUNS_HEADER.split(" | ").length);
   });
 });
@@ -83,6 +88,11 @@ describe("parseTsc", () => {
       unused: [{ file: "src/b.ts", line: 3, message: "All imports in import declaration are unused." }],
       otherErrors: 1,
     });
+  });
+
+  it("leaves out the skills copied into .claude/, which stay unchanged in this repo", () => {
+    const output = ".claude/skills/x/a.ts(2,7): error TS6133: 'y' is declared but its value is never read.";
+    expect(parseTsc(output)).toEqual({ unused: [], otherErrors: 0 });
   });
 
   it("finds nothing in a clean run", () => {

@@ -19,9 +19,9 @@ function git(...args: string[]): string {
 
 // Runs a command through the shell (npm and npx are .cmd files on Windows) and
 // times it. Output is kept so a failure can be shown.
-function timed(command: string): { seconds: number; ok: boolean; output: string } {
+function timed(command: string, env: NodeJS.ProcessEnv = process.env): { seconds: number; ok: boolean; output: string } {
   const start = Date.now();
-  const run = spawnSync(command, { shell: true, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const run = spawnSync(command, { shell: true, encoding: "utf8", env, maxBuffer: 64 * 1024 * 1024 });
   const output = `${run.stdout ?? ""}${run.stderr ?? ""}`;
   return { seconds: (Date.now() - start) / 1000, ok: run.status === 0, output };
 }
@@ -30,7 +30,10 @@ function tail(output: string, lines = 15): string {
   return output.trimEnd().split(/\r?\n/).slice(-lines).join("\n");
 }
 
-const date = new Date().toISOString().slice(0, 10);
+// The local date (en-CA writes YYYY-MM-DD), so it matches the day the run's branch is named after.
+const date = new Date().toLocaleDateString("en-CA");
+// Cloud sessions set CLAUDE_CODE_REMOTE, the same flag the cloud setup hook checks.
+const ranIn = process.env.CLAUDE_CODE_REMOTE === "true" ? "cloud" : "local";
 git("fetch", "--quiet", "origin");
 const head = git("rev-parse", "--short", "origin/main");
 const last = lastRun(readFileSync("docs/wellness.md", "utf8"));
@@ -42,13 +45,17 @@ const shortstat = git("diff", "--shortstat", `${base}..${head}`) || "no changes"
 console.error("Running npm test...");
 const test = timed("npm test");
 console.error("Running npm run build...");
-const build = timed("npm run build");
+// Without the token, Sentry's build plugin skips uploading source maps for a build nothing deploys.
+const build = timed("npm run build", { ...process.env, SENTRY_AUTH_TOKEN: "" });
 // After the build, so the route types Next.js generates exist for tsc.
 console.error("Scanning for unused code...");
 const tsc = parseTsc(timed("npx tsc --noEmit --noUnusedLocals --noUnusedParameters -p tsconfig.json").output);
 
 const time = (r: { seconds: number; ok: boolean }) => (r.ok ? `${Math.round(r.seconds)} s` : "failed");
-const before = (s: number | null | undefined) => (s === undefined ? "no earlier run" : s === null ? "failed" : `${s} s`);
+// Only a run from the same place is a fair comparison: a cloud machine starts with no build cache.
+const comparable = last?.ranIn === ranIn ? last : undefined;
+const before = (s: number | null | undefined) =>
+  s === undefined ? `no earlier ${ranIn} run` : s === null ? "failed" : `${s} s`;
 
 const report = [
   `# Wellness run ${date}`,
@@ -57,10 +64,10 @@ const report = [
   "",
   "## Speed",
   "",
-  "| | This run | Last run |",
+  `| | This run (${ranIn}) | Last ${ranIn} run |`,
   "|---|---|---|",
-  `| \`npm test\` | ${time(test)} | ${before(last?.testSeconds)} |`,
-  `| \`npm run build\` | ${time(build)} | ${before(last?.buildSeconds)} |`,
+  `| \`npm test\` | ${time(test)} | ${before(comparable?.testSeconds)} |`,
+  `| \`npm run build\` | ${time(build)} | ${before(comparable?.buildSeconds)} |`,
   ...(test.ok ? [] : ["", "`npm test` failed:", "", "```", tail(test.output), "```"]),
   ...(build.ok ? [] : ["", "`npm run build` failed:", "", "```", tail(build.output), "```"]),
   "",
@@ -75,6 +82,7 @@ const report = [
   "",
   formatRow({
     date,
+    ranIn,
     commit: head,
     tickets: [],
     testSeconds: test.ok ? test.seconds : null,

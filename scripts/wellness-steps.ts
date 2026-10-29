@@ -5,10 +5,12 @@
 
 // The Runs table's header in docs/wellness.md. A test checks the page still
 // has it, so the page and formatRow can't drift apart.
-export const RUNS_HEADER = "| Date | Checked up to | Tickets | `npm test` | `npm run build` | Notes |";
+export const RUNS_HEADER = "| Date | Ran in | Checked up to | Tickets | `npm test` | `npm run build` | Notes |";
 
 export type LastRun = {
   date: string;
+  /** Where the run happened. Times depend on the machine, so a run is only compared with one from the same place. */
+  ranIn: "cloud" | "local";
   /** The commit on main the run checked up to; the next run diffs from it. */
   commit: string;
   /** null when that run's tests or build failed. */
@@ -43,12 +45,15 @@ export function lastRun(markdown: string): LastRun | null {
   const last = rows.at(-1);
   if (!last) return null;
 
-  const [date, commit, , test, build] = cells(last);
+  const [date, ranIn, commit, , test, build] = cells(last);
+  if (ranIn !== "cloud" && ranIn !== "local") {
+    throw new Error(`The last Runs row's "Ran in" must be cloud or local: ${ranIn}`);
+  }
   const sha = commit.replaceAll("`", "");
   if (!/^[0-9a-f]{7,40}$/.test(sha)) {
     throw new Error(`The last Runs row's "Checked up to" isn't a commit: ${commit}`);
   }
-  return { date, commit: sha, testSeconds: seconds(test), buildSeconds: seconds(build) };
+  return { date, ranIn, commit: sha, testSeconds: seconds(test), buildSeconds: seconds(build) };
 }
 
 /** The Runs table row for a finished run. */
@@ -56,7 +61,7 @@ export function formatRow(row: RunRow): string {
   const time = (s: number | null) => (s === null ? "failed" : `${Math.round(s)} s`);
   const tickets = row.tickets.length > 0 ? row.tickets.join(", ") : "none";
   const notes = row.notes.replaceAll("|", "\\|");
-  return `| ${row.date} | \`${row.commit}\` | ${tickets} | ${time(row.testSeconds)} | ${time(row.buildSeconds)} | ${notes} |`;
+  return `| ${row.date} | ${row.ranIn} | \`${row.commit}\` | ${tickets} | ${time(row.testSeconds)} | ${time(row.buildSeconds)} | ${notes} |`;
 }
 
 /** Splits `tsc --noUnusedLocals --noUnusedParameters` output into unused code and everything else. */
@@ -66,6 +71,8 @@ export function parseTsc(output: string): TscResult {
     const match = /^(.+)\((\d+),\d+\): error TS(\d+): (.*)$/.exec(line.trim());
     if (!match) continue;
     const [, file, lineNumber, code, message] = match;
+    // The skills in .claude/ are copies kept unchanged, so their unused code isn't this repo's to fix.
+    if (file.startsWith(".claude/")) continue;
     if (UNUSED_CODES.has(code)) result.unused.push({ file, line: Number(lineNumber), message });
     else result.otherErrors += 1;
   }
