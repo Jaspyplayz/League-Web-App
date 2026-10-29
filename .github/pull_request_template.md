@@ -9,6 +9,13 @@ new to the codebase.
 ## Acceptance criteria
 - [ ] Criterion: screenshot or test name
 
+## Tested
+Each command you ran and its result, such as `npm test`: `Tests <n> passed`.
+A test count must not fall; if tests were removed, say which and why.
+
+## Not tested
+What you didn't run or couldn't check, in plain words, or "nothing".
+
 ## Review
 The reviewer's first line, `Reviewer agent at <sha>: no blockers`, then its
 findings, each fixed (with the test that shows it) or rejected (with the
