@@ -29,7 +29,7 @@ Option 3.
 
 ## Consequences
 
-- A cloud session can run check-only `npm run can-merge` and `npm run shot -- --pr`. Opening a PR (`gh pr create`) and editing its description still use GraphQL, so a cloud builder still can't open a PR or write its Review section.
+- The GraphQL block no longer stops a cloud session from running check-only `npm run can-merge` and `npm run shot -- --pr`, though neither had run in one when this was written (JAS-26's cloud check). Opening a PR (`gh pr create`) and editing its description still use GraphQL, so a cloud builder still can't open a PR or write its Review section.
 - On the 40 most recent PRs (#142 to #196), main's GraphQL code and this REST code print the same gate lines on 37. The other 3 are Dependabot's, where the bot's name is spelled `dependabot[bot]` instead of gh's `app/dependabot`; the gate fails either way.
 - A bot is now recognised by GitHub's account type (`Bot`), not gh's `is_bot` flag. A PR from a deleted fork, whose head repository GitHub reports as null, counts as a fork.
 - `npm run shot -- --pr` takes only a PR number now, since the number goes into an API path. `gh pr view` also took a branch name or a URL, which no doc or skill used.

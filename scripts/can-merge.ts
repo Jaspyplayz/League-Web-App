@@ -163,7 +163,7 @@ function merge(pr: Pr, decision: Decision) {
 
   // The PR is merged now, and nothing below can undo that. So each step that
   // fails says so and the rest still run; the run then ends with an error
-  // naming what failed. A missing marker can't be fixed afterwards, only reverted.
+  // naming what failed.
   const unfinished: string[] = [];
   const step = (what: string, action: () => void) => {
     try {
@@ -199,7 +199,10 @@ function merge(pr: Pr, decision: Decision) {
     console.log(`Added the ${MERGED_BY_CLAUDE} label`);
   });
   if (unfinished.length > 0) {
-    throw new Error(`#${number} is merged, but these steps failed (errors above), so tell Jasper: ${unfinished.join("; ")}.`);
+    throw new Error(
+      `#${number} is merged, but these steps failed (errors above): ${unfinished.join("; ")}. Tell Jasper. ` +
+        "A comment or label can be added by hand; a merge commit missing the marker can only be reverted.",
+    );
   }
 }
 
