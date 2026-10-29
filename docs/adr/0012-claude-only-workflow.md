@@ -44,7 +44,7 @@ Bad:
 - Four branches at once means more merges of `main` into open branches, and a chance of two builders reaching for the same file. The open-PR check before editing is the only guard, and it's a habit, not a gate.
 - `docs/STATUS.md` is gone, so "what's the status?" is answered by Linear and the merged PRs, not one page.
 - The shorter `docs/workflow.md` drops the long explanations of the merge gates and re-review rules. Anyone who wants the why now reads 0008 to 0011 and the code. It also drops the old plan to count the reviewer's useful findings after 10 normal PRs.
-- Until JAS-26, a cloud session can only push its branch. A local session opens the PR, runs the reviews and merges, so cloud builders save less of Jasper's time than they will later.
+- Until JAS-26, a cloud session can only push its branch. A local session opens the PR, runs the reviews and merges, so cloud builders save less of Jasper's time than they will later. Update 2026-10-29 (JAS-55): opening a PR and commenting on it also work over REST (`gh api -X POST .../pulls` and `.../issues/{n}/comments`). A cloud session opened, waited on and merged PR 204, a tiny docs-only PR, on its own. Editing a description over REST and running the reviewer agent there haven't been tried yet.
 - The startup hook runs on every cloud session start, which adds the install time (about half a minute for `npm ci` on 2026-10-28, more with Chromium) before Claude's first reply. A reopened session on the same machine skips `npm ci`.
 
 ## In my words
