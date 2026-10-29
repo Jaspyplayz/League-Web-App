@@ -4,7 +4,7 @@ import { participants, match } from "@/lib/analyzer/test-fixtures";
 import { getMatch, getMatchIds } from "@/lib/riot/api";
 import { RiotApiError } from "@/lib/riot/client";
 import type { SeasonGame } from "./season";
-import { loadSeasonStats, SYNC_GAMES, syncSeasons } from "./season-store";
+import { fairShares, loadSeasonStats, SYNC_CALLS, syncSeasons } from "./season-store";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
@@ -190,10 +190,11 @@ describe("loadSeasonStats", () => {
 
 describe("syncSeasons", () => {
   const jaspy = { puuid: "player-2", region: "na", name: "Jaspy", tag: "CA1" };
+  const friend = { puuid: "player-3", region: "na", name: "Friend", tag: "NA1" };
+  const ids = (n: number, prefix = "NA1_") => Array.from({ length: n }, (_, i) => `${prefix}${n - i}`);
 
-  it("lists the season again and saves the newest missing games", async () => {
+  it("brings a saved list up to date with one call and saves the newest missing games", async () => {
     tracked = [jaspy];
-    // A list saved earlier; the sync always asks Riot for a fresh one.
     savedList = { matchIds: ["NA1_1"], fetchedAt: new Date(Date.now() - 1000) };
     wholeGames = [saved("NA1_1")];
     vi.mocked(getMatchIds).mockResolvedValueOnce(["NA1_3", "NA1_2", "NA1_1"]);
@@ -201,21 +202,44 @@ describe("syncSeasons", () => {
     const results = await syncSeasons();
 
     expect(getMatchIds).toHaveBeenCalledTimes(1);
+    expect(writtenLists).toEqual([["NA1_3", "NA1_2", "NA1_1"]]);
     expect(writtenGames.map((g) => g.matchId)).toEqual(["NA1_3", "NA1_2"]);
     expect(results).toEqual([{ player: "Jaspy#CA1", saved: 2, left: 0, error: null }]);
   });
 
-  it("stops at SYNC_GAMES Riot calls for games, across every player", async () => {
-    const friend = { puuid: "player-3", region: "na", name: "Friend", tag: "NA1" };
-    tracked = [jaspy, friend];
-    const ids = Array.from({ length: SYNC_GAMES + 15 }, (_, i) => `NA1_${i}`);
-    vi.mocked(getMatchIds).mockResolvedValue(ids);
+  it("asks for the whole list again after 100 or more new games, and counts those calls", async () => {
+    tracked = [jaspy];
+    savedList = { matchIds: ["NA1_old"], fetchedAt: new Date(Date.now() - 1000) };
+    const newest = ids(100);
+    vi.mocked(getMatchIds)
+      .mockResolvedValueOnce(newest) // the newest page: all new
+      .mockResolvedValueOnce(newest) // the whole list, page 1
+      .mockResolvedValueOnce(["NA1_old"]); // and page 2
 
     const results = await syncSeasons();
 
-    expect(getMatch).toHaveBeenCalledTimes(SYNC_GAMES);
-    // Nothing left for the second player this run; it waits for tomorrow.
-    expect(results).toEqual([{ player: "Jaspy#CA1", saved: SYNC_GAMES, left: 15, error: null }]);
+    expect(getMatchIds).toHaveBeenCalledTimes(3);
+    expect(writtenLists).toEqual([[...newest, "NA1_old"]]);
+    // Three calls went on the list, so 57 are left for games.
+    expect(getMatch).toHaveBeenCalledTimes(SYNC_CALLS - 3);
+    expect(results).toEqual([{ player: "Jaspy#CA1", saved: SYNC_CALLS - 3, left: 101 - 57, error: null }]);
+  });
+
+  it("shares the calls, so one long backlog doesn't hold up another player's new games", async () => {
+    tracked = [jaspy, friend];
+    vi.mocked(getMatchIds).mockImplementation(async (_region, puuid) =>
+      puuid === jaspy.puuid ? ids(75) : ids(3, "NA1_f"),
+    );
+
+    const results = await syncSeasons();
+
+    // One call each for the lists, then 58 for games.
+    expect(getMatchIds).toHaveBeenCalledTimes(2);
+    expect(getMatch).toHaveBeenCalledTimes(SYNC_CALLS - 2);
+    expect(results).toEqual([
+      { player: "Jaspy#CA1", saved: 55, left: 20, error: null },
+      { player: "Friend#NA1", saved: 3, left: 0, error: null },
+    ]);
   });
 
   it("says why games were left when Riot stops answering", async () => {
@@ -232,6 +256,17 @@ describe("syncSeasons", () => {
     ]);
   });
 
+  it("keeps the saved list when Riot can't send the newest page", async () => {
+    tracked = [jaspy];
+    savedList = { matchIds: ["NA1_2", "NA1_1"], fetchedAt: new Date(Date.now() - 1000) };
+    vi.mocked(getMatchIds).mockRejectedValue(new RiotApiError("unavailable", "down"));
+
+    const results = await syncSeasons();
+
+    expect(writtenGames.map((g) => g.matchId)).toEqual(["NA1_2", "NA1_1"]);
+    expect(results).toEqual([{ player: "Jaspy#CA1", saved: 2, left: 0, error: null }]);
+  });
+
   it("skips a player saved with an unknown region", async () => {
     tracked = [{ ...jaspy, region: "moon" }];
     expect(await syncSeasons()).toEqual([]);
@@ -241,5 +276,19 @@ describe("syncSeasons", () => {
   it("does nothing without a database", async () => {
     hasDatabase = false;
     expect(await syncSeasons()).toEqual([]);
+  });
+});
+
+describe("fairShares", () => {
+  it("gives every player their missing games while the calls last", () => {
+    expect(fairShares([3, 2], 10)).toEqual([3, 2]);
+  });
+
+  it("splits the calls in turn when there aren't enough", () => {
+    expect(fairShares([700, 3, 10], 20)).toEqual([9, 3, 8]);
+  });
+
+  it("gives nothing with no calls left", () => {
+    expect(fairShares([5, 5], 0)).toEqual([0, 0]);
   });
 });

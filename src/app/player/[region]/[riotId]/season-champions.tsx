@@ -56,7 +56,8 @@ export async function SeasonChampions({
       {stats.loaded < stats.total ? (
         <p className="text-xs text-faint">
           {stats.loaded} of {stats.total} season games loaded so far. More load each time{" "}
-          {loadMore ? "the profile is opened" : "the profile's first page is opened"}.
+          {loadMore ? "the profile is opened" : "the profile's first page is opened"}, and once a
+          day for players marked This is me.
         </p>
       ) : (
         <p className="text-xs text-faint">All {stats.total} games this season.</p>
@@ -73,7 +74,8 @@ function ChampionBox({
 }: {
   title: string;
   dd: DataDragon | null;
-  // csPerMin is missing for the recent-games fallback, which doesn't count it.
+  // csPerMin is missing for the recent-games fallback, which doesn't count
+  // it, and for a champion played only in Arena, which has no minions.
   champions: { championName: string; games: number; wins: number; kda: number; csPerMin?: number }[];
   children: React.ReactNode;
 }) {

@@ -43,8 +43,8 @@ export default function PrivacyPage() {
       </p>
       <p>
         Finished matches never change, so they are kept. For the season&apos;s champion stats,
-        Turnpoint also keeps each player&apos;s champion, result, kills, deaths, assists and CS in
-        every game of the season. A player&apos;s rank and lists of recent and this season&apos;s
+        Turnpoint also keeps each player&apos;s champion, result, kills, deaths, assists and CS, and
+        the game&apos;s mode, start time and length, for every game of the season. A player&apos;s rank and lists of recent and this season&apos;s
         matches are refreshed from Riot after a day, or sooner when someone clicks Update. Once a
         day, Turnpoint also saves the new games of players someone marked with This is me. The
         data is stored in a Postgres database hosted by Supabase in the United States.

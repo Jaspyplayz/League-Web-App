@@ -18,8 +18,8 @@ import { SEASON, seasonChampions, type SeasonChampion, type SeasonGame } from "@
 // the key allows 100 calls per 2 minutes. So the games fill in over time:
 // - every visit to the plain profile page loads up to GAMES_PER_VIEW more,
 // - and once a day a scheduled job (src/app/api/cron/season-sync/route.ts)
-//   loads up to SYNC_GAMES for the players someone marked "This is me", so
-//   their season stays complete without anyone opening the page.
+//   spends up to SYNC_CALLS Riot calls on the players someone marked "This
+//   is me", so their season fills in without anyone opening the page.
 // The panel says how many are in so far.
 //
 // The box needs only each game's champion, result, K/D/A, CS and length, so
@@ -79,21 +79,26 @@ export async function loadSeasonStats(
   };
 }
 
-// Games the daily job may ask Riot for in one run, across every player.
-// Leaves room in the 100 calls per 2 minutes for the job's match ID lists
-// (one call per 100 games) and for anyone using the site at the time.
-export const SYNC_GAMES = 60;
+// Riot calls the daily job may make in one run, across every player: the
+// season lists and the games together. Leaves room in the 100 calls per 2
+// minutes for anyone using the site at the time. A list can only be counted
+// once it's in, so a whole season list asked for near the end of a run can
+// go up to 10 over.
+export const SYNC_CALLS = 60;
 
 export type SyncResult = {
   player: string; // "Name#TAG", for the job's log
   saved: number; // games loaded and saved this run
-  left: number; // season games still missing after this run
+  left: number | null; // season games still missing after this run; null if the list couldn't be read
   error: string | null; // why some games couldn't be loaded this run
 };
 
-// The daily job: refresh the season's match list for every player someone
-// marked "This is me", then save their missing games, newest first, until
-// SYNC_GAMES are used up. A long backlog finishes over the next days.
+// The daily job, for every player someone marked "This is me":
+// 1. bring each season list up to date (usually one call per player),
+// 2. share the calls left between the players with missing games, so one
+//    long backlog doesn't hold up everyone else's new games,
+// 3. load those games, newest first, and save them.
+// A long backlog finishes over the next days.
 export async function syncSeasons(): Promise<SyncResult[]> {
   const db = database();
   if (!db) return [];
@@ -109,38 +114,96 @@ export async function syncSeasons(): Promise<SyncResult[]> {
     .from(userPlayers)
     .innerJoin(players, eq(players.puuid, userPlayers.puuid));
 
-  const results: SyncResult[] = [];
-  let budget = SYNC_GAMES;
+  let budget = SYNC_CALLS;
+  const lists: {
+    player: string;
+    region: Region;
+    puuid: string;
+    missing: string[] | null; // null when the list couldn't be read
+    why: string; // why it couldn't
+  }[] = [];
   for (const player of tracked) {
-    if (budget <= 0 || !isRegion(player.region)) continue;
-    const result = await syncSeason(player.region, player.puuid, budget);
-    budget -= result.tried;
+    if (!isRegion(player.region)) continue;
+    const name = `${player.name}#${player.tag}`;
+    if (budget <= 0) {
+      const why = "No Riot calls left this run";
+      lists.push({ player: name, region: player.region, puuid: player.puuid, missing: null, why });
+      continue;
+    }
+    const refreshed = await refreshSeasonIds(player.region, player.puuid);
+    budget -= refreshed.calls;
+    const missing = refreshed.ids && missingIds(refreshed.ids, await savedGames(player.puuid, refreshed.ids));
+    const why = "Couldn't list the season's games";
+    lists.push({ player: name, region: player.region, puuid: player.puuid, missing, why });
+  }
+
+  const shares = fairShares(lists.map((l) => l.missing?.length ?? 0), Math.max(budget, 0));
+  const results: SyncResult[] = [];
+  for (const [i, list] of lists.entries()) {
+    if (!list.missing) {
+      results.push({ player: list.player, saved: 0, left: null, error: list.why });
+      continue;
+    }
+    // "now", so the rows are written before the job reports what it saved.
+    const fetched = await fetchSeasonGames(list.region, list.puuid, list.missing.slice(0, shares[i]), "now");
     results.push({
-      player: `${player.name}#${player.tag}`,
-      saved: result.saved,
-      left: result.left,
-      error: result.error,
+      player: list.player,
+      saved: fetched.games.length,
+      left: list.missing.length - fetched.games.length,
+      error: fetched.error?.message ?? null,
     });
   }
   return results;
 }
 
-async function syncSeason(region: Region, puuid: string, budget: number) {
-  // Passing now makes the saved list count as stale, so Riot is asked for a
-  // fresh one with the games played since yesterday.
-  const ids = await seasonMatchIds(region, puuid, new Date());
-  if (!ids) return { tried: 0, saved: 0, left: 0, error: "Couldn't list the season's games" };
+// Splits `budget` calls between players who are missing `missing[i]` games:
+// one each in turn, so a player with 3 new games gets all 3 even while
+// another has 700 to catch up on.
+export function fairShares(missing: number[], budget: number): number[] {
+  const shares = missing.map(() => 0);
+  let left = budget;
+  while (left > 0) {
+    let gave = false;
+    for (let i = 0; i < missing.length && left > 0; i++) {
+      if (shares[i] < missing[i]) {
+        shares[i]++;
+        left--;
+        gave = true;
+      }
+    }
+    if (!gave) break;
+  }
+  return shares;
+}
 
-  const missing = missingIds(ids, await savedGames(puuid, ids));
-  const batch = missing.slice(0, budget);
-  // "now", so the rows are written before the job reports what it saved.
-  const fetched = await fetchSeasonGames(region, puuid, batch, "now");
-  return {
-    tried: batch.length,
-    saved: fetched.games.length,
-    left: missing.length - fetched.games.length,
-    error: fetched.error?.message ?? null,
-  };
+// The season list for the daily job, and how many Riot calls it took.
+// With a saved list, only the newest page is asked for: the games played
+// since the last run are on it, unless there were 100 or more, and then the
+// whole list is asked for again. Riot being down keeps the saved list.
+async function refreshSeasonIds(
+  region: Region,
+  puuid: string,
+): Promise<{ ids: string[] | null; calls: number }> {
+  const saved = await readSavedSeasonIds(puuid);
+  if (saved) {
+    const page = await settle(
+      getMatchIds(region, puuid, IDS_PER_PAGE, { startTime: seasonStartSeconds() }),
+    );
+    if (!page.ok) return { ids: saved, calls: 1 };
+    const known = new Set(saved);
+    const fresh = page.value.filter((id) => !known.has(id));
+    if (fresh.length < IDS_PER_PAGE) {
+      const ids = [...fresh, ...saved];
+      if (fresh.length > 0) await saveSeasonMatchIds(puuid, ids);
+      return { ids, calls: 1 };
+    }
+  }
+  const fetched = await settle(fetchSeasonMatchIds(region, puuid));
+  if (!fetched.ok) return { ids: saved, calls: saved ? 2 : 1 };
+  await saveSeasonMatchIds(puuid, fetched.value);
+  // One call per page of 100, and the last page is the short one.
+  const pages = Math.min(MAX_PAGES, Math.floor(fetched.value.length / IDS_PER_PAGE) + 1);
+  return { ids: fetched.value, calls: pages + (saved ? 1 : 0) };
 }
 
 // The season's IDs not counted yet, newest first.
@@ -200,11 +263,7 @@ export async function seasonMatchIds(
   puuid: string,
   profileUpdatedAt: Date,
 ): Promise<string[] | null> {
-  const row = await readCache((db) =>
-    db.query.playerSeasons.findFirst({
-      where: and(eq(tables.playerSeasons.puuid, puuid), eq(tables.playerSeasons.season, SEASON.id)),
-    }),
-  );
+  const row = await readSavedSeason(puuid);
   if (row && row.fetchedAt >= profileUpdatedAt) return row.matchIds;
 
   const fetched = await settle(fetchSeasonMatchIds(region, puuid));
@@ -215,10 +274,26 @@ export async function seasonMatchIds(
   return fetched.value;
 }
 
+function readSavedSeason(puuid: string) {
+  return readCache((db) =>
+    db.query.playerSeasons.findFirst({
+      where: and(eq(tables.playerSeasons.puuid, puuid), eq(tables.playerSeasons.season, SEASON.id)),
+    }),
+  );
+}
+
+async function readSavedSeasonIds(puuid: string): Promise<string[] | null> {
+  return (await readSavedSeason(puuid))?.matchIds ?? null;
+}
+
+// Riot takes times in seconds, not milliseconds.
+function seasonStartSeconds(): number {
+  return Math.floor(SEASON.start / 1000);
+}
+
 async function fetchSeasonMatchIds(region: Region, puuid: string): Promise<string[]> {
   const ids: string[] = [];
-  // Riot takes times in seconds, not milliseconds.
-  const startTime = Math.floor(SEASON.start / 1000);
+  const startTime = seasonStartSeconds();
   for (let page = 0; page < MAX_PAGES; page++) {
     const batch = await getMatchIds(region, puuid, IDS_PER_PAGE, {
       startTime,

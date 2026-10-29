@@ -1,6 +1,7 @@
 import "server-only";
 
 import { timingSafeEqual } from "node:crypto";
+import * as Sentry from "@sentry/nextjs";
 import { syncSeasons } from "@/lib/season-store";
 
 // The daily season sync. Vercel calls this once a day (the schedule is in
@@ -12,8 +13,8 @@ import { syncSeasons } from "@/lib/season-store";
 // nobody else can make the site spend its Riot calls by opening this URL.
 // Without the variable set, every call is refused.
 
-// Up to 60 games plus their match ID lists usually take a few seconds; this
-// leaves room for the rate limiter to wait out a busy minute.
+// Up to 60 Riot calls usually take a few seconds; this leaves room for the
+// rate limiter to wait out a busy minute.
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
@@ -21,6 +22,17 @@ export async function GET(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
   const players = await syncSeasons();
+  // Nobody reads the answer, so the run is written to the function's logs
+  // on Vercel, and a Riot error goes to Sentry too: a rejected key would
+  // otherwise stop the season boxes filling in without anyone noticing.
+  console.log("season sync", JSON.stringify(players));
+  const failed = players.filter((p) => p.error !== null);
+  if (failed.length > 0) {
+    Sentry.captureMessage(`Season sync: ${failed.length} of ${players.length} players had Riot errors`, {
+      level: "warning",
+      extra: { players: failed },
+    });
+  }
   return Response.json({ players });
 }
 

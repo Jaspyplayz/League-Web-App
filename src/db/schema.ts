@@ -203,8 +203,8 @@ export const playerSeasons = pgTable(
 export const seasonGames = pgTable(
   "season_games",
   {
-    // Deleting the player, as the Riot key move does with old PUUIDs,
-    // deletes these too; the daily sync loads them again under the new one.
+    // The Riot key move (scripts/remap-puuids-db.ts) moves these to the
+    // new PUUID before it deletes the old player.
     puuid: text("puuid")
       .notNull()
       .references(() => players.puuid, { onDelete: "cascade" }),
