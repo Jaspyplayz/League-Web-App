@@ -32,6 +32,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Subagents' copies of the repo. The commit hook lints each one in its own folder.
     ".claude/worktrees/**",
+    // pstack's scripts, copied unchanged from its repo, which checks them with
+    // its own Bun tools (decision record 0014).
+    ".claude/skills/poteto-mode/scripts/**",
+    ".claude/skills/reflect/scripts/**",
   ]),
 ]);
 
