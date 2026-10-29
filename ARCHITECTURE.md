@@ -102,7 +102,8 @@ eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/
                   on files that read secrets, no green classes), run by npm run lint, tested in npm test
 .github/          CI, smoke test, dependency review and reviewer workflows, Dependabot, PR and issue templates
 .claude/          Claude Code settings, hooks/ (lint and typecheck before commits, installs when
-                  a cloud session starts, and pstack's startup instruction), agents/ (reviewer.md,
+                  a cloud session starts, pstack's startup instruction, and Matt Pocock's skills
+                  for cloud sessions, see docs/workflow.md), agents/ (reviewer.md,
                   plus pstack's four), agent-merge.json (the switch for npm run can-merge, read from main),
                   rules/ (rules for one area, loaded when Claude opens a file there),
                   skills/ (explain-back, the three verify skills and soft-rounded-ux, plus eight copied

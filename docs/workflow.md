@@ -76,6 +76,14 @@ pstack lives in this repo, pinned to version 0.9.102 ([0014](adr/0014-pstack-liv
 | 9 and 10 | Babysit (conflicts, then review threads, then CI, until the PR can merge), then Shipping | The merge is `npm run can-merge`, since the deny rules block `gh pr merge` and the REST merge request |
 | Any | Autonomous run ("keep going until X"), woken by `/loop` | The tiers still hold, so a risky plan waits for Jasper |
 
+## Matt Pocock's skills
+
+On Jasper's PC, Matt Pocock's skills (`grilling`, `to-tickets`, `domain-modeling` and more) come from the plugin `mattpocock-skills@claude-plugins-official`, which updates itself from Anthropic's official marketplace. Cloud sessions can't install plugins, so the startup hook [`pocock-skills.mjs`](../.claude/hooks/pocock-skills.mjs) downloads them instead, only in the cloud ([0015](adr/0015-cloud-sessions-get-pocock-skills-at-anthropics-pin.md)). It reads the commit Anthropic's marketplace pins for the plugin, not the newest one on GitHub, so cloud and local sessions run the same commit, and the cloud copy updates when Anthropic moves that pin. Nothing is committed: the hook fetches that one commit with git and puts the skills in the cloud machine's `~/.claude/skills/`, next to the folders the cloud keeps there, and `~/.claude/mattpocock-skills.json` records the commit so a resumed session skips the download.
+
+- **Skipped:** any name the repo already has (today pstack's `tdd` and `teach`), and `diagnosing-bugs`, `code-review` and `pr`, which Jasper's rules replace with pstack's `why`, the reviewer agent and the PR template. The list is `SKIPPED_BY_RULE` in [`pocock-skills-steps.mjs`](../.claude/hooks/pocock-skills-steps.mjs).
+- **When they appear:** on a fresh cloud machine the skills should arrive after the session's first tool call, because Claude Code reads its skill list before startup hooks finish. That order was seen on Jasper's PC; the cloud check on JAS-37 confirms it there. A resumed session has them from the start. Claude can start 7 of them itself; the other 15, such as `to-tickets`, run only when someone types the slash command, as on Jasper's PC.
+- **If it fails,** the session starts anyway, and the hook's one line in Claude's context says why the skills are missing.
+
 ## Jobs on Jasper's PC and guard rails
 
 - **Jobs:** every 30 minutes a scheduled task pulls `main`, only when that folder is on `main` with nothing uncommitted, and then deletes local branches already merged except ones a worktree has open. On each run it also removes Claude's worktrees in `.claude/worktrees/` whose last commit is a merged PR's, with their branches, unless they hold uncommitted or untracked files; files git ignores, such as `node_modules` and a copied `.env.local`, go with them. After each pull, a git hook rebuilds the notes in his private Obsidian vault from the merged PRs. Daily, a task copies new unresolved Sentry issues into the error inbox in the vault's Bug Log.
