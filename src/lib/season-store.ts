@@ -83,14 +83,16 @@ export async function loadSeasonStats(
 // season lists and the games together. Leaves room in the 100 calls per 2
 // minutes for anyone using the site at the time. A list can only be counted
 // once it's in, so a whole season list asked for near the end of a run can
-// go up to 10 over.
+// go a few calls over; the shared rate limiter (src/lib/riot/rate-limit.ts)
+// is what keeps the site inside Riot's limit.
 export const SYNC_CALLS = 60;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type SyncResult = {
   player: string; // "Name#TAG", for the job's log
   saved: number; // games loaded and saved this run
-  left: number | null; // season games still missing after this run; null if the list couldn't be read
-  error: string | null; // why some games couldn't be loaded this run
+  left: number | null; // season games still missing after this run; null if the list wasn't read
+  error: string | null; // the Riot error that stopped a list or some games this run
 };
 
 // The daily job, for every player someone marked "This is me":
@@ -112,36 +114,42 @@ export async function syncSeasons(): Promise<SyncResult[]> {
       tag: players.tagLine,
     })
     .from(userPlayers)
-    .innerJoin(players, eq(players.puuid, userPlayers.puuid));
+    .innerJoin(players, eq(players.puuid, userPlayers.puuid))
+    .orderBy(players.puuid);
+  // Start one player further along each day, so if the lists alone ever use
+  // up the calls, it isn't the same players who wait every run.
+  const day = Math.floor(Date.now() / DAY_MS);
+  const start = tracked.length > 0 ? day % tracked.length : 0;
+  const order = [...tracked.slice(start), ...tracked.slice(0, start)];
 
   let budget = SYNC_CALLS;
   const lists: {
     player: string;
     region: Region;
     puuid: string;
-    missing: string[] | null; // null when the list couldn't be read
-    why: string; // why it couldn't
+    missing: string[] | null; // null when the list wasn't read
+    error: string | null;
   }[] = [];
-  for (const player of tracked) {
+  for (const player of order) {
     if (!isRegion(player.region)) continue;
     const name = `${player.name}#${player.tag}`;
+    // No calls left this run isn't an error: the player waits for tomorrow.
     if (budget <= 0) {
-      const why = "No Riot calls left this run";
-      lists.push({ player: name, region: player.region, puuid: player.puuid, missing: null, why });
+      lists.push({ player: name, region: player.region, puuid: player.puuid, missing: null, error: null });
       continue;
     }
     const refreshed = await refreshSeasonIds(player.region, player.puuid);
     budget -= refreshed.calls;
     const missing = refreshed.ids && missingIds(refreshed.ids, await savedGames(player.puuid, refreshed.ids));
-    const why = "Couldn't list the season's games";
-    lists.push({ player: name, region: player.region, puuid: player.puuid, missing, why });
+    const error = refreshed.error?.message ?? null;
+    lists.push({ player: name, region: player.region, puuid: player.puuid, missing, error });
   }
 
   const shares = fairShares(lists.map((l) => l.missing?.length ?? 0), Math.max(budget, 0));
   const results: SyncResult[] = [];
   for (const [i, list] of lists.entries()) {
     if (!list.missing) {
-      results.push({ player: list.player, saved: 0, left: null, error: list.why });
+      results.push({ player: list.player, saved: 0, left: null, error: list.error });
       continue;
     }
     // "now", so the rows are written before the job reports what it saved.
@@ -150,7 +158,8 @@ export async function syncSeasons(): Promise<SyncResult[]> {
       player: list.player,
       saved: fetched.games.length,
       left: list.missing.length - fetched.games.length,
-      error: fetched.error?.message ?? null,
+      // A failed list keeps the saved one, so its error is still worth telling.
+      error: list.error ?? fetched.error?.message ?? null,
     });
   }
   return results;
@@ -179,31 +188,34 @@ export function fairShares(missing: number[], budget: number): number[] {
 // The season list for the daily job, and how many Riot calls it took.
 // With a saved list, only the newest page is asked for: the games played
 // since the last run are on it, unless there were 100 or more, and then the
-// whole list is asked for again. Riot being down keeps the saved list.
+// whole list is asked for again. Riot being down keeps the saved list, and
+// `error` says why, so a rejected key is noticed even once every game is in.
 async function refreshSeasonIds(
   region: Region,
   puuid: string,
-): Promise<{ ids: string[] | null; calls: number }> {
+): Promise<{ ids: string[] | null; calls: number; error: RiotApiError | null }> {
   const saved = await readSavedSeasonIds(puuid);
   if (saved) {
     const page = await settle(
       getMatchIds(region, puuid, IDS_PER_PAGE, { startTime: seasonStartSeconds() }),
     );
-    if (!page.ok) return { ids: saved, calls: 1 };
+    if (!page.ok) return { ids: saved, calls: 1, error: page.error };
     const known = new Set(saved);
     const fresh = page.value.filter((id) => !known.has(id));
     if (fresh.length < IDS_PER_PAGE) {
       const ids = [...fresh, ...saved];
-      if (fresh.length > 0) await saveSeasonMatchIds(puuid, ids);
-      return { ids, calls: 1 };
+      // Saved even with nothing new, so the profile sees the list is fresh
+      // and doesn't ask Riot for the whole of it again.
+      await saveSeasonMatchIds(puuid, ids);
+      return { ids, calls: 1, error: null };
     }
   }
   const fetched = await settle(fetchSeasonMatchIds(region, puuid));
-  if (!fetched.ok) return { ids: saved, calls: saved ? 2 : 1 };
+  if (!fetched.ok) return { ids: saved, calls: saved ? 2 : 1, error: fetched.error };
   await saveSeasonMatchIds(puuid, fetched.value);
   // One call per page of 100, and the last page is the short one.
   const pages = Math.min(MAX_PAGES, Math.floor(fetched.value.length / IDS_PER_PAGE) + 1);
-  return { ids: fetched.value, calls: pages + (saved ? 1 : 0) };
+  return { ids: fetched.value, calls: pages + (saved ? 1 : 0), error: null };
 }
 
 // The season's IDs not counted yet, newest first.

@@ -28,7 +28,7 @@ const fakeDb = {
         ? { where: async () => slimGames }
         : { innerJoin: () => ({ where: async () => wholeGames }) },
   }),
-  selectDistinct: () => ({ from: () => ({ innerJoin: async () => tracked }) }),
+  selectDistinct: () => ({ from: () => ({ innerJoin: () => ({ orderBy: async () => tracked }) }) }),
   insert: (table: unknown) => ({
     values: (row: { matchIds: string[] } | { puuid: string; matchId: string }[]) => {
       if (table === tables.seasonGames) {
@@ -236,10 +236,14 @@ describe("syncSeasons", () => {
     // One call each for the lists, then 58 for games.
     expect(getMatchIds).toHaveBeenCalledTimes(2);
     expect(getMatch).toHaveBeenCalledTimes(SYNC_CALLS - 2);
-    expect(results).toEqual([
-      { player: "Jaspy#CA1", saved: 55, left: 20, error: null },
-      { player: "Friend#NA1", saved: 3, left: 0, error: null },
-    ]);
+    // The order turns by one player each day, so it isn't checked here.
+    expect(results).toHaveLength(2);
+    expect(results).toEqual(
+      expect.arrayContaining([
+        { player: "Jaspy#CA1", saved: 55, left: 20, error: null },
+        { player: "Friend#NA1", saved: 3, left: 0, error: null },
+      ]),
+    );
   });
 
   it("says why games were left when Riot stops answering", async () => {
@@ -256,7 +260,7 @@ describe("syncSeasons", () => {
     ]);
   });
 
-  it("keeps the saved list when Riot can't send the newest page", async () => {
+  it("keeps the saved list when Riot can't send the newest page, and says why", async () => {
     tracked = [jaspy];
     savedList = { matchIds: ["NA1_2", "NA1_1"], fetchedAt: new Date(Date.now() - 1000) };
     vi.mocked(getMatchIds).mockRejectedValue(new RiotApiError("unavailable", "down"));
@@ -264,7 +268,50 @@ describe("syncSeasons", () => {
     const results = await syncSeasons();
 
     expect(writtenGames.map((g) => g.matchId)).toEqual(["NA1_2", "NA1_1"]);
-    expect(results).toEqual([{ player: "Jaspy#CA1", saved: 2, left: 0, error: null }]);
+    expect(results).toEqual([{ player: "Jaspy#CA1", saved: 2, left: 0, error: "down" }]);
+  });
+
+  it("reports a rejected key even when every game is already in", async () => {
+    tracked = [jaspy];
+    savedList = { matchIds: ["NA1_1"], fetchedAt: new Date(Date.now() - 1000) };
+    wholeGames = [saved("NA1_1")];
+    vi.mocked(getMatchIds).mockRejectedValue(
+      new RiotApiError("bad-key", "Riot rejected the API key (403)"),
+    );
+
+    const results = await syncSeasons();
+
+    expect(getMatch).not.toHaveBeenCalled();
+    expect(results).toEqual([
+      { player: "Jaspy#CA1", saved: 0, left: 0, error: "Riot rejected the API key (403)" },
+    ]);
+  });
+
+  it("saves an unchanged list again, so the profile sees it's fresh", async () => {
+    tracked = [jaspy];
+    savedList = { matchIds: ["NA1_1"], fetchedAt: new Date(Date.now() - 1000) };
+    wholeGames = [saved("NA1_1")];
+    vi.mocked(getMatchIds).mockResolvedValueOnce(["NA1_1"]);
+
+    await syncSeasons();
+
+    expect(writtenLists).toEqual([["NA1_1"]]);
+  });
+
+  it("leaves a player for tomorrow when the lists use up every call", async () => {
+    // Seven new players with 1,000 games each: 10 calls per list, so the
+    // seventh list doesn't fit, and no calls are left for games.
+    tracked = Array.from({ length: 7 }, (_, i) => ({ ...jaspy, puuid: `p${i}`, name: `P${i}` }));
+    vi.mocked(getMatchIds).mockResolvedValue(ids(100));
+
+    const results = await syncSeasons();
+
+    expect(getMatchIds).toHaveBeenCalledTimes(SYNC_CALLS);
+    expect(getMatch).not.toHaveBeenCalled();
+    const waiting = results.filter((r) => r.left === null);
+    expect(waiting).toHaveLength(1);
+    // Not an error, so it doesn't reach Sentry.
+    expect(waiting[0]).toMatchObject({ saved: 0, error: null });
   });
 
   it("skips a player saved with an unknown region", async () => {
