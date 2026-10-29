@@ -52,6 +52,3 @@ Thumbs.db
 .claude/settings.local.json
 # Worktrees Claude Code makes for subagents that work on their own copy
 .claude/worktrees/
-# Which commit of Matt Pocock's skills a cloud session installed (the skill
-# folders hide themselves with their own .gitignore; decision record 0015)
-.claude/skills/.mattpocock-skills.json

@@ -19,7 +19,7 @@ pstack came in differently from the eight above: it was a Claude Code plugin on 
 
 ## Matt Pocock's skills, in cloud sessions only
 
-Cloud sessions also get Matt Pocock's skills from [mattpocock/skills](https://github.com/mattpocock/skills), MIT license, Matt Pocock. None of their files are committed here. The startup hook [`pocock-skills.mjs`](../hooks/pocock-skills.mjs) downloads them into this folder when a cloud session starts, at the commit Anthropic's official marketplace pins for `mattpocock-skills` (`49dd158`, version 1.3.1, on 2026-10-29), and each downloaded folder holds a `.gitignore` that keeps it out of git. Their license text is below. Decision record [0015](../../docs/adr/0015-cloud-sessions-get-pocock-skills-at-anthropics-pin.md) has the details.
+Cloud sessions also get Matt Pocock's skills from [mattpocock/skills](https://github.com/mattpocock/skills), MIT license, Matt Pocock. None of their files are committed here. The startup hook [`pocock-skills.mjs`](../hooks/pocock-skills.mjs) fetches them when a cloud session starts, at the commit Anthropic's official marketplace pins for `mattpocock-skills` (`49dd158`, version 1.3.1, on 2026-10-29), and puts them in the cloud machine's `~/.claude/skills/`, outside the repo. Their license text is below. Decision record [0015](../../docs/adr/0015-cloud-sessions-get-pocock-skills-at-anthropics-pin.md) has the details.
 
 ## How they fit this repo
 

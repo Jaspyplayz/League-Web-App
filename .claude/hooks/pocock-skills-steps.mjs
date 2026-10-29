@@ -1,9 +1,10 @@
 // Helpers for pocock-skills.mjs, in their own file so pocock-skills.test.mjs
-// can test them on temporary folders with a fake download.
+// can test them on temporary folders and local git repos.
 
-import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, posix } from "node:path";
+import { execFile, spawnSync } from "node:child_process";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
 // Anthropic's official marketplace, the file Claude Code reads to install and
 // update `mattpocock-skills@claude-plugins-official` on Jasper's PC.
@@ -18,11 +19,11 @@ export const SOURCE_URL = "https://github.com/mattpocock/skills.git";
 // bugs, the reviewer agent for review and the PR template for PR bodies.
 export const SKIPPED_BY_RULE = ["diagnosing-bugs", "code-review", "pr"];
 
-// A cloud session can fetch another public repo's files only from
-// raw.githubusercontent.com: the GitHub proxy answers 403 for archives and API
-// calls on repos the session didn't clone (decision record 0015). A URL with
-// the commit in it always serves that commit's file.
-export const rawUrl = (sha, path) => `https://raw.githubusercontent.com/mattpocock/skills/${sha}/${path}`;
+// Claude Code stops a hook at its timeout (120 seconds in settings.json), and
+// a stopped hook prints nothing, so the downloads give up well before that:
+// curl within CURL_WORST_MS, and the git steps together within GIT_BUDGET_MS.
+export const CURL_WORST_MS = 35_000;
+export const GIT_BUDGET_MS = 60_000;
 
 // A reason the hook installed nothing, worded to finish "not installed, because".
 export class Refusal extends Error {}
@@ -52,8 +53,8 @@ const SKILL_PATH = /^\.\/skills\/[a-z0-9-]+\/([a-z0-9][a-z0-9-]*)$/;
 
 // Splits the plugin's skills into the ones to install and the ones skipped.
 // `taken` holds the names that already belong to someone else, such as the
-// repo's own `tdd` and `teach`: a skill installed under the same name would
-// hide or be hidden by it.
+// repo's own `tdd` and `teach`: a personal skill beats a project skill with
+// the same name, so installing Pocock's would hide pstack's.
 export function skillsToInstall(pluginText, taken) {
   let plugin;
   try {
@@ -69,6 +70,9 @@ export function skillsToInstall(pluginText, taken) {
   for (const path of plugin.skills) {
     const name = typeof path === "string" && path.match(SKILL_PATH)?.[1];
     if (!name) throw new Refusal(`the commit's plugin.json lists an unexpected skill path ${JSON.stringify(path)}`);
+    if ([...install, ...skipped.taken, ...skipped.byRule].some((seen) => (seen.name ?? seen) === name)) {
+      throw new Refusal(`the commit's plugin.json lists two skills named ${name}`);
+    }
     if (SKIPPED_BY_RULE.includes(name)) skipped.byRule.push(name);
     else if (taken.has(name)) skipped.taken.push(name);
     else install.push({ name, path: path.slice(2) });
@@ -76,99 +80,137 @@ export function skillsToInstall(pluginText, taken) {
   return { install, skipped };
 }
 
-// The relative Markdown links in a skill file, as paths inside the skill
-// folder. A link that leaves the folder, starts at the root or is a web
-// address is left out, and so is any name starting with a dot.
-const LINK = /\]\(\s*<?([^)\s>#]+)/g;
-const SAFE_PATH = /^(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+const lastLine = (text) => text.trim().split("\n").pop();
 
-export function linkedFiles(markdown, fromFile) {
-  const files = [];
-  for (const [, target] of markdown.matchAll(LINK)) {
-    if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("/")) continue;
-    const path = posix.normalize(posix.join(posix.dirname(fromFile), target));
-    if (SAFE_PATH.test(path) && !files.includes(path)) files.push(path);
-  }
-  return files;
-}
-
-// A skill folder has no file list on raw.githubusercontent.com, so the hook
-// starts at SKILL.md and follows its relative links, and the links in any
-// Markdown file those lead to. At 49dd158 that finds every file in the
-// installed skills except agents/openai.yaml, which is for OpenAI's Codex. A
-// link to a file that isn't there (404), such as an example path, is skipped.
-export const MAX_FILES_PER_SKILL = 50;
-
-export async function downloadSkill(get, sha, skill) {
-  const files = new Map();
-  const queue = ["SKILL.md"];
-  const seen = new Set(queue);
-  while (queue.length > 0) {
-    const file = queue.shift();
-    const { status, body } = await get(rawUrl(sha, `${skill.path}/${file}`));
-    if (status === 404 && file !== "SKILL.md") continue;
-    if (status !== 200) throw new Refusal(`${skill.path}/${file} at ${sha.slice(0, 7)} answered HTTP ${status}`);
-    files.set(file, body);
-    if (files.size > MAX_FILES_PER_SKILL) throw new Refusal(`${skill.name} links to more than ${MAX_FILES_PER_SKILL} files`);
-    if (!file.endsWith(".md")) continue;
-    for (const linked of linkedFiles(body.toString("utf8"), file)) {
-      if (!seen.has(linked)) {
-        seen.add(linked);
-        queue.push(linked);
-      }
+// Checks out exactly `sha` from `url` into the empty folder `dir`: a fetch of
+// that one commit, never a branch. A cloud session's GitHub proxy lets git
+// fetch a public repo the session didn't clone, though it answers 403 for its
+// archive downloads (decision record 0015). The steps share GIT_BUDGET_MS.
+export function fetchCommit(url, sha, dir, budgetMs = GIT_BUDGET_MS) {
+  const end = Date.now() + budgetMs;
+  const git = (...args) => {
+    const result = spawnSync("git", ["-C", dir, ...args], {
+      encoding: "utf8",
+      timeout: Math.max(1, end - Date.now()),
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    });
+    if (result.status !== 0) {
+      const why = result.error?.message ?? lastLine(result.stderr || `exit code ${result.status}`);
+      throw new Refusal(`\`git ${args[0]}\` failed (${why})`);
     }
-  }
+    return result.stdout.trim();
+  };
+  git("init", "-q");
+  git("fetch", "-q", "--depth", "1", "--no-tags", url, sha);
+  git("checkout", "-q", "--detach", "FETCH_HEAD");
+  if (git("rev-parse", "HEAD") !== sha) throw new Refusal(`git checked out something other than ${sha}`);
+}
+
+// Every regular file in a skill folder of the checkout, by its path inside the
+// folder. A symlink or anything else that isn't a plain file is left out, so
+// nothing installed can point outside the skill.
+export function readSkill(checkout, skill) {
+  const root = join(checkout, ...skill.path.split("/"));
+  if (!existsSync(join(root, "SKILL.md"))) throw new Refusal(`${skill.path} has no SKILL.md`);
+  const files = new Map();
+  const walk = (dir, prefix) => {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      const stat = lstatSync(full);
+      if (stat.isDirectory()) walk(full, `${prefix}${entry}/`);
+      else if (stat.isFile()) files.set(`${prefix}${entry}`, readFileSync(full));
+    }
+  };
+  walk(root, "");
   return files;
 }
 
-// The marker says which commit is installed and which skill folders this hook
-// wrote, so it only ever replaces its own folders.
-export function readMarker(markerFile) {
-  try {
-    const marker = JSON.parse(readFileSync(markerFile, "utf8"));
-    return { commit: typeof marker.commit === "string" ? marker.commit : null, skills: marker.skills.filter((s) => typeof s === "string") };
-  } catch {
-    return { commit: null, skills: [] };
-  }
-}
-
-const writeMarker = (markerFile, commit, skills) => {
-  mkdirSync(dirname(markerFile), { recursive: true });
-  writeFileSync(markerFile, `${JSON.stringify({ commit, skills }, null, 2)}\n`);
-};
+// Each folder this hook installs holds this file, with the commit in it.
+// Ownership lives in the folder, so a lost marker never strands a folder, and
+// the hook never replaces or deletes a folder without one.
+export const OWNER_FILE = ".mattpocock-skills";
 
 const folders = (dir) => (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name) : []);
+const ownedFolders = (skillsDir) => folders(skillsDir).filter((name) => existsSync(join(skillsDir, name, OWNER_FILE)));
 
-// Every skill folder in the given directories that this hook didn't write.
-export function takenNames(dirs, owned) {
-  return new Set(dirs.flatMap(folders).filter((name) => !owned.includes(name)));
+// The names Pocock's skills must not take: every folder in the repo's
+// .claude/skills/, and every folder in the install folder this hook didn't
+// write, such as the cloud's own `session-start-hook` and `synced`.
+export function takenNames(repoSkillsDir, skillsDir) {
+  const owned = ownedFolders(skillsDir);
+  return new Set([...folders(repoSkillsDir), ...folders(skillsDir).filter((name) => !owned.includes(name))]);
 }
 
-// Swaps the old install for the new one. The marker first lists both sets with
-// no commit, so if writing stops halfway, the next start still owns every
-// folder and downloads again. `extraFiles` go in each skill folder too.
-export function replaceSkills(skillsDir, markerFile, previous, sha, downloaded, extraFiles = {}) {
-  const names = [...downloaded.keys()];
-  writeMarker(markerFile, null, [...new Set([...previous, ...names])]);
-  for (const name of previous) rmSync(join(skillsDir, name), { recursive: true, force: true });
-  for (const [name, files] of downloaded) {
-    rmSync(join(skillsDir, name), { recursive: true, force: true });
-    for (const [file, body] of [...files, ...Object.entries(extraFiles)]) {
-      const target = join(skillsDir, name, ...file.split("/"));
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, body);
+// The marker records the installed commit and skill names, only so an
+// unchanged pin can skip the download. Anything odd in it means "download".
+export function readMarker(markerFile) {
+  try {
+    const { commit, skills } = JSON.parse(readFileSync(markerFile, "utf8"));
+    if (typeof commit === "string" && Array.isArray(skills) && skills.every((s) => typeof s === "string")) {
+      return { commit, skills };
     }
+  } catch {
+    // Missing or unreadable: same as no install.
   }
-  writeMarker(markerFile, sha, names);
+  return { commit: null, skills: [] };
+}
+
+// Skipping is safe only when the marker's commit is the pinned one and every
+// skill it lists is still there, still the hook's, and not a repo skill now.
+export function alreadyInstalled(marker, sha, skillsDir, repoSkillsDir) {
+  const repo = folders(repoSkillsDir);
+  return (
+    marker.commit === sha &&
+    marker.skills.length > 0 &&
+    marker.skills.every((name) => !repo.includes(name) && existsSync(join(skillsDir, name, "SKILL.md")) && existsSync(join(skillsDir, name, OWNER_FILE)))
+  );
+}
+
+// Writes `text` to a temporary file beside `file`, then renames it over
+// `file`, so a reader never sees half of it.
+function writeWhole(file, text) {
+  mkdirSync(dirname(file), { recursive: true });
+  const temporary = `${file}.${process.pid}.tmp`;
+  writeFileSync(temporary, text);
+  renameSync(temporary, file);
+}
+
+// Swaps the old install for the new one. Every skill is written in full to a
+// staging folder beside the install folder first, then each is renamed into
+// place, so Claude Code's folder watcher never sees half a skill. Only the
+// hook's own folders are deleted or replaced. The marker is written last.
+export function replaceSkills(skillsDir, markerFile, sha, installed) {
+  mkdirSync(skillsDir, { recursive: true });
+  const staging = mkdtempSync(join(dirname(skillsDir), ".mattpocock-skills-staging-"));
+  try {
+    for (const [name, files] of installed) {
+      for (const [file, body] of [...files, [OWNER_FILE, `${sha}\n`]]) {
+        const target = join(staging, name, ...file.split("/"));
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, body);
+      }
+    }
+    for (const name of ownedFolders(skillsDir)) {
+      if (!installed.has(name)) rmSync(join(skillsDir, name), { recursive: true, force: true });
+    }
+    for (const name of installed.keys()) {
+      rmSync(join(skillsDir, name), { recursive: true, force: true });
+      renameSync(join(staging, name), join(skillsDir, name));
+    }
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
+  writeWhole(markerFile, `${JSON.stringify({ commit: sha, skills: [...installed.keys()] }, null, 2)}\n`);
 }
 
 const list = (names) => names.join(", ");
 
 // The whole job. Returns the one line to print, or "" outside the cloud.
-// `get(url)` resolves to { status, body } and rejects on a network error.
-// `skillsDir` is where the skills go, `repoSkillsDir` the repo's own
-// .claude/skills/, and `extraFiles` files added to each installed skill.
-export async function installPocockSkills(env, { get, skillsDir, repoSkillsDir, markerFile, extraFiles }) {
+// `get(url)` resolves to { status, body } and rejects with a Refusal when it
+// can't reach the server; `fetchCommit(url, sha, dir)` checks the commit out
+// into an empty folder. `skillsDir` is where the skills go and
+// `repoSkillsDir` the repo's own .claude/skills/.
+export async function installPocockSkills(env, { get, fetchCommit, skillsDir, repoSkillsDir, markerFile }) {
   if (env.CLAUDE_CODE_REMOTE !== "true") return "";
   const marker = readMarker(markerFile);
   try {
@@ -176,57 +218,50 @@ export async function installPocockSkills(env, { get, skillsDir, repoSkillsDir, 
     if (marketplace.status !== 200) throw new Refusal(`Anthropic's marketplace answered HTTP ${marketplace.status}`);
     const sha = pinnedCommit(marketplace.body.toString("utf8"));
     const short = sha.slice(0, 7);
-    if (marker.commit === sha) {
+    if (alreadyInstalled(marker, sha, skillsDir, repoSkillsDir)) {
       return `Matt Pocock's skills: commit ${short} is already installed, so nothing was downloaded.`;
     }
-    const plugin = await get(rawUrl(sha, ".claude-plugin/plugin.json"));
-    if (plugin.status !== 200) throw new Refusal(`the commit's plugin.json answered HTTP ${plugin.status}`);
-    const taken = takenNames([...new Set([repoSkillsDir, skillsDir])], marker.skills);
-    const { install, skipped } = skillsToInstall(plugin.body.toString("utf8"), taken);
-    const downloaded = new Map(await Promise.all(install.map(async (skill) => [skill.name, await downloadSkill(get, sha, skill)])));
+    const checkout = mkdtempSync(join(tmpdir(), "pocock-skills-"));
+    let install, skipped, files;
     try {
-      replaceSkills(skillsDir, markerFile, marker.skills, sha, downloaded, extraFiles);
+      fetchCommit(SOURCE_URL, sha, checkout);
+      const pluginFile = join(checkout, ".claude-plugin", "plugin.json");
+      if (!existsSync(pluginFile)) throw new Refusal(`commit ${short} has no .claude-plugin/plugin.json`);
+      ({ install, skipped } = skillsToInstall(readFileSync(pluginFile, "utf8"), takenNames(repoSkillsDir, skillsDir)));
+      if (install.length === 0) throw new Refusal(`every skill in commit ${short} is skipped`);
+      files = new Map(install.map((skill) => [skill.name, readSkill(checkout, skill)]));
+    } finally {
+      rmSync(checkout, { recursive: true, force: true });
+    }
+    try {
+      replaceSkills(skillsDir, markerFile, sha, files);
     } catch (error) {
-      return `Matt Pocock's skills: writing commit ${short} stopped halfway (${error.message}), so some may be missing. The next session start downloads them again.`;
+      return `Matt Pocock's skills: writing commit ${short} stopped halfway (${error.message}), so some may be missing. The next session start tries again.`;
     }
     const notes = [];
     if (skipped.taken.length) notes.push(`${list(skipped.taken)} (a skill with that name is already here)`);
     if (skipped.byRule.length) notes.push(`${list(skipped.byRule)} (Jasper's rules use other skills)`);
     return `Matt Pocock's skills: installed ${install.length} from commit ${short}, the one Anthropic's marketplace pins: ${list(install.map((s) => s.name))}.${notes.length ? ` Skipped ${notes.join(" and ")}.` : ""}`;
   } catch (error) {
-    const reason = error instanceof Refusal ? error.message : `of an unexpected error: ${error?.message ?? error}`;
+    // Collapsed onto one line, since git's or curl's own message may have several.
+    const reason = (error instanceof Refusal ? error.message : `of an unexpected error: ${error?.message ?? error}`).replace(/\s+/g, " ");
     const kept = marker.commit ? ` The skills from commit ${marker.commit.slice(0, 7)} stay.` : "";
     return `Matt Pocock's skills: not installed, because ${reason}. Nothing was changed.${kept}`;
   }
 }
 
-// Claude Code stops a hook at its timeout, and a stopped hook prints nothing,
-// so all the downloads together get less time than the hook's 120 seconds.
-export const DOWNLOAD_BUDGET_MS = 90_000;
-
-// Wraps `get` so every call after `ms` from now fails with a Refusal, and a
-// call still running at that point fails then too.
-export function withDeadline(get, ms) {
-  const end = Date.now() + ms;
-  const late = `the downloads took longer than ${ms / 1000} seconds`;
-  return (url) => {
-    const left = end - Date.now();
-    if (left <= 0) return Promise.reject(new Refusal(late));
-    let timer;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Refusal(late)), left);
-    });
-    return Promise.race([get(url), timeout]).finally(() => clearTimeout(timer));
-  };
-}
-
 // Fetches a URL with curl, which uses the cloud machine's proxy settings, and
-// resolves to { status, body }. It rejects when curl can't reach the server.
+// resolves to { status, body }. curl tries 3 times, 10 seconds each, and only
+// over https. It rejects with a Refusal when it can't reach the server.
 export function curlGet(url) {
   return new Promise((resolve, reject) => {
-    const args = ["-sS", "--location", "--max-time", "20", "--max-filesize", "1000000", "--write-out", "\n%{http_code}", url];
-    execFile("curl", args, { encoding: "buffer", maxBuffer: 2_000_000, timeout: 30_000 }, (error, stdout, stderr) => {
-      if (error) return reject(new Error(`curl couldn't fetch ${url}: ${stderr.toString("utf8").trim() || error.message}`));
+    const args = ["-sS", "--location", "--proto", "=https", "--proto-redir", "=https", "--max-time", "10", "--retry", "2", "--retry-all-errors"];
+    args.push("--max-filesize", "5000000", "--write-out", "\n%{http_code}", url);
+    execFile("curl", args, { encoding: "buffer", maxBuffer: 10_000_000, timeout: CURL_WORST_MS }, (error, stdout, stderr) => {
+      if (error) {
+        const why = lastLine(stderr.toString("utf8")) || error.message;
+        return reject(new Refusal(`curl couldn't reach ${new URL(url).host} (${why})`));
+      }
       const split = stdout.lastIndexOf("\n");
       resolve({ status: Number(stdout.subarray(split + 1).toString("utf8")), body: stdout.subarray(0, split) });
     });
