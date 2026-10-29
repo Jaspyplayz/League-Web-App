@@ -91,6 +91,10 @@ Check in this order:
 6. Security and cost: secrets, unvalidated input, unauthenticated routes, Claude
    calls without a cap.
 7. Docs drift: which doc or decision record does this PR make untrue?
+8. Merge Danger: does the PR's section match the diff? A migration, deleted or
+   rewritten saved data, a sent message or a changed setting is a one-way door,
+   whatever the PR says. The blast radius must name the page, command or file
+   that could break, not "some players".
 
 Make the report's first line `Reviewer agent at <sha>: no blockers` or
 `Reviewer agent at <sha>: <n> blockers`, where `<sha>` is the full SHA that

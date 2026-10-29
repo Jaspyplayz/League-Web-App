@@ -2,9 +2,15 @@
 **Builder:** Claude Code on Opus 5.5, in a local or cloud session.
 Closes #
 
-## Walkthrough
-What changed, why, and how to try it on the preview, written for someone
-new to the codebase.
+## Summary
+What changed and why, in plain words for someone new to the codebase, using
+the words in `GLOSSARY.md`. Add the smallest picture that shows it: a diagram,
+a short diff sketch or a file tree. End with how to try it on the preview.
+
+## Evidence
+**Before:** what happened without this change (a screenshot, output or steps).
+
+**After:** what happens now, shown the same way.
 
 ## Acceptance criteria
 - [ ] Criterion: screenshot or test name
@@ -15,6 +21,14 @@ A test count must not fall; if tests were removed, say which and why.
 
 ## Not tested
 What you didn't run or couldn't check, in plain words, or "nothing".
+
+## Merge Danger
+**Door:** one-way or two-way. Two-way means a revert undoes it completely;
+one-way means something stays changed after a revert (saved data, a
+migration, a message sent, a setting).
+
+**Blast radius:** low, medium or high, then what could break and for whom if
+this is wrong. Name the page, command or file, not "some players".
 
 ## Review
 The reviewer's first line, `Reviewer agent at <sha>: no blockers`, then its
