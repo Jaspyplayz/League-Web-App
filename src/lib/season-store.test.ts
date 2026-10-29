@@ -314,6 +314,21 @@ describe("syncSeasons", () => {
     expect(waiting[0]).toMatchObject({ saved: 0, error: null });
   });
 
+  it("starts one player further along each day, so it isn't always the same player who waits", async () => {
+    tracked = Array.from({ length: 7 }, (_, i) => ({ ...jaspy, puuid: `p${i}`, name: `P${i}` }));
+    vi.mocked(getMatchIds).mockResolvedValue(ids(100));
+    const waiter = async (day: number) => {
+      vi.setSystemTime(Date.UTC(2026, 9, day, 9));
+      return (await syncSeasons()).find((r) => r.left === null)?.player;
+    };
+
+    try {
+      expect(await waiter(29)).not.toBe(await waiter(30));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("skips a player saved with an unknown region", async () => {
     tracked = [{ ...jaspy, region: "moon" }];
     expect(await syncSeasons()).toEqual([]);

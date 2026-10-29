@@ -83,7 +83,7 @@ export async function loadSeasonStats(
 // season lists and the games together. Leaves room in the 100 calls per 2
 // minutes for anyone using the site at the time. A list can only be counted
 // once it's in, so a whole season list asked for near the end of a run can
-// go a few calls over; the shared rate limiter (src/lib/riot/rate-limit.ts)
+// take it up to 10 calls over; the shared rate limiter (src/lib/riot/rate-limit.ts)
 // is what keeps the site inside Riot's limit.
 export const SYNC_CALLS = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
