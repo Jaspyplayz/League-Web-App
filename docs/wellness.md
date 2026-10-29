@@ -35,7 +35,7 @@ To run the whole check by hand instead, open a local session on an up-to-date `m
 ## After the checks
 
 - **Commit and push.** The cloud run adds the script's Runs row with the ticket numbers filled in, commits it on `claude/wellness-<date>`, and pushes.
-- **Pull request.** It opens the pull request with `gh api -X POST repos/Jaspyplayz/League-Web-App/pulls`. The description follows `.github/pull_request_template.md`, starting with a `**Tier:** tiny` line and a `**Builder:**` line, because `can-merge` refuses a PR without them; the report goes under its walkthrough. A row is a docs-only change, so the pull request skips the reviewer.
+- **Pull request.** It opens the pull request with `gh api -X POST repos/Jaspyplayz/League-Web-App/pulls`. The description follows `.github/pull_request_template.md`, starting with a `**Tier:** tiny` line and a `**Builder:**` line, because `can-merge` refuses a PR without them; the report goes under its Summary. A row is a docs-only change, so the pull request skips the reviewer.
 - **Merge.** Once `can-merge` says the checks at the head commit passed (CI, the smoke test and Vercel's deploy all report, and the smoke test only starts after Vercel's deploy), it runs `npm run can-merge -- <pr> --merge` from a checkout of `origin/main`. If a gate fails, it merges nothing and comments the reason on the pull request.
 - **Check 2.** It files a ticket assigned to Jasper, `Wellness: run check 2 for <date>`, in Backlog, asking him to type `/improve-codebase-architecture`.
 
@@ -62,9 +62,11 @@ Steps:
 9. git push -u origin claude/wellness-$DATE.
 10. Write the pull request's description to .cache/wellness/pr-body.md (git-ignored), in the sections of .github/pull_request_template.md:
    - First line `**Tier:** tiny: one Runs row in docs/wellness.md.`, second line `**Builder:** Claude Code on Opus 5.5, in a cloud session.` Write both lines exactly as given: can-merge refuses any other tier or builder wording.
-   - Walkthrough: the report: the script's output, check 1's findings (most serious first), check 3's judgment, check 4's judgment, and the tickets made (or "Tickets to file").
+   - Summary: the report: the script's output, check 1's findings (most serious first), check 3's judgment, check 4's judgment, and the tickets made (or "Tickets to file").
+   - Evidence: "Before: the last Runs row." and "After: this run's row."
    - Acceptance criteria: "None: a tiny PR."
    - Tested: the script's command and its result. Not tested: what you couldn't run.
+   - Merge Danger: `**Door:** two-way: one Runs row in docs/wellness.md.` and `**Blast radius:** low: no player sees it.`
    - Review: "A tiny PR that changes only docs skips the reviewer."
    - Docs and decisions touched: docs/wellness.md (the Runs row).
    - Last line: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.

@@ -217,7 +217,7 @@ About 90 test files cover Riot ID parsing and region routing, the Riot client (e
 
 ## How it's built
 
-Turnpoint is built with [Claude Code](https://claude.com/claude-code) as a pair programmer. Every change goes through a pull request with a plain-language walkthrough, CI, a preview deploy and, for anything beyond docs, a review by a separate reviewer agent before merging. Riskier changes (database, sign-in, anything that spends API money) also get a second model's review and a manual test of the preview. The process, and the reasons behind it, are in [docs/workflow.md](docs/workflow.md) and the [decision records](docs/adr/).
+Turnpoint is built with [Claude Code](https://claude.com/claude-code) as a pair programmer. Every change goes through a pull request with a plain-language summary, CI, a preview deploy and, for anything beyond docs, a review by a separate reviewer agent before merging. Riskier changes (database, sign-in, anything that spends API money) also get a second model's review and a manual test of the preview. The process, and the reasons behind it, are in [docs/workflow.md](docs/workflow.md) and the [decision records](docs/adr/).
 
 ## Documentation
 

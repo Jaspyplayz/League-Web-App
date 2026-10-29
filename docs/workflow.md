@@ -23,7 +23,7 @@ Work lives in Linear ([linear.app/jaspy](https://linear.app/jaspy), team JAS, pr
 
 ## Review tiers
 
-The builder picks a tier when it starts and names it in the PR. Every tier gets the same automatic checks; the higher tiers add review and Jasper's time. A PR that touches a path on the risky list is Jasper's to merge, whatever its tier says. So is every PR Claude Code didn't build, such as Dependabot's. Rules for one area of the code are in [`.claude/rules/`](../.claude/rules/).
+The builder picks a tier when it starts and names it in the PR. Every tier gets the same automatic checks; the higher tiers add review and Jasper's time. A PR that touches a path on the risky list is Jasper's to merge, whatever its tier says. So is a one-way door, a change a revert doesn't fully undo (the PR template's Merge Danger section says what counts), so it takes the risky tier ([0008](adr/0008-agents-merge-two-way-doors.md)). So is every PR Claude Code didn't build, such as Dependabot's. Rules for one area of the code are in [`.claude/rules/`](../.claude/rules/).
 
 | Tier | What counts | Review | Who merges |
 |---|---|---|---|

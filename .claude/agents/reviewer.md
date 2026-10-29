@@ -61,7 +61,7 @@ after your first line. Otherwise:
   (`git diff --name-only origin/main...HEAD`), not only the new commits.
 - Judge each answer: a fix needs a test or a line that shows it, and a
   rejection needs evidence.
-- Run checks 2 to 7 below on the new commits.
+- Run checks 2 to 8 below on the new commits.
 - Run check 1 on each criterion whose code, test or screenshot page the new
   commits touch, and check every box as GitHub shows it now. The earlier
   review's judgment stands for the other criteria.
@@ -91,6 +91,16 @@ Check in this order:
 6. Security and cost: secrets, unvalidated input, unauthenticated routes, Claude
    calls without a cap.
 7. Docs drift: which doc or decision record does this PR make untrue?
+8. Merge Danger: does the PR's section match the whole diff, by the
+   definitions in `.github/pull_request_template.md` (read it, even when the
+   diff doesn't touch it)? Whatever the PR says, it's a one-way door if the
+   diff adds a migration, code that writes database rows, new paid Claude
+   calls, a sent message, or a setting changed outside the repo; files,
+   browser storage and a setting changed in code are two-way. These are blockers: a one-way
+   door on a tiny or normal PR, a door or blast radius the diff contradicts,
+   or no Merge Danger section on a PR Claude Code built. On a PR Claude Code
+   didn't build, such as Dependabot's, write the door and blast radius in your
+   report instead.
 
 Make the report's first line `Reviewer agent at <sha>: no blockers` or
 `Reviewer agent at <sha>: <n> blockers`, where `<sha>` is the full SHA that

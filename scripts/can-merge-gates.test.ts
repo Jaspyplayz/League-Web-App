@@ -17,6 +17,7 @@ const HEAD = "2ee7e1dc85217494c55a3dd20022b87184b8d675";
 const OLDER = "85e30eb0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6";
 const ON: AgentMerge = { on: true, since: "2026-10-25" };
 const VERCEL = "https://vercel.com/jaspy-s-team/league-web-app/Bth8tZWfPTqkq34tGX4qgjxz2ry3";
+const TEMPLATE = readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
 
 function main(overrides: Partial<MainState> = {}): MainState {
   return { agentMerge: ON, changedGateCode: [], reverts: [], claudeMerges: [], ...overrides };
@@ -35,7 +36,7 @@ function body({
     builder === null ? "" : `**Builder:** ${builder}`,
     "Closes #170",
     "",
-    "## Walkthrough",
+    "## Summary",
     "Adds a card to Insights.",
     "",
     "## Acceptance criteria",
@@ -46,8 +47,6 @@ function body({
     "",
     "## Docs and decisions touched",
     "none",
-    "",
-    "## My read (Jasper)",
     "",
   ].join("\n");
 }
@@ -217,10 +216,43 @@ describe("decide", () => {
   // Claude Code is the only builder (decision record 0012), so the PR
   // template's Builder line is already true as written.
   it("accepts the PR template's Builder line as written", () => {
-    const template = readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
-    const builder = template.match(/^\*\*Builder:\*\*\s*(.+)$/m)?.[1].trim() ?? "";
+    const builder = TEMPLATE.match(/^\*\*Builder:\*\*\s*(.+)$/m)?.[1].trim() ?? "";
     expect(builder).toBe("Claude Code on Opus 5.5, in a local or cloud session.");
     expect(failed(decide(pr({ body: body({ builder }) }), main()))).toEqual([]);
+  });
+
+  // A PR written from the template, with only its placeholders filled in,
+  // must pass every gate, so a template edit can't quietly break can-merge.
+  it("passes a PR written from the PR template", () => {
+    const filled = TEMPLATE.replace(/^\*\*Tier:\*\*.*$/m, "**Tier:** normal. One Insights card.")
+      .replace(/^- \[ \] .*$/m, '- [x] The card shows the win rate: test "shows the win rate"')
+      .replace(/^## Review\s*$/m, `## Review\nReviewer agent at ${HEAD}: no blockers`);
+    expect(failed(decide(pr({ body: filled }), main()))).toEqual([]);
+  });
+
+  // The gates read sections line by line, and a heading inside an HTML comment
+  // or a code block can fool them (decision record 0009), so the template
+  // itself has neither.
+  it("keeps HTML comments and code blocks out of the PR template", () => {
+    expect(TEMPLATE).not.toMatch(/<!--|^\s*(```|~~~)/m);
+  });
+
+  // The order is the layout Jasper chose on 2026-10-29, not something a gate
+  // reads; change this list with the template.
+  it("keeps the PR template's sections in the chosen order, with the Merge Danger labels", () => {
+    const headings = [...TEMPLATE.matchAll(/^## (.+?)\s*$/gm)].map((match) => match[1]);
+    expect(headings).toEqual([
+      "Summary",
+      "Evidence",
+      "Acceptance criteria",
+      "Tested",
+      "Not tested",
+      "Merge Danger",
+      "Review",
+      "Docs and decisions touched",
+    ]);
+    expect(TEMPLATE).toMatch(/^\*\*Door:\*\*/m);
+    expect(TEMPLATE).toMatch(/^\*\*Blast radius:\*\*/m);
   });
 
   it.each<[string, string | null]>([
