@@ -101,6 +101,10 @@ Dark "scouting report" style with a light theme. **Blue = you / ahead / win, red
 - **Merge conflicts:** merge `main` into the branch (don't rebase shared branches). For `package-lock.json`, take `main`'s version and re-run `npm install`.
 - `next dev` may re-add a block to `AGENTS.md`; committing it is fine.
 
+## Agent skills
+
+Matt Pocock's skills read their setup from `docs/agents/`: the issue tracker (Linear) in `issue-tracker.md`, triage roles as Linear statuses in `triage-labels.md`, and the single-context domain docs in `domain.md`.
+
 ## Keeping this file current
 
 Update this file, and the folder map in [ARCHITECTURE.md](ARCHITECTURE.md#where-the-code-lives), in the same PR whenever a change makes them wrong: a new command, env var, folder, convention or major decision. Keep it under about 100 lines; link to `docs/` for detail instead of copying it here, and put rules that matter in only one folder in `.claude/rules/`. Jasper can also ask Claude to "update CLAUDE.md" with a new rule.
