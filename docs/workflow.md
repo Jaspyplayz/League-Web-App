@@ -60,7 +60,7 @@ Every session has these, local or cloud: pstack's are copied into the repo ([bel
 | 5. Implement | `why` (pstack) | Why code works the way it does, or when it broke. `poteto-mode`'s bug playbook calls it for you |
 | 7. Self-check | `verify`, `verify-turnpoint`, `verify-turnpoint-ux` | As in step 7 |
 | 8. Review | the reviewer agent, plus `interrogate` (pstack) on risky PRs | As in step 8 |
-| 9. Triage, 10. Merge | `fix-merge-conflicts`, then `fix-ci` (pstack) | A conflict with `main` (GitHub won't run the checks until it's gone), then a failing check |
+| 9. Triage, 10. Merge | `fix-merge-conflicts`, then `fix-ci` (pstack) | A conflict with `main` (GitHub won't run the checks until it's gone), then a failing check. `fix-ci` reads checks with `gh pr`, so it works only in a local session |
 | 11. Close out | `documentation-and-adrs` (copied in) | A decision record in this repo's [format](#decision-records-and-done), such as a risky PR's draft, or a doc the change makes wrong |
 | PR text | `unslop` (pstack) | Before opening the PR |
 
