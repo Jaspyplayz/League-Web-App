@@ -14,19 +14,9 @@
 // with the last lines of output when a step fails.
 
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { cloudSetup, INSTALL } from "./cloud-setup-steps.mjs";
+import { cloudSetup, INSTALL, markPackagesCurrent, packagesCurrent } from "./cloud-setup-steps.mjs";
 
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-
-// After a good npm ci, the lockfile's hash goes in node_modules, so a resumed
-// session on the same machine skips the reinstall. npm ci deletes
-// node_modules first, so a failed install leaves no mark and runs again.
-const mark = join(root, "node_modules", ".cloud-setup-lock-hash");
-const lockHash = () => createHash("sha256").update(readFileSync(join(root, "package-lock.json"))).digest("hex");
-const packagesCurrent = () => existsSync(mark) && readFileSync(mark, "utf8") === lockHash();
 
 // Each step gets under half of the hook's 600-second timeout, so a stalled
 // download still ends in a line Claude can read.
@@ -44,11 +34,11 @@ function run(command) {
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   process.stderr.write(output);
   const ok = result.status === 0;
-  if (ok && command === INSTALL) writeFileSync(mark, lockHash());
+  if (ok && command === INSTALL) markPackagesCurrent(root);
   const lines = output.trimEnd().split("\n").slice(-5);
   if (result.error) lines.push(result.error.message);
   return { ok, tail: lines.join("\n") };
 }
 
-const line = cloudSetup(process.env, run, packagesCurrent);
+const line = cloudSetup(process.env, run, () => packagesCurrent(root));
 if (line) console.log(line);

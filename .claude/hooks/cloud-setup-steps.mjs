@@ -1,6 +1,31 @@
 // Helpers for cloud-setup.mjs, in their own file so cloud-setup.test.mjs can
 // test them without installing anything.
 
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+// After a good npm ci, the lockfile's hash goes in node_modules, so a resumed
+// session on the same machine skips the reinstall. npm ci deletes
+// node_modules first, so a failed install leaves no mark and runs again.
+const markFile = (root) => join(root, "node_modules", ".cloud-setup-lock-hash");
+
+// null when there's no lockfile, so npm ci runs and reports that itself.
+function lockHash(root) {
+  const lock = join(root, "package-lock.json");
+  return existsSync(lock) ? createHash("sha256").update(readFileSync(lock)).digest("hex") : null;
+}
+
+export function packagesCurrent(root) {
+  const hash = lockHash(root);
+  return hash !== null && existsSync(markFile(root)) && readFileSync(markFile(root), "utf8") === hash;
+}
+
+export function markPackagesCurrent(root) {
+  const hash = lockHash(root);
+  if (hash !== null) writeFileSync(markFile(root), hash);
+}
+
 export const INSTALL = "npm ci";
 export const BROWSER = "npx playwright install chromium";
 

@@ -1,8 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
-import { cloudSetup } from "./cloud-setup-steps.mjs";
+import { afterAll, describe, expect, it } from "vitest";
+import { cloudSetup, markPackagesCurrent, packagesCurrent } from "./cloud-setup-steps.mjs";
 
 const CLOUD = { CLAUDE_CODE_REMOTE: "true" };
 
@@ -59,6 +61,39 @@ describe("cloudSetup", () => {
   it("says screenshots won't work when only Chromium fails", () => {
     const { run } = fakeRun(["npx playwright install chromium"]);
     expect(cloudSetup(CLOUD, run)).toMatch(/^Cloud setup: `npx playwright install chromium` failed, so npm run shot/);
+  });
+});
+
+describe("packagesCurrent and markPackagesCurrent", () => {
+  const roots = [];
+  // A checkout with a lockfile and an empty node_modules, as npm ci leaves it.
+  function checkout({ lockfile = true } = {}) {
+    const root = mkdtempSync(join(tmpdir(), "cloud-setup-"));
+    roots.push(root);
+    mkdirSync(join(root, "node_modules"));
+    if (lockfile) writeFileSync(join(root, "package-lock.json"), '{"lockfileVersion":3}');
+    return root;
+  }
+  afterAll(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
+
+  it("is false before any install, and true after one is marked", () => {
+    const root = checkout();
+    expect(packagesCurrent(root)).toBe(false);
+    markPackagesCurrent(root);
+    expect(packagesCurrent(root)).toBe(true);
+  });
+
+  it("is false again once the lockfile changes", () => {
+    const root = checkout();
+    markPackagesCurrent(root);
+    writeFileSync(join(root, "package-lock.json"), '{"lockfileVersion":3,"packages":{}}');
+    expect(packagesCurrent(root)).toBe(false);
+  });
+
+  it("is false, and marks nothing, without a lockfile", () => {
+    const root = checkout({ lockfile: false });
+    expect(() => markPackagesCurrent(root)).not.toThrow();
+    expect(packagesCurrent(root)).toBe(false);
   });
 });
 
