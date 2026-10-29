@@ -40,3 +40,4 @@ To run the whole check by hand instead, open a local session on an up-to-date `m
 
 | Date | Ran in | Checked up to | Tickets | `npm test` | `npm run build` | Notes |
 |---|---|---|---|---|---|---|
+| 2026-10-29 | cloud | `0e76a79` | JAS-39, JAS-40, JAS-41, JAS-42, JAS-43, JAS-44, JAS-45, JAS-46, JAS-47, JAS-48, JAS-49, JAS-50 | 20 s | 33 s | First run. Build time is the cold first run, a warm rerun took 8 s. Clone was shallow (JAS-45) |
