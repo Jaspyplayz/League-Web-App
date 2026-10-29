@@ -11,6 +11,10 @@ const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others",
   .split("\0")
   .filter(Boolean);
 
+// The only risky patterns allowed to match no file in the repo (see the
+// "names only paths that exist" test below).
+const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/"];
+
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
 
@@ -107,8 +111,8 @@ describe("riskyFiles", () => {
   });
 
   // Local settings override the commit hook, a copied agent can take the
-  // reviewer's name, and Cursor's settings and rules set up the Grok review
-  // (JAS-13).
+  // reviewer's name, and a Cursor settings or rules file could still give an
+  // AI tool instructions (JAS-13).
   it("flags local settings, every agent, and Cursor's settings and rules", () => {
     const paths = [
       ".claude/settings.local.json",
@@ -155,9 +159,29 @@ describe("riskyFiles", () => {
   });
 
   // A folder renamed without updating the list would quietly stop being risky.
-  it("names only paths that exist in the repo", () => {
-    const missing = RISKY_PATHS.filter(({ pattern }) => !repoFiles.some((file) => matchesPattern(pattern, file)));
+  // The Cursor patterns are the exception: .cursor/ was deleted when Cursor
+  // stopped being used (decision record 0012), so they match no file, but
+  // they stay so a Cursor settings or rules file added later still goes to
+  // Jasper.
+  it("names only paths that exist in the repo, except the kept Cursor patterns", () => {
+    const missing = RISKY_PATHS.filter(
+      ({ pattern }) => !KEPT_WITHOUT_FILES.includes(pattern) && !repoFiles.some((file) => matchesPattern(pattern, file)),
+    );
     expect(missing).toEqual([]);
+  });
+
+  it("keeps the Cursor patterns, and they still flag a Cursor settings or rules file added later", () => {
+    expect(RISKY_PATHS.map(({ pattern }) => pattern)).toEqual(expect.arrayContaining(KEPT_WITHOUT_FILES));
+    expect(riskyFiles([".cursor/settings.json", ".cursor/rules/x.mdc"])).toEqual([
+      {
+        path: ".cursor/settings.json",
+        why: "Cursor isn't used any more, but its settings could still turn on an AI tool here",
+      },
+      {
+        path: ".cursor/rules/x.mdc",
+        why: "Cursor isn't used any more, but a rule here could still give an AI tool instructions",
+      },
+    ]);
   });
 
   // Anyone can call a server action, and a store under a new name would

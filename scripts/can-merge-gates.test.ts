@@ -213,9 +213,18 @@ describe("decide", () => {
     ["it comes from a fork", { isCrossRepository: true }],
     ["it has no Builder line", { body: body({ builder: null }) }],
     ["the Cursor chat built it", { body: body({ builder: "Cursor chat on Grok 4.7." }) }],
-    ["its Builder line is the template's placeholder", { body: body({ builder: "Claude Code on Opus 5.5, Cursor chat on Grok 4.7, or cloud agent." }) }],
+    ["its Builder line names other builders too", { body: body({ builder: "Claude Code on Opus 5.5, Cursor chat on Grok 4.7, or cloud agent." }) }],
   ])("refuses a PR that Claude Code didn't build: %s", (_, overrides) => {
     expect(failed(decide(pr(overrides), main()))).toEqual(["Built by Claude Code"]);
+  });
+
+  // Claude Code is the only builder (decision record 0012), so the PR
+  // template's Builder line is already true as written.
+  it("accepts the PR template's Builder line as written", () => {
+    const template = readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
+    const builder = template.match(/^\*\*Builder:\*\*\s*(.+)$/m)?.[1].trim() ?? "";
+    expect(builder).toBe("Claude Code on Opus 5.5, in a local or cloud session.");
+    expect(failed(decide(pr({ body: body({ builder }) }), main()))).toEqual([]);
   });
 
   it.each<[string, string | null]>([

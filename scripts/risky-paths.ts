@@ -46,10 +46,10 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   // Anything that defines or runs a check, since loosening one is risky.
   { pattern: ".github/", why: "CI, the smoke test and the PR template" },
   { pattern: ".claude/settings", why: "Claude's deny rules and commit hook, and local overrides of them" },
-  { pattern: ".claude/hooks/", why: "the commit hook" },
+  { pattern: ".claude/hooks/", why: "the commit hook, and the startup hook that runs commands in every cloud session" },
   { pattern: ".claude/agents/", why: "the reviewer agent, and any agent that could take its name" },
-  { pattern: ".cursor/settings.json", why: "the Grok review of risky PRs" },
-  { pattern: ".cursor/rules/", why: "rules the Cursor chat follows when it runs the Grok review" },
+  { pattern: ".cursor/settings.json", why: "Cursor isn't used any more, but its settings could still turn on an AI tool here" },
+  { pattern: ".cursor/rules/", why: "Cursor isn't used any more, but a rule here could still give an AI tool instructions" },
   { pattern: ".claude/skills/", why: "skills the reviewer loads" },
   { pattern: ".claude/rules/", why: "rules the reviewer checks against" },
   { pattern: "eslint.config.mjs", why: "lint" },

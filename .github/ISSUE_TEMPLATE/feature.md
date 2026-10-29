@@ -13,7 +13,7 @@ about: A player problem with acceptance criteria, for normal and risky changes
 
 **Tier.** Tiny, normal or risky, and why.
 
-**Builder.** Claude Code on Opus 5.5 (default), Cursor chat on Grok 4.7, or a cloud agent. One builder for this issue.
+**Builder.** Claude Code on Opus 5.5, in a local or cloud session. One builder for this ticket.
 
 **Plan** (the builder fills in before coding). Files, data, tests, docs to update.
 
