@@ -105,7 +105,7 @@ eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/
                   a cloud session starts), agents/reviewer.md,
                   agent-merge.json (the switch for npm run can-merge, read from main),
                   rules/ (rules for one area, loaded when Claude opens a file there),
-                  skills/ (explain-back and the three verify skills, plus eight copied from other repos)
+                  skills/ (explain-back, the three verify skills and soft-rounded-ux, plus eight copied from other repos)
 ```
 
 ## What happens when you open a match

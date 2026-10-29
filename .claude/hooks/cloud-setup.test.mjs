@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { cloudSetup, markPackagesCurrent, packagesCurrent } from "./cloud-setup-steps.mjs";
+import { cloudSetup, markPackagesCurrent, packagesCurrent, runStep } from "./cloud-setup-steps.mjs";
 
 const CLOUD = { CLAUDE_CODE_REMOTE: "true" };
 
@@ -58,7 +58,7 @@ describe("cloudSetup", () => {
     const { ran, run } = fakeRun();
     const packages = fakePackages(true);
     expect(cloudSetup(CLOUD, run, packages)).toBe(
-      "Cloud setup: ran `npx playwright install chromium` (node_modules already matched package-lock.json).",
+      "Cloud setup: ran `npx playwright install chromium` (node_modules already matched package.json and package-lock.json).",
     );
     expect(ran).toEqual(["npx playwright install chromium"]);
     expect(packages.marked).toBe(0);
@@ -80,6 +80,30 @@ describe("cloudSetup", () => {
   });
 });
 
+describe("runStep", () => {
+  const node = (script) => [process.execPath, "-e", script];
+
+  it("is ok when the program exits 0", () => {
+    expect(runStep(node("console.log('done')"), process.cwd(), 10_000)).toEqual({ ok: true, tail: "done" });
+  });
+
+  it("fails with the last 5 lines when the program exits non-zero", () => {
+    const script = "for (let i = 1; i <= 7; i++) console.log('line ' + i); process.exit(3)";
+    expect(runStep(node(script), process.cwd(), 10_000)).toEqual({
+      ok: false,
+      tail: ["line 3", "line 4", "line 5", "line 6", "line 7"].join("\n"),
+    });
+  });
+
+  it("stops a program that runs past its time, and says so", () => {
+    const started = Date.now();
+    const { ok, tail } = runStep(node("setTimeout(() => {}, 20_000)"), process.cwd(), 500);
+    expect(ok).toBe(false);
+    expect(tail).toMatch(/ETIMEDOUT/);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
+});
+
 describe("packagesCurrent and markPackagesCurrent", () => {
   const roots = [];
   // A checkout with a lockfile and an empty node_modules, as npm ci leaves it.
@@ -87,6 +111,7 @@ describe("packagesCurrent and markPackagesCurrent", () => {
     const root = mkdtempSync(join(tmpdir(), "cloud-setup-"));
     roots.push(root);
     mkdirSync(join(root, "node_modules"));
+    writeFileSync(join(root, "package.json"), '{"name":"app"}');
     if (lockfile) writeFileSync(join(root, "package-lock.json"), '{"lockfileVersion":3}');
     return root;
   }
@@ -103,6 +128,29 @@ describe("packagesCurrent and markPackagesCurrent", () => {
     const root = checkout();
     markPackagesCurrent(root);
     writeFileSync(join(root, "package-lock.json"), '{"lockfileVersion":3,"packages":{}}');
+    expect(packagesCurrent(root)).toBe(false);
+  });
+
+  it("is false again once package.json changes", () => {
+    const root = checkout();
+    markPackagesCurrent(root);
+    writeFileSync(join(root, "package.json"), '{"name":"app","dependencies":{}}');
+    expect(packagesCurrent(root)).toBe(false);
+  });
+
+  // npm ci deletes node_modules before it installs, so the mark has to live
+  // there for a failed install to leave none behind.
+  it("is false once node_modules is gone, as when npm ci starts over", () => {
+    const root = checkout();
+    markPackagesCurrent(root);
+    rmSync(join(root, "node_modules"), { recursive: true });
+    expect(packagesCurrent(root)).toBe(false);
+  });
+
+  it("doesn't throw when the mark can't be written", () => {
+    const root = checkout();
+    rmSync(join(root, "node_modules"), { recursive: true });
+    expect(() => markPackagesCurrent(root)).not.toThrow();
     expect(packagesCurrent(root)).toBe(false);
   });
 
@@ -125,11 +173,11 @@ describe("the hook as Claude Code runs it", () => {
   });
 
   // Without this entry the hook never runs, and every other test still passes.
-  it("is wired to session start and resume in the project settings", () => {
+  it("is wired to session start, resume and fork in the project settings", () => {
     const settings = JSON.parse(readFileSync(new URL("../settings.json", import.meta.url), "utf8"));
-    expect(settings.hooks.SessionStart).toEqual([
+    expect(settings.hooks.SessionStart).toContainEqual(
       {
-        matcher: "startup|resume",
+        matcher: "startup|resume|fork",
         hooks: [
           {
             type: "command",
@@ -138,6 +186,6 @@ describe("the hook as Claude Code runs it", () => {
           },
         ],
       },
-    ]);
+    );
   });
 });

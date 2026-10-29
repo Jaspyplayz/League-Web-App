@@ -1,6 +1,6 @@
 # 0012: A Claude-only workflow, with up to 4 builders and a Ready queue
 
-Status: draft, waiting on Jasper's "In my words" (Linear JAS-27). It changes who reviews risky PRs and who builds, which 0010 and 0011 describe with the Grok review in them. Those records stay as they were written.
+Status: draft, waiting on Jasper's "In my words" (Linear JAS-27). It changes who reviews risky PRs and who builds, which 0008 to 0011 describe with Cursor, the Grok review or Cursor's cloud agents in them. Those records stay as they were written.
 
 ## Context
 
@@ -19,13 +19,13 @@ A cloud check the same day found that a Claude Code cloud session in the `League
 ## Decision
 
 Option 3, along with these changes:
-- **Cursor and Grok are gone.** `.cursor/` and `docs/STATUS.md` are deleted, and the after-merge step (status, leftover docs and the Dev Log entry) is dropped. Docs a PR leaves wrong get fixed in that PR. The code checks stay: `.cursor/settings.json` and `.cursor/rules/` are still on the risky list in `scripts/risky-paths.ts`, and `scripts/can-merge-gates.ts` still refuses a Builder line that names Cursor, Grok, Composer or a cloud agent. So a Cursor settings or rules file added later still goes to Jasper. Other root `.cursor/` files, such as `.cursor/mcp.json`, weren't on the list before and still aren't.
+- **Cursor and Grok are gone.** `.cursor/` and `docs/STATUS.md` are deleted, and the after-merge step (status, leftover docs and the Dev Log entry) is dropped. Docs a PR leaves wrong get fixed in that PR. The code checks stay: `.cursor/settings.json` and `.cursor/rules/` are still on the risky list in `scripts/risky-paths.ts`, and `scripts/can-merge-gates.ts` still refuses a Builder line that names Cursor, Grok, Composer or a cloud agent. So a Cursor settings or rules file added later still goes to Jasper. Any other `.cursor/` file added later wasn't on the list before and still isn't.
 - **Claude Code is the only builder**, in a local session or a cloud session.
 - **The reviewer agent runs on Fable** (`model: fable` in `.claude/agents/reviewer.md`) instead of the builder's model, so the first review comes from a different model than the one that wrote the code.
 - **Risky PRs get the reviewer agent plus an `interrogate` panel**, run on the same head commit. The panel records its own line in the Review section. If it can't run, the PR says "no interrogate panel yet".
 - **Up to 4 branches in progress at once**, each touching different files. It was two.
 - **A Ready status** in Linear (after Todo) holds tickets Jasper approved, which a builder may start without being asked. A later `/run-queue` skill will hand them to cloud sessions.
-- **A startup hook** (`.claude/hooks/cloud-setup.mjs`) runs `npm ci` and `npx playwright install chromium` when a cloud session starts or is reopened, and nothing locally. It skips `npm ci` when `node_modules` already matches `package-lock.json`.
+- **A startup hook** (`.claude/hooks/cloud-setup.mjs`) runs `npm ci` and `npx playwright install chromium` when a cloud session starts, is reopened or is forked, and nothing locally. It skips `npm ci` when `node_modules` already matches `package.json` and `package-lock.json`.
 - **`docs/workflow.md` is under 80 lines.** The detail it dropped lives in the code and in `reviewer.md`, where agents already read it. The rules that only the builder follows, such as when to ask for a full review, stay in it.
 
 The plan check and `/explain-back` stay as they were. Who merges stays too: Claude through `can-merge` for its tiny and normal PRs, Jasper for the rest.
@@ -40,7 +40,7 @@ Good:
 
 Bad:
 - Every reviewer is now a Claude model or a model pstack picks, so the review loses Grok's view from another company's training.
-- `interrogate` comes from pstack, which only Jasper's PC has. Until it's copied into `.claude/skills/` (the next ticket), a risky PR built in a cloud session gets "no interrogate panel yet" and needs a local session for the panel.
+- `interrogate` comes from pstack, which only Jasper's PC has. Until it's copied into `.claude/skills/` (the next ticket), a risky PR built in a cloud session needs a local session for the panel. Until JAS-26 a local session opens those PRs anyway, so the gap opens only once cloud sessions can open PRs themselves.
 - Four branches at once means more merges of `main` into open branches, and a chance of two builders reaching for the same file. The open-PR check before editing is the only guard, and it's a habit, not a gate.
 - `docs/STATUS.md` is gone, so "what's the status?" is answered by Linear and the merged PRs, not one page.
 - The shorter `docs/workflow.md` drops the long explanations of the merge gates and re-review rules. Anyone who wants the why now reads 0008 to 0011 and the code. It also drops the old plan to count the reviewer's useful findings after 10 normal PRs.

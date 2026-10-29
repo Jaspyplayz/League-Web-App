@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Who writes this change
 
-Claude Code on Opus 5.5 is the only builder, in a local session or a cloud session. One ticket has one builder: the one whose start comment is on the Linear ticket. Up to 4 branches can be in progress at once, each touching different files. Claude Code merges only its own tiny and normal pull requests, through `npm run can-merge -- <pr> --merge`, and Jasper merges every other one. Nobody but Jasper writes "My read". The full rule is [docs/workflow.md](docs/workflow.md#tickets-and-builders).
+Claude Code on Opus 5.5 is the only builder, in a local session or a cloud session. One ticket has one builder: the one whose start comment on the Linear ticket came first. Up to 4 branches can be in progress at once, each touching different files. Claude Code merges only its own tiny and normal pull requests, through `npm run can-merge -- <pr> --merge`, and Jasper merges every other one. Nobody but Jasper writes "My read". The full rule is [docs/workflow.md](docs/workflow.md#tickets-and-builders).
 
 If another open pull request already edits a file, leave that file alone.
 
