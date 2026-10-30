@@ -43,7 +43,11 @@ not "some players".
 ## Review
 The reviewer's first line, `Reviewer agent at <sha>: no blockers`, then its
 findings, each fixed (with the test that shows it) or rejected (with the
-evidence). Risky PRs: the pstack `interrogate` panel too, starting
+evidence). Each blocker keeps its `Check could catch this: yes, <which check>`
+or `Check could catch this: no, judgement call` line as written, on a plain
+line of its own, and your answer goes on the line after it, starting `Fixed:`
+or `Rejected:`. The `postmortem` skill and the wellness check read both lines
+(`docs/workflow.md`, Recording). Risky PRs: the pstack `interrogate` panel too, starting
 `Interrogate panel at <sha>: <n> to act on`, or "no interrogate panel yet" if
 it couldn't run. Any other check gets its own line too, such as `Security check at <sha>: no findings`. Keep each review's findings
 under its line, and use that `<name> at <sha>:` shape only for reviews.
