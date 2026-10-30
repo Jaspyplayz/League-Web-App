@@ -11,7 +11,7 @@ The thread picks a tier when it starts and names it in the PR, so tiny changes s
 | Tier | What counts | Before code | After code | Jasper's part |
 |---|---|---|---|---|
 | Tiny | Copy, styling inside one component, docs, Dependabot's weekly minor and patch bumps | Nothing | Commit hook, CI, smoke test and accessibility scan, plus the reviewer agent unless it changes only docs | None for Claude Code's own PRs off the [risky list](../scripts/risky-paths.ts), which it merges with `npm run can-merge`. Skim and merge the rest |
-| Normal | A feature or fix inside one area, such as a new Insights card; a Dependabot major version bump; a change in `.github/` or `.claude/` that adds or tightens a check, which Jasper merges when it touches the risky list | A [Linear ticket](#work-starts-as-a-linear-ticket) with 3 to 5 acceptance criteria; Claude reads the code and posts a short plan | Tiny's checks, plus the [reviewer agent](../.claude/agents/reviewer.md) and a screenshot or test name per criterion | None for Claude Code's own PRs off the risky list, once the reviewer finds no blockers. Merge the rest. "My read" when he chooses |
+| Normal | A feature or fix inside one area, such as a new Insights card; a Dependabot major version bump; a change in `.github/` or `.claude/` that adds or tightens a check, which Jasper merges when it touches the risky list | A [Linear ticket](#work-starts-as-a-linear-ticket) with 3 to 5 acceptance criteria; Claude reads the code and posts a short plan | Tiny's checks, plus the [reviewer agent](../.claude/agents/reviewer.md) and a screenshot or test name per criterion | None for Claude Code's own PRs off the risky list, once the reviewer finds no blockers. Merge the rest |
 | Risky | Database code (`src/db/`, `drizzle/`, the stores in `src/lib/`, scripts that use the live database), sign-in, the Riot client and rate limiter, `src/app/api/`, server actions, the MCP server, anything that spends Claude API money, model retraining, a new judgment shown to players (a grade, a cause, a rating), Riot policy questions, anything that removes or loosens a check (a CI step, the commit hook, a deny rule) | Normal's ticket, plus a draft [decision record](#decision-records); Jasper approves the plan | Normal's checks, plus a second model's review and Jasper's own test of the preview | He merges it himself |
 
 Every tier runs the same automatic checks; the extra steps in the lower rows are where Jasper's time goes. Claude Code writes this app on Opus 5.5. The second look on a risky pull request is Grok 4.7, in the Cursor chat, through pstack ([`.cursor/settings.json`](../.cursor/settings.json)). If that review cannot be run, the PR says "no second review yet".
@@ -31,9 +31,9 @@ Every tier runs the same automatic checks; the extra steps in the lower rows are
 11. **Close out in the same PR.** Docs and decision records change with the code. The ticket ID in the branch name closes the ticket when the PR merges. For an older GitHub issue, `Closes #N` in the PR closes it.
 12. **After the merge.** The Cursor chat, on Grok 4.7, updates [docs/STATUS.md](STATUS.md) and any doc the pull request left wrong. It does not redo the code. A scheduled task on Jasper's PC pulls `main` every 30 minutes, but only when that folder is on `main` with nothing uncommitted, so it never touches a branch in progress. A local git hook then rebuilds the notes in his private Obsidian vault from the merged PRs. The thread that drove the PR adds a dated, facts-only entry to his Dev Log there (what changed, what's next); the "why" and "what I learned" lines are his to write.
 
-Tiny changes skip the ticket, the plan and "My read". A tiny change to docs alone also skips the reviewer. A tiny change to anything else gets the reviewer before it merges, because the PR names its own tier. Only the `.md`, `.png`, `.jpg`, `.gif` and `.webp` files in `docs/` and the root `README.md` and `ARCHITECTURE.md` count as docs. This file, any `CLAUDE` or `AGENTS` file and anything in a dot folder don't, because agents follow them as rules. The thread reads the code, makes the change, opens the PR and, once the checks pass, merges it with `npm run can-merge`. Step 12 still happens.
+Tiny changes skip the ticket, and the plan. A tiny change to docs alone also skips the reviewer. A tiny change to anything else gets the reviewer before it merges, because the PR names its own tier. Only the `.md`, `.png`, `.jpg`, `.gif` and `.webp` files in `docs/` and the root `README.md` and `ARCHITECTURE.md` count as docs. This file, any `CLAUDE` or `AGENTS` file and anything in a dot folder don't, because agents follow them as rules. The thread reads the code, makes the change, opens the PR and, once the checks pass, merges it with `npm run can-merge`. Step 12 still happens.
 
-The PR template ([`.github/pull_request_template.md`](../.github/pull_request_template.md)) has a section for each of these: the tier, the walkthrough, the criteria with their evidence, the review, the docs touched and "My read".
+The PR template ([`.github/pull_request_template.md`](../.github/pull_request_template.md)) has a section for each of these: the tier, the walkthrough, the criteria with their evidence, the review, and the docs touched.
 
 ## Who does what
 
@@ -43,7 +43,7 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 | Framing, planning, implementing, docs that belong with the code, merging its own tiny and normal PRs | Claude Code, on Opus 5.5 | It holds the thread, and the code has to stay explainable |
 | Searching a large area, digging through logs | A subagent with a fresh context | Keeps noise out of the builder's context |
 | Reviewing a risky diff, then updating status and leftover docs after the merge | The Cursor chat, on Grok 4.7 | A different model family from the one that wrote the code |
-| Acceptance criteria, product calls, the preview check, "My read", merging risky PRs and every PR Claude Code didn't build | Jasper | Judgment, and the learning is the point |
+| Acceptance criteria, product calls, the preview check, merging risky PRs and every PR Claude Code didn't build | Jasper | Judgment, and the learning is the point |
 
 ## The reviewer agent
 
@@ -62,10 +62,6 @@ The PR template ([`.github/pull_request_template.md`](../.github/pull_request_te
 2. The builder answers each finding: reproduce it (a failing test or exact steps) and fix it, or reject it with evidence (a passing test, a doc line, the Riot docs).
 3. One more round if the reviewer still objects. After that it comes to Jasper as a two-line summary: the claim and the evidence on each side.
 4. Jasper decides on evidence, not confidence. A failing test beats an argument. With no test either way, risky paths take the safer behavior and design choices follow `CLAUDE.md`.
-
-## "My read"
-
-"My read" is the last section of every normal and risky PR: three to five sentences in Jasper's own words, written when he chooses, before or after the merge. It isn't a merge gate. Claude never writes it, because writing it is how the code becomes his to explain in an interview.
 
 ## Skills
 
@@ -97,7 +93,7 @@ Numbers 0001 to 0004 are saved for the four records [#16](https://github.com/Jas
 ## Three meanings of done
 
 - **Merged:** CI is green and it deployed, whether Jasper or `npm run can-merge` merged it.
-- **Verified:** every acceptance criterion has evidence. "My read" can come later and isn't part of it.
+- **Verified:** every acceptance criterion has evidence.
 - **Validated:** at least three players used it, and Jasper recorded what they said.
 
 ## Which tool writes the code
@@ -148,7 +144,7 @@ An agent is not done when the code compiles. It is done when the checks that app
 
 ## Checking that the loop is worth it
 
-The next three normal PRs go through the whole loop, then a 15-minute retro: did the reviewer find anything real, and did "My read" take under 10 minutes? After 10 normal PRs, count the reviewer's useful findings. If fewer than about 3 in 10 PRs get one, rewrite its prompt once; if the next 10 are no better, drop it.
+The next three normal PRs go through the whole loop, then a 15-minute retro: did the reviewer find anything real? After 10 normal PRs, count the reviewer's useful findings. If fewer than about 3 in 10 PRs get one, rewrite its prompt once; if the next 10 are no better, drop it.
 
 ## Guard rails
 

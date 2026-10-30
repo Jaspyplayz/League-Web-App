@@ -16,7 +16,7 @@ If another open pull request already edits a file, leave that file alone.
 
 ## Cursor Cloud specific instructions
 
-A cloud agent on this repo uses Grok or Composer, branches from `origin/main`, and opens a draft pull request. It does not merge, and it does not write "My read".
+A cloud agent on this repo uses Grok or Composer, branches from `origin/main`, and opens a draft pull request. It does not merge.
 
 Node 22. The environment build runs `npm ci`. Before pushing, run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. `npm run test:e2e` runs against the Vercel preview, not in this machine. Do not run `npm run db:migrate`. Secrets come from the cloud environment, never from a file in the repo.
 
