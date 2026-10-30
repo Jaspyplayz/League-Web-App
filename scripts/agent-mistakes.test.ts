@@ -14,7 +14,7 @@ type ClassFile = { problems: string[]; entries: number; rung: string | undefined
 // Git on Jasper's PC checks text files out with Windows line endings
 // (core.autocrlf), and CI's Linux checkout doesn't, so both must read the same.
 // Notepad's "UTF-8 with BOM" adds an invisible character before the # title.
-const plainText = (text: string) => text.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+const plainText = (text: string) => text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
 
 // A real calendar date in YYYY-MM-DD, so 2026-13-45 and 2026-02-30 don't count.
 function isDate(text: string): boolean {
@@ -138,7 +138,7 @@ describe("readClassFile", () => {
   });
 
   it("reads a file saved with a byte-order mark the same", () => {
-    expect(readClassFile(`﻿${GOOD}`)).toEqual(readClassFile(GOOD));
+    expect(readClassFile(`\uFEFF${GOOD}`)).toEqual(readClassFile(GOOD));
   });
 });
 
