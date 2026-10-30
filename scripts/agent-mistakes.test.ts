@@ -171,6 +171,17 @@ describe("readIndexRows", () => {
   });
 });
 
+// Builders copy the skill's entry block, so a block the reader refuses would
+// put a wrong entry in every PR that follows it.
+describe("the postmortem skill's entry block", () => {
+  it("is an entry the log accepts", () => {
+    const skill = plainText(readFileSync(".claude/skills/postmortem/SKILL.md", "utf8"));
+    const block = skill.match(/```md\n([\s\S]*?)```/)?.[1];
+    expect(block, "a ```md block in .claude/skills/postmortem/SKILL.md").toBeDefined();
+    expect(readClassFile(`# A class\n\n## 2026-10-30\n\n${block}`)).toMatchObject({ problems: [], entries: 1 });
+  });
+});
+
 describe("the agent mistakes log", () => {
   const files = readdirSync(FOLDER).filter((name) => name.endsWith(".md"));
   const { problems, rows } = readIndexRows(readFileSync("docs/agent-mistakes.md", "utf8"));
