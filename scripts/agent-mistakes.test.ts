@@ -2,8 +2,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // The agent mistakes log (docs/agent-mistakes.md and docs/agent-mistakes/).
-// The postmortem skill (JAS-63) will write it and the wellness check (JAS-65)
-// will read it, so an entry in another shape would be skipped instead of counted.
+// The postmortem skill (.claude/skills/postmortem/) writes it and the wellness
+// check (JAS-65) will read it, so an entry in another shape would be skipped
+// instead of counted.
 
 const LINES = ["What happened", "Evidence", "Root cause", "Rung", "Fix"];
 const RUNGS = ["design", "check", "rule file or skill", "CLAUDE.md line", "none yet"];
