@@ -20,6 +20,10 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/?tab=insights")).toBe("/?tab=insights");
   });
 
+  it("keeps a path that tidies to another page on this site", () => {
+    expect(safeNextPath("/player/../?tab=insights")).toBe("/?tab=insights");
+  });
+
   it.each([
     null,
     undefined,
@@ -28,6 +32,9 @@ describe("safeNextPath", () => {
     "//evil.com",
     "/\\evil.com",
     "/\t/evil.com",
+    "/a/..//evil.com",
+    "/.//evil.com",
+    "/%2e%2e//evil.com",
     "player",
   ])(
     "sends %j home instead",

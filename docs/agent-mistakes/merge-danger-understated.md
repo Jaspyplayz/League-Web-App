@@ -17,3 +17,11 @@ The PR template defines the door and the blast radius by what the diff does: cod
 - **Root cause:** the same belief as the entry above, that a small edit means a small blast radius, and nothing before the reviewer checks it.
 - **Rung:** none yet
 - **Fix:** JAS-69.
+
+## 2026-10-30
+
+- **What happened:** Claude opened PR 219 (`safeNextPath`, `src/lib/sign-in.ts`) with "Blast radius: low to medium". By the template it's high, since it's sign-in, and "low to medium" isn't one of the template's values.
+- **Evidence:** the reviewer agent's report at `09e8a83` on [PR 219](https://github.com/Jaspyplayz/League-Web-App/pull/219), blocker 1, quoting `.github/pull_request_template.md`'s Merge Danger definitions. The same session made the same mistake twice on PR 218, logged above.
+- **Root cause:** Claude rated the change by how small and safe the edit looked (a two-line check) instead of by the template's definitions, which go by what the code touches. Nothing before the reviewer compares the Merge Danger lines with the files in the diff.
+- **Rung:** none yet
+- **Fix:** JAS-69, a `can-merge` gate that compares the Merge Danger lines with the diff. `scripts/can-merge` is on the risky list, so Jasper merges it.

@@ -26,7 +26,10 @@ const HOME = "http://turnpoint.invalid";
 export function safeNextPath(next: string | null | undefined): string {
   if (!next?.startsWith("/")) return "/";
   const url = new URL(next, HOME);
-  return url.origin === HOME ? `${url.pathname}${url.search}${url.hash}` : "/";
+  // The parser also tidies the path, and that can make a new "//":
+  // "/a/..//evil.com" tidies to "//evil.com". So check the tidied path too.
+  if (url.origin !== HOME || url.pathname.startsWith("//")) return "/";
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 // The parts of a signed-in user the site uses. Google and Discord fill in
