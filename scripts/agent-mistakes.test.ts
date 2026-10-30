@@ -171,14 +171,21 @@ describe("readIndexRows", () => {
   });
 });
 
-// Builders copy the skill's entry block, so a block the reader refuses would
-// put a wrong entry in every PR that follows it.
-describe("the postmortem skill's entry block", () => {
-  it("is an entry the log accepts", () => {
-    const skill = plainText(readFileSync(".claude/skills/postmortem/SKILL.md", "utf8"));
-    const block = skill.match(/```md\n([\s\S]*?)```/)?.[1];
-    expect(block, "a ```md block in .claude/skills/postmortem/SKILL.md").toBeDefined();
+// Builders copy the skill's entry block and class table row, so a shape the
+// readers refuse would put a wrong entry in every PR that follows it.
+describe("the postmortem skill's templates", () => {
+  const skill = plainText(readFileSync(".claude/skills/postmortem/SKILL.md", "utf8"));
+
+  it("has an entry block the log accepts", () => {
+    const block = skill.match(/these five lines in this order:\n\n```md\n([\s\S]*?)```/)?.[1];
+    expect(block, 'the ```md block after "these five lines in this order:"').toBeDefined();
     expect(readClassFile(`# A class\n\n## 2026-10-30\n\n${block}`)).toMatchObject({ problems: [], entries: 1 });
+  });
+
+  it("has a class table row the index accepts", () => {
+    const row = skill.match(/a new class gets a row `(\|.+?\|)`/)?.[1];
+    expect(row, 'the row after "a new class gets a row"').toBeDefined();
+    expect(readIndexRows(`| Class | Times seen | Rung |\n| --- | --- | --- |\n${row}\n`).problems).toEqual([]);
   });
 });
 
