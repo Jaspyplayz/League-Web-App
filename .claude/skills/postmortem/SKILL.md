@@ -41,7 +41,7 @@ The entry's Rung line names the rung that lands in this PR. A fix left to a tick
 
 - **The entry** goes in the PR where the mistake happened. A mistake caught outside a PR, such as a find in the weekly read or a correction in a session with no PR, gets a PR of its own.
 - **The fix** goes in the same PR when it's small and doesn't put the PR on the risky list (`scripts/risky-paths.ts`). That list covers nearly every home of a check or a rule (lint rules, hooks, CI, agents, rule files, skills), and a PR that touches it is Jasper's to merge. A test under `src/` or most of `scripts/` stays off it.
-- **A first time logged as `none yet`** gets no ticket: its Fix line says "none yet, first occurrence". The wellness check watches for its repeat.
+- **A first time logged as `none yet`** gets no ticket: its Fix line says so, such as "none yet, as a first occurrence". The wellness check will watch for its repeat (JAS-65).
 - **Otherwise** search Linear for an open `Postmortem:` ticket for this class first; if there's none, file one titled `Postmortem: <what>` in Backlog (team JAS, project Turnpoint), with the evidence and the rung you'd pick. Its ID goes in the entry's Fix line. If the Linear tools fail, put the ticket under a "Tickets to file" heading in the PR and don't merge until Jasper has filed it.
 - **An entry added after the reviewer cleared the head** is a new commit, so the reviewer checks the new head before anyone merges.
 
