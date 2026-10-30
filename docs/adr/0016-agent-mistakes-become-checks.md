@@ -1,6 +1,6 @@
 # 0016: Agent mistakes become checks without Jasper asking
 
-Status: draft, waiting on Jasper's "In my words" (Linear JAS-61, built in JAS-62 to JAS-66).
+Status: accepted (Linear JAS-61, built in JAS-62 to JAS-66). It also ends "In my words": Jasper decided on 2026-10-29 that decision records no longer have that part, so 0005 to 0015, which say they're waiting on it, count as accepted and stay as written.
 
 ## Context
 
@@ -47,7 +47,3 @@ The design came from a grilling interview with Jasper on 2026-10-29 (18 question
 - A builder has to recognise its own mistake. Nothing forces that; the wellness check finds the ones it missed, two weeks later at most.
 - Lessons only a model can judge, such as "reproduce before you fix", have no automatic proof until evals exist. They sit at the "rule file or skill" rung.
 - Memory gets smaller, and cloud sessions see every lesson the local ones do.
-
-## In my words
-
-_(Jasper writes this.)_

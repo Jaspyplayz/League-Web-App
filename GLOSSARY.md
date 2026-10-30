@@ -248,4 +248,4 @@ _Avoid_: Incident report, root-cause analysis
 
 **Rung**:
 One level of the fix ladder: design, check, rule file or skill, or CLAUDE.md line.
-_Avoid_: Level, tier (tiers are review sizes)
+_Avoid_: Level, tier (a review tier in docs/workflow.md, or a player's rank tier)

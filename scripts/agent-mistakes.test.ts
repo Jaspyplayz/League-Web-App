@@ -11,9 +11,22 @@ const FOLDER = "docs/agent-mistakes";
 
 type ClassFile = { problems: string[]; entries: number; rung: string | undefined };
 
+// Git on Jasper's PC checks text files out with Windows line endings
+// (core.autocrlf), and CI's Linux checkout doesn't, so both must read the same.
+const toLf = (text: string) => text.replace(/\r\n/g, "\n");
+
+// A real calendar date in YYYY-MM-DD, so 2026-13-45 and 2026-02-30 don't count.
+function isDate(text: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const time = Date.parse(`${text}T00:00:00Z`);
+  // A day past the month's end can roll into the next month instead of failing.
+  return !Number.isNaN(time) && new Date(time).toISOString().startsWith(text);
+}
+
 // Reads one class file: a # title, then a ## YYYY-MM-DD section per
 // occurrence holding the five lines in order. `rung` is the newest entry's.
-function readClassFile(text: string): ClassFile {
+function readClassFile(raw: string): ClassFile {
+  const text = toLf(raw);
   const problems: string[] = [];
   if (!/^# \S/.test(text)) problems.push("doesn't start with a # title");
   const sections = text.split(/^## /m).slice(1);
@@ -23,7 +36,7 @@ function readClassFile(text: string): ClassFile {
   for (const section of sections) {
     const [heading, ...body] = section.split("\n");
     const date = heading.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (!isDate(date)) {
       problems.push(`has a section "## ${date}" that isn't a date`);
       continue;
     }
@@ -50,13 +63,24 @@ function readClassFile(text: string): ClassFile {
   return { problems, entries: sections.length, rung };
 }
 
+type IndexRows = { problems: string[]; rows: Map<string, { entries: number; rung: string }> };
+
 // The index's class table: one row per class file, with its count and rung.
-function readIndexRows(text: string): Map<string, { entries: number; rung: string }> {
+// Any other row in it, such as an old-style one-row postmortem, is a problem.
+function readIndexRows(raw: string): IndexRows {
+  const problems: string[] = [];
   const rows = new Map<string, { entries: number; rung: string }>();
-  for (const match of text.matchAll(/^\| \[.+?\]\(agent-mistakes\/(.+?\.md)\) \| (\d+) \| (.+?) \|$/gm)) {
-    rows.set(match[1], { entries: Number(match[2]), rung: match[3].trim() });
+  const lines = toLf(raw).split("\n");
+  const header = lines.indexOf("| Class | Times seen | Rung |");
+  if (header === -1) return { problems: ['has no "| Class | Times seen | Rung |" table'], rows };
+  // Skip the header and the |---| line under it; the table ends at the first non-table line.
+  for (const line of lines.slice(header + 2)) {
+    if (!line.startsWith("|")) break;
+    const match = line.match(/^\| \[.+?\]\(agent-mistakes\/(.+?\.md)\) \| (\d+) \| (.+?) \|$/);
+    if (match) rows.set(match[1], { entries: Number(match[2]), rung: match[3].trim() });
+    else problems.push(`has a class table row that isn't "| [title](agent-mistakes/<file>.md) | <count> | <rung> |": ${line}`);
   }
-  return rows;
+  return { problems, rows };
 }
 
 const GOOD = `# A class
@@ -97,18 +121,60 @@ describe("readClassFile", () => {
     ]);
   });
 
+  it("refuses a date that isn't on the calendar", () => {
+    expect(readClassFile(GOOD.replace("2026-10-29", "2026-13-45")).problems).toEqual([
+      'has a section "## 2026-13-45" that isn\'t a date',
+    ]);
+  });
+
   it("counts repeats and takes the newest entry's rung", () => {
     const repeat = GOOD.replace("none yet", "check").replace("2026-10-29", "2026-11-02").split("\n").slice(4).join("\n");
     expect(readClassFile(`${GOOD}\n${repeat}`)).toMatchObject({ entries: 2, rung: "check" });
+  });
+
+  it("reads a file with Windows line endings the same", () => {
+    expect(readClassFile(GOOD.replace(/\n/g, "\r\n"))).toEqual(readClassFile(GOOD));
+  });
+});
+
+const INDEX = `| Class | Times seen | Rung |
+| ----- | ---------- | ---- |
+| [A class](agent-mistakes/a-class.md) | 1 | none yet |
+
+After the table.
+`;
+
+describe("readIndexRows", () => {
+  it("reads each row's file, count and rung", () => {
+    expect(readIndexRows(INDEX)).toEqual({
+      problems: [],
+      rows: new Map([["a-class.md", { entries: 1, rung: "none yet" }]]),
+    });
+  });
+
+  it("refuses a row in another shape, such as an old one-row postmortem", () => {
+    const old = "| 2026-11-01 | Claude did a thing | PR 1 | a belief | Check, plus the rule file | PR 2 |";
+    const { problems } = readIndexRows(INDEX.replace("\n\nAfter", `\n${old}\n\nAfter`));
+    expect(problems).toEqual([
+      `has a class table row that isn't "| [title](agent-mistakes/<file>.md) | <count> | <rung> |": ${old}`,
+    ]);
+  });
+
+  it("reads a file with Windows line endings the same", () => {
+    expect(readIndexRows(INDEX.replace(/\n/g, "\r\n"))).toEqual(readIndexRows(INDEX));
   });
 });
 
 describe("the agent mistakes log", () => {
   const files = readdirSync(FOLDER).filter((name) => name.endsWith(".md"));
-  const rows = readIndexRows(readFileSync("docs/agent-mistakes.md", "utf8"));
+  const { problems, rows } = readIndexRows(readFileSync("docs/agent-mistakes.md", "utf8"));
 
   it("has at least one class file", () => {
     expect(files.length).toBeGreaterThan(0);
+  });
+
+  it("has a class table with only rows it can read", () => {
+    expect(problems).toEqual([]);
   });
 
   it.each(files)("%s is well formed and matches its row in the index", (name) => {
