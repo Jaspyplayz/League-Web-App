@@ -48,5 +48,7 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
 | A PR that touches the risky list is Jasper's to merge | `npm run can-merge`, which refuses it (`scripts/risky-paths.ts`) |
 | Every agent mistake entry has all five lines | `scripts/agent-mistakes.test.ts` |
+| Each line in the reviewer's Judgement calls checklist names a class file that exists | `scripts/agent-mistakes.test.ts` |
+| Every reviewer blocker ends with a `Check could catch this:` line, kept in the PR's Review section | Nothing yet: `.claude/agents/reviewer.md` and `docs/workflow.md`; the wellness check will read it (JAS-65) |
 | Every agent mistake gets an entry | Nothing yet: the `postmortem` skill and step 10 of `docs/workflow.md`; the wellness check will look for missed ones (JAS-65) |
 | Jasper's Dev Log why and what-I-learned lines are never listed as his to-do | Nothing yet: a line in Jasper's `~/.claude/CLAUDE.md` |

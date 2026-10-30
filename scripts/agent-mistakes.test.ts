@@ -85,6 +85,30 @@ function readIndexRows(raw: string): IndexRows {
   return { problems, rows };
 }
 
+type Checklist = { problems: string[]; files: string[] };
+
+// The reviewer's "## Judgement calls" checklist (.claude/agents/reviewer.md):
+// "None yet." or one line per lesson, each naming its class file, so a reviewer
+// that finds a repeat can tell the builder which class it repeats.
+function readChecklist(raw: string): Checklist {
+  const text = plainText(raw);
+  const section = text.split(/^## /m).find((part) => part.startsWith("Judgement calls\n"));
+  if (!section) return { problems: ['has no "## Judgement calls" section'], files: [] };
+  const problems: string[] = [];
+  const files: string[] = [];
+  const lines = section.split("\n").slice(1);
+  const bullets = lines.filter((line) => line.startsWith("- "));
+  const empty = lines.some((line) => line.trim() === "None yet.");
+  if (empty && bullets.length > 0) problems.push('says "None yet." above its lines');
+  if (!empty && bullets.length === 0) problems.push('has no lines and no "None yet."');
+  for (const line of bullets) {
+    const match = line.match(/^- \S.* \(`docs\/agent-mistakes\/([^`]+\.md)`\)$/);
+    if (match) files.push(match[1]);
+    else problems.push(`has a line that isn't "- <what to look for> (\`docs/agent-mistakes/<file>.md\`)": ${line}`);
+  }
+  return { problems, files };
+}
+
 const GOOD = `# A class
 
 What it is.
@@ -171,6 +195,37 @@ describe("readIndexRows", () => {
   });
 });
 
+describe("readChecklist", () => {
+  const intro = "Lessons a reader has to catch.\n\n";
+  const line = "- A Tier line that names two tiers (`docs/agent-mistakes/tier-line-names-two-tiers.md`)";
+
+  it("accepts an empty checklist", () => {
+    expect(readChecklist(`## Judgement calls\n\n${intro}None yet.\n\n## Report\n`)).toEqual({ problems: [], files: [] });
+  });
+
+  it("reads each line's class file", () => {
+    expect(readChecklist(`## Judgement calls\n\n${intro}${line}\n`)).toEqual({
+      problems: [],
+      files: ["tier-line-names-two-tiers.md"],
+    });
+  });
+
+  it('refuses "None yet." left above a line', () => {
+    expect(readChecklist(`## Judgement calls\n\n${intro}None yet.\n${line}\n`).problems).toEqual([
+      'says "None yet." above its lines',
+    ]);
+  });
+
+  it("refuses a line that links its class file instead of naming it", () => {
+    const link = "- Look for X. ([class](../../docs/agent-mistakes/x.md))";
+    expect(readChecklist(`## Judgement calls\n\n${intro}${link}\n`).problems).toHaveLength(1);
+  });
+
+  it("refuses a file with no checklist", () => {
+    expect(readChecklist("## Report\n").problems).toEqual(['has no "## Judgement calls" section']);
+  });
+});
+
 // Builders copy the skill's entry block and class table row, so a shape the
 // readers refuse would put a wrong entry in every PR that follows it.
 describe("the postmortem skill's templates", () => {
@@ -186,6 +241,32 @@ describe("the postmortem skill's templates", () => {
     const row = skill.match(/a new class gets a row `(\|.+?\|)`/)?.[1];
     expect(row, 'the row after "a new class gets a row"').toBeDefined();
     expect(readIndexRows(`| Class | Times seen | Rung |\n| --- | --- | --- |\n${row}\n`).problems).toEqual([]);
+  });
+
+  it("has a checklist line the reviewer's checklist accepts", () => {
+    const template = skill.match(/replacing its `None yet\.`, as ``(.+?)``/)?.[1];
+    expect(template, 'the line after "replacing its `None yet.`, as"').toBeDefined();
+    expect(readChecklist(`## Judgement calls\n\n${template}\n`).problems).toEqual([]);
+  });
+});
+
+// The postmortem starts from each blocker's last line, and the wellness check
+// (JAS-65) will count them, so the reviewer must ask for these exact shapes.
+describe("the reviewer's instructions", () => {
+  const reviewer = plainText(readFileSync(".claude/agents/reviewer.md", "utf8"));
+  const files = readdirSync(FOLDER).filter((name) => name.endsWith(".md"));
+
+  it.each(["`Check could catch this: yes, <which check>`", "`Check could catch this: no, judgement call`"])(
+    "ask each blocker to end with %s",
+    (shape) => {
+      expect(reviewer).toContain(shape);
+    },
+  );
+
+  it("have a Judgement calls checklist whose lines name class files that exist", () => {
+    const { problems, files: named } = readChecklist(reviewer);
+    expect(problems).toEqual([]);
+    expect(named.filter((name) => !files.includes(name))).toEqual([]);
   });
 });
 

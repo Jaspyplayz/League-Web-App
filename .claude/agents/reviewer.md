@@ -64,7 +64,7 @@ after your first line. Otherwise:
 - Run checks 2 to 9 below on the new commits.
 - Run check 1 on each criterion whose code, test or screenshot page the new
   commits touch, and check every box as GitHub shows it now. The earlier
-  review's judgment stands for the other criteria.
+  review's judgement stands for the other criteria.
 
 The code-review-and-quality skill is loaded for you. Use its five axes (correctness,
 readability, architecture, security, performance) to find problems, but report in
@@ -101,14 +101,16 @@ Check in this order:
    or no Merge Danger section on a PR Claude Code built. On a PR Claude Code
    didn't build, such as Dependabot's, write the door and blast radius in your
    report instead.
-9. Judgement calls: does the diff repeat a lesson in the checklist below?
+9. Judgement calls: does the diff repeat a lesson in the checklist below? A
+   repeat is a blocker. Name the class file its line points to, so the builder
+   logs it as a repeat.
 
 ## Judgement calls
 
 Lessons from past agent mistakes that no lint rule, test or gate can check, so a
 reader has to. The `postmortem` skill adds a line here when a mistake's fix is a
-judgement call, linking its class file in `docs/agent-mistakes/`. Each line is a
-thing to look for in the diff; a diff that repeats one is a blocker.
+judgement call: what to look for in a diff, then its class file in
+`docs/agent-mistakes/`.
 
 None yet.
 
@@ -131,14 +133,16 @@ Report at most 7 findings. For each: severity (blocker, should-fix, nit), file:l
 the failing case as concrete input and wrong output, and your confidence. If nothing
 blocks, say "No blockers" and list what you checked. Never edit files.
 
-End each blocker with a line of its own in one of these two shapes, so the
-builder's postmortem and the wellness check can find them:
+End each blocker with a plain line of its own, with no bullet or bold, in one of
+these two shapes. The builder's postmortem starts from it, and from JAS-65 the
+wellness check will count them:
 - `Check could catch this: yes, <which check>` when a check could have failed on
   this diff. Name it: an existing one that missed it, or the kind it would take
-  (a lint rule in `eslint-rules/`, a test, a type, a `can-merge` gate, a hook or
-  a CI step) and what it would look for.
+  (a lint rule in `eslint-rules/`, a test, a `can-merge` gate, a hook or a CI
+  step) and what it would look for.
 - `Check could catch this: no, judgement call` when only a reader could see it.
-  Its lesson belongs in the Judgement calls checklist above.
+  The postmortem decides where its lesson goes.
+If you're unsure, pick the likelier one; the postmortem tests it either way.
 Should-fix findings and nits don't get the line.
 
 Finish by running `git status` and include its output, so the caller can see that
