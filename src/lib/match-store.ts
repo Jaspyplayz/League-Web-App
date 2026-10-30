@@ -191,7 +191,13 @@ async function fetchTimeline(
 async function saveMatch(db: Db, match: Match) {
   await db.transaction(async (tx) => {
     await tx.insert(tables.matches).values(matchRow(match)).onConflictDoNothing();
-    await tx.insert(tables.matchParticipants).values(participantRows(match)).onConflictDoNothing();
+    // Riot sometimes sends a game with no players in it, and Drizzle throws
+    // on an insert with no rows. That threw away the whole save, so the game
+    // was downloaded from Riot again on every view (Sentry TURNPOINT-5).
+    const players = participantRows(match);
+    if (players.length > 0) {
+      await tx.insert(tables.matchParticipants).values(players).onConflictDoNothing();
+    }
   });
 }
 
