@@ -255,6 +255,22 @@ describe("decide", () => {
     expect(TEMPLATE).toMatch(/^\*\*Blast radius:\*\*/m);
   });
 
+  // Wellness check 5 reads each blocker's check line and the answer under it,
+  // so the template asks for the shapes reviewer.md writes. It mentions them
+  // mid-sentence only: a template line starting with one would count as a
+  // blocker in every PR that keeps the template's words.
+  it("asks for the reviewer's check line and the Fixed or Rejected answer", () => {
+    for (const shape of [
+      "`Check could catch this: yes, <which check>`",
+      "`Check could catch this: no, judgement call`",
+      "`Fixed:`",
+      "`Rejected:`",
+    ]) {
+      expect(TEMPLATE).toContain(shape);
+    }
+    expect(TEMPLATE).not.toMatch(/^[\s*_`-]*Check could catch this/m);
+  });
+
   it.each<[string, string | null]>([
     ["risky", "risky. It changes the Riot client."],
     ["missing", null],
