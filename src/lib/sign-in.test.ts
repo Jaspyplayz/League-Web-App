@@ -20,6 +20,10 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/?tab=insights")).toBe("/?tab=insights");
   });
 
+  it("keeps a path that tidies to another page on this site", () => {
+    expect(safeNextPath("/player/../?tab=insights")).toBe("/?tab=insights");
+  });
+
   it.each([
     null,
     undefined,

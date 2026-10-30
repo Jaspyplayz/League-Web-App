@@ -21,14 +21,13 @@ export function isProvider(value: string): value is Provider {
 // enough: browsers read "//evil.com" and "/\evil.com" as other websites. So
 // let the URL parser decide, the same way the browser will, and keep the
 // result only if it stays on our (placeholder) site.
-//
-// The parser also tidies the path, and that can create a new "//": "/a/..//evil.com"
-// tidies to "//evil.com". So check the tidied path too before sending it back.
 const HOME = "http://turnpoint.invalid";
 
 export function safeNextPath(next: string | null | undefined): string {
   if (!next?.startsWith("/")) return "/";
   const url = new URL(next, HOME);
+  // The parser also tidies the path, and that can make a new "//":
+  // "/a/..//evil.com" tidies to "//evil.com". So check the tidied path too.
   if (url.origin !== HOME || url.pathname.startsWith("//")) return "/";
   return `${url.pathname}${url.search}${url.hash}`;
 }
