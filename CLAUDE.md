@@ -29,6 +29,7 @@ It's a portfolio project for Jasper (a second-year UofT student, new to TypeScri
 - MCP server (Claude and other AI apps can look players up and read the analyzer's results at `/api/mcp`): [docs/mcp.md](docs/mcp.md)
 - Requirements and setup on a new computer: [docs/SETUP.md](docs/SETUP.md)
 - How a change gets made (the Linear queue, review tiers, the reviewer agent): [docs/workflow.md](docs/workflow.md)
+- Agent mistakes (each one caught, its fix, and each rule next to what enforces it): [docs/agent-mistakes.md](docs/agent-mistakes.md)
 
 ## Stack
 

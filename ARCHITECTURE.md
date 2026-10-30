@@ -95,7 +95,9 @@ src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
 scripts/          Command-line jobs run with tsx (benchmarks, train-score, check-score, train-win-chance, train-phase-score, tempo study, item check, shot for screenshots, remap-puuids after a Riot key change, can-merge and the risky-paths list for Claude Code's own merges, wellness for the biweekly check in docs/wellness.md; can-merge-rest.ts turns GitHub's REST answers into what the gates check, tested on the saved answers in can-merge-fixtures/)
 drizzle/          Generated SQL migrations (never edit by hand)
-docs/             Design and research docs
+docs/             Design and research docs, decision records in adr/, and the agent
+                  mistakes log in agent-mistakes/ (one file per mistake class,
+                  listed in agent-mistakes.md; scripts/agent-mistakes.test.ts checks it)
 e2e/              Playwright smoke test and accessibility scan, run against each Vercel preview;
                   fixtures.ts gets past the preview login (shot uses preview-login.ts too)
 eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/, "server-only"
