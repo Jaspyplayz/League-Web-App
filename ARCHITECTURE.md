@@ -108,7 +108,7 @@ eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/
                   for cloud sessions, see docs/workflow.md), agents/ (reviewer.md,
                   plus pstack's four), agent-merge.json (the switch for npm run can-merge, read from main),
                   rules/ (rules for one area, loaded when Claude opens a file there),
-                  skills/ (explain-back, the three verify skills and soft-rounded-ux, plus eight copied
+                  skills/ (explain-back, postmortem, the three verify skills and soft-rounded-ux, plus eight copied
                   from other repos and pstack's 65, see docs/workflow.md#pstack)
 ```
 

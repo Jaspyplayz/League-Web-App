@@ -2,8 +2,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // The agent mistakes log (docs/agent-mistakes.md and docs/agent-mistakes/).
-// The postmortem skill (JAS-63) will write it and the wellness check (JAS-65)
-// will read it, so an entry in another shape would be skipped instead of counted.
+// The postmortem skill (.claude/skills/postmortem/) writes it and the wellness
+// check (JAS-65) will read it, so an entry in another shape would be skipped
+// instead of counted.
 
 const LINES = ["What happened", "Evidence", "Root cause", "Rung", "Fix"];
 const RUNGS = ["design", "check", "rule file or skill", "CLAUDE.md line", "none yet"];
@@ -167,6 +168,24 @@ describe("readIndexRows", () => {
 
   it("reads a file with Windows line endings the same", () => {
     expect(readIndexRows(INDEX.replace(/\n/g, "\r\n"))).toEqual(readIndexRows(INDEX));
+  });
+});
+
+// Builders copy the skill's entry block and class table row, so a shape the
+// readers refuse would put a wrong entry in every PR that follows it.
+describe("the postmortem skill's templates", () => {
+  const skill = plainText(readFileSync(".claude/skills/postmortem/SKILL.md", "utf8"));
+
+  it("has an entry block the log accepts", () => {
+    const block = skill.match(/these five lines in this order:\n\n```md\n([\s\S]*?)```/)?.[1];
+    expect(block, 'the ```md block after "these five lines in this order:"').toBeDefined();
+    expect(readClassFile(`# A class\n\n## 2026-10-30\n\n${block}`)).toMatchObject({ problems: [], entries: 1 });
+  });
+
+  it("has a class table row the index accepts", () => {
+    const row = skill.match(/a new class gets a row `(\|.+?\|)`/)?.[1];
+    expect(row, 'the row after "a new class gets a row"').toBeDefined();
+    expect(readIndexRows(`| Class | Times seen | Rung |\n| --- | --- | --- |\n${row}\n`).problems).toEqual([]);
   });
 });
 

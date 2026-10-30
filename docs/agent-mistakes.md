@@ -1,6 +1,6 @@
 # Agent mistakes
 
-Each agent mistake that was caught, grouped by mistake class, and how it was fixed. The builder that made the mistake adds the entry, in the shape below. The repo's own `postmortem` skill will do it (JAS-63); until then, don't follow the older copy in `~/.claude/skills/`, which writes a one-row table this file no longer has. The words are defined under Workflow in [GLOSSARY.md](../GLOSSARY.md). Why it works this way: [0016](adr/0016-agent-mistakes-become-checks.md).
+Each agent mistake that was caught, grouped by mistake class, and how it was fixed. The builder that made the mistake adds the entry, in the shape below, with the repo's [`postmortem` skill](../.claude/skills/postmortem/SKILL.md). On Jasper's PC, read it at that path: the older copy in `~/.claude/skills/` has the same name, Claude Code runs a personal skill over a project one, and that copy writes a one-row table this file no longer has. The words are defined under Workflow in [GLOSSARY.md](../GLOSSARY.md). Why it works this way: [0016](adr/0016-agent-mistakes-become-checks.md).
 
 ## Fix ladder
 
@@ -48,4 +48,5 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
 | A PR that touches the risky list is Jasper's to merge | `npm run can-merge`, which refuses it (`scripts/risky-paths.ts`) |
 | Every agent mistake entry has all five lines | `scripts/agent-mistakes.test.ts` |
+| Every agent mistake gets an entry | Nothing yet: the `postmortem` skill and step 10 of `docs/workflow.md`; the wellness check will look for missed ones (JAS-65) |
 | Jasper's Dev Log why and what-I-learned lines are never listed as his to-do | Nothing yet: a line in Jasper's `~/.claude/CLAUDE.md` |
