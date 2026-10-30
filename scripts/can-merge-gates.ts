@@ -263,13 +263,15 @@ function reviewerResult(pr: ReviewInput, tier: Tier): Result {
   // A line that names a commit but isn't a verdict, such as PR 209's
   // "Reviewer agent at <sha> (re-review since <since>): no blockers", is
   // skipped, so a failure names it instead of only the commits it did read.
-  const unread = lines
-    .filter((line) => /Reviewer agent at [0-9a-f]{7,40}\b/i.test(line) && !/Reviewer agent at [0-9a-f]{7,40}:/i.test(line))
-    .map(
-      (line) =>
-        `; couldn't read "${line}": a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`,
-    )
-    .join("");
+  // Only a line with a colon after the commit looks like a verdict; one that
+  // just mentions a commit in passing isn't quoted.
+  const misread = new Set(
+    lines.filter((line) => /Reviewer agent at [0-9a-f]{7,40}\b[^:]+:/i.test(line) && !/Reviewer agent at [0-9a-f]{7,40}:/i.test(line)),
+  );
+  const unread =
+    misread.size === 0
+      ? ""
+      : `; couldn't read ${[...misread].map((line) => `"${line}"`).join(", ")}: a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`;
   if (verdicts.length === 0) {
     const missing = 'the Review section has no "Reviewer agent at <sha>: no blockers" line';
     return fail(`${tiny ? `${missing}, which a tiny PR needs once it changes ${code.join(", ")}` : missing}${unread}`);

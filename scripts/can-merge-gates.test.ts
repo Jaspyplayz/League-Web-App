@@ -371,6 +371,15 @@ describe("decide", () => {
     );
   });
 
+  it("quotes a repeated unread line once, and not a line that only mentions a commit", () => {
+    const misplaced = `Reviewer agent at ${HEAD} (re-review since ${OLDER.slice(0, 7)}): no blockers`;
+    const mention = `- Fixed: the Reviewer agent at ${OLDER.slice(0, 7)} asked for a test`;
+    const decision = decide(pr({ body: body({ review: [misplaced, misplaced, mention] }) }), main());
+    const text = detail(decision, "Reviewer cleared the head commit");
+    expect(text.split(misplaced)).toHaveLength(2);
+    expect(text).not.toContain("asked for a test");
+  });
+
   // GitHub's required reviewer check runs reviewerCleared (JAS-15).
   it.each<[string, Partial<PrSnapshot>]>([
     ["a verdict at the head commit", {}],
