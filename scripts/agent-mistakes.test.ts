@@ -2,9 +2,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // The agent mistakes log (docs/agent-mistakes.md and docs/agent-mistakes/).
-// The postmortem skill (.claude/skills/postmortem/) writes it and the wellness
-// check (JAS-65) will read it, so an entry in another shape would be skipped
-// instead of counted.
+// The postmortem skill (.claude/skills/postmortem/) writes it and wellness
+// check 5 (docs/wellness.md) reads it, so an entry in another shape would be
+// skipped instead of counted.
 
 const LINES = ["What happened", "Evidence", "Root cause", "Rung", "Fix"];
 const RUNGS = ["design", "check", "rule file or skill", "CLAUDE.md line", "none yet"];
@@ -250,8 +250,8 @@ describe("the postmortem skill's templates", () => {
   });
 });
 
-// The postmortem starts from each blocker's last line, and the wellness check
-// (JAS-65) will count them, so the reviewer must ask for these exact shapes.
+// The postmortem starts from each blocker's last line, and wellness check 5
+// counts them, so the reviewer must ask for these exact shapes.
 describe("the reviewer's instructions", () => {
   const reviewer = plainText(readFileSync(".claude/agents/reviewer.md", "utf8"));
   const files = readdirSync(FOLDER).filter((name) => name.endsWith(".md"));
