@@ -28,6 +28,9 @@ describe("safeNextPath", () => {
     "//evil.com",
     "/\\evil.com",
     "/\t/evil.com",
+    "/a/..//evil.com",
+    "/.//evil.com",
+    "/%2e%2e//evil.com",
     "player",
   ])(
     "sends %j home instead",
