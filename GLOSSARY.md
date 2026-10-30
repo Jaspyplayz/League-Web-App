@@ -230,6 +230,14 @@ _Avoid_: Match note, comment
 
 ### Workflow
 
+**Verdict**:
+The reviewer agent's answer on one commit: no blockers, or how many blockers it found.
+_Avoid_: Approval, review result
+
+**Carried-over verdict**:
+A no-blockers verdict that still counts after small later commits, so they don't need another review.
+_Avoid_: Stale review, skipped review
+
 **Agent mistake**:
 Something an agent did wrong that the reviewer, a merge gate, CI or Jasper caught.
 _Avoid_: Mistake (a play's grade), bug, error
