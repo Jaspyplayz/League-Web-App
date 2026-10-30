@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { match, participants } from "@/lib/analyzer/test-fixtures";
 import { getMatch } from "@/lib/riot/api";
@@ -7,10 +8,24 @@ vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/riot/api", () => ({ getMatch: vi.fn(), getTimeline: vi.fn() }));
-// A database with no saved games, so every game is missing.
+// A database with no saved games, so every game is missing. Its inserts
+// throw on an empty list, the way Drizzle's do.
+const inserted: unknown[] = [];
+const insert = () => ({
+  values: (rows: unknown) => {
+    if (Array.isArray(rows) && rows.length === 0) {
+      throw new Error("values() must be called with at least one value");
+    }
+    inserted.push(rows);
+    return { onConflictDoNothing: async () => {} };
+  },
+});
 vi.mock("@/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/db")>()),
-  getDb: () => ({ query: { matches: { findMany: async () => [] } } }),
+  getDb: () => ({
+    query: { matches: { findMany: async () => [] } },
+    transaction: async (write: (tx: unknown) => Promise<void>) => write({ insert }),
+  }),
 }));
 
 const ids = Array.from({ length: 30 }, (_, i) => `NA1_${i}`);
@@ -23,6 +38,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  inserted.length = 0;
+  vi.mocked(Sentry.captureException).mockClear();
 });
 
 describe("loadMatches", () => {
@@ -39,5 +56,16 @@ describe("loadMatches", () => {
     const result = await loadMatches("na", ids, 20);
     expect(getMatch).toHaveBeenCalledTimes(30);
     expect(result.waiting).toBe(0);
+  });
+
+  it("still saves a game Riot sent with no players in it", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://test");
+    vi.mocked(getMatch).mockImplementation(async (_region, id) => ({
+      ...match([]),
+      metadata: { matchId: id },
+    }));
+    await loadMatches("na", ["NA1_0"], 20, "now");
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(inserted).toHaveLength(1);
   });
 });
