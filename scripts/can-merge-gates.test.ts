@@ -356,6 +356,30 @@ describe("decide", () => {
     expect(detail(decision, "Reviewer cleared the head commit")).toContain(`${verdict} (re-review since ${since})`);
   });
 
+  // PR 209's re-review lines put the suffix before the colon, so the gate
+  // skipped them and its message named only the older commits. It names the
+  // line it couldn't read and the shape it reads (docs/agent-mistakes.md).
+  it.each<[string, string[]]>([
+    ["with an older verdict", [`Reviewer agent at ${OLDER}: no blockers`]],
+    ["on its own", []],
+  ])("names a verdict line it can't read, %s", (_, others) => {
+    const misplaced = `Reviewer agent at ${HEAD} (re-review since ${OLDER.slice(0, 7)}): no blockers`;
+    const decision = decide(pr({ body: body({ review: [misplaced, ...others] }) }), main());
+    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
+    expect(detail(decision, "Reviewer cleared the head commit")).toContain(
+      `couldn't read "${misplaced}": a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`,
+    );
+  });
+
+  it("quotes a repeated unread line once, and not a line that only mentions a commit", () => {
+    const misplaced = `Reviewer agent at ${HEAD} (re-review since ${OLDER.slice(0, 7)}): no blockers`;
+    const mention = `- Fixed: the Reviewer agent at ${OLDER.slice(0, 7)} asked for a test`;
+    const decision = decide(pr({ body: body({ review: [misplaced, misplaced, mention] }) }), main());
+    const text = detail(decision, "Reviewer cleared the head commit");
+    expect(text.split(misplaced)).toHaveLength(2);
+    expect(text).not.toContain("asked for a test");
+  });
+
   // GitHub's required reviewer check runs reviewerCleared (JAS-15).
   it.each<[string, Partial<PrSnapshot>]>([
     ["a verdict at the head commit", {}],

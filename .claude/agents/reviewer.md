@@ -104,8 +104,10 @@ Check in this order:
 
 Make the report's first line `Reviewer agent at <sha>: no blockers` or
 `Reviewer agent at <sha>: <n> blockers`, where `<sha>` is the full SHA that
-`git rev-parse HEAD` printed. A re-review adds ` (re-review since <since>)` after
-it, with the first 7 characters of the earlier commit. A re-review that turned
+`git rev-parse HEAD` printed. A re-review adds ` (re-review since <since>)` at
+the end of the line, after the verdict, with the first 7 characters of the
+earlier commit: `Reviewer agent at <sha>: no blockers (re-review since <since>)`.
+Before the colon, the `reviewer` check can't read it. A re-review that turned
 into a full review doesn't. Only this reviewer writes "Reviewer agent at": any
 other review, such as the `interrogate` panel on a risky PR, starts with its own
 name, like `Interrogate panel at <sha>:`. When a finding quotes a review

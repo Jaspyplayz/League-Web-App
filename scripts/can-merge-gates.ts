@@ -255,18 +255,31 @@ function reviewerResult(pr: ReviewInput, tier: Tier): Result {
   const tiny = tier.ok && tier.tier === "tiny";
   const code = pr.files.filter((path) => !isDoc(path));
   if (tiny && code.length === 0) return pass("a tiny PR that changes only docs skips the reviewer");
-  const verdicts = section(pr.body, "Review").flatMap((line) => {
-    const match = line.replace(/[*_`]/g, "").match(/Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
+  const lines = section(pr.body, "Review").map((line) => line.replace(/[*_`]/g, "").trim());
+  const verdicts = lines.flatMap((line) => {
+    const match = line.match(/Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
     return match ? [{ sha: match[1].toLowerCase(), verdict: match[2].trim(), line: match[0].trim() }] : [];
   });
+  // A line that names a commit but isn't a verdict, such as PR 209's
+  // "Reviewer agent at <sha> (re-review since <since>): no blockers", is
+  // skipped, so a failure names it instead of only the commits it did read.
+  // Only a line with a colon after the commit looks like a verdict; one that
+  // just mentions a commit in passing isn't quoted.
+  const misread = new Set(
+    lines.filter((line) => /Reviewer agent at [0-9a-f]{7,40}\b[^:]+:/i.test(line) && !/Reviewer agent at [0-9a-f]{7,40}:/i.test(line)),
+  );
+  const unread =
+    misread.size === 0
+      ? ""
+      : `; couldn't read ${[...misread].map((line) => `"${line}"`).join(", ")}: a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`;
   if (verdicts.length === 0) {
     const missing = 'the Review section has no "Reviewer agent at <sha>: no blockers" line';
-    return fail(tiny ? `${missing}, which a tiny PR needs once it changes ${code.join(", ")}` : missing);
+    return fail(`${tiny ? `${missing}, which a tiny PR needs once it changes ${code.join(", ")}` : missing}${unread}`);
   }
   const atHead = verdicts.filter(({ sha }) => pr.headRefOid.startsWith(sha));
   if (atHead.length === 0) {
     const shas = verdicts.map(({ sha }) => sha.slice(0, 7)).join(", ");
-    return fail(`the reviewer saw ${shas}, not the head commit ${pr.headRefOid.slice(0, 7)}`);
+    return fail(`the reviewer saw ${shas}, not the head commit ${pr.headRefOid.slice(0, 7)}${unread}`);
   }
   const blocked = atHead.find(({ verdict }) => !/^no blockers\b/i.test(verdict));
   return blocked ? fail(`blockers at the head commit: "${blocked.line}"`) : pass(atHead[0].line);
