@@ -7,5 +7,9 @@ export default defineConfig({
   // e2e/ holds the Playwright browser test, which runs with `npm run test:e2e`.
   // .claude/worktrees/ holds subagents' copies of the repo, whose tests would
   // otherwise run a second time, half-finished.
-  test: { exclude: [...configDefaults.exclude, "e2e/**", ".claude/worktrees/**"] },
+  // poteto-mode's scripts are a copy of pstack's code with Bun tests
+  // (`bun:test`), which Vitest can't run (decision record 0014).
+  test: {
+    exclude: [...configDefaults.exclude, "e2e/**", ".claude/worktrees/**", ".claude/skills/poteto-mode/scripts/**"],
+  },
 });

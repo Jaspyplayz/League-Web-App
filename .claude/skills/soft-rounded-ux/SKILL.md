@@ -65,13 +65,13 @@ If a ticket only lists corner radius, still treat spacing, hierarchy, and intera
 2. Screenshots of every key surface in the ticket, proving Soft Rounded chrome and UX consistency.
 3. Side-by-side against the mockup or before paths. Call out intentional deltas.
 4. Run `verify-turnpoint` and `verify-turnpoint-ux` when they are in the repo. Green CI alone is not Done.
-5. Attach proof paths in the PR and the report to Engineering Lead, then Chief of Staff.
+5. Attach proof paths in the PR and in the Linear ticket's comment.
 
 ## Merge gate
 
-- Jasper Yes before merge on Soft Rounded or UI-direction work, via Chief of Staff. Do not auto-merge a UI fidelity PR.
+- Jasper's yes before merge on Soft Rounded or UI-direction work, asked in the PR. Do not auto-merge a UI fidelity PR.
 - Reject Done if screenshots still look like the pre-Soft-Rounded slice with new labels, or if only one surface is rounded.
-- One coding surface per PR (Cloud Agent or Claude Code, never both).
+- One builder per PR: Claude Code, in one local or cloud session.
 
 ## Encode after a miss
 

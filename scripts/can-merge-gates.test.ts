@@ -5,22 +5,19 @@ import {
   parseAgentMerge,
   parseReverts,
   reviewerCleared,
-  toChecks,
   type AgentMerge,
   type Check,
   type CheckState,
   type Decision,
   type MainState,
   type PrSnapshot,
-  type RollupEntry,
 } from "./can-merge-gates";
 
 const HEAD = "2ee7e1dc85217494c55a3dd20022b87184b8d675";
 const OLDER = "85e30eb0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6";
 const ON: AgentMerge = { on: true, since: "2026-10-25" };
 const VERCEL = "https://vercel.com/jaspy-s-team/league-web-app/Bth8tZWfPTqkq34tGX4qgjxz2ry3";
-const STARTED = "2026-10-26T05:59:13Z";
-const RAN_AGAIN = "2026-10-26T06:02:40Z";
+const TEMPLATE = readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
 
 function main(overrides: Partial<MainState> = {}): MainState {
   return { agentMerge: ON, changedGateCode: [], reverts: [], claudeMerges: [], ...overrides };
@@ -39,7 +36,7 @@ function body({
     builder === null ? "" : `**Builder:** ${builder}`,
     "Closes #170",
     "",
-    "## Walkthrough",
+    "## Summary",
     "Adds a card to Insights.",
     "",
     "## Acceptance criteria",
@@ -50,8 +47,6 @@ function body({
     "",
     "## Docs and decisions touched",
     "none",
-    "",
-    "## My read (Jasper)",
     "",
   ].join("\n");
 }
@@ -213,9 +208,67 @@ describe("decide", () => {
     ["it comes from a fork", { isCrossRepository: true }],
     ["it has no Builder line", { body: body({ builder: null }) }],
     ["the Cursor chat built it", { body: body({ builder: "Cursor chat on Grok 4.7." }) }],
-    ["its Builder line is the template's placeholder", { body: body({ builder: "Claude Code on Opus 5.5, Cursor chat on Grok 4.7, or cloud agent." }) }],
+    ["its Builder line names other builders too", { body: body({ builder: "Claude Code on Opus 5.5, Cursor chat on Grok 4.7, or cloud agent." }) }],
   ])("refuses a PR that Claude Code didn't build: %s", (_, overrides) => {
     expect(failed(decide(pr(overrides), main()))).toEqual(["Built by Claude Code"]);
+  });
+
+  // Claude Code is the only builder (decision record 0012), so the PR
+  // template's Builder line is already true as written.
+  it("accepts the PR template's Builder line as written", () => {
+    const builder = TEMPLATE.match(/^\*\*Builder:\*\*\s*(.+)$/m)?.[1].trim() ?? "";
+    expect(builder).toBe("Claude Code on Opus 5.5, in a local or cloud session.");
+    expect(failed(decide(pr({ body: body({ builder }) }), main()))).toEqual([]);
+  });
+
+  // A PR written from the template, with only its placeholders filled in,
+  // must pass every gate, so a template edit can't quietly break can-merge.
+  it("passes a PR written from the PR template", () => {
+    const filled = TEMPLATE.replace(/^\*\*Tier:\*\*.*$/m, "**Tier:** normal. One Insights card.")
+      .replace(/^- \[ \] .*$/m, '- [x] The card shows the win rate: test "shows the win rate"')
+      .replace(/^## Review\s*$/m, `## Review\nReviewer agent at ${HEAD}: no blockers`);
+    expect(failed(decide(pr({ body: filled }), main()))).toEqual([]);
+  });
+
+  // The gates read sections line by line, and a heading inside an HTML comment
+  // or a code block can fool them (decision record 0009), so the template
+  // itself has neither.
+  it("keeps HTML comments and code blocks out of the PR template", () => {
+    expect(TEMPLATE).not.toMatch(/<!--|^\s*(```|~~~)/m);
+  });
+
+  // The order is the layout Jasper chose on 2026-10-29, not something a gate
+  // reads; change this list with the template.
+  it("keeps the PR template's sections in the chosen order, with the Merge Danger labels", () => {
+    const headings = [...TEMPLATE.matchAll(/^## (.+?)\s*$/gm)].map((match) => match[1]);
+    expect(headings).toEqual([
+      "Summary",
+      "Evidence",
+      "Acceptance criteria",
+      "Tested",
+      "Not tested",
+      "Merge Danger",
+      "Review",
+      "Docs and decisions touched",
+    ]);
+    expect(TEMPLATE).toMatch(/^\*\*Door:\*\*/m);
+    expect(TEMPLATE).toMatch(/^\*\*Blast radius:\*\*/m);
+  });
+
+  // Wellness check 5 reads each blocker's check line and the answer under it,
+  // so the template asks for the shapes reviewer.md writes. It mentions them
+  // mid-sentence only: a template line starting with one would count as a
+  // blocker in every PR that keeps the template's words.
+  it("asks for the reviewer's check line and the Fixed or Rejected answer", () => {
+    for (const shape of [
+      "`Check could catch this: yes, <which check>`",
+      "`Check could catch this: no, judgement call`",
+      "`Fixed:`",
+      "`Rejected:`",
+    ]) {
+      expect(TEMPLATE).toContain(shape);
+    }
+    expect(TEMPLATE).not.toMatch(/^[\s*_`-]*Check could catch this/m);
   });
 
   it.each<[string, string | null]>([
@@ -281,24 +334,6 @@ describe("decide", () => {
     expect(detail(decision, "Checks pass at the head commit")).toBe(expected);
   });
 
-  // Each description edit runs the reviewer check again, and GitHub's merge
-  // box counts only the latest run.
-  it.each<[string, string, string, string[]]>([
-    ["passes once a failed reviewer run passes when run again", "FAILURE", "SUCCESS", []],
-    ["refuses when the latest reviewer run failed", "SUCCESS", "FAILURE", ["Checks pass at the head commit"]],
-  ])("%s", (_, first, again, failures) => {
-    const reviewer = (conclusion: string, startedAt: string): RollupEntry => ({
-      __typename: "CheckRun",
-      name: "reviewer",
-      workflowName: "Reviewer",
-      status: "COMPLETED",
-      conclusion,
-      startedAt,
-    });
-    const checks = [...passing, ...toChecks([reviewer(first, STARTED), reviewer(again, RAN_AGAIN)])];
-    expect(failed(decide(pr({ checks }), main()))).toEqual(failures);
-  });
-
   // The gate counts check and smoke only from these workflows, so renaming one
   // without updating scripts/can-merge-gates.ts would stop every merge.
   it("matches the workflow and job names in .github/workflows/", () => {
@@ -335,6 +370,30 @@ describe("decide", () => {
     const decision = decide(pr({ body: body({ review }) }), main());
     expect(failed(decision)).toEqual(failing);
     expect(detail(decision, "Reviewer cleared the head commit")).toContain(`${verdict} (re-review since ${since})`);
+  });
+
+  // PR 209's re-review lines put the suffix before the colon, so the gate
+  // skipped them and its message named only the older commits. It names the
+  // line it couldn't read and the shape it reads (docs/agent-mistakes.md).
+  it.each<[string, string[]]>([
+    ["with an older verdict", [`Reviewer agent at ${OLDER}: no blockers`]],
+    ["on its own", []],
+  ])("names a verdict line it can't read, %s", (_, others) => {
+    const misplaced = `Reviewer agent at ${HEAD} (re-review since ${OLDER.slice(0, 7)}): no blockers`;
+    const decision = decide(pr({ body: body({ review: [misplaced, ...others] }) }), main());
+    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
+    expect(detail(decision, "Reviewer cleared the head commit")).toContain(
+      `couldn't read "${misplaced}": a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`,
+    );
+  });
+
+  it("quotes a repeated unread line once, and not a line that only mentions a commit", () => {
+    const misplaced = `Reviewer agent at ${HEAD} (re-review since ${OLDER.slice(0, 7)}): no blockers`;
+    const mention = `- Fixed: the Reviewer agent at ${OLDER.slice(0, 7)} asked for a test`;
+    const decision = decide(pr({ body: body({ review: [misplaced, misplaced, mention] }) }), main());
+    const text = detail(decision, "Reviewer cleared the head commit");
+    expect(text.split(misplaced)).toHaveLength(2);
+    expect(text).not.toContain("asked for a test");
   });
 
   // GitHub's required reviewer check runs reviewerCleared (JAS-15).
@@ -428,59 +487,5 @@ describe("parseReverts", () => {
     expect(parseReverts(record("a".repeat(40), "2026-10-26T01:00:00Z", message), "2026-10-25")).toEqual([
       { sha: "a".repeat(40), reverts: [reverted] },
     ]);
-  });
-});
-
-describe("toChecks", () => {
-  // gh prints Go's zero time for a run that hasn't started.
-  const NOT_STARTED = "0001-01-01T00:00:00Z";
-  const run = (
-    status: string,
-    conclusion: string | null,
-    startedAt: string | null = STARTED,
-    workflowName = "Smoke test",
-  ): RollupEntry => ({ __typename: "CheckRun", name: "smoke", workflowName, status, conclusion, startedAt });
-  const status = (state: string): RollupEntry => ({
-    __typename: "StatusContext",
-    context: "Vercel",
-    targetUrl: VERCEL,
-    state,
-  });
-
-  it.each<[string, RollupEntry, CheckState]>([
-    ["a running check", run("IN_PROGRESS", ""), "pending"],
-    ["a queued check", run("QUEUED", null), "pending"],
-    ["a passed check", run("COMPLETED", "SUCCESS"), "success"],
-    ["a skipped check", run("COMPLETED", "SKIPPED"), "skipped"],
-    ["a cancelled check", run("COMPLETED", "CANCELLED"), "failure"],
-    ["a timed-out check", run("COMPLETED", "TIMED_OUT"), "failure"],
-    ["a pending status", status("PENDING"), "pending"],
-    ["a passed status", status("SUCCESS"), "success"],
-    ["an errored status", status("ERROR"), "failure"],
-  ])("reads %s as %s", (_, entry, state) => {
-    expect(toChecks([entry]).map((check) => check.state)).toEqual([state]);
-  });
-
-  it("keeps where each check came from", () => {
-    expect(toChecks([run("COMPLETED", "SUCCESS"), status("SUCCESS")])).toEqual([
-      { kind: "run", name: "smoke", workflow: "Smoke test", state: "success" },
-      { kind: "status", name: "Vercel", url: VERCEL, state: "success" },
-    ]);
-  });
-
-  it.each<[string, RollupEntry[], CheckState[]]>([
-    ["a failed run passed when run again", [run("COMPLETED", "FAILURE"), run("COMPLETED", "SUCCESS", RAN_AGAIN)], ["success"]],
-    ["a passed run failed when run again", [run("COMPLETED", "SUCCESS"), run("COMPLETED", "FAILURE", RAN_AGAIN)], ["failure"]],
-    ["a newer run is queued", [run("COMPLETED", "SUCCESS"), run("QUEUED", "", NOT_STARTED)], ["pending"]],
-    ["a newer run is queued and has no start time", [run("COMPLETED", "SUCCESS"), run("QUEUED", null, null)], ["pending"]],
-    ["a run was cancelled before it started", [run("COMPLETED", "CANCELLED", NOT_STARTED), run("COMPLETED", "SUCCESS")], ["success"]],
-    ["two runs started in the same second", [run("COMPLETED", "SUCCESS"), run("COMPLETED", "FAILURE")], ["success", "failure"]],
-    [
-      "smoke ran in two workflows",
-      [run("COMPLETED", "FAILURE"), run("COMPLETED", "SUCCESS", RAN_AGAIN, "Quick smoke")],
-      ["failure", "success"],
-    ],
-  ])("keeps the latest run of each check when %s", (_, rollup, states) => {
-    expect(toChecks(rollup).map((check) => check.state)).toEqual(states);
   });
 });

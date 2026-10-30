@@ -68,6 +68,7 @@ export type Counts = {
   rankedOld: number;
   rankHistoryOld: number;
   seasonsOld: number;
+  seasonGamesOld: number;
   userPlayersOld: number;
   recapsOld: number;
   insightsOld: number;
@@ -245,6 +246,7 @@ async function countRows(db: Db): Promise<Counts> {
       (select count(*) from ranked_entries where puuid in (select puuid from oldp))::int as "rankedOld",
       (select count(*) from rank_history where puuid in (select puuid from oldp))::int as "rankHistoryOld",
       (select count(*) from player_seasons where puuid in (select puuid from oldp))::int as "seasonsOld",
+      (select count(*) from season_games where puuid in (select puuid from oldp))::int as "seasonGamesOld",
       (select count(*) from user_players where puuid in (select puuid from oldp))::int as "userPlayersOld",
       (select count(*) from match_recaps where puuid in (select puuid from op))::int as "recapsOld",
       (select count(*) from match_insights
@@ -310,6 +312,7 @@ export const TOUCHED: Touched[] = [
   touched(schema.players, ["puuid"], sql`puuid in ${OLD}`),
   touched(schema.rankedEntries, ["puuid", "queue_type"], sql`puuid in ${OLD}`),
   touched(schema.playerSeasons, ["puuid", "season"], sql`puuid in ${OLD}`),
+  touched(schema.seasonGames, ["puuid", "match_id"], sql`puuid in ${OLD}`),
   touched(schema.rankHistory, ["puuid", "queue_type", "recorded_at"], sql`puuid in ${OLD}`),
   touched(schema.userPlayers, ["user_id"], sql`puuid in ${OLD}`),
   touched(schema.matches, ["match_id"], sql`fetched_at < ${cutoff}`),
@@ -454,7 +457,11 @@ async function moveEverything(tx: Tx, file: MapFile, backup: BackupSummary): Pro
     returning ${keyJson(["puuid"], "players")} as key`));
 
   // 2.2
-  for (const [table, other] of [["ranked_entries", "queue_type"], ["player_seasons", "season"]]) {
+  for (const [table, other] of [
+    ["ranked_entries", "queue_type"],
+    ["player_seasons", "season"],
+    ["season_games", "match_id"],
+  ]) {
     const { moved, deleted } = await moveRows(tx, table, other);
     keep(table, moved);
     count(table, moved.length + deleted);
@@ -571,6 +578,7 @@ const PLAYER_CHILDREN = [
   ["ranked_entries", "puuid"],
   ["rank_history", "puuid"],
   ["player_seasons", "puuid"],
+  ["season_games", "puuid"],
   ["user_players", "puuid"],
 ] as const;
 const PUUID_COLUMNS = [
