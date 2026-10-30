@@ -1,6 +1,6 @@
 # Turnpoint
 
-Turnpoint analyzes a player's League of Legends games against their lane opponent, then looks across many games for habits and weaknesses worth working on. This glossary sets the words to use for what it shows, even where a screen still uses an older one.
+Turnpoint analyzes a player's League of Legends games against their lane opponent, then looks across many games for habits and weaknesses worth working on. This glossary sets the words to use for what it shows, even where a screen still uses an older one, and, under Workflow, for how agents build it.
 
 ## Language
 
@@ -227,3 +227,25 @@ _Avoid_: Journal entry, daily note
 **Game note**:
 A note a player writes about one game, under Your notes on the game page.
 _Avoid_: Match note, comment
+
+### Workflow
+
+**Agent mistake**:
+Something an agent did wrong that the reviewer, a merge gate, CI or Jasper caught.
+_Avoid_: Mistake (a play's grade), bug, error
+
+**Mistake class**:
+Agent mistakes that share one root cause, such as a re-review line written in the wrong shape.
+_Avoid_: Category, type of mistake
+
+**Repeat**:
+An agent mistake in a mistake class that was already logged.
+_Avoid_: Recurrence, regression
+
+**Postmortem**:
+Logging an agent mistake and picking its fix from the fix ladder.
+_Avoid_: Incident report, root-cause analysis
+
+**Rung**:
+One level of the fix ladder: design, check, rule file or skill, or CLAUDE.md line.
+_Avoid_: Level, tier (tiers are review sizes)
