@@ -43,14 +43,20 @@ not "some players".
 ## Review
 The reviewer's first line, `Reviewer agent at <sha>: no blockers`, then its
 findings, each fixed (with the test that shows it) or rejected (with the
-evidence). Each blocker keeps its `Check could catch this: yes, <which check>`
-or `Check could catch this: no, judgement call` line as written, on a plain
-line of its own, and your answer goes on the line after it, starting `Fixed:`
-or `Rejected:`. The `postmortem` skill and the wellness check read both lines
-(`docs/workflow.md`, Recording). Risky PRs: the pstack `interrogate` panel too, starting
+evidence).
+
+Each reviewer blocker keeps its `Check could catch this: yes, <which check>`
+or `Check could catch this: no, judgement call` line as written, on a line of
+its own with no bullet or bold. Your answer goes on the line after it, also
+with no bullet or bold: `Fixed:` and the test, or `Rejected:` and the
+evidence. The `postmortem` skill starts from the check line, and wellness
+check 5 reads both (`docs/workflow.md`, Recording).
+
+Risky PRs: the pstack `interrogate` panel too, starting
 `Interrogate panel at <sha>: <n> to act on`, or "no interrogate panel yet" if
-it couldn't run. Any other check gets its own line too, such as `Security check at <sha>: no findings`. Keep each review's findings
-under its line, and use that `<name> at <sha>:` shape only for reviews.
+it couldn't run. Any other check gets its own line too, such as
+`Security check at <sha>: no findings`. Keep each review's findings under its
+line, and use that `<name> at <sha>:` shape only for reviews.
 
 ## Docs and decisions touched
 The docs/ or docs/adr/ files this changes, or "none".
