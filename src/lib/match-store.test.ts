@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { match, participants } from "@/lib/analyzer/test-fixtures";
+import { tables } from "@/db";
 import { getMatch } from "@/lib/riot/api";
 import { loadMatches } from "./match-store";
 
@@ -9,14 +10,15 @@ vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/riot/api", () => ({ getMatch: vi.fn(), getTimeline: vi.fn() }));
 // A database with no saved games, so every game is missing. Its inserts
-// throw on an empty list, the way Drizzle's do.
-const inserted: unknown[] = [];
-const insert = () => ({
+// throw on an empty list, the way Drizzle's do, and record which table
+// each write went to.
+const inserted: { table: unknown; rows: unknown }[] = [];
+const insert = (table: unknown) => ({
   values: (rows: unknown) => {
     if (Array.isArray(rows) && rows.length === 0) {
       throw new Error("values() must be called with at least one value");
     }
-    inserted.push(rows);
+    inserted.push({ table, rows });
     return { onConflictDoNothing: async () => {} };
   },
 });
@@ -67,5 +69,15 @@ describe("loadMatches", () => {
     await loadMatches("na", ["NA1_0"], 20, "now");
     expect(Sentry.captureException).not.toHaveBeenCalled();
     expect(inserted).toHaveLength(1);
+    expect(inserted[0].table).toBe(tables.matches);
+    expect(inserted[0].rows).toMatchObject({ matchId: "NA1_0" });
+  });
+
+  it("saves a game's scoreboard rows along with the game", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://test");
+    await loadMatches("na", ["NA1_0"], 20, "now");
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(inserted.map((w) => w.table)).toEqual([tables.matches, tables.matchParticipants]);
+    expect(inserted[1].rows).toHaveLength(10);
   });
 });
