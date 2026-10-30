@@ -59,6 +59,8 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   champion (src/lib/champion-stats.ts);
                   settings/ holds preferences saved in the browser (theme);
                   api/mcp/ is the MCP server, with its tools in src/lib/mcp/;
+                  api/cron/season-sync/ the daily job that saves "This is me"
+                  players' new games (docs/database.md);
                   robots.ts keeps crawlers off player pages and the API
 src/components/   React components; ui/ holds small shared pieces
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
@@ -85,24 +87,29 @@ src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back 
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
-src/lib/season-store.ts Season champion stats; loads 10 more season games per plain profile visit
+src/lib/season-store.ts Season champion stats from slim season_games rows; loads 10 more per plain profile visit,
+                  and syncSeasons fills in "This is me" players once a day (api/cron/season-sync)
 src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
 src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves each question before Claude answers, ask-rules.ts the caps
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
-scripts/          Command-line jobs run with tsx (benchmarks, train-score, check-score, train-win-chance, train-phase-score, tempo study, item check, shot for screenshots, remap-puuids after a Riot key change, can-merge and the risky-paths list for Claude Code's own merges)
+scripts/          Command-line jobs run with tsx (benchmarks, train-score, check-score, train-win-chance, train-phase-score, tempo study, item check, shot for screenshots, remap-puuids after a Riot key change, can-merge and the risky-paths list for Claude Code's own merges, wellness for the biweekly check in docs/wellness.md; can-merge-rest.ts turns GitHub's REST answers into what the gates check, tested on the saved answers in can-merge-fixtures/)
 drizzle/          Generated SQL migrations (never edit by hand)
-docs/             Design and research docs
+docs/             Design and research docs, decision records in adr/, and the agent
+                  mistakes log in agent-mistakes/ (one file per mistake class,
+                  listed in agent-mistakes.md; scripts/agent-mistakes.test.ts checks it)
 e2e/              Playwright smoke test and accessibility scan, run against each Vercel preview;
                   fixtures.ts gets past the preview login (shot uses preview-login.ts too)
 eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/, "server-only"
                   on files that read secrets, no green classes), run by npm run lint, tested in npm test
 .github/          CI, smoke test, dependency review and reviewer workflows, Dependabot, PR and issue templates
-.claude/          Claude Code settings, hooks/ (lint and typecheck before commits), agents/reviewer.md,
-                  agent-merge.json (the switch for npm run can-merge, read from main),
+.claude/          Claude Code settings, hooks/ (lint and typecheck before commits, installs when
+                  a cloud session starts, pstack's startup instruction, and Matt Pocock's skills
+                  for cloud sessions, see docs/workflow.md), agents/ (reviewer.md,
+                  plus pstack's four), agent-merge.json (the switch for npm run can-merge, read from main),
                   rules/ (rules for one area, loaded when Claude opens a file there),
-                  skills/ (explain-back and the three verify skills, plus eight copied from other repos;
-                  Cursor loads them too)
+                  skills/ (explain-back, postmortem, the three verify skills and soft-rounded-ux, plus eight copied
+                  from other repos and pstack's 65, see docs/workflow.md#pstack)
 ```
 
 ## What happens when you open a match
@@ -148,7 +155,7 @@ The rules live in `src/db/freshness.ts`.
 A development key allows 20 requests a second and 100 every 2 minutes, per region, and a brand new player can take 20 or more. Four things keep Turnpoint inside that:
 
 1. **The cache.** Most visits cost zero Riot calls.
-2. **A budget per page.** Insights and season stats fetch only a few missing games per visit and fill in the rest over the next few loads, so a 100-game view can't use the whole allowance at once.
+2. **A budget per page.** Insights and season stats fetch only a few missing games per visit and fill in the rest over the next few loads, so a 100-game view can't use the whole allowance at once. The daily season sync spends about 60 calls a run, lists included (70 at worst).
 3. **Counting before calling, shared by every server.** Vercel runs several copies of the app at once, and none of them can see the others' memory. So the count lives in Postgres: one row per Riot region in `riot_rate_limits`, holding how many requests each of Riot's windows has used. Before every request the client locks that row, asks a pure function (`takeTurn` in `src/lib/riot/rate-limit.ts`) whether one more fits, and saves the new count. Locking the row means two servers asking at the same moment take turns, so they can't both spend the last request in a window. A short wait (the per-second limit) is slept through; a long one (the 2 minute window is used up) fails right away with "try again in N seconds".
 4. **Backing off.** After a "too many requests" answer, the client refuses to call that region again until Riot's `Retry-After` time has passed, and saves that time in the same row so every server waits. Riot can disable keys that keep calling after being told to stop.
 
@@ -165,7 +172,7 @@ These are fine for a portfolio site's traffic, and are the next things to fix be
 - **Every Riot request costs a database round trip** for the shared count, a few milliseconds next to Riot's hundreds. At much higher traffic, Redis would be the usual home for a counter like this.
 - **The limits are written in the code** (`RIOT_LIMITS`), set for a development key. A production key allows more, so they need changing when the key does.
 - **`/api/mcp` has no request limit.** An AI app looking up many new players could spend the Riot allowance for everyone.
-- **Crawlers are only asked to stay out.** Each profile links to the 90 or so players in its games, and a new player costs about 15 to 35 Riot calls and saves their games for good, so a crawler following those links could use up the allowance and fill the database. `src/app/robots.ts` asks crawlers to skip `/player/` and `/api/` (link preview bots on Discord, X and LinkedIn may open player pages, since they only open the one pasted link). On a profile, only the plain page (no `?queue=` or `?games=`) loads more of the season's games; the Champions tab does too, on each of its game-mode links. Polite crawlers like Google's follow robots.txt; others don't. For one that ignores it, the biggest cost is the match list: `?games=50` on each game-mode tab loads up to 50 unsaved games per URL. Vercel's bot protection (a dashboard setting) would be the next step.
+- **Crawlers are only asked to stay out.** Each profile links to the 90 or so players in its games, and a new player costs about 15 to 35 Riot calls and saves their games for good, so a crawler following those links could use up the allowance and fill the database. `src/app/robots.ts` asks crawlers to skip `/player/` and `/api/` (link preview bots on Discord, X and LinkedIn may open player pages, since they only open the one pasted link). On a profile, only the plain page (no `?queue=` or `?games=`) loads more of the season's games; the Champions tab does too, on each of its game-mode links. Polite crawlers like Google's follow robots.txt; others don't. For one that ignores it, the biggest cost is the match list: each game-mode tab has a URL for every 10 games up to 200 (`?games=10` to `?games=200`, reaching back two months), and each URL loads up to 20 unsaved games (`MISSING_PER_VIEW` in `src/lib/more-games.ts`), so up to 200 unsaved games per tab per player. Without a database (a fresh local checkout) nothing is remembered, so a URL loads every game it lists. Vercel's bot protection (a dashboard setting) would be the next step.
 - **One free database.** Supabase's free tier holds 500 MB and has no downloadable backups. Matches can be fetched again, but accounts, goals and notes can't.
 - **No uptime check.** Sentry reports errors, but nothing alerts when the site is down or the daily dev key has expired.
 

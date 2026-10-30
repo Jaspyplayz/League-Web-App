@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { FilterableMatchList } from "@/components/filterable-match-list";
 import { PanelSkeleton } from "@/components/loading-skeleton";
-import { MatchDetails } from "@/components/match-details";
 import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { findPlayer } from "@/lib/analyzer";
@@ -20,17 +19,21 @@ import {
 import { loadMatches } from "@/lib/match-store";
 import {
   GAMES_STEP,
-  hasMoreGames,
+  HISTORY_DAYS,
   isPlainProfilePage,
+  listEnd,
   matchListHref,
+  MAX_GAMES,
+  MISSING_PER_VIEW,
   readGameCount,
 } from "@/lib/more-games";
 import type { Profile } from "@/lib/profile-store";
 import type { QueueFilter } from "@/lib/queue-filters";
 import type { Region } from "@/lib/regions";
-import { getMatchIds } from "@/lib/riot/api";
+import { getManyMatchIds } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
+import { loadMatchDetailsAction } from "./match-details-action";
 import { QueueTabs } from "./queue-tabs";
 import { RecentSummary } from "./recent-summary";
 import { SeasonChampions } from "./season-champions";
@@ -41,7 +44,7 @@ import { MasteryCard } from "./mastery-card";
 // URL's ?games=, how many games to show after "Show 10 more games" (see
 // src/lib/more-games.ts); missing means the first 10. playerPath is this
 // player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with both teams' scoreboard
-// and a link to the match analysis under that path.
+// and a link to the match analysis under that path, loaded when it opens.
 type Props = {
   region: Region;
   puuid: string;
@@ -72,27 +75,49 @@ export async function RecentMatches({
   const [ids, dd] = await Promise.all([
     // The All tab's first 10 games are the snapshot's, for free. The other
     // tabs, and longer lists after "Show 10 more games", ask Riot for the
-    // IDs: one call per view.
+    // IDs: one call per 100 games listed.
     plainPage
       ? { ok: true as const, value: profile.matchIds }
-      : settle(getMatchIds(region, puuid, count, queue.filter)),
+      : settle(getManyMatchIds(region, puuid, count, queue.filter)),
     getDataDragon().catch(() => null),
   ]);
-  // Stored matches come from the database; only new ones cost a Riot call.
+  // Stored matches come from the database; only new ones cost a Riot call,
+  // and at most MISSING_PER_VIEW of them per view (see src/lib/more-games.ts).
   const result = ids.ok
-    ? await loadMatches(region, ids.value, ids.value.length)
-    : { matches: [], error: ids.error };
+    ? await loadMatches(region, ids.value, MISSING_PER_VIEW)
+    : { matches: [], waiting: 0, error: ids.error };
+  // The games left for a refresh. When Riot refused some, `waiting` counts
+  // those too and a refresh may not help, so the list says Riot failed
+  // instead and keeps its button.
+  const waiting = result.error ? 0 : result.waiting;
+
+  // While some games are still to load, the list stops before the first of
+  // them. Saved games further down would otherwise show under a gap, and
+  // "Last 80 games" would count games that aren't the last 80.
+  const loaded = new Set(result.matches.map((m) => m.metadata.matchId));
+  const firstMissing = ids.ok ? ids.value.findIndex((id) => !loaded.has(id)) : -1;
+  const listed = waiting > 0 && firstMissing >= 0 ? result.matches.slice(0, firstMissing) : result.matches;
 
   // Keep each full match next to its summary: the row shows the summary, and
-  // the panel under it needs every player's numbers.
-  const games = result.matches
+  // its score, teams and badges need every player's numbers.
+  const games = listed
     .map((match) => ({ match, summary: summarizeMatch(match, puuid) }))
     .filter((g): g is { match: Match; summary: MatchSummary } => g.summary !== null);
   const matches = games.map((g) => g.summary);
 
   const record = summarizeRecord(matches);
 
-  const showMore = ids.ok && hasMoreGames(ids.value.length, count);
+  const oldest = matches.length > 0 ? Math.min(...matches.map((m) => m.startedAt)) : null;
+  const end = ids.ok
+    ? listEnd({
+        idsShown: ids.value.length,
+        count,
+        oldestStartedAt: oldest,
+        now,
+        waiting,
+        riotFailed: result.error !== null,
+      })
+    : "end";
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -145,21 +170,48 @@ export async function RecentMatches({
                   score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
                   teams={{ region, players: matchTeams(match, puuid) }}
                   badges={matchBadges(match, puuid)}
-                  details={
-                    <MatchDetails
-                      region={region}
-                      dd={dd}
-                      match={match}
-                      puuid={puuid}
-                      analysisHref={`${playerPath}/match/${m.matchId}`}
-                    />
-                  }
+                  // The panel is rendered when the row first opens, not sent
+                  // with the page (see src/components/expandable-row.tsx).
+                  loadDetails={loadMatchDetailsAction.bind(
+                    null,
+                    region,
+                    m.matchId,
+                    puuid,
+                    playerPath,
+                  )}
                 />
               ),
             }))}
           />
         )}
-        {showMore && (
+        {end === "waiting" && matches.length > 0 && (
+          <p className="self-center text-sm text-faint">
+            {waiting} more {waiting === 1 ? "game hasn't" : "games haven't"} loaded from Riot yet.{" "}
+            {/* A plain link, not next/link: a Link to this same URL reuses
+                the page it already has instead of asking the server again. */}
+            <a
+              href={matchListHref(playerPath, queue, count, `game-${games.length + 1}`)}
+              className="text-ink underline hover:text-ahead"
+            >
+              Refresh
+            </a>{" "}
+            to load the next {Math.min(waiting, MISSING_PER_VIEW)}.
+          </p>
+        )}
+        {result.error && matches.length > 0 && (
+          <p className="self-center text-sm text-faint">
+            Some games couldn&rsquo;t be loaded from Riot just now.
+          </p>
+        )}
+        {end === "two-months" && (
+          <p className="self-center text-sm text-faint">
+            That&rsquo;s every game from the last {HISTORY_DAYS / 30} months.
+          </p>
+        )}
+        {end === "max" && (
+          <p className="self-center text-sm text-faint">The list stops at {MAX_GAMES} games.</p>
+        )}
+        {end === "more" && (
           <Link
             // Lands on the first new game, where the list left off.
             href={matchListHref(playerPath, queue, count + GAMES_STEP, `game-${games.length + 1}`)}

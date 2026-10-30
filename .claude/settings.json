@@ -1,11 +1,14 @@
 {
+  "enabledPlugins": {
+    "pstack@pstack-claude": false
+  },
   "permissions": {
     "deny": [
       "Read(.env.local)",
       "Edit(.claude/agent-merge.json)",
-      "Write(.claude/agent-merge.json)",
       "Bash(gh pr merge)",
       "Bash(gh pr merge*)",
+      "Bash(gh api *pulls/*/merge*)",
       "Bash(git push *--force*)",
       "Bash(git push -f*)",
       "Bash(git push * -f*)",
@@ -17,6 +20,38 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/cloud-setup.mjs\"",
+            "timeout": 600
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pstack-context.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pocock-skills.mjs\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

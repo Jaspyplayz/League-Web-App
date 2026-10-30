@@ -31,5 +31,5 @@
     "**/*.mts",
     ".claude/skills/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", ".claude/skills/poteto-mode/scripts/**"]
 }

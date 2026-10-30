@@ -73,6 +73,35 @@ export function getMatchIds(
   );
 }
 
+// Riot lists at most this many match IDs per request.
+export const MATCH_IDS_PER_CALL = 100;
+
+// Like getMatchIds, but for any `count`: past 100 it asks again for the next
+// 100 (with `start`), one call per 100 IDs, and stops early when Riot runs
+// out of games. A game that ends between two calls shifts the list by one,
+// so the next page can repeat an ID; repeats are dropped and asked for again,
+// so a full list still means Riot may have more.
+export async function getManyMatchIds(
+  region: Region,
+  puuid: string,
+  count: number,
+  filter: MatchIdFilter = {},
+): Promise<string[]> {
+  const ids = new Set<string>();
+  let start = 0;
+  // Two extra calls are plenty for repeats; this stops a Riot that keeps
+  // sending IDs it already sent from spending calls forever.
+  for (let call = 0; ids.size < count && call < Math.ceil(count / MATCH_IDS_PER_CALL) + 2; call++) {
+    const asked = Math.min(MATCH_IDS_PER_CALL, count - ids.size);
+    const batch = await getMatchIds(region, puuid, asked, { ...filter, start });
+    start += batch.length;
+    for (const id of batch) ids.add(id);
+    // A short page is the last one.
+    if (batch.length < asked) break;
+  }
+  return [...ids];
+}
+
 // The whole Master, Grandmaster or Challenger ladder of ranked solo/duo on
 // one server. Challenger is the top ~300 players (200 on smaller servers).
 export function getApexLeague(region: Region, tier: ApexTier) {

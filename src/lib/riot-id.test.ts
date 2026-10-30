@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fromSlug, parseRiotId, participantRiotId, toSlug } from "./riot-id";
+import { fromSlug, isPlayerPath, parseRiotId, participantRiotId, toSlug } from "./riot-id";
 
 describe("parseRiotId", () => {
   it("splits a game name and tag line", () => {
@@ -49,5 +49,21 @@ describe("participantRiotId", () => {
     expect(participantRiotId({})).toBeNull();
     expect(participantRiotId({ riotIdGameName: "Faker", riotIdTagline: "" })).toBeNull();
     expect(participantRiotId({ riotIdGameName: "", riotIdTagline: "KR1" })).toBeNull();
+  });
+});
+
+describe("isPlayerPath", () => {
+  it("accepts a player's page as the profile writes it", () => {
+    const slug = toSlug({ gameName: "Hide on bush", tagLine: "KR1" });
+    expect(isPlayerPath("kr", `/player/kr/${slug}`)).toBe(true);
+    expect(isPlayerPath("na", "/player/na/Jaspy-CA1")).toBe(true);
+  });
+
+  it("rejects another region, another page or a link elsewhere", () => {
+    expect(isPlayerPath("na", "/player/euw/Jaspy-CA1")).toBe(false);
+    expect(isPlayerPath("na", "/player/na/")).toBe(false);
+    expect(isPlayerPath("na", "/player/na/Jaspy-CA1/insights")).toBe(false);
+    expect(isPlayerPath("na", "/player/na/x?next=//evil.example")).toBe(false);
+    expect(isPlayerPath("na", "https://evil.example/player/na/x")).toBe(false);
   });
 });

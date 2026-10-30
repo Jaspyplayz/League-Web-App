@@ -1,0 +1,41 @@
+{
+  "number": 188,
+  "title": "chore(deps): Bump the npm-minor-and-patch group across 1 directory with 6 updates",
+  "state": "open",
+  "draft": false,
+  "merged": false,
+  "merged_at": null,
+  "user": {
+    "login": "dependabot[bot]",
+    "type": "Bot"
+  },
+  "body": "Bumps the npm-minor-and-patch group with 6 updates in the / directory:",
+  "head": {
+    "ref": "dependabot/npm_and_yarn/npm-minor-and-patch-d5706eee8b",
+    "sha": "e32534668438350b01d21e5049953569e18785d8",
+    "user": {
+      "login": "Jaspyplayz"
+    },
+    "repo": {
+      "id": 1417131473,
+      "full_name": "Jaspyplayz/League-Web-App",
+      "owner": {
+        "login": "Jaspyplayz"
+      }
+    }
+  },
+  "base": {
+    "ref": "main",
+    "sha": "6861d8a094522e3fe82ee12ad1f6b06e381741f0",
+    "user": {
+      "login": "Jaspyplayz"
+    },
+    "repo": {
+      "id": 1417131473,
+      "full_name": "Jaspyplayz/League-Web-App",
+      "owner": {
+        "login": "Jaspyplayz"
+      }
+    }
+  }
+}

@@ -129,6 +129,7 @@ const TABLES = [
   "ranked_entries",
   "rank_history",
   "player_seasons",
+  "season_games",
   "user_players",
   "matches",
   "match_participants",
@@ -218,6 +219,27 @@ async function seed(db: Db) {
     { puuid: old("jaspy"), season: "2026", matchIds: [g1.matchId, arena.matchId], fetchedAt: OLD_AT },
     { puuid: now("jaspy"), season: "2026", matchIds: [recent1.matchId, g1.matchId], fetchedAt: NEW_AT },
     { puuid: old("carl"), season: "2026", matchIds: [g1.matchId, bots.matchId, missing.matchId], fetchedAt: OLD_AT },
+  ]);
+
+  // Slim season rows. Jaspy has g1 under both PUUIDs, so the new row stays.
+  const slim = (id: string, matchId: string, championName: string) => ({
+    puuid: id,
+    matchId,
+    gameStartAt: OLD_AT,
+    queueId: 420,
+    durationS: 1800,
+    championName,
+    win: true,
+    kills: 5,
+    deaths: 2,
+    assists: 7,
+    cs: 180,
+  });
+  await db.insert(schema.seasonGames).values([
+    slim(old("jaspy"), g1.matchId, "Vi"),
+    slim(old("jaspy"), arena.matchId, "Ahri"),
+    slim(now("jaspy"), g1.matchId, "LeeSin"),
+    slim(old("carl"), bots.matchId, "Garen"),
   ]);
 
   await db.insert(schema.userPlayers).values([
@@ -372,6 +394,7 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
       rankedOld: 5,
       rankHistoryOld: 3,
       seasonsOld: 2,
+      seasonGamesOld: 3,
       userPlayersOld: 1,
       recapsOld: 3,
       insightsOld: 3,
@@ -462,6 +485,7 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
       players: 3,
       ranked_entries: 4,
       player_seasons: 2,
+      season_games: 3,
       rank_history: 3,
       user_players: 1,
       matches: 7,
@@ -497,6 +521,13 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
     expect(await rowsOf(db, sql`select puuid, match_ids from player_seasons order by puuid`)).toEqual([
       { puuid: now("carl"), match_ids: [g1.matchId, bots.matchId, missing.matchId] },
       { puuid: now("jaspy"), match_ids: [recent1.matchId, g1.matchId] },
+    ]);
+    expect(await rowsOf(db, sql`select puuid, match_id, champion_name from season_games order by puuid, match_id`)).toEqual([
+      { puuid: now("carl"), match_id: bots.matchId, champion_name: "Garen" },
+      ...[
+        { puuid: now("jaspy"), match_id: arena.matchId, champion_name: "Ahri" },
+        { puuid: now("jaspy"), match_id: g1.matchId, champion_name: "LeeSin" },
+      ].sort((a, b) => a.match_id.localeCompare(b.match_id)),
     ]);
     expect(await rowsOf(db, sql`select user_id, puuid from user_players order by user_id`)).toEqual([
       { user_id: U1, puuid: now("carl") },
@@ -569,12 +600,13 @@ describe.skipIf(!url)("remap-puuids on a throwaway Postgres", () => {
       rank_history: 3,
       player_seasons: 1,
       ranked_entries: 3,
+      season_games: 2,
       players: 1,
     });
     expect(await snapshot(db)).toEqual(beforeApply);
 
     const lines = readFileSync(backupFile, "utf8").trim().split("\n");
-    expect(lines.filter((line) => line.includes('"type":"created"'))).toHaveLength(62);
+    expect(lines.filter((line) => line.includes('"type":"created"'))).toHaveLength(64);
   });
 
   it("refuses a second rollback, and a backup from an apply that stopped early", async () => {

@@ -10,15 +10,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Who writes this change
 
-One branch has one builder, named on the issue. Claude Code on Opus 5.5 writes this app's features and fixes. The Cursor chat, on Grok 4.7, does a small edit while Jasper is at the machine, reviews a risky pull request without editing it, and updates status and leftover docs after that pull request merges. A cloud agent is the builder only when the issue says so. Claude Code merges only its own tiny and normal pull requests, through `npm run can-merge -- <pr> --merge`, and Jasper merges every other one. The full rule is [docs/workflow.md](docs/workflow.md#which-tool-writes-the-code).
+Claude Code on Opus 5.5 is the only builder, in a local session or a cloud session. One ticket has one builder: the one whose start comment on the Linear ticket came first. Up to 4 branches can be in progress at once, each touching different files. Claude Code merges only its own tiny and normal pull requests, through `npm run can-merge -- <pr> --merge`, and Jasper merges every other one. The full rule is [docs/workflow.md](docs/workflow.md#tickets-and-builders).
 
 If another open pull request already edits a file, leave that file alone.
 
-## Cursor Cloud specific instructions
+## Cloud sessions
 
-A cloud agent on this repo uses Grok or Composer, branches from `origin/main`, and opens a draft pull request. It does not merge, and it does not write "My read".
-
-Node 22. The environment build runs `npm ci`. Before pushing, run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. `npm run test:e2e` runs against the Vercel preview, not in this machine. Do not run `npm run db:migrate`. Secrets come from the cloud environment, never from a file in the repo.
+A Claude Code cloud session starts from a pushed branch, usually `origin/main`, and its startup hook (`.claude/hooks/cloud-setup.mjs`) runs `npm ci` and `npx playwright install chromium`. Another (`.claude/hooks/pocock-skills.mjs`) downloads Matt Pocock's skills into `~/.claude/skills/`, outside the repo; on a fresh machine they should appear after your first tool call (seen on Jasper's PC, not yet in the cloud), and the hook's line in your context says if they failed. GitHub's GraphQL API is blocked there, so no `gh pr` or `gh issue` command works. `npm run can-merge` and `npm run shot -- --pr` use GitHub's REST API instead, so that block doesn't stop them (JAS-26). Opening a pull request and commenting on it work over REST too (`gh api -X POST repos/Jaspyplayz/League-Web-App/pulls`, and `.../issues/<n>/comments`): a cloud session opened, waited on and merged PR 204 that way. So a cloud session can finish its own tiny docs-only pull request, as PR 204 did, running `can-merge` from `git checkout -B main origin/main`. Editing a description (`gh api -X PATCH .../pulls/<n>`) and running the reviewer agent in a cloud session haven't been tried yet, and skills that call `gh pr`, such as `fix-ci`, don't work there. Node 22. Before pushing, run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. `npm run test:e2e` runs against the Vercel preview, not in this machine. Do not run `npm run db:migrate`. Secrets come from the cloud environment, never from a file in the repo.
 
 ## Code Review Rules
 
@@ -26,7 +24,8 @@ When you review a pull request, read CLAUDE.md first for the project rules,
 use the checklist in .claude/agents/reviewer.md, and report findings
 without editing files. Review is a second look, not a second builder:
 do not start a parallel implementation of the same issue.
-When the Cursor chat reviews a pull request, start your report with
-`Second review (<your model>) at <sha>:`, not the first line reviewer.md asks
-for, and never write `Reviewer agent at`. GitHub's `reviewer` check counts any
-line containing `Reviewer agent at <sha>:` as the reviewer's verdict.
+Only the reviewer agent starts its report with `Reviewer agent at <sha>:`.
+Any other review, such as the `interrogate` panel on a risky pull request,
+starts with its own name instead, like `Interrogate panel at <sha>:`, and never
+writes `Reviewer agent at`. GitHub's `reviewer` check counts any line
+containing `Reviewer agent at <sha>:` as the reviewer's verdict.

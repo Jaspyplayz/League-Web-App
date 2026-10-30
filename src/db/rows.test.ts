@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { match, participants } from "../lib/analyzer/test-fixtures";
-import { BENCHMARK_STATS_VERSION, benchmarkRow, matchRow, participantRows, winChanceRow } from "./rows";
+import {
+  BENCHMARK_STATS_VERSION,
+  benchmarkRow,
+  matchRow,
+  participantRows,
+  seasonGameRow,
+  winChanceRow,
+} from "./rows";
 
 describe("matchRow", () => {
   it("copies the match details and keeps the whole payload", () => {
@@ -84,6 +91,30 @@ describe("participantRows", () => {
     expect(row.csAt10).toBeNull();
     expect(row.wardsKilled).toBeNull();
     expect(row.doubleKills).toBeNull();
+  });
+});
+
+describe("seasonGameRow", () => {
+  it("keeps only the player's champion, result, K/D/A and CS", () => {
+    const players = participants();
+    players[2] = { ...players[2], kills: 4, deaths: 6, assists: 8, totalMinionsKilled: 200, neutralMinionsKilled: 31 };
+    expect(seasonGameRow(match(players, 1902), "player-3")).toEqual({
+      puuid: "player-3",
+      matchId: "NA1_1",
+      gameStartAt: new Date(1_700_000_000_000),
+      queueId: 420,
+      durationS: 1902,
+      championName: players[2].championName,
+      win: players[2].win,
+      kills: 4,
+      deaths: 6,
+      assists: 8,
+      cs: 231,
+    });
+  });
+
+  it("is null when the player isn't in the game", () => {
+    expect(seasonGameRow(match(), "someone-else")).toBeNull();
   });
 });
 
