@@ -25,7 +25,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 - **Fix:** the file or PR that holds the fix, or the ticket that will.
 ```
 
-`scripts/agent-mistakes.test.ts` fails when an entry misses a line or names another rung, or when the table below doesn't match the files: a class missing, a row in another shape, or a wrong count or rung. The rung is the newest entry's.
+`scripts/agent-mistakes.test.ts` fails when an entry misses a line or names another rung, or when the table below doesn't match the files: a class missing, a row in another shape, or a wrong count or rung. The rung is the newest entry's, so it shows the latest fix, not that every case in the class is covered; a case still left to an instruction shows as "Nothing yet" in the rules table below.
 
 | Class | Times seen | Rung |
 | ----- | ---------- | ---- |
@@ -35,7 +35,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 
 ## Rules and what enforces them
 
-A rule agents are given, next to what fails when they break it. A rule with nothing in the second column is one to climb the ladder on.
+A rule agents are given, next to what fails when they break it. A rule whose second column starts "Nothing yet" is one to climb the ladder on.
 
 | Rule | Enforced by |
 | ---- | ----------- |

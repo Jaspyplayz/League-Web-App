@@ -2,8 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // The agent mistakes log (docs/agent-mistakes.md and docs/agent-mistakes/).
-// The postmortem skill writes it and the wellness check reads it, so an entry
-// in another shape would be skipped instead of counted.
+// The postmortem skill (JAS-63) will write it and the wellness check (JAS-65)
+// will read it, so an entry in another shape would be skipped instead of counted.
 
 const LINES = ["What happened", "Evidence", "Root cause", "Rung", "Fix"];
 const RUNGS = ["design", "check", "rule file or skill", "CLAUDE.md line", "none yet"];
@@ -13,7 +13,8 @@ type ClassFile = { problems: string[]; entries: number; rung: string | undefined
 
 // Git on Jasper's PC checks text files out with Windows line endings
 // (core.autocrlf), and CI's Linux checkout doesn't, so both must read the same.
-const toLf = (text: string) => text.replace(/\r\n/g, "\n");
+// Notepad's "UTF-8 with BOM" adds an invisible character before the # title.
+const plainText = (text: string) => text.replace(/^﻿/, "").replace(/\r\n/g, "\n");
 
 // A real calendar date in YYYY-MM-DD, so 2026-13-45 and 2026-02-30 don't count.
 function isDate(text: string): boolean {
@@ -26,7 +27,7 @@ function isDate(text: string): boolean {
 // Reads one class file: a # title, then a ## YYYY-MM-DD section per
 // occurrence holding the five lines in order. `rung` is the newest entry's.
 function readClassFile(raw: string): ClassFile {
-  const text = toLf(raw);
+  const text = plainText(raw);
   const problems: string[] = [];
   if (!/^# \S/.test(text)) problems.push("doesn't start with a # title");
   const sections = text.split(/^## /m).slice(1);
@@ -70,7 +71,7 @@ type IndexRows = { problems: string[]; rows: Map<string, { entries: number; rung
 function readIndexRows(raw: string): IndexRows {
   const problems: string[] = [];
   const rows = new Map<string, { entries: number; rung: string }>();
-  const lines = toLf(raw).split("\n");
+  const lines = plainText(raw).split("\n");
   const header = lines.indexOf("| Class | Times seen | Rung |");
   if (header === -1) return { problems: ['has no "| Class | Times seen | Rung |" table'], rows };
   // Skip the header and the |---| line under it; the table ends at the first non-table line.
@@ -134,6 +135,10 @@ describe("readClassFile", () => {
 
   it("reads a file with Windows line endings the same", () => {
     expect(readClassFile(GOOD.replace(/\n/g, "\r\n"))).toEqual(readClassFile(GOOD));
+  });
+
+  it("reads a file saved with a byte-order mark the same", () => {
+    expect(readClassFile(`﻿${GOOD}`)).toEqual(readClassFile(GOOD));
   });
 });
 
