@@ -52,7 +52,8 @@ Every session has these, local or cloud: pstack's are copied into the repo ([bel
 | Step | Skill | When |
 |---|---|---|
 | Before a ticket | `grill-with-docs`, then `to-spec`, then `to-tickets` (Matt Pocock) | Work too big for one PR, in a local session with Jasper. Jasper types each one, in the order [below the table](#work-too-big-for-one-pr) |
-| 1. Frame | `grilling` (Matt Pocock) | The problem or the criteria are unclear, in a local session where Jasper can answer. A cloud session posts its questions on the ticket as blocked instead |
+| 1. Frame | `grilling` and `domain-modeling` together (Matt Pocock), what `/grill-with-docs` runs | The problem or the criteria are unclear, in a local session where Jasper can answer. New words go into [`GLOSSARY.md`](../GLOSSARY.md) and decisions into [records](#decision-records-and-done) as they settle, not only into the chat. Claude can start both; only Jasper can type `/grill-with-docs`. A cloud session posts its questions on the ticket as blocked instead |
+| 1. Frame | `grilling` alone (Matt Pocock) | A question outside the code, such as how the workflow should run, where there's nothing to write into the glossary or a record |
 | 1. Frame | `to-tickets` (Matt Pocock) | The ticket is bigger than one PR. The builder stops before coding, comments a proposed split on the ticket, deletes its own start comment so it no longer owns the ticket, moves it back to Todo, and asks Jasper to run `/to-tickets` on it, as [below the table](#work-too-big-for-one-pr) |
 | 2. Inspect | `how` (pstack) | Before changing a part you haven't read |
 | 3. Plan | `architect` (pstack) or `codebase-design` (Matt Pocock) | A design choice, or where a module's boundary should go |
