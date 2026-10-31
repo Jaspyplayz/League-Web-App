@@ -126,11 +126,13 @@ describe("reviewMoments", () => {
       before: 0.5,
       after: 0.54,
       swing: 4,
+      grade: "Excellent",
       question: "What set this up, and could you make it happen again?",
       tempo: null,
       noteLine: "3:00 Ahri killed Syndra: ",
     });
     expect(second.swing).toBe(-5);
+    expect(second.grade).toBe("Mistake");
   });
 
   it("says who had tempo just before, for junglers", () => {

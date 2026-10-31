@@ -169,7 +169,22 @@ function chanceReader(
 
 // --- Grades and words, for the plays list ---
 
-export type Grade = "Great" | "Good" | "Even" | "Inaccuracy" | "Mistake";
+// Chess-style grades, best first. Chess.com's scale also has Best, Miss
+// and Book, which Turnpoint leaves out on purpose (decision record 0022):
+// Best needs the other options a player had, Miss the absence of a play,
+// and Book an opening move that isn't a kill or an objective.
+export const GRADES = [
+  "Brilliant",
+  "Great",
+  "Excellent",
+  "Good",
+  "Even",
+  "Inaccuracy",
+  "Mistake",
+  "Blunder",
+] as const;
+
+export type Grade = (typeof GRADES)[number];
 
 // Where the replay jumps to for a play: the first whole second of it, so the
 // clock, scoreboard and win chance all count its first event.
@@ -183,15 +198,83 @@ export function playSwing(play: Pick<Play, "before" | "after">): number {
   return Math.round((play.after - play.before) * 1000) / 10;
 }
 
-// Great from +4 points, Good from +1, Inaccuracy from −1, Mistake from −4,
-// and Even in between. It grades what a play did to the chance, not whether
-// it was the right call.
-export function gradeOf(swing: number): Grade {
-  if (swing >= 4) return "Great";
-  if (swing >= 1) return "Good";
-  if (swing <= -4) return "Mistake";
-  if (swing <= -1) return "Inaccuracy";
+// The lines between the grades, in points of win chance.
+const SMALL_SWING = 1;
+const BIG_SWING = 4;
+// Great and Blunder also need the play to change your team's band, below.
+// Without this, an early lone kill that tips the chance from 43% to 39%
+// would be a Blunder.
+const TURNING_SWING = 8;
+
+// Your team is losing under 40%, winning over 60%, and even in between
+// (40% and 60% included). Moving across one of these lines is what makes a
+// big play Great or a Blunder: it changed who was ahead, not just by how
+// much.
+const LOSING_BELOW = 0.4;
+const WINNING_ABOVE = 0.6;
+
+// A fight is Brilliant when your team won it with at least this many fewer
+// champions than the enemy. One fewer isn't enough: in a big fight the
+// losing side nearly always shows all five, so a 4 against 5 is usually a
+// teammate who stayed out of it, not a risk.
+const OUTNUMBERED_BY = 2;
+
+// A play's grade, from how much it moved your team's chance to win:
+//
+// - 4 points or more: Brilliant for a fight your team won while
+//   outnumbered by 2 or more, Great for 8 points or more that moved your
+//   team up a band (losing, even, winning), Excellent otherwise.
+// - 1 to 4 points: Good. Less than 1 either way: Even. −1 to −4: Inaccuracy.
+// - −4 or more: Blunder for −8 or more that dropped your team down a band,
+//   Mistake otherwise.
+//
+// It grades what a play did to the chance, not whether it was the right
+// call.
+export function gradePlay(
+  play: Pick<Play, "before" | "after" | "kills">,
+  replay: Pick<ReplayData, "kills" | "players" | "myTeamId">,
+): Grade {
+  const swing = playSwing(play);
+  const moved = band(play.after) - band(play.before);
+  if (swing >= BIG_SWING) {
+    if (wonOutnumbered(play, replay)) return "Brilliant";
+    return swing >= TURNING_SWING && moved > 0 ? "Great" : "Excellent";
+  }
+  if (swing >= SMALL_SWING) return "Good";
+  if (swing <= -BIG_SWING) return swing <= -TURNING_SWING && moved < 0 ? "Blunder" : "Mistake";
+  if (swing <= -SMALL_SWING) return "Inaccuracy";
   return "Even";
+}
+
+function band(chance: number): number {
+  if (chance < LOSING_BELOW) return 0;
+  if (chance > WINNING_ABOVE) return 2;
+  return 1;
+}
+
+// True when your team won the play's fight (more enemy deaths than yours)
+// with OUTNUMBERED_BY or more fewer champions in it than the enemy team. A champion is in it when
+// they killed, helped or died. Riot counts anyone who did damage as a
+// helper, but an enemy who ran away untouched isn't counted at all.
+function wonOutnumbered(
+  play: Pick<Play, "kills">,
+  replay: Pick<ReplayData, "kills" | "players" | "myTeamId">,
+): boolean {
+  const teamOf = new Map(replay.players.map((p) => [p.participantId, p.teamId]));
+  const ours = (id: number) => teamOf.get(id) === replay.myTeamId;
+  const us = new Set<number>();
+  const them = new Set<number>();
+  let won = 0;
+  let lost = 0;
+  for (const i of play.kills) {
+    const k = replay.kills[i];
+    if (ours(k.victimId)) lost++;
+    else won++;
+    // killerId is 0 when a tower or minions got the kill.
+    const champions = [k.victimId, ...(k.killerId > 0 ? [k.killerId] : []), ...k.assists];
+    for (const id of champions) (ours(id) ? us : them).add(id);
+  }
+  return won > lost && them.size - us.size >= OUTNUMBERED_BY;
 }
 
 // 7.6 -> "+7.6%", -2 -> "−2.0%" (with a real minus sign), 0 -> "0.0%".

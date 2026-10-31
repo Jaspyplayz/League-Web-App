@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatSwing,
-  gradeOf,
+  GRADES,
+  gradePlay,
   playLines,
   playSwing,
   playTitle,
@@ -173,22 +174,104 @@ describe("replayChances", () => {
   });
 });
 
-describe("gradeOf and formatSwing", () => {
-  it("grades by the points the chance moved", () => {
-    expect([7.6, 4, 3.9, 1, 0.9, 0, -0.9, -1, -3.9, -4].map(gradeOf)).toEqual([
+describe("gradePlay", () => {
+  // Kills, in time order: 0 Ahri kills Syndra (Vi helps), 1 Kaisa kills Vi
+  // (Darius and 9 help), 2 Ahri kills Kaisa, 3 Ahri kills Darius, 4 9 kills
+  // Ahri (10 helps), 5 Vi kills 9 (1, 4 and 5 help).
+  const timeline = game([
+    kill("4:40", 7, VI, [6, 9]),
+    kill("4:41", AHRI, 7),
+    kill("4:42", AHRI, 6),
+    kill("4:50", 9, AHRI, [10]),
+    kill("4:52", VI, 9, [1, 4, 5]),
+  ]);
+  const replay = replayData(timeline, players, BLUE);
+  // A play that moved your team's chance from `before` to `after` (0 to 1).
+  const grade = (before: number, after: number, kills: number[] = []) =>
+    gradePlay({ kills, before, after }, replay);
+
+  it("lists the grades best first, leaving out Best, Miss and Book", () => {
+    expect(GRADES).toEqual([
+      "Brilliant",
       "Great",
-      "Great",
+      "Excellent",
       "Good",
-      "Good",
       "Even",
-      "Even",
-      "Even",
-      "Inaccuracy",
       "Inaccuracy",
       "Mistake",
+      "Blunder",
     ]);
   });
 
+  it("grades small moves by the points the chance moved", () => {
+    expect([0.539, 0.51, 0.509, 0.491, 0.49, 0.461].map((after) => grade(0.5, after))).toEqual([
+      "Good",
+      "Good",
+      "Even",
+      "Even",
+      "Inaccuracy",
+      "Inaccuracy",
+    ]);
+  });
+
+  it("calls a gain of 4 points or more Excellent when your team stays in its band", () => {
+    expect(grade(0.7, 0.8)).toBe("Excellent");
+    expect(grade(0.1, 0.15)).toBe("Excellent");
+    expect(grade(0.45, 0.55)).toBe("Excellent");
+  });
+
+  it("calls a gain of 8 points or more Great when it moves your team up a band", () => {
+    // Losing under 40%, even from 40% to 60%, winning over 60%.
+    expect(grade(0.35, 0.45)).toBe("Great");
+    expect(grade(0.55, 0.65)).toBe("Great");
+    expect(grade(0.3, 0.7)).toBe("Great");
+    // A smaller gain that only tips over a line isn't.
+    expect(grade(0.38, 0.43)).toBe("Excellent");
+    expect(grade(0.58, 0.61)).toBe("Good");
+  });
+
+  it("calls a loss of 8 points or more a Blunder when it drops your team down a band", () => {
+    // Like the 33:36 fight in KR_8419370694, -34.1 points.
+    expect(grade(0.7, 0.359)).toBe("Blunder");
+    expect(grade(0.65, 0.55)).toBe("Blunder");
+    expect(grade(0.45, 0.35)).toBe("Blunder");
+    expect(grade(0.43, 0.38)).toBe("Mistake");
+    expect(grade(0.9, 0.82)).toBe("Mistake");
+    expect(grade(0.2, 0.1)).toBe("Mistake");
+    expect(grade(0.62, 0.59)).toBe("Inaccuracy");
+  });
+
+  it("counts 40% and 60% as even", () => {
+    expect(grade(0.32, 0.4)).toBe("Great");
+    expect(grade(0.52, 0.6)).toBe("Excellent");
+    expect(grade(0.6, 0.68)).toBe("Great");
+    expect(grade(0.48, 0.4)).toBe("Mistake");
+    expect(grade(0.4, 0.32)).toBe("Blunder");
+  });
+
+  it("calls a fight won while outnumbered by 2 or more Brilliant, from 4 points", () => {
+    // Ahri and Vi against Syndra, Kaisa, Darius and 9: won 3 for 1.
+    expect(grade(0.5, 0.55, [0, 1, 2, 3])).toBe("Brilliant");
+    expect(grade(0.55, 0.65, [0, 1, 2, 3])).toBe("Brilliant");
+    expect(grade(0.5, 0.53, [0, 1, 2, 3])).toBe("Good");
+    expect(grade(0.5, 0.45, [0, 1, 2, 3])).toBe("Mistake");
+  });
+
+  it("doesn't call it Brilliant when your team wasn't outnumbered by 2 or didn't win the fight", () => {
+    // Two of yours on Syndra alone.
+    expect(grade(0.5, 0.55, [0])).toBe("Excellent");
+    // Two of yours against three of theirs: Syndra, Kaisa and Darius.
+    expect(grade(0.5, 0.55, [0, 2, 3])).toBe("Excellent");
+    // Five of yours against two of theirs.
+    expect(grade(0.5, 0.55, [3, 5])).toBe("Excellent");
+    // Two of yours against four of theirs, but lost 0 for 2.
+    expect(grade(0.5, 0.55, [1, 4])).toBe("Excellent");
+    // Traded 1 for 1.
+    expect(grade(0.5, 0.55, [1, 2])).toBe("Excellent");
+  });
+});
+
+describe("formatSwing", () => {
   it("writes the swing with its sign", () => {
     expect([7.6, -2, 0].map(formatSwing)).toEqual(["+7.6%", "−2.0%", "0.0%"]);
   });

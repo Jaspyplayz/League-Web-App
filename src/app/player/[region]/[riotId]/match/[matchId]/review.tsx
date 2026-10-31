@@ -11,7 +11,7 @@
 
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
-import { formatSwing, gradeOf } from "@/lib/analyzer/plays";
+import { formatSwing } from "@/lib/analyzer/plays";
 import type { Moment } from "@/lib/analyzer/review";
 import { GRADE_CHIP } from "./replay-plays";
 import { useReviewLinks } from "./review-links";
@@ -38,7 +38,7 @@ export function Review({ moments, notes }: { moments: Moment[]; notes: boolean }
       ) : (
         <ol className="grid gap-4 md:grid-cols-3">
           {moments.map((m) => {
-            const grade = gradeOf(m.swing);
+            const { grade } = m;
             return (
               <li
                 key={m.at}

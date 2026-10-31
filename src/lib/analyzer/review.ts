@@ -10,7 +10,15 @@
 // verdict.
 
 import { formatClock } from "./format";
-import { playStart, playSwing, playTitle, type Play, type ReplayChances } from "./plays";
+import {
+  gradePlay,
+  playStart,
+  playSwing,
+  playTitle,
+  type Grade,
+  type Play,
+  type ReplayChances,
+} from "./plays";
 import type { ReplayData } from "./replay";
 import { stretchAt, type TempoTimeline } from "./tempo";
 
@@ -26,6 +34,8 @@ export type Moment = {
   before: number;
   after: number;
   swing: number;
+  // Its grade, as the replay's plays list shows it.
+  grade: Grade;
   question: string;
   // For junglers, who had tempo just before it. Null for everyone else.
   tempo: string | null;
@@ -70,6 +80,7 @@ export function reviewMoments(
       before: play.before,
       after: play.after,
       swing: playSwing(play),
+      grade: gradePlay(play, replay),
       question: momentQuestion(play, replay, meId),
       tempo: tempo ? tempoWords(tempo, play.from - 1, names) : null,
       noteLine: `${clock} ${title}: `,
