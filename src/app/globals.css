@@ -96,6 +96,11 @@
   --text-title: 28px;
   --text-heading: 19px;
   --text-subheading: 17px;
+  /* Headings sit tighter than sentences: without these, a wrapped 28px title
+     takes the page's 1.5 line height. */
+  --text-title--line-height: 1.25;
+  --text-heading--line-height: 1.375;
+  --text-subheading--line-height: 1.375;
 
   --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
   --font-sans: var(--font-rubik), system-ui, sans-serif;
