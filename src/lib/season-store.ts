@@ -275,15 +275,27 @@ export async function seasonMatchIds(
   puuid: string,
   profileUpdatedAt: Date,
 ): Promise<string[] | null> {
-  const row = await readSavedSeason(puuid);
+  // The saved list belongs to the region the profile is saved for. On
+  // another region's page (Riot accounts are global) it's neither shown nor
+  // saved over, so the daily sync keeps the real one (JAS-41).
+  const ours = (await savedRegion(puuid)) === region;
+  const row = ours ? await readSavedSeason(puuid) : undefined;
   if (row && row.fetchedAt >= profileUpdatedAt) return row.matchIds;
 
   const fetched = await settle(fetchSeasonMatchIds(region, puuid));
   // A day-old list beats no list when Riot is busy.
   if (!fetched.ok) return row?.matchIds ?? null;
 
-  await saveSeasonMatchIds(puuid, fetched.value);
+  if (ours) await saveSeasonMatchIds(puuid, fetched.value);
   return fetched.value;
+}
+
+// The region the player's profile is saved for, if it is.
+async function savedRegion(puuid: string): Promise<string | undefined> {
+  const player = await readCache((db) =>
+    db.query.players.findFirst({ columns: { region: true }, where: eq(tables.players.puuid, puuid) }),
+  );
+  return player?.region;
 }
 
 function readSavedSeason(puuid: string) {

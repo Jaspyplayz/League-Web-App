@@ -74,7 +74,9 @@ export async function RankCards({ puuid, profile }: { puuid: string; profile: Pr
   // eslint-disable-next-line react-hooks/purity
   const now = new Date(Date.now());
   // Saved ranks for the LP graph. Comes from our database only, never Riot.
-  const history = await loadRankHistory(puuid, now);
+  // They belong to the saved profile's region, so another region's page
+  // draws no graph rather than one from a different server (JAS-41).
+  const history = profile.stored ? await loadRankHistory(puuid, now) : [];
   const graph = (queueType: string) => graphPoints(history, queueType, now);
 
   return (

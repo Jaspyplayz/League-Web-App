@@ -1,7 +1,7 @@
 import "server-only";
 
 import * as Sentry from "@sentry/nextjs";
-import { and, desc, eq, gte, lt } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, or } from "drizzle-orm";
 import { tables } from "@/db";
 import { isFresh, secondsUntilUpdate, TTL_MS } from "@/db/freshness";
 import { database, readCache } from "@/lib/match-store";
@@ -16,6 +16,8 @@ import type { Account, LeagueEntry } from "@/lib/riot/types";
 // Turnpoint asks Riot for a new one the first time anyone opens the player,
 // when the saved one is a day old, or when someone clicks Update. Visits in
 // between read the snapshot and cost no Riot calls for rank or match history.
+// A player has one saved snapshot, for one region (decision record 0021):
+// their page on another server is fetched fresh on every visit.
 //
 // Like match-store.ts, the database is only a cache: without one, every
 // visit fetches a fresh profile from Riot.
@@ -29,6 +31,10 @@ export type Profile = {
   matchIds: string[];
   // When this snapshot was fetched from Riot.
   updatedAt: Date;
+  // Whether this is the player's saved snapshot. False on another region's
+  // page, whose rank history (saved for the other region) doesn't belong
+  // next to this one's ranks.
+  stored: boolean;
 };
 
 // Each game listed costs one Riot call the first time anyone sees it. The
@@ -65,6 +71,10 @@ export async function updateProfile(region: Region, puuid: string): Promise<Upda
   // No database, or nothing saved yet: the page fetches a fresh profile on
   // its own when it reloads, so there's nothing to do here.
   if (!player) return { status: "updated" };
+  // A real profile saved for another region doesn't change from this page,
+  // which fetches a fresh one on every load anyway, so the click costs no
+  // Riot calls here, and the cooldown can't be dodged by picking a region.
+  if (player.region !== region && player.summonerLevel !== null) return { status: "updated" };
 
   const secondsLeft = secondsUntilUpdate(player.matchIdsFetchedAt);
   if (secondsLeft > 0) return { status: "cooldown", secondsLeft };
@@ -90,11 +100,12 @@ async function fetchProfile(region: Region, account: Account): Promise<Profile> 
     ranked,
     matchIds,
     updatedAt: new Date(),
+    stored: false,
   };
   // Saved before returning, not after the response like matches are: after
   // an Update the page reloads straight away and must read the new snapshot.
-  await saveProfile(region, account, profile);
-  return profile;
+  const stored = await saveProfile(region, account, profile);
+  return { ...profile, stored };
 }
 
 // The player's saved solo queue tier ("GOLD"), so the match page can use
@@ -160,13 +171,15 @@ async function readProfile(region: Region, puuid: string): Promise<Profile | und
       ranked,
       matchIds: player.matchIds,
       updatedAt: player.matchIdsFetchedAt,
+      stored: true,
     };
   });
 }
 
-async function saveProfile(region: Region, account: Account, profile: Profile) {
+// Returns whether the snapshot was saved as the player's profile.
+async function saveProfile(region: Region, account: Account, profile: Profile): Promise<boolean> {
   const db = database();
-  if (!db) return;
+  if (!db) return false;
 
   const { puuid, gameName, tagLine } = account;
   const { updatedAt } = profile;
@@ -181,14 +194,34 @@ async function saveProfile(region: Region, account: Account, profile: Profile) {
     rankedFetchedAt: updatedAt,
     matchIdsFetchedAt: updatedAt,
   };
+  let saved: boolean;
   try {
     // One transaction, so a reader never sees the new rank with the old
     // player row or the other way round.
-    await db.transaction(async (tx) => {
-      await tx
+    saved = await db.transaction(async (tx) => {
+      // Riot accounts are global, so anyone can open a player on a server
+      // they don't play on. A profile saved for another region stays as it
+      // is, ranks and all: only a visit to its own region updates it
+      // (JAS-41, issue #150). The page still shows what this region sent.
+      // The exception is a saved row with no summoner, from a first visit
+      // to a server the player never played on (the search box starts on
+      // NA): a visit that finds their summoner replaces it, or that row
+      // would stick for good.
+      const ours = eq(tables.players.region, region);
+      const written = await tx
         .insert(tables.players)
         .values({ puuid, ...row })
-        .onConflictDoUpdate({ target: tables.players.puuid, set: row });
+        .onConflictDoUpdate({
+          target: tables.players.puuid,
+          set: row,
+          setWhere: profile.summonerLevel === null ? ours : or(ours, isNull(tables.players.summonerLevel)),
+        })
+        .returning({ puuid: tables.players.puuid });
+      if (written.length === 0) {
+        // Riot IDs are global, so a rename still counts from any server.
+        await tx.update(tables.players).set({ gameName, tagLine }).where(eq(tables.players.puuid, puuid));
+        return false;
+      }
       // Replace the rank rows rather than update them: a player who dropped
       // out of a queue (or never played it) has no row for it.
       await tx.delete(tables.rankedEntries).where(eq(tables.rankedEntries.puuid, puuid));
@@ -206,12 +239,14 @@ async function saveProfile(region: Region, account: Account, profile: Profile) {
           })),
         );
       }
+      return true;
     });
   } catch (error) {
     // The page still has the fresh profile to show; it just isn't saved.
     Sentry.captureException(error);
-    return;
+    return false;
   }
+  if (!saved) return false;
 
   // Kept out of the transaction above on purpose: if this fails (say the
   // rank_history table hasn't been created yet), the profile is still saved
@@ -234,6 +269,7 @@ async function saveProfile(region: Region, account: Account, profile: Profile) {
   } catch (error) {
     Sentry.captureException(error);
   }
+  return true;
 }
 
 // Only the columns rank_history stores; Riot's entries carry more fields.
