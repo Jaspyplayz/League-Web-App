@@ -24,6 +24,10 @@ import {
 // participantId 1-5 are blue side (team 100), 6-10 red side (team 200):
 // 3 is blue's Ahri, 2 blue's Vi, 8 red's Syndra.
 const players = participants();
+// Where kills happen: the middle of the map, and the far ends of top and bot.
+const MID = { x: 7400, y: 7400 };
+const TOP = { x: 2000, y: 12000 };
+const BOT = { x: 12500, y: 2000 };
 const BLUE = 100;
 const RED = 200;
 const AHRI = 3;
@@ -63,7 +67,7 @@ function game(events: TrimmedEvent[]): TrimmedTimeline {
     frames: frames(10, (minute, id) => ({
       gold: 500 + 400 * minute + (minute >= 5 ? (id === AHRI ? 300 : id === VI ? 150 : 0) : 0),
     })),
-    events: [kill("4:30", AHRI, SYNDRA, [VI]), ...events],
+    events: [kill("4:30", AHRI, SYNDRA, [VI], MID), ...events],
   };
 }
 
@@ -192,19 +196,26 @@ describe("gradePlay", () => {
   // 10 8:00 Ahri kills Darius                } three pickoffs, 15 seconds
   // 11 8:15 Ahri kills Kaisa                 } apart: one play, three
   // 12 8:30 Ahri kills Syndra                } fights
+  // 13 10:00 Darius kills 1 top (Kaisa, Syndra help)  } two fights at once:
+  // 14 10:01 4 kills 9 bot (5 helps)                  } 1 against 3 top, lost,
+  // 15 10:02 5 kills 10 bot (4 helps)                 } and 2 against 2 bot, won
+  // All but 13 to 15 are in the middle of the map.
   const timeline = game([
-    kill("4:32", 7, VI, [6, 9]),
-    kill("4:34", AHRI, 7),
-    kill("4:36", AHRI, 6),
-    kill("4:50", 9, AHRI, [10]),
-    kill("4:52", VI, 9, [1, 4, 5]),
-    kill("6:00", 7, VI, [6, 9]),
-    kill("6:02", 0, 10),
-    kill("7:00", 0, 6),
-    kill("7:02", 0, 9),
-    kill("8:00", AHRI, 6),
-    kill("8:15", AHRI, 7),
-    kill("8:30", AHRI, SYNDRA),
+    kill("4:32", 7, VI, [6, 9], MID),
+    kill("4:34", AHRI, 7, [], MID),
+    kill("4:36", AHRI, 6, [], MID),
+    kill("4:50", 9, AHRI, [10], MID),
+    kill("4:52", VI, 9, [1, 4, 5], MID),
+    kill("6:00", 7, VI, [6, 9], MID),
+    kill("6:02", 0, 10, [], MID),
+    kill("7:00", 0, 6, [], MID),
+    kill("7:02", 0, 9, [], MID),
+    kill("8:00", AHRI, 6, [], MID),
+    kill("8:15", AHRI, 7, [], MID),
+    kill("8:30", AHRI, SYNDRA, [], MID),
+    kill("10:00", 6, 1, [7, SYNDRA], TOP),
+    kill("10:01", 4, 9, [5], BOT),
+    kill("10:02", 5, 10, [4], BOT),
   ]);
   const replay = replayData(timeline, players, BLUE);
   // A play that moved your team's chance from `before` to `after` (0 to 1).
@@ -288,6 +299,19 @@ describe("gradePlay", () => {
     expect(grade(0.5, 0.55, [0, 1, 2, 3, 4, 5])).toBe("Brilliant");
     // Three pickoffs in a row are three 1 against 1 fights.
     expect(grade(0.5, 0.58, [10, 11, 12])).toBe("Excellent");
+  });
+
+  it("splits kills far apart on the map into separate fights, even seconds apart", () => {
+    // Together they'd be 3 against 5, won 2 for 1. Apart, top is lost and
+    // bot is an even 2 against 2.
+    expect(grade(0.5, 0.55, [13, 14, 15])).toBe("Excellent");
+  });
+
+  it("counts a kill with no position as a fight of its own", () => {
+    // Without Kaisa's kill on Vi in the fight, the rest is Ahri and Vi on
+    // Syndra, then Ahri alone on Kaisa and Darius: never 2 fewer.
+    const noPosition = { ...replay, kills: replay.kills.map((k, i) => (i === 1 ? { ...k, position: null } : k)) };
+    expect(gradePlay({ kills: [0, 1, 2, 3], before: 0.5, after: 0.55 }, noPosition)).toBe("Excellent");
   });
 
   it("doesn't call it Brilliant unless your team won a fight outnumbered by 2", () => {

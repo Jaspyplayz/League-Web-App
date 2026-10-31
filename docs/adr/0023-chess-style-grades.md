@@ -1,4 +1,4 @@
-# 0022: Plays are graded on a chess-style scale
+# 0023: Plays are graded on a chess-style scale
 
 Status: draft (JAS-85). Jasper accepts it by merging the PR.
 
@@ -40,5 +40,6 @@ Option 3, settled with Jasper on the ticket. Eight grades, best first:
 
 - The replay and the 60-second review show the new grades now, with pills and marks built from the existing blue and red tokens; the Review board (JAS-107, JAS-108) restyles them. The MCP tools and Ask pass only the swing, and the game score and phase ratings don't use grades, so they don't change.
 - The same play gets mirrored grades from the two teams' sides (a Great for one is a Blunder for the other), except Brilliant, which only the winning side can earn; the losing side's grade for that play is Mistake or Blunder.
-- Brilliant counts champions from Riot's kill events, so an enemy who was there but neither died nor got a kill or assist isn't counted, and neither is a teammate who only stood nearby. Either way the count can be wrong, so a Brilliant can be missed or, rarely, awarded to a fight that wasn't really outnumbered.
+- Brilliant counts champions from Riot's kill events, so an enemy who was there but neither died nor got a kill or assist isn't counted, and neither is a teammate who only stood nearby. Either way the count can be wrong, so a Brilliant can be missed or awarded to a fight that wasn't really outnumbered. How often hasn't been measured: the golden games have no Brilliant.
+- A fight is the kills less than 10 seconds and 3,000 units apart (the map is 14,900 across), so two fights at once in different lanes stay apart. A kill Riot gave no position is a fight of its own, which can split one real fight in two and miss a Brilliant.
 - The thresholds (1, 4 and 8 points, 40% and 60%, 2 fewer champions) are constants in `plays.ts`, chosen on the three golden games with a timeline (the remake has none). `golden.test.ts` checks each jungler's grade counts in them. A later change that moves the thresholds replaces this record.

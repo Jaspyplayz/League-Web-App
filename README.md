@@ -28,7 +28,7 @@
 - **You vs your opponent:** gold, CS, XP and damage difference against the enemy in your role, minute by minute, with the turning points explained in plain English.
 - **Phase ratings:** a 0 to 100 rating for your early, mid and late game, each saying what helped or held it back most.
 - **60-second review:** the three plays you were in that moved the win chance most, each with a question to think over and a jump into the replay.
-- **Replay (beta):** the whole game second by second on Summoner's Rift, with every player's items and position, and every play graded by how much it moved the win chance.
+- **Replay (beta):** the whole game second by second on Summoner's Rift, with every player's items and position, and every play graded from Brilliant to Blunder by what it did to the win chance.
 - **Deaths, ganks and jungle pathing:** each death labeled (solo killed, ganked, teamfight, caught), every gank before 14:00, and which side of the map the jungler started on.
 - **AI recap:** a headline and a few timed points on what decided the game, written by Claude from the analyzer's facts.
 

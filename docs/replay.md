@@ -121,7 +121,7 @@ With one snapshot left out, the estimate spans two minutes, while the replay's n
 
 A play is a run of kills, epic monsters, towers and inhibitors less than 20 seconds apart, so a fight at Baron and the tower right after it are one play. Its grade is your team's chance to win just after its last event minus just before its first, in points: from 52.0% to 59.6% is +7.6. Plays never overlap, so between them only gold and XP move the chance (farming, plates and passive gold), plus a buff running out or an inhibitor coming back.
 
-The grades borrow chess.com's game review scale, which ranks moves from Brilliant to Blunder ([decision record 0022](adr/0022-chess-style-grades.md)):
+The grades borrow chess.com's game review scale, which ranks moves from Brilliant to Blunder ([decision record 0023](adr/0023-chess-style-grades.md)):
 
 | Grade | Your team's chance moved by | And |
 |---|---|---|
@@ -160,7 +160,7 @@ In the golden comeback game (`src/lib/analyzer/fixtures/comeback.json`), the 14 
 - The walls champions walk around are learned from this season's games, so after a change to the map they're out of date until `npm run rift-map` runs on games from the new patch.
 - Plays are grouped by time only, so two things 15 seconds apart on opposite sides of the map make one play.
 - A play's grade uses the base kill gold, so shutdowns and first blood count for less than they paid, and kills on players who keep dying for more.
-- Brilliant counts the champions in a fight from its kills, so an enemy who was there but neither died nor got a kill or assist isn't counted, and a teammate who only stood nearby isn't either.
+- Brilliant counts the champions in a fight from its kills, so an enemy who was there but neither died nor got a kill or assist isn't counted, and a teammate who only stood nearby isn't either. Its fights are kills less than 10 seconds and 3,000 units apart, so a kill with no position counts as a fight on its own.
 
 ## Running the checks
 

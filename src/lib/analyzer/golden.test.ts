@@ -193,7 +193,7 @@ describe("anonymized", () => {
 describe("play grades", () => {
   // The replay's graded plays from one player's side, with the base win
   // chance model (no rank). The thresholds in plays.ts were picked on these
-  // games (decision record 0022), so a change to them, to how plays are
+  // games (decision record 0023), so a change to them, to how plays are
   // grouped, or to the model shows here.
   function playsOf(game: Game, participantId: number): Play[] {
     const analysis = analyze(game, participantId);

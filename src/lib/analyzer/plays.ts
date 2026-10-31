@@ -19,6 +19,7 @@
 // Everything here runs on the server: the page gets the chance at every
 // second and the graded plays, not the model.
 
+import type { MapPosition } from "@/lib/riot/types";
 import { formatClock, listNames } from "./format";
 import type { ObjectiveKind } from "./objectives";
 import { between, goldAt, type ReplayData, type ReplayKill } from "./replay";
@@ -175,7 +176,7 @@ function chanceReader(
 // --- Grades and words, for the plays list ---
 
 // Chess-style grades, best first. Chess.com's scale also has Best, Miss
-// and Book, which Turnpoint leaves out on purpose (decision record 0022):
+// and Book, which Turnpoint leaves out on purpose (decision record 0023):
 // Best needs the other options a player had, Miss the absence of a play,
 // and Book an opening move that isn't a kill or an objective.
 export const GRADES = [
@@ -228,6 +229,11 @@ const OUTNUMBERED_BY = 2;
 // apart. Three pickoffs 15 seconds apart are three 1 against 1 fights, not
 // one 1 against 3.
 const FIGHT_GAP_MS = 10_000;
+// Kills this far apart on the map (in game units, out of 14,900 across) are
+// in different fights, even seconds apart: a dive top while bot lane wins a
+// 2 against 2 is two fights, not one 3 against 5. It's a little wider than a
+// side lane, so kills in one chase still join up.
+const FIGHT_RANGE = 3000;
 
 // A play's grade, from how much it moved your team's chance to win:
 //
@@ -268,16 +274,28 @@ function band(chance: number): number {
 }
 
 // A play's kills (indexes into ReplayData.kills, in time order) cut into
-// fights wherever two are FIGHT_GAP_MS or more apart.
+// fights. A kill joins the latest fight whose last kill was less than
+// FIGHT_GAP_MS before it and that has a kill within FIGHT_RANGE of it;
+// otherwise it starts a fight. Two fights at once on different parts of the
+// map stay apart this way. A kill Riot gave no position is a fight of its
+// own, since there's no telling which fight it was in.
 function fights(kills: number[], replay: Pick<ReplayData, "kills">): number[][] {
-  const at = (i: number) => replay.kills[i].timestamp;
   const out: number[][] = [];
   for (const i of kills) {
-    const last = out[out.length - 1];
-    if (last && at(i) - at(last[last.length - 1]) < FIGHT_GAP_MS) last.push(i);
+    const kill = replay.kills[i];
+    const fight = out.findLast((f) => {
+      const last = replay.kills[f[f.length - 1]];
+      if (kill.timestamp - last.timestamp >= FIGHT_GAP_MS) return false;
+      return f.some((j) => near(replay.kills[j].position, kill.position));
+    });
+    if (fight) fight.push(i);
     else out.push([i]);
   }
   return out;
+}
+
+function near(a: MapPosition | null, b: MapPosition | null): boolean {
+  return a !== null && b !== null && Math.hypot(a.x - b.x, a.y - b.y) < FIGHT_RANGE;
 }
 
 // True when your team won the fight (more enemy deaths than yours), had at
