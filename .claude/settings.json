@@ -3,6 +3,26 @@
     "pstack@pstack-claude": false
   },
   "permissions": {
+    "allow": [
+      "mcp__Linear__get_issue",
+      "mcp__Linear__list_issues",
+      "mcp__Linear__list_comments",
+      "mcp__Linear__save_comment",
+      "mcp__Linear__get_issue_status",
+      "mcp__Linear__list_issue_statuses",
+      "mcp__Linear__list_issue_labels",
+      "mcp__Linear__get_document",
+      "mcp__Linear__list_documents",
+      "mcp__Linear__extract_images",
+      "mcp__Linear__get_attachment",
+      "mcp__Linear__get_project",
+      "mcp__Linear__list_projects",
+      "mcp__Linear__get_team",
+      "mcp__Linear__list_teams",
+      "mcp__Linear__get_user",
+      "mcp__Linear__list_users",
+      "mcp__Linear__whoami"
+    ],
     "deny": [
       "Read(.env.local)",
       "Edit(.claude/agent-merge.json)",
