@@ -1,9 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as Sentry from "@sentry/nextjs";
 import { checkAllowance, readQuestions } from "@/lib/ask-store";
 import { AskContent } from "./ask-panel";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/player/kr/Faker-KR1/match/KR_1" }));
 vi.mock("@/app/account/actions", () => ({ askAction: vi.fn() }));
 vi.mock("@/lib/ask", () => ({ askEnabled: () => true }));
@@ -44,5 +46,6 @@ describe("AskContent", () => {
     const html = await render();
     expect(html).toContain("Couldn&#x27;t load Ask. Reload to try again.");
     expect(html).not.toContain("ask-question");
+    expect(Sentry.captureException).toHaveBeenCalled();
   });
 });

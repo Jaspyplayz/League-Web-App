@@ -1,5 +1,6 @@
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
 import { SignInLink } from "@/components/sign-in-link";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
@@ -101,11 +102,13 @@ export async function AskContent({
 
   // checkAllowance throws when its queries fail. On the old Ask page that
   // showed the error page; here it would take the whole match page with it,
-  // so the panel says so instead and the analysis stays.
+  // so the panel says so instead and the analysis stays. Sentry still hears
+  // about it, so a broken Ask doesn't go unnoticed.
   let loaded;
   try {
     loaded = await Promise.all([readQuestions(user.id, puuid), checkAllowance(user.id)]);
-  } catch {
+  } catch (error) {
+    Sentry.captureException(error);
     return <p className="text-behind">Couldn&apos;t load Ask. Reload to try again.</p>;
   }
   const [history, allowed] = loaded;

@@ -65,7 +65,7 @@ export function AskBox({
     <div className="flex flex-col gap-6">
       <form onSubmit={submit} className="flex flex-col gap-3">
         <label htmlFor="ask-question" className="text-sm text-quiet">
-          Ask about this player&apos;s recent games. Only you see your questions.
+          Your question about this player&apos;s games. Only you see your questions.
         </label>
         <textarea
           id="ask-question"
