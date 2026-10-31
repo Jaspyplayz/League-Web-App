@@ -35,7 +35,7 @@ export function WhatIfCalculator({ ranks }: { ranks: RankWeights[] }) {
   const baronLabel = useId();
 
   return (
-    <Panel className="flex flex-col gap-5 p-4 md:flex-row md:items-center md:gap-8 md:p-5">
+    <Panel className="flex flex-col gap-5 p-4 md:flex-row md:items-center md:gap-6 md:p-5">
       <div className="flex flex-col gap-2.5 md:flex-[0_0_200px] md:flex-row md:items-center md:gap-[18px]">
         <EvalBar chance={chance} className="hidden h-[232px] w-3.5 flex-col justify-end md:flex" />
         <div className="flex flex-1 flex-col gap-0.5" aria-live="polite">
@@ -130,7 +130,7 @@ export function WhatIfCalculator({ ranks }: { ranks: RankWeights[] }) {
                 aria-pressed={w.baron === value}
                 onClick={() => setW((old) => ({ ...old, baron: value }))}
                 // 44px on a phone, so a thumb can hit it.
-                className={`h-11 rounded-md px-3 text-sm font-medium md:h-[34px] ${
+                className={`h-11 rounded-md px-2.5 text-sm font-medium md:h-[34px] ${
                   w.baron === value ? "bg-main text-page" : "bg-raised text-main"
                 }`}
               >
