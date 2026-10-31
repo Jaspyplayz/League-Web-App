@@ -19,6 +19,7 @@ import { fromSlug, toSlug } from "@/lib/riot-id";
 import { SEASON } from "@/lib/season";
 import { QueueTabs } from "../queue-tabs";
 import { ChampionTable } from "./champion-table";
+import { emptyAction } from "./empty-action";
 import { LoadMoreGames } from "./load-more-games";
 
 // The Champions tab: every champion the player played this season, with
@@ -108,20 +109,15 @@ async function Champions({ params, searchParams }: { params: Params; searchParam
       <QueueTabs playerPath={`${playerPath}/champions`} current={queue} defaultId={DEFAULT_QUEUE} />
       {!stats ? (
         <ProblemPanel title="Champion stats can't load right now" actions={<TryAgainButton />}>
-          <p>
-            They come from the games Turnpoint has saved, and its database isn&apos;t answering.
-            Try again in a minute.
-          </p>
+          <p>Turnpoint couldn&apos;t add up this season&apos;s games just now. Try again in a minute.</p>
         </ProblemPanel>
       ) : stats.champions.length === 0 ? (
-        // One way forward: load more of the season while some games are
-        // still missing, then try every mode once they're all in.
         <EmptyPanel
           title={`No ${modeName}games this season yet`}
           action={
-            !allLoaded ? (
+            emptyAction(queue.id, allLoaded) === "load-more" ? (
               loadMore
-            ) : queue.id !== "all" ? (
+            ) : emptyAction(queue.id, allLoaded) === "every-mode" ? (
               <Link href={`${playerPath}/champions?queue=all`} className={secondButtonClass}>
                 Show every mode
               </Link>

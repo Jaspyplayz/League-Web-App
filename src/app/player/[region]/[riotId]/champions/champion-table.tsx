@@ -43,7 +43,7 @@ const COLUMNS = HEADINGS.length + 1;
 // scrolling under it would show through, so an open or hovered row is
 // `raised` rather than the see-through `select`. It follows the row's hover
 // and open states (data-open is set by ChampionRowGroup) at the same speed.
-export const PINNED =
+const PINNED =
   "sticky left-0 z-10 bg-panel transition-colors duration-320 ease-out group-hover:bg-raised group-hover:duration-120 group-data-[open=true]:bg-raised motion-reduce:transition-none";
 
 export function ChampionTable({
@@ -80,7 +80,7 @@ export function ChampionTable({
       </thead>
       {/* The thicker line sets the total apart from the champions under it. */}
       <tbody className="border-b-2 border-divider">
-        <tr className="group">
+        <tr>
           <th scope="row" className={`${PINNED} py-2.5 pr-2 pl-4 text-left font-semibold`}>
             <span className="flex items-center gap-3">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-raised text-note text-quiet">
