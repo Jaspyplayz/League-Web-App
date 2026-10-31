@@ -142,5 +142,6 @@ describe("Review board tokens", () => {
 
   it("hides the panel outline, since Review board panels have no border", () => {
     expect(colourTokens(css, DARK).get("frame")).toBe("transparent");
+    expect(colourTokens(css, LIGHT).get("frame")).toBe("transparent");
   });
 });

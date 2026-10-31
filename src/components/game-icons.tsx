@@ -161,7 +161,7 @@ export function ProfileIcon({
   name: string;
   size?: number;
 }) {
-  // 12px, not 20px: the header uses this icon at 40px, and 20px would circle it.
+  // The small 4px corner, as the design rules give portraits.
   const frame = "soft-round-sm border-2 border-frame";
   return (
     // Spans rather than divs, so the icon can sit inside a button (the
