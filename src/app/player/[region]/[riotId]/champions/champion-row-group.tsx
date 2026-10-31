@@ -62,7 +62,7 @@ export function ChampionRowGroup({
             <button
               type="button"
               onClick={() => setShown((n) => n + STEP)}
-              className="soft-round-sm sticky left-3 w-full max-w-[calc(100vw-4rem)] border border-ahead/50 bg-ahead/10 py-2 text-note font-medium text-ahead-soft transition-colors hover:bg-ahead/20"
+              className="soft-round-sm sticky left-3 w-full max-w-[calc(100vw-4rem)] border border-ahead/50 bg-ahead/10 py-2 text-note font-medium text-ahead-soft transition-colors hover:bg-ahead/20 hover:text-ahead-bright"
             >
               Show more ({opponents.length - shown} left)
             </button>
