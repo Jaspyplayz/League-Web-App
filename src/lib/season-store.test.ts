@@ -202,6 +202,18 @@ describe("loadSeasonStats", () => {
     expect(writtenLists).toEqual([]);
   });
 
+  // On a page the profile is saved first, so the row is there by now. With
+  // none (its save failed), the list isn't saved for a region nobody owns.
+  it("doesn't save the season list for a player with no saved profile", async () => {
+    savedRegion = undefined;
+    vi.mocked(getMatchIds).mockResolvedValue(["NA1_1"]);
+
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
+
+    expect(stats?.total).toBe(1);
+    expect(writtenLists).toEqual([]);
+  });
+
   it("returns null without a database to remember games in", async () => {
     hasDatabase = false;
     expect(await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage)).toBeNull();

@@ -3,6 +3,7 @@ import type { SQL } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { tables } from "@/db";
 import { getMatchIds, getRankedEntries, getSummoner } from "@/lib/riot/api";
+import { RiotApiError } from "@/lib/riot/client";
 import type { LeagueEntry } from "@/lib/riot/types";
 import { loadProfile, updateProfile } from "./profile-store";
 
@@ -31,9 +32,16 @@ function upsert(values: Row, config: { set: Row; setWhere?: SQL }): Row[] {
     return [{ puuid: values.puuid }];
   }
   if (config.setWhere) {
+    // The two conditions saveProfile writes: the saved region only, or the
+    // saved region or a saved row with no summoner.
     const { sql, params } = dialect.sqlToQuery(config.setWhere);
-    expect(sql).toBe('"players"."region" = $1');
-    if (player.region !== params[0]) return [];
+    const ours = player.region === params[0];
+    if (sql === '"players"."region" = $1') {
+      if (!ours) return [];
+    } else {
+      expect(sql).toBe('("players"."region" = $1 or "players"."summoner_level" is null)');
+      if (!ours && player.summonerLevel !== null) return [];
+    }
   }
   player = { ...player, ...config.set };
   return [{ puuid: player.puuid }];
@@ -70,6 +78,16 @@ const tx = {
     where: async () => {
       if (table === tables.rankedEntries) ranked = [];
     },
+  }),
+  // Only the rename on another region's visit updates a player row.
+  update: (table: unknown) => ({
+    set: (values: Row) => ({
+      where: async () => {
+        expect(table).toBe(tables.players);
+        expect(Object.keys(values).sort()).toEqual(["gameName", "tagLine"]);
+        if (player) player = { ...player, ...values };
+      },
+    }),
   }),
 };
 const fakeDb = {
@@ -128,11 +146,12 @@ beforeEach(() => {
 // GitHub issue #150 and JAS-41: Riot accounts are global, so the same player
 // can be opened on any region's page.
 describe("a visit on another region than the saved profile's", () => {
-  it("shows what that region returned", async () => {
+  it("shows what that region returned, marked as not the saved profile", async () => {
     saveEuwProfile();
     const profile = await loadProfile("na", account);
     expect(profile.matchIds).toEqual(["NA1_new"]);
     expect(profile.ranked).toEqual([gold]);
+    expect(profile.stored).toBe(false);
   });
 
   it("keeps the saved region and match ids", async () => {
@@ -148,11 +167,52 @@ describe("a visit on another region than the saved profile's", () => {
     expect(history).toEqual([]);
   });
 
-  it("changes nothing through the Update button either", async () => {
+  // The cooldown comes from the saved row, which this page never moves on,
+  // so asking Riot here would let anyone click without a cooldown.
+  it("changes nothing through the Update button either, and asks Riot nothing", async () => {
     saveEuwProfile(dayAgo);
     expect(await updateProfile("na", "p1")).toEqual({ status: "updated" });
     expect(player).toMatchObject({ region: "euw", matchIds: ["EUW1_saved"] });
     expect(ranked).toEqual([euwRank]);
+    expect(getMatchIds).not.toHaveBeenCalled();
+  });
+
+  it("still saves a rename, since Riot IDs are global", async () => {
+    saveEuwProfile();
+    await loadProfile("na", { ...account, gameName: "Jaspy", tagLine: "CA1" });
+    expect(player).toMatchObject({ gameName: "Jaspy", tagLine: "CA1", region: "euw", matchIds: ["EUW1_saved"] });
+  });
+});
+
+// The search box starts on NA, so a EUW player's first visit can land on NA,
+// where Riot has no summoner for them. That row mustn't stick for good.
+describe("a saved row from a server the player never played on", () => {
+  function saveEmptyNaRow(fetchedAt = new Date()) {
+    player = { ...account, region: "na", profileIconId: null, summonerLevel: null, matchIds: [], fetchedAt, rankedFetchedAt: fetchedAt, matchIdsFetchedAt: fetchedAt };
+    ranked = [];
+  }
+
+  it("is replaced by a visit to a region that finds their summoner", async () => {
+    saveEmptyNaRow();
+    vi.mocked(getMatchIds).mockResolvedValue(["EUW1_real"]);
+    const profile = await loadProfile("euw", account);
+    expect(player).toMatchObject({ region: "euw", summonerLevel: 12, matchIds: ["EUW1_real"] });
+    expect(ranked).toMatchObject([{ tier: "GOLD" }]);
+    expect(history).toMatchObject([{ tier: "GOLD" }]);
+    expect(profile.stored).toBe(true);
+  });
+
+  it("is replaced through the Update button too", async () => {
+    saveEmptyNaRow(dayAgo);
+    expect(await updateProfile("euw", "p1")).toEqual({ status: "updated" });
+    expect(player).toMatchObject({ region: "euw", summonerLevel: 12 });
+  });
+
+  it("isn't replaced by another region with no summoner either", async () => {
+    saveEmptyNaRow();
+    vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("not-found", "no summoner on KR"));
+    await loadProfile("kr", account);
+    expect(player).toMatchObject({ region: "na", summonerLevel: null });
   });
 });
 
@@ -167,7 +227,7 @@ describe("a visit on the saved profile's region", () => {
   });
 
   it("saves the first visit to a player", async () => {
-    await loadProfile("na", account);
+    expect((await loadProfile("na", account)).stored).toBe(true);
     expect(player).toMatchObject({ puuid: "p1", region: "na", matchIds: ["NA1_new"] });
     expect(ranked).toMatchObject([{ puuid: "p1", tier: "GOLD" }]);
   });
