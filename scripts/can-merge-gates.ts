@@ -505,7 +505,7 @@ function lines(text: string): string[] {
   return text.split(/\r?\n/);
 }
 
-type Field = { value: string } | { why: string };
+export type Field = { value: string } | { why: string };
 
 // Ignores list and quote markers and indentation, to count every line that
 // could pass for a heading or field somewhere GitHub shows it differently.
@@ -516,7 +516,8 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // The text after "**Label:**" on the one line that starts with it. A second
 // such line anywhere, even in a code block or comment, fails closed: the
 // readers below can't promise to agree with GitHub on which one it shows.
-function field(body: string, label: string): Field {
+// The Agent merge workflow reads its **Ready to merge:** line with it too.
+export function field(body: string, label: string): Field {
   const prefix = `**${label}:**`;
   const candidates = new RegExp(`${CONTAINER}${escape(prefix)}`);
   const count = lines(body).filter((line) => candidates.test(line)).length;

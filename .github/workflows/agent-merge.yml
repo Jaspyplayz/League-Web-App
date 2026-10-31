@@ -2,20 +2,22 @@ name: Agent merge
 
 # Merges Claude Code's tiny and normal PRs without a Claude session (JAS-121,
 # docs/adr/0024-a-github-action-runs-can-merge.md). Each time one of a PR's
-# checks finishes, this runs `can-merge --merge` on it from main. can-merge
-# checks every gate at the PR's head commit and merges only if all pass, so
-# most runs end in a refusal while another check is still going, and the last
-# check to finish is the one that merges.
+# workflows finishes, this runs `can-merge --merge` on it from main, once the
+# PR's description says `**Ready to merge:** yes`. can-merge checks every gate
+# at the PR's head commit and merges only if all pass, so most runs end in a
+# refusal while another check is still going, and the last one to finish is
+# the one that merges.
 #
 # A workflow_run workflow always runs as this file is on main, never a PR's
 # copy, and the job checks out main. The PR's code is never checked out or
 # run here, so no PR can change what this job does with its write token.
 on:
   workflow_run:
-    # Every workflow that reports a check on a PR. Vercel's check comes from
-    # Vercel's app, which starts no workflow run, but the smoke test starts
-    # only once Vercel's preview is live and takes minutes, so Vercel has
-    # reported by the time it finishes.
+    # Every named workflow that reports a check on a PR. Vercel's check comes
+    # from Vercel's app and CodeQL's from a "dynamic" workflow named after the
+    # PR, so neither can be listed. The smoke test starts only once Vercel's
+    # preview is live and takes minutes, so Vercel has reported by the time it
+    # finishes, and CodeQL has finished first on every recent Claude PR.
     workflows: [CI, Reviewer, Smoke test, Dependency review]
     types: [completed]
 
@@ -25,16 +27,18 @@ permissions: {}
 jobs:
   merge:
     # Only a successful run on one of Claude's branches in this repo. Anything
-    # else (main, Jasper's branches, Dependabot's, a fork, a failed or
-    # cancelled run) never starts a runner, since can-merge couldn't merge it.
+    # else (main, Jasper's branches, Dependabot's, a failed or cancelled run)
+    # shows as a skipped run and never starts a runner, since can-merge
+    # couldn't merge it.
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       startsWith(github.event.workflow_run.head_branch, 'claude/') &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     # One run per branch at a time, so two checks finishing together can't
-    # both merge or both comment. A newer run waits rather than cancelling one
-    # that may be mid-merge.
+    # both merge or both comment. A running one is never cancelled, since it
+    # may be mid-merge; a queued one is replaced by the newest, which reads
+    # the latest state anyway.
     concurrency:
       group: agent-merge-${{ github.event.workflow_run.head_branch }}
       cancel-in-progress: false
@@ -42,25 +46,34 @@ jobs:
       contents: write # merge the PR
       pull-requests: write # read and merge the PR
       issues: write # the gates comment and the merged-by-claude label
+      # can-merge reads the PR's check runs, workflow runs and commit
+      # statuses. A public repo lets any token read them, but naming them
+      # keeps this working if the repo goes private.
+      checks: read
+      actions: read
+      statuses: read
     steps:
+      # checkout uses the job's token for this one fetch of main, and
+      # persist-credentials: false removes it from .git/config afterwards.
       - uses: actions/checkout@v7
         with:
           ref: main
           # The whole history: can-merge diffs the PR against main and reads
           # main's merges and reverts.
           fetch-depth: 0
-          # Don't leave the token in .git/config. The repo is public, so git
-          # fetches the PR's commits without it.
+          # The repo is public, so git fetches the PR's commits without it.
           persist-credentials: false
-      # No npm cache: PR workflows fill caches too, and this job holds a
-      # write token, so it installs from npm itself.
+      # No npm cache. Dependencies install from npm against main's lockfile,
+      # so nothing another workflow saved can change the code that runs with
+      # the token below.
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
+          package-manager-cache: false
       - run: npm ci
       - run: npx tsx scripts/can-merge-action.ts
         env:
-          # Only this step gets the token; npm ci's install scripts never see it.
+          # npm ci above runs without the token in its environment.
           GH_TOKEN: ${{ github.token }}
           # gh fills in can-merge's {owner}/{repo} from this.
           GH_REPO: ${{ github.repository }}
