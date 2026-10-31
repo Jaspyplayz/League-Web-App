@@ -76,7 +76,7 @@ export default function HowItWorksPage() {
 
       <main className="flex min-w-0 max-w-[720px] flex-1 flex-col gap-10 text-body leading-normal md:gap-[52px]">
         <div className="flex flex-col gap-3">
-          <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.01em] text-main">
+          <h1 className="text-title font-semibold tracking-[-0.01em] text-main">
             How Turnpoint works
           </h1>
           <p className="text-quiet">
@@ -208,7 +208,8 @@ export default function HowItWorksPage() {
               {count(winChance.games)} ranked games
             </strong>{" "}
             on patches {winChance.patches[0]} to {winChance.patches.at(-1)}. The leads that matter,
-            blue where a lead raises your chance and red where it lowers it:
+            blue where a lead raises your chance, red where it lowers it, and grey where a weight
+            only adjusts another lead:
           </p>
           <ul className={`${panelClass} py-1.5`}>
             {weightBars(winChance).map((w) => (
@@ -222,7 +223,7 @@ export default function HowItWorksPage() {
                   <span aria-hidden="true" className="relative h-2.5 flex-1">
                     <span className="absolute -bottom-[3px] -top-[3px] left-1/2 w-px bg-divider" />
                     <span
-                      className={`absolute inset-y-0 rounded-sm ${w.helps ? "bg-ahead" : "bg-behind"}`}
+                      className={`absolute inset-y-0 rounded-sm ${w.adjusts ? "bg-quiet" : w.helps ? "bg-ahead" : "bg-behind"}`}
                       style={{
                         [w.helps ? "left" : "right"]: "50%",
                         width: `${(w.share * 50).toFixed(1)}%`,
@@ -230,7 +231,7 @@ export default function HowItWorksPage() {
                     />
                   </span>
                   <span
-                    className={`w-14 text-right font-medium ${w.helps ? "text-ahead" : "text-behind"}`}
+                    className={`w-14 text-right font-medium tabular-nums ${w.adjusts ? "text-quiet" : w.helps ? "text-ahead" : "text-behind"}`}
                   >
                     {w.value}
                   </span>
@@ -245,10 +246,10 @@ export default function HowItWorksPage() {
             everyone is close to a full build.
           </p>
 
-          <h3 className="pt-2 text-lg font-semibold text-main">Try it yourself</h3>
+          <h3 className="pt-2 text-subheading font-semibold text-main">Try it yourself</h3>
           <WhatIfCalculator ranks={calculatorRanks} />
 
-          <h3 className="pt-2 text-lg font-semibold text-main">How good is it?</h3>
+          <h3 className="pt-2 text-subheading font-semibold text-main">How good is it?</h3>
           <p>
             Tested on games it never saw during training (5-fold cross-validation, with every minute
             of a game kept in the same group so it can&apos;t peek at the result). The comparison is
@@ -267,10 +268,10 @@ export default function HowItWorksPage() {
                 {winChance.evaluation.byMinute.map((m) => (
                   <tr key={m.minute} className="border-t border-divider">
                     <td className="px-[18px] py-2">{m.minute}:00</td>
-                    <td className="px-[18px] py-2 text-right font-semibold text-main">
+                    <td className="px-[18px] py-2 text-right tabular-nums font-semibold text-main">
                       {percent(m.accuracy)}
                     </td>
-                    <td className="px-[18px] py-2 text-right">{percent(m.goldRule)}</td>
+                    <td className="px-[18px] py-2 text-right tabular-nums">{percent(m.goldRule)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -289,7 +290,7 @@ export default function HowItWorksPage() {
 
           {ranks.length > 0 && (
             <>
-              <h3 className="pt-2 text-lg font-semibold text-main">Does rank matter?</h3>
+              <h3 className="pt-2 text-subheading font-semibold text-main">Does rank matter?</h3>
               <p>
                 Maybe leads are worth less in Iron, where games get thrown more often. To check,
                 each rank (and Emerald+ and Master+) got a model of its own, trained only on games
@@ -345,10 +346,10 @@ export default function HowItWorksPage() {
                       {ranks.map((r) => (
                         <tr key={r.key} className="border-t border-divider">
                           <td className="px-[18px] py-[7px] text-main">{r.label}</td>
-                          <td className="px-[18px] py-[7px] text-right">{r.games}</td>
-                          <td className="px-[18px] py-[7px] text-right text-main">{r.own}</td>
-                          <td className="px-[18px] py-[7px] text-right">{r.allRanks}</td>
-                          <td className="px-[18px] py-[7px] text-right">{r.lead}</td>
+                          <td className="px-[18px] py-[7px] text-right tabular-nums">{r.games}</td>
+                          <td className="px-[18px] py-[7px] text-right tabular-nums text-main">{r.own}</td>
+                          <td className="px-[18px] py-[7px] text-right tabular-nums">{r.allRanks}</td>
+                          <td className="px-[18px] py-[7px] text-right tabular-nums">{r.lead}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -389,8 +390,8 @@ export default function HowItWorksPage() {
                 {phases.map((p) => (
                   <tr key={p.key} className="border-t border-divider">
                     <td className="px-[18px] py-2 text-main">{p.name}</td>
-                    <td className="px-[18px] py-2 text-right">{p.games}</td>
-                    <td className="px-[18px] py-2 text-right font-semibold text-main">
+                    <td className="px-[18px] py-2 text-right tabular-nums">{p.games}</td>
+                    <td className="px-[18px] py-2 text-right tabular-nums font-semibold text-main">
                       {p.accuracy}
                     </td>
                     <td className="px-[18px] py-2">{p.countsMost}</td>
@@ -508,7 +509,7 @@ function Section({ id, children }: { id: SectionId; children: React.ReactNode })
       aria-labelledby={`${id}-heading`}
       className="flex scroll-mt-6 flex-col gap-3.5 text-quiet"
     >
-      <h2 id={`${id}-heading`} className="text-xl font-semibold text-main">
+      <h2 id={`${id}-heading`} className="text-heading font-semibold text-main">
         {title}
       </h2>
       {children}

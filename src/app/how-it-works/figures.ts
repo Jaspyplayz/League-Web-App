@@ -57,7 +57,7 @@ export function glanceRows({ winChance, score, phases }: Models): GlanceRow[] {
       gives: "Each team’s chance to win at every minute",
       learnedFrom: `${count(winChance.games)} ranked games, patches ${winChance.patches[0]} to ${winChance.patches.at(-1)}`,
       result: quoted
-        ? `Right ${percent(quoted.accuracy)} of the time at ${quoted.minute}:00, where “more gold wins” gets ${percent(quoted.goldRule)}`
+        ? `Right ${percent(quoted.accuracy)} of the time at ${quoted.minute}:00, where “more gold wins” gets ${percent(quoted.goldRule)} (both flattered; see How it’s checked)`
         : `Right ${percent(winChance.evaluation.accuracy)} of the time`,
     },
     {
@@ -83,6 +83,9 @@ export type WeightBar = {
   value: string;
   // Whether a lead here raises the chance (blue) or lowers it (red).
   helps: boolean;
+  // Whether this weight only adjusts another lead (grey), like the gold lead
+  // counting for less late in the game.
+  adjusts: boolean;
   // How long the bar is, from 0 to 1, where the biggest weight is 1.
   share: number;
 };
@@ -101,6 +104,8 @@ export function weightBars(model: WinChanceModel): WeightBar[] {
     label: capitalize(w.label.replace(/ \(.*\)$/, "")),
     value: `${w.weight < 0 ? "−" : ""}${Math.abs(w.weight).toFixed(3)}`,
     helps: w.weight > 0,
+    // A red bar here would wrongly say a gold lead hurts.
+    adjusts: w.label.includes(" times "),
     share: Math.abs(w.weight) / biggest,
   }));
 }

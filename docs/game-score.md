@@ -67,7 +67,7 @@ npm run train-score    # needs DATABASE_URL; makes no Riot calls
 
 The script prints the new accuracy and weights. If they look right, commit the new `score-model.json`. Scoring a game on the site costs nothing: the model is a small JSON file bundled with the code.
 
-The new file has no `unseen` check, so How it works stops showing an accuracy. Once `npm run benchmarks` has collected games since the retrain, run `npm run check-score` (needs `DATABASE_URL`, only reads the database) and commit `score-model.json` again. Update the game score row in the README's models table to the new result in the same commit.
+The new file has no `unseen` check, so How it works' models table falls back to the cross-validation accuracy and its game score section shows none. Once `npm run benchmarks` has collected games since the retrain, run `npm run check-score` (needs `DATABASE_URL`, only reads the database) and commit `score-model.json` again. Update the game score row in the README's models table to the new result in the same commit.
 
 If you change the list of stats in `SCORE_FEATURES`, retrain before deploying. A saved model trained on a different list is ignored, so scores disappear until it's retrained.
 

@@ -13,7 +13,8 @@ const ROW =
   "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 md:grid-cols-[140px_minmax(0,1fr)_64px] md:gap-3";
 const ROW_LABEL = "col-start-1 row-start-1 text-note text-quiet";
 const ROW_CONTROL = "col-span-2 row-start-2 md:col-span-1 md:col-start-2 md:row-start-1";
-const ROW_VALUE = "col-start-2 row-start-1 text-right font-medium text-main md:col-start-3";
+const ROW_VALUE =
+  "col-start-2 row-start-1 text-right font-medium tabular-nums text-main md:col-start-3";
 
 // Sliders for a few leads, and the win chance the real model gives them. It
 // runs the same function as the match page, in the browser, so moving a
@@ -41,7 +42,7 @@ export function WhatIfCalculator({ ranks }: { ranks: RankWeights[] }) {
         <div className="flex flex-1 flex-col gap-0.5" aria-live="polite">
           <span className="text-note text-quiet">Your win chance</span>
           <span
-            className={`text-[56px] font-bold leading-[1.05] ${chance >= 50 ? "text-ahead" : "text-behind"}`}
+            className={`text-6xl font-bold leading-[1.05] tabular-nums ${chance > 50 ? "text-ahead" : chance < 50 ? "text-behind" : "text-main"}`}
           >
             {chance}%
           </span>
