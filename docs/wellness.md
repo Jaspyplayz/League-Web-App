@@ -6,7 +6,7 @@ Every two weeks, a health check of Turnpoint's code: its architecture, the quali
 
 One Claude Code routine runs the automatic part in the cloud, so Jasper doesn't have to be at the computer.
 
-1. **The cloud run** (a routine on the 1st and 15th of each month at 14:00 UTC, 9 or 10 in the morning in Toronto). A cloud session on `origin/main` runs checks 1, 3, 4, 5 and 6 below, files their tickets, adds a row to Runs on a branch named `claude/wellness-<date>`, opens the pull request and merges it with `can-merge`. Its GitHub steps use GitHub's REST API, which cloud sessions can reach ([AGENTS.md](../AGENTS.md#cloud-sessions)). Last, it files a ticket asking Jasper to run check 2.
+1. **The cloud run** (a routine on the 1st and 15th of each month at 14:00 UTC, 9 or 10 in the morning in Toronto). A cloud session on `origin/main` runs checks 1, 3, 4, 5 and 6 below, files their tickets, adds a row to Runs on a branch named `claude/wellness-<date>`, opens the pull request, marks it ready, and waits for the Agent merge workflow to merge it. Its GitHub steps use GitHub's REST API, which cloud sessions can reach ([AGENTS.md](../AGENTS.md#cloud-sessions)). Last, it files a ticket asking Jasper to run check 2.
 2. **Jasper** sees that ticket, types `/improve-codebase-architecture` in a local session (Claude can't start that skill itself), picks a candidate from its report, and moves any ticket he wants done from Backlog to Ready.
 
 If the run can't merge (a gate fails, or Linear's tools didn't work), it leaves the pull request open with a comment saying why, for Jasper.

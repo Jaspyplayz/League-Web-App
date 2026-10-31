@@ -17,6 +17,7 @@
 import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { z } from "zod";
+import { readyToMerge } from "./can-merge-action-steps";
 import { changedLines, changedPaths, reviewHistory } from "./can-merge-files";
 import {
   decide,
@@ -239,6 +240,10 @@ const decision = decide(pr, main, history);
 
 console.log(`#${pr.number} at ${pr.headRefOid}`);
 for (const line of gateLines(decision)) console.log(line);
+// Not a gate: the Agent merge workflow's own hold. It's printed so a builder
+// checking a PR by hand sees why the workflow hasn't merged it yet.
+const ready = readyToMerge(pr.body, pr.headRefOid);
+console.log(`NOTE  Agent merge: ${ready.ready ? "marked ready at the head commit" : `held, since ${ready.why}`} (not a gate)`);
 if (!decision.ok) {
   console.log(`\nClaude Code can't merge #${pr.number}.`);
   process.exit(REFUSED_EXIT_CODE);
