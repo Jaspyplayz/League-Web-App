@@ -116,6 +116,35 @@ export async function loadTimeline(
   return fetchTimeline(region, match);
 }
 
+// A saved game straight from the database, never from Riot: home's example
+// game must show even when the Riot key has expired, and a home visit
+// shouldn't spend the rate limit. Null when there's no database, the game
+// isn't saved, or its timeline was trimmed by an older version (the match
+// page fetches that one again).
+export async function readSavedGame(
+  matchId: string,
+): Promise<{ match: Match; timeline: TrimmedTimeline } | null> {
+  const [match, timeline] = await Promise.all([
+    readCache((db) =>
+      db.query.matches.findFirst({
+        where: eq(tables.matches.matchId, matchId),
+        columns: { raw: true },
+      }),
+    ),
+    readCache((db) =>
+      db.query.matchTimelines.findFirst({
+        where: eq(tables.matchTimelines.matchId, matchId),
+        columns: { frames: true, events: true, trimVersion: true },
+      }),
+    ),
+  ]);
+  if (!match || timeline?.trimVersion !== TRIM_VERSION) return null;
+  return {
+    match: match.raw as Match,
+    timeline: { frames: timeline.frames as TrimmedFrame[], events: timeline.events as TrimmedEvent[] },
+  };
+}
+
 // Timelines for many matches at once, for the insights page. Cached ones come
 // from a single database query. At most `budget` missing ones are fetched
 // from Riot, so one page view can't use up the rate limit: the page shows what

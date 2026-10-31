@@ -10,7 +10,7 @@ One game, minute by minute, against the enemy in the same role. The Summary tab 
 
 ## How to get to it (user POV)
 
-- "See a sample analysis" on the home page.
+- "Open this game" on the home page, or its gold chart.
 - A row in a profile's recent matches.
 - A pasted link: `/player/<region>/<riot id>/match/<match id>`.
 

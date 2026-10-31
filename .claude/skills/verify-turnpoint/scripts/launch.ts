@@ -1,6 +1,6 @@
 // Start a Turnpoint dev server for verification, owned by this run.
 //   npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts [port]   (default 3100, never 3000)
-// Ready = the log says "Ready in" AND the home page renders "Find the minute"
+// Ready = the log says "Ready in" AND the home page renders "Look up any player by Riot ID"
 // (the first request compiles it). Works on Windows, Linux and macOS.
 
 import { spawn } from "node:child_process";
@@ -24,7 +24,7 @@ const HIDDEN_CONSOLE = `require("node:child_process").spawn(process.execPath, pr
 async function homeRenders(): Promise<boolean> {
   try {
     const res = await fetch(`${base}/`, { signal: AbortSignal.timeout(60_000) });
-    return res.ok && (await res.text()).includes("Find the minute");
+    return res.ok && (await res.text()).includes("Look up any player by Riot ID");
   } catch {
     return false;
   }

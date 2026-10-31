@@ -14,7 +14,7 @@ export async function searchPlayer(
   const riotId = parseRiotId(String(formData.get("riotId") ?? ""));
 
   if (!isRegion(region)) return { error: "Pick a region." };
-  if (!riotId) return { error: "Enter a Riot ID like Faker#KR1." };
+  if (!riotId) return { error: "Add the tag after a #, like Faker#KR1. It's on the player's Riot profile." };
 
   redirect(`/player/${region}/${toSlug(riotId)}`);
 }

@@ -15,7 +15,7 @@ const journeys: Journey[] = [
     run: async ({ page, step }) => {
       await step("open home", async () => {
         await page.goto("/", LOAD);
-        await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint");
         await expect(page.getByRole("search", { name: "Player lookup" })).toBeVisible();
       });
       await step("type riot id and region", async () => {
@@ -23,8 +23,8 @@ const journeys: Journey[] = [
         await page.getByLabel("Region").selectOption(TEST_PLAYER.region);
         await expect(page.getByLabel("Riot ID")).toHaveValue(TEST_PLAYER.riotId);
       });
-      await step("press analyze", async () => {
-        await page.getByRole("button", { name: "Analyze" }).click();
+      await step("press search", async () => {
+        await page.getByRole("button", { name: "Search", exact: true }).click();
         await expect(page).toHaveURL(/\/player\/kr\/Hide%20on%20bush-KR1$/, LOAD);
         await assertAppPage(page);
         await expect(page.getByRole("heading", { level: 1 })).toContainText(/Hide on bush/i, LOAD);

@@ -14,7 +14,7 @@ const TSX = resolve("node_modules/tsx/dist/cli.mjs");
 // works like next dev: it forks a child that serves the home page on the -p
 // port and logs "Ready in". So stopping only the parent leaves the port taken.
 const FAKE_NEXT = `if (process.argv[2] === "serve") {
-  require("node:http").createServer((_, res) => res.end("Find the minute")).listen(Number(process.argv[3]), "127.0.0.1", () => console.log("Ready in 1ms"));
+  require("node:http").createServer((_, res) => res.end("Look up any player by Riot ID")).listen(Number(process.argv[3]), "127.0.0.1", () => console.log("Ready in 1ms"));
 } else {
   require("node:child_process").fork(__filename, ["serve", process.argv[process.argv.indexOf("-p") + 1]]);
 }

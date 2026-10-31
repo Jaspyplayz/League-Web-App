@@ -11,7 +11,7 @@ Opening a game lands on its Summary tab, which leads with a `60-second review`: 
 
 ## How to get to it (user POV)
 
-- Choose `See a sample analysis` on the home page.
+- Choose `Open this game` on the home page.
 - Choose a row in a profile's `Recent matches` list.
 - Open a pasted match link such as `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221`.
 

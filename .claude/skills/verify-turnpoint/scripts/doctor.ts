@@ -78,7 +78,7 @@ async function run() {
       return `unreachable (${String(e).split("\n")[0]})`;
     }
   };
-  const home = await probe("/", "Find the minute");
+  const home = await probe("/", "Look up any player by Riot ID");
   const db = await probe(SAMPLE_MATCH_PATH, "60-second review");
   const riot = await probe(TEST_PLAYER.path, "Recent matches");
   let supa = await probe(`${TEST_PLAYER.path}/ask`, "to ask questions");

@@ -30,7 +30,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts 3101     # another por
 ```
 
 - Needs `node_modules`, so run `npm ci` once in a fresh checkout. A worktree needs its own install: with `node_modules` linked to another checkout, Turbopack stops with "Could not find the Next.js package" and the home page never renders. Starts `next dev -p <port> -H 127.0.0.1` in the background, in its own process group on Linux and macOS. On Windows, from PowerShell or Git Bash, a small `node -e` keeper starts `next dev` with a hidden console, so no terminal window opens. The printed and recorded PID is then the keeper's, which Task Manager shows as `node.exe -e …`; it exits with `next dev`, and stopping it stops `next dev`.
-- Ready = the log says `Ready in` AND `GET /` returns HTML containing "Find the minute" (the first request compiles the page; ~10 s on the box). It prints `ready: http://127.0.0.1:3100 (pid …, log .cache/verify-turnpoint-server/dev-3100.log)`.
+- Ready = the log says `Ready in` AND `GET /` returns HTML containing "Look up any player by Riot ID" (the first request compiles the page; ~10 s on the box). It prints `ready: http://127.0.0.1:3100 (pid …, log .cache/verify-turnpoint-server/dev-3100.log)`.
 - State goes to `.cache/verify-turnpoint-server/instance.json` in the checkout (git-ignored); `drive.ts` and `doctor.ts` use its `base` when you pass no `--base`.
 - Refuses port 3000 (may be Jasper's own server), a port someone else holds, and a second launch while the server it started earlier still runs.
 - No database migrations or seed step: the app reads Supabase Postgres through `DATABASE_URL`; the sample game `KR_8416261221` already lives there. Never run `npm run db:migrate`.
@@ -75,7 +75,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts --base https://league-w
 | `insights-others` | riot, database | [features/insights-others.md](features/insights-others.md) |
 | `ask-teaser` | riot, supabase | [features/ask-teaser.md](features/ask-teaser.md) |
 
-Handles the journeys use (all from the source, stable across restyles such as the Review board look): `role=search name="Player lookup"`, labels `Riot ID` / `Region`, button `Analyze`, `navigation "Profile sections"`, `region "Recent matches"`, `tablist "Match analysis"` with tabs `Summary` / `Deep dive`, `region "60-second review"`, `navigation "Insights views"`, `region /^You vs /`, `form "Compare with a rank"`, `region "Compare with a player"`. Test player: `Hide on bush#KR1` on KR → `/player/kr/Hide%20on%20bush-KR1`. Sample game: `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221`.
+Handles the journeys use (all from the source, stable across restyles such as the Review board look): `role=search name="Player lookup"`, labels `Riot ID` / `Region`, button `Search`, `navigation "Profile sections"`, `region "Recent matches"`, `tablist "Match analysis"` with tabs `Summary` / `Deep dive`, `region "60-second review"`, `navigation "Insights views"`, `region /^You vs /`, `form "Compare with a rank"`, `region "Compare with a player"`. Test player: `Hide on bush#KR1` on KR → `/player/kr/Hide%20on%20bush-KR1`. Sample game: `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221`.
 
 To add a journey: add an entry to `journeys` in `scripts/drive.ts` (each `step(name, act)` is one user action plus its expectations, written with `page.getByRole/getByLabel` and Playwright `expect`), add or update its feature file, and run it once.
 
@@ -95,7 +95,7 @@ Location (git-ignored, survives cleanup): `.cache/verify-turnpoint/<run id>/`
 
 `--run <id>` names the folder (default: an ISO timestamp). Proof standards:
 
-- Exercise the real user path: type into the form and press `Analyze`, click the tab, follow the link. Navigating straight to a URL is fine only when that is how a player arrives (a pasted link) and the feature file says so.
+- Exercise the real user path: type into the form and press `Search`, click the tab, follow the link. Navigating straight to a URL is fine only when that is how a player arrives (a pasted link) and the feature file says so.
 - Capture the action and the resulting state: the step screenshots form a before/after sequence; the ARIA snapshot proves roles and names a screenshot can't.
 - A page that loaded is not proof. The journey's expectations (row counts, `aria-selected`, `aria-current`, hrefs) are the proof; read `result.json` notes and look at the last screenshot before reporting.
 - `riot-key`, `vercel-login`, an error page, or a not-enough-data notice is a FAIL with that reason, never a pass. Report it with the target.
