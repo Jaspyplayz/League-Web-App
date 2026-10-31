@@ -26,7 +26,7 @@
 - **Rung:** none yet
 - **Fix:** JAS-117, with a comment there about the full-stop form. It's in `scripts/can-merge-gates.ts`, a risky path, so it gets its own PR.
 
-## 2026-10-31 (again)
+## 2026-10-31
 
 - **What happened:** Claude wrote PR 238's Tier line as "normal. It fixes one script and changes what `npm run shot -- --phone` does; `scripts/` files here aren't on the risky list." `can-merge` refused it. The reason should have left out where the files sit, or said it with no tier word, such as "paths Claude Code may merge".
 - **Evidence:** `npm run can-merge -- 238` at b4e87d8: "FAIL  Tiny or normal tier: the **Tier:** line names more than one tier (normal, risky)". [PR 238](https://github.com/Jaspyplayz/League-Web-App/pull/238).
