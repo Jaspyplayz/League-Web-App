@@ -126,7 +126,8 @@ export default function PrivacyPage() {
         device. Remove it with the Stop focusing button.
       </p>
       <p>
-        The theme you pick with the sun and moon button in the header (dark or light) is saved
+        The theme you pick with the sun and moon button in the header (dark or light, or &quot;system&quot; if you picked it on the old
+        Settings page) is saved
         in the same local storage, so the site looks the way you chose on your next visit.
       </p>
       <p>

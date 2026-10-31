@@ -77,7 +77,7 @@ export function HeaderSearch({ region = "na" }: { region?: Region }) {
         enterKeyHint="search"
         placeholder={placeholder}
         {...riotIdProps}
-        className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-base text-main outline-none placeholder:text-quiet focus-visible:outline-none lg:text-[15px]"
+        className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-base text-main outline-none placeholder:text-quiet focus-visible:outline-none lg:text-body"
       />
       <button
         type="submit"
@@ -91,7 +91,7 @@ export function HeaderSearch({ region = "na" }: { region?: Region }) {
         <p
           id={errorId}
           role="alert"
-          className="absolute inset-x-0 top-full z-20 mt-2 rounded-md bg-panel px-3 py-2 text-note text-behind shadow-lg"
+          className="absolute inset-x-0 top-full z-20 mt-2 rounded-md bg-panel px-3 py-2 text-note text-main shadow-lg"
         >
           {error}
         </p>

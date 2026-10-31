@@ -112,7 +112,7 @@ export function SearchForm() {
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center gap-2 rounded-md bg-ahead px-6 font-semibold text-page transition-colors hover:bg-ahead-soft disabled:opacity-60 max-sm:w-full"
+          className="inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center gap-2 rounded-md bg-main px-6 font-semibold text-page transition-opacity hover:opacity-90 disabled:opacity-60 max-sm:w-full"
         >
           {pending ? "Looking up…" : "Analyze"}
           <ArrowRightIcon />
@@ -120,7 +120,7 @@ export function SearchForm() {
       </div>
       {menu}
       {error && (
-        <p id="search-error" role="alert" className="px-1 text-sm text-behind">
+        <p id="search-error" role="alert" className="px-1 text-sm text-main">
           {error}
         </p>
       )}

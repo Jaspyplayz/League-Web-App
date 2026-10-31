@@ -37,7 +37,7 @@ export async function AccountMenu() {
     return (
       <SignInLink
         hideOnSignInPage
-        className="flex h-11 items-center rounded-md bg-main px-3.5 text-[15px] font-medium text-page transition-opacity duration-320 ease-out hover:opacity-85 hover:duration-120 motion-reduce:transition-none lg:h-10 lg:px-4"
+        className="flex h-11 items-center rounded-md bg-main px-3.5 text-body font-medium text-page transition-opacity duration-320 ease-out hover:opacity-85 hover:duration-120 motion-reduce:transition-none lg:h-10 lg:px-4"
       />
     );
   }
@@ -72,7 +72,7 @@ export async function AccountMenu() {
           {picture}
           <span className="sr-only lg:hidden">{name}</span>
           <span className="hidden max-w-[180px] flex-col leading-tight lg:flex">
-            <span className="truncate text-[15px] font-medium">{name}</span>
+            <span className="truncate text-body font-medium">{name}</span>
             <span className="text-note text-quiet">{hint}</span>
           </span>
         </span>
@@ -91,7 +91,7 @@ export async function AccountMenu() {
       >
         {picture}
         <span aria-hidden="true" className="hidden max-w-[200px] flex-col leading-tight lg:flex">
-          <span className="truncate text-[15px] font-medium">
+          <span className="truncate text-body font-medium">
             {me.gameName} <span className="font-normal text-quiet">#{me.tagLine}</span>
           </span>
           <span className="text-note text-quiet">{rankText}</span>

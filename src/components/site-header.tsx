@@ -38,7 +38,7 @@ export function SiteHeader() {
           <Link
             href="/"
             aria-label="Turnpoint home"
-            className="flex items-center gap-2.5 whitespace-nowrap rounded-md text-[17px] font-semibold tracking-[-0.01em] text-main lg:mr-5 lg:text-[19px]"
+            className="flex items-center gap-2.5 whitespace-nowrap rounded-md text-subheading font-semibold tracking-[-0.01em] text-main lg:mr-5 lg:text-heading"
           >
             <LogoMark className="size-6 lg:size-7" />
             Turnpoint

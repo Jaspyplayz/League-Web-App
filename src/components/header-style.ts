@@ -26,6 +26,6 @@ export const iconButton = `inline-flex size-11 shrink-0 items-center justify-cen
 export function headerLinkClass(current: boolean, inMenu = false): string {
   const shape = inMenu
     ? "flex h-12 items-center rounded-md px-3 text-base font-medium"
-    : "flex h-9 items-center whitespace-nowrap rounded-md px-3 text-[15px] font-medium";
+    : "flex h-9 items-center whitespace-nowrap rounded-md px-3 text-body font-medium";
   return `${shape} ${hoverFade} ${current ? "bg-select text-main" : "text-quiet"}`;
 }

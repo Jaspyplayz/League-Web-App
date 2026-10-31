@@ -118,7 +118,7 @@
 
 /*
  * Light mode. The colors above are the dark theme and the default; picking
- * Light on the Settings page puts data-theme="light" on <html> (see
+ * light with the header's theme switch puts data-theme="light" on <html> (see
  * src/lib/theme.ts), and these replace them. Every utility reads the colors
  * through var(--color-...), so pages and charts switch without changes.
  *
@@ -180,8 +180,8 @@
 }
 
 /*
- * dark: and light: utilities follow the theme picked in Settings, not the
- * visitor's OS setting (System handles that in src/lib/theme.ts).
+ * dark: and light: utilities follow the theme picked with the header's switch, not
+ * the visitor's OS setting (System handles that in src/lib/theme.ts).
  */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
