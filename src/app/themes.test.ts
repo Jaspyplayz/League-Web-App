@@ -20,6 +20,8 @@ const ALIAS = /^var\(--color-([\w-]+)\)$/;
 function colourTokens(css: string, opener: string): Map<string, string> {
   const start = css.indexOf(opener);
   if (start === -1) throw new Error(`globals.css has no block starting with ${opener}`);
+  // A second block would be skipped here, so its colours would go unchecked.
+  if (css.indexOf(opener, start + 1) !== -1) throw new Error(`globals.css has more than one ${opener} block`);
   const body = css.slice(start + opener.length, css.indexOf("\n}", start));
   const withoutComments = body.replace(/\/\*[\s\S]*?\*\//g, "");
   const tokens = new Map<string, string>();
@@ -81,33 +83,36 @@ describe("both themes", () => {
 // move to the new names (JAS-96's table). The contract ticket deletes the old
 // names and this part of the test with them.
 describe("Review board tokens", () => {
-  const NEW_TOKENS = [
-    "page",
-    "panel",
-    "raised",
-    "select",
-    "divider",
-    "main",
-    "quiet",
-    "placeholder",
-    "ahead",
-    "ahead-soft",
-    "ahead-bright",
-    "behind",
-    "ahead-fill",
-    "behind-fill",
-    "grade-brilliant",
-    "grade-great",
-    "grade-best",
-    "grade-excellent",
-    "grade-good",
-    "grade-even",
-    "grade-book",
-    "grade-inaccuracy",
-    "grade-mistake",
-    "grade-miss",
-    "grade-blunder",
-  ];
+  // Every approved value as [dark, light]: JAS-94's table, and the grades from
+  // JAS-77. A typo in globals.css fails here instead of shipping.
+  const SPEC: Record<string, [dark: string, light: string]> = {
+    page: ["#21201d", "#f1efeb"],
+    panel: ["#2b2925", "#ffffff"],
+    raised: ["#353330", "#f6f5f2"],
+    select: ["rgb(255 255 255 / 7%)", "rgb(30 28 25 / 6%)"],
+    divider: ["#3e3b36", "#dedad2"],
+    main: ["#f2efe9", "#1e1c19"],
+    quiet: ["#aaa498", "#645e55"],
+    placeholder: ["#7d786f", "#9a948a"],
+    ahead: ["#62a8ff", "#1c66d6"],
+    "ahead-soft": ["#8fc0ff", "#1857b8"],
+    "ahead-bright": ["#b8d8ff", "#134a9e"],
+    behind: ["#ff6a63", "#cb2c2c"],
+    // The blue and red above at 32% and 30% in dark, 22% and 20% in light.
+    "ahead-fill": ["rgb(98 168 255 / 32%)", "rgb(28 102 214 / 22%)"],
+    "behind-fill": ["rgb(255 106 99 / 30%)", "rgb(203 44 44 / 20%)"],
+    "grade-brilliant": ["#3cc8e4", "#0b8aa8"],
+    "grade-great": ["#4f9dff", "#1c66d6"],
+    "grade-best": ["#9cc4ff", "#7aa6e6"],
+    "grade-excellent": ["#c9dcf7", "#bcd2f0"],
+    "grade-good": ["#ddd6ca", "#d8d1c4"],
+    "grade-even": ["#8f8a81", "#8a857c"],
+    "grade-book": ["#c49a6c", "#a8784a"],
+    "grade-inaccuracy": ["#f2c230", "#f0bd1d"],
+    "grade-mistake": ["#ff9a4a", "#e0731f"],
+    "grade-miss": ["#ff7aa8", "#c93a74"],
+    "grade-blunder": ["#ff5f57", "#cb2c2c"],
+  };
 
   const OLD_TO_NEW: Record<string, string> = {
     surface: "panel",
@@ -120,17 +125,11 @@ describe("Review board tokens", () => {
     faint: "quiet",
   };
 
-  it("sets every new token in both themes", () => {
+  it("sets every approved value in both themes", () => {
     const dark = colourTokens(css, DARK);
     const light = colourTokens(css, LIGHT);
-    expect(NEW_TOKENS.filter((name) => !dark.has(name) || !light.has(name))).toEqual([]);
-  });
-
-  it("uses JAS-94's page and panel colours", () => {
-    const dark = colourTokens(css, DARK);
-    const light = colourTokens(css, LIGHT);
-    expect([dark.get("page"), light.get("page")]).toEqual(["#21201d", "#f1efeb"]);
-    expect([dark.get("panel"), light.get("panel")]).toEqual(["#2b2925", "#ffffff"]);
+    const actual = Object.fromEntries(Object.keys(SPEC).map((name) => [name, [dark.get(name), light.get(name)]]));
+    expect(actual).toEqual(SPEC);
   });
 
   it("points each old name at its new token", () => {
