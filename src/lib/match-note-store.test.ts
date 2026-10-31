@@ -6,14 +6,19 @@ vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 
 const findFirst = vi.fn();
+let connects = true;
 vi.mock("@/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/db")>()),
-  getDb: () => ({ query: { matchNotes: { findFirst } } }),
+  getDb: () => {
+    if (!connects) throw new Error("can't connect");
+    return { query: { matchNotes: { findFirst } } };
+  },
 }));
 
 beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "postgres://test");
   findFirst.mockReset();
+  connects = true;
   vi.mocked(Sentry.captureException).mockClear();
 });
 
@@ -38,6 +43,13 @@ describe("readMatchNote", () => {
   it("returns nothing saved without a database, not a failure", async () => {
     vi.stubEnv("DATABASE_URL", "");
     expect(await readMatchNote("user-1", "NA1_1")).toEqual({ ok: true, text: "" });
+  });
+
+  // JAS-71: like readMyPlayer, a DATABASE_URL that gives no usable database
+  // (getDb throws, for example on a malformed URL) isn't the same as no note.
+  it("reports a failed read when DATABASE_URL gives no usable database", async () => {
+    connects = false;
+    expect(await readMatchNote("user-1", "NA1_1")).toEqual({ ok: false });
   });
 
   it("reports a failed read when the query throws", async () => {

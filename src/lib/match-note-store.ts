@@ -5,25 +5,22 @@ import { and, eq } from "drizzle-orm";
 import { tables } from "@/db";
 import type { ReadNoteResult } from "@/lib/match-note";
 import { database } from "@/lib/match-store";
+import { readOwnData } from "@/lib/own-data";
 
 // Reads and saves notes in the match_notes table (see src/db/schema.ts).
 // Without a database, nothing is found and saving reports a failure. Reads
-// don't go through readCache, which treats a failed read as nothing found
-// (see ReadNoteResult).
+// go through readOwnData, not readCache, which treats a failed read as
+// nothing found (see ReadNoteResult).
 
 export async function readMatchNote(userId: string, matchId: string): Promise<ReadNoteResult> {
-  const db = database();
-  if (!db) return { ok: true, text: "" };
-  try {
+  const result = await readOwnData(async (db) => {
     const row = await db.query.matchNotes.findFirst({
       columns: { text: true },
       where: and(eq(tables.matchNotes.userId, userId), eq(tables.matchNotes.matchId, matchId)),
     });
-    return { ok: true, text: row?.text ?? "" };
-  } catch (error) {
-    Sentry.captureException(error);
-    return { ok: false };
-  }
+    return row?.text ?? "";
+  }, "");
+  return result.ok ? { ok: true, text: result.value } : result;
 }
 
 // Saves the note, or deletes it when the text is empty. Returns false when

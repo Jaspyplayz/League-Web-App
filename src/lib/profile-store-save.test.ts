@@ -3,7 +3,7 @@ import type { SQL } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { tables } from "@/db";
 import { getMatchIds, getRankedEntries, getSummoner } from "@/lib/riot/api";
-import { RiotApiError } from "@/lib/riot/client";
+import { RiotApiError, type RiotErrorKind } from "@/lib/riot/client";
 import type { LeagueEntry } from "@/lib/riot/types";
 import { loadProfile, updateProfile } from "./profile-store";
 
@@ -27,9 +27,10 @@ let history: Row[];
 const dialect = new PgDialect();
 
 function upsert(values: Row, config: { set: Row; setWhere?: SQL }): Row[] {
+  // Returns the whole row, which .returning() narrows in Postgres.
   if (!player) {
     player = { ...values };
-    return [{ puuid: values.puuid }];
+    return [{ ...player }];
   }
   if (config.setWhere) {
     // The two conditions saveProfile writes: the saved region only, or the
@@ -44,7 +45,7 @@ function upsert(values: Row, config: { set: Row; setWhere?: SQL }): Row[] {
     }
   }
   player = { ...player, ...config.set };
-  return [{ puuid: player.puuid }];
+  return [{ ...player }];
 }
 
 const tx = {
@@ -174,6 +175,8 @@ describe("a visit on another region than the saved profile's", () => {
     expect(await updateProfile("na", "p1")).toEqual({ status: "updated" });
     expect(player).toMatchObject({ region: "euw", matchIds: ["EUW1_saved"] });
     expect(ranked).toEqual([euwRank]);
+    expect(getSummoner).not.toHaveBeenCalled();
+    expect(getRankedEntries).not.toHaveBeenCalled();
     expect(getMatchIds).not.toHaveBeenCalled();
   });
 
@@ -202,9 +205,16 @@ describe("a saved row from a server the player never played on", () => {
     expect(profile.stored).toBe(true);
   });
 
-  it("is replaced through the Update button too", async () => {
+  // The page fetches EUW again when it reloads, and that visit replaces the
+  // row, so the click itself has nothing to do (JAS-71).
+  it("is replaced on the reload after Update, not by the click, which asks Riot nothing", async () => {
     saveEmptyNaRow(dayAgo);
     expect(await updateProfile("euw", "p1")).toEqual({ status: "updated" });
+    expect(getSummoner).not.toHaveBeenCalled();
+    expect(getRankedEntries).not.toHaveBeenCalled();
+    expect(getMatchIds).not.toHaveBeenCalled();
+    expect(player).toMatchObject({ region: "na", summonerLevel: null });
+    await loadProfile("euw", account);
     expect(player).toMatchObject({ region: "euw", summonerLevel: 12 });
   });
 
@@ -213,6 +223,66 @@ describe("a saved row from a server the player never played on", () => {
     vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("not-found", "no summoner on KR"));
     await loadProfile("kr", account);
     expect(player).toMatchObject({ region: "na", summonerLevel: null });
+  });
+
+  // Passes on main too (the region check blocks it either way), so it only
+  // guards against a regression.
+  it("isn't replaced when Riot fails to answer about the summoner", async () => {
+    saveEmptyNaRow();
+    vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("unavailable", "summoner-v4 is down"));
+    vi.mocked(getMatchIds).mockResolvedValue(["EUW1_real"]);
+    const profile = await loadProfile("euw", account);
+    expect(player).toMatchObject({ region: "na", summonerLevel: null, matchIds: [] });
+    expect(profile).toMatchObject({ matchIds: ["EUW1_real"], stored: false });
+  });
+});
+
+// JAS-71: a saved level of null means "no summoner on this server", which
+// lets another server take the row, so only Riot's "not found" may save one.
+describe("a summoner call that fails for another reason than not found", () => {
+  const fail = (kind: RiotErrorKind = "unavailable") =>
+    vi.mocked(getSummoner).mockRejectedValue(new RiotApiError(kind, "summoner-v4 failed"));
+
+  it("keeps the saved icon and level, and saves the fresh ranks and games", async () => {
+    saveEuwProfile(dayAgo);
+    fail();
+    vi.mocked(getMatchIds).mockResolvedValue(["EUW1_new"]);
+    const profile = await loadProfile("euw", account);
+    expect(player).toMatchObject({ region: "euw", profileIconId: 1, summonerLevel: 300, matchIds: ["EUW1_new"] });
+    expect(ranked).toMatchObject([{ tier: "GOLD" }]);
+    expect(profile).toMatchObject({ profileIconId: 1, summonerLevel: 300, matchIds: ["EUW1_new"], stored: true });
+  });
+
+  it.each(["unavailable", "rate-limited", "bad-key"] as const)(
+    "so another server with a summoner can't take the row afterwards (%s)",
+    async (kind) => {
+      saveEuwProfile(dayAgo);
+      fail(kind);
+      await loadProfile("euw", account);
+      vi.mocked(getSummoner).mockResolvedValue({ puuid: "p1", profileIconId: 7, summonerLevel: 12 });
+      await loadProfile("na", account);
+      expect(player).toMatchObject({ region: "euw", summonerLevel: 300 });
+    },
+  );
+
+  it("still saves a first visit, and the next visit that reaches Riot fills in the level", async () => {
+    fail();
+    const profile = await loadProfile("na", account);
+    expect(player).toMatchObject({ region: "na", summonerLevel: null, matchIds: ["NA1_new"] });
+    expect(profile).toMatchObject({ summonerLevel: null, stored: true });
+    vi.mocked(getSummoner).mockResolvedValue({ puuid: "p1", profileIconId: 7, summonerLevel: 12 });
+    player = { ...player, matchIdsFetchedAt: dayAgo };
+    await loadProfile("na", account);
+    expect(player).toMatchObject({ region: "na", summonerLevel: 12 });
+  });
+
+  it("lets Update save the fresh ranks and games, which starts the cooldown", async () => {
+    saveEuwProfile(dayAgo);
+    fail();
+    vi.mocked(getMatchIds).mockResolvedValue(["EUW1_new"]);
+    expect(await updateProfile("euw", "p1")).toEqual({ status: "updated" });
+    expect(player).toMatchObject({ summonerLevel: 300, matchIds: ["EUW1_new"] });
+    expect((await updateProfile("euw", "p1")).status).toBe("cooldown");
   });
 });
 
@@ -224,6 +294,21 @@ describe("a visit on the saved profile's region", () => {
     expect(player).toMatchObject({ region: "euw", matchIds: ["EUW1_new"], summonerLevel: 12 });
     expect(ranked).toMatchObject([{ puuid: "p1", tier: "GOLD", leaguePoints: 40 }]);
     expect(history).toMatchObject([{ puuid: "p1", tier: "GOLD" }]);
+  });
+
+  // Decision record 0021's repair starts from this row, so "not found" must
+  // still save one.
+  it("saves a first visit with no summoner as a row with no level", async () => {
+    vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("not-found", "no summoner on NA"));
+    expect((await loadProfile("na", account)).stored).toBe(true);
+    expect(player).toMatchObject({ region: "na", summonerLevel: null, profileIconId: null });
+  });
+
+  it("saves a not-found summoner over a saved level through Update", async () => {
+    saveEuwProfile(dayAgo);
+    vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("not-found", "summoner gone"));
+    expect(await updateProfile("euw", "p1")).toEqual({ status: "updated" });
+    expect(player).toMatchObject({ region: "euw", summonerLevel: null });
   });
 
   it("saves the first visit to a player", async () => {

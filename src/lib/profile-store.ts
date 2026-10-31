@@ -71,10 +71,12 @@ export async function updateProfile(region: Region, puuid: string): Promise<Upda
   // No database, or nothing saved yet: the page fetches a fresh profile on
   // its own when it reloads, so there's nothing to do here.
   if (!player) return { status: "updated" };
-  // A real profile saved for another region doesn't change from this page,
-  // which fetches a fresh one on every load anyway, so the click costs no
-  // Riot calls here, and the cooldown can't be dodged by picking a region.
-  if (player.region !== region && player.summonerLevel !== null) return { status: "updated" };
+  // A profile saved for another region isn't this page's to refresh. The
+  // page fetches a fresh profile on every load anyway, and that fetch also
+  // replaces a saved row with no summoner when it finds one, so the click
+  // costs no Riot calls here and the cooldown can't be dodged by picking a
+  // region.
+  if (player.region !== region) return { status: "updated" };
 
   const secondsLeft = secondsUntilUpdate(player.matchIdsFetchedAt);
   if (secondsLeft > 0) return { status: "cooldown", secondsLeft };
@@ -102,10 +104,15 @@ async function fetchProfile(region: Region, account: Account): Promise<Profile> 
     updatedAt: new Date(),
     stored: false,
   };
+  // Only Riot's "not found" says the player has no summoner here. A call
+  // that failed for another reason, such as an outage, says nothing either
+  // way (JAS-71).
+  const summonerKnown = summoner.ok || summoner.error.kind === "not-found";
   // Saved before returning, not after the response like matches are: after
   // an Update the page reloads straight away and must read the new snapshot.
-  const stored = await saveProfile(region, account, profile);
-  return { ...profile, stored };
+  const saved = await saveProfile(region, account, profile, summonerKnown);
+  // The saved row may have kept its icon and level (see saveProfile).
+  return saved ? { ...profile, ...saved, stored: true } : profile;
 }
 
 // The player's saved solo queue tier ("GOLD"), so the match page can use
@@ -176,25 +183,39 @@ async function readProfile(region: Region, puuid: string): Promise<Profile | und
   });
 }
 
-// Returns whether the snapshot was saved as the player's profile.
-async function saveProfile(region: Region, account: Account, profile: Profile): Promise<boolean> {
+type SavedSummoner = Pick<Profile, "profileIconId" | "summonerLevel">;
+
+// Returns the saved icon and level when the snapshot was saved as the
+// player's profile, or null when it wasn't.
+async function saveProfile(
+  region: Region,
+  account: Account,
+  profile: Profile,
+  summonerKnown: boolean,
+): Promise<SavedSummoner | null> {
   const db = database();
-  if (!db) return false;
+  if (!db) return null;
 
   const { puuid, gameName, tagLine } = account;
   const { updatedAt } = profile;
-  const row = {
+  const summoner = { profileIconId: profile.profileIconId, summonerLevel: profile.summonerLevel };
+  const rest = {
     gameName,
     tagLine,
     region,
-    profileIconId: profile.profileIconId,
-    summonerLevel: profile.summonerLevel,
     matchIds: profile.matchIds,
     fetchedAt: updatedAt,
     rankedFetchedAt: updatedAt,
     matchIdsFetchedAt: updatedAt,
   };
-  let saved: boolean;
+  const row = { ...rest, ...summoner };
+  // A saved level of null means "no summoner on this server", which lets a
+  // visit to another server take the row (below). When Riot didn't answer
+  // about the summoner, the row keeps the icon and level it has, so an outage
+  // can't hand the player's profile to another server. A new row starts
+  // with none, and the next visit that reaches Riot fills them in.
+  const set = summonerKnown ? row : rest;
+  let saved: SavedSummoner | null;
   try {
     // One transaction, so a reader never sees the new rank with the old
     // player row or the other way round.
@@ -213,14 +234,17 @@ async function saveProfile(region: Region, account: Account, profile: Profile): 
         .values({ puuid, ...row })
         .onConflictDoUpdate({
           target: tables.players.puuid,
-          set: row,
+          set,
           setWhere: profile.summonerLevel === null ? ours : or(ours, isNull(tables.players.summonerLevel)),
         })
-        .returning({ puuid: tables.players.puuid });
+        .returning({
+          profileIconId: tables.players.profileIconId,
+          summonerLevel: tables.players.summonerLevel,
+        });
       if (written.length === 0) {
         // Riot IDs are global, so a rename still counts from any server.
         await tx.update(tables.players).set({ gameName, tagLine }).where(eq(tables.players.puuid, puuid));
-        return false;
+        return null;
       }
       // Replace the rank rows rather than update them: a player who dropped
       // out of a queue (or never played it) has no row for it.
@@ -239,14 +263,14 @@ async function saveProfile(region: Region, account: Account, profile: Profile): 
           })),
         );
       }
-      return true;
+      return written[0];
     });
   } catch (error) {
     // The page still has the fresh profile to show; it just isn't saved.
     Sentry.captureException(error);
-    return false;
+    return null;
   }
-  if (!saved) return false;
+  if (!saved) return null;
 
   // Kept out of the transaction above on purpose: if this fails (say the
   // rank_history table hasn't been created yet), the profile is still saved
@@ -269,7 +293,7 @@ async function saveProfile(region: Region, account: Account, profile: Profile): 
   } catch (error) {
     Sentry.captureException(error);
   }
-  return true;
+  return saved;
 }
 
 // Only the columns rank_history stores; Riot's entries carry more fields.

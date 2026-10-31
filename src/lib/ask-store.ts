@@ -14,6 +14,7 @@ import {
   type UsedSoFar,
 } from "@/lib/ask-rules";
 import { database } from "@/lib/match-store";
+import { readOwnData } from "@/lib/own-data";
 import type { Region } from "@/lib/regions";
 import type { Account } from "@/lib/riot/types";
 
@@ -46,9 +47,7 @@ export type AskedQuestion = {
 export type ReadQuestionsResult = { ok: true; questions: AskedQuestion[] } | { ok: false };
 
 export async function readQuestions(userId: string, puuid: string): Promise<ReadQuestionsResult> {
-  const db = database();
-  if (!db) return process.env.DATABASE_URL ? { ok: false } : { ok: true, questions: [] };
-  try {
+  const result = await readOwnData(async (db) => {
     const rows = await db
       .select({
         id: tables.askQuestions.id,
@@ -67,11 +66,9 @@ export async function readQuestions(userId: string, puuid: string): Promise<Read
       )
       .orderBy(desc(tables.askQuestions.createdAt))
       .limit(HISTORY_LENGTH);
-    return { ok: true, questions: rows.map((r) => ({ ...r, answer: r.answer ?? "" })) };
-  } catch (error) {
-    Sentry.captureException(error);
-    return { ok: false };
-  }
+    return rows.map((r) => ({ ...r, answer: r.answer ?? "" }));
+  }, []);
+  return result.ok ? { ok: true, questions: result.value } : result;
 }
 
 // Whether this account can ask now, and how many questions it has left today.
