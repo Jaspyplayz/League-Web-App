@@ -9,3 +9,11 @@
 - **Root cause:** the PR template asks for "tiny, normal or risky, and why", and the natural why for a normal PR is that it's off the risky list. Nothing before the merge gate says which words the reason can't use, and the gate counts "risky" inside `risky-paths.ts` because a hyphen ends a word.
 - **Rung:** none yet
 - **Fix:** none yet, as a first occurrence. If it repeats, Jaspyplayz/project-template already has a fix to copy: `readTier` in its `scripts/can-merge-gates.ts` drops anything in backticks before counting tier words, and its PR template's comment says which words to keep out of the reason. Both files are on the risky list here, so Jasper merges that change.
+
+## 2026-10-31
+
+- **What happened:** Claude wrote PR 230's Tier line as "normal: it adds a check and loosens nothing. But it adds a file in `e2e/`, which is on the risky list", to say why Jasper merges it. `can-merge` refused it. The reason should have named who merges without a tier word, as PR 229's did ("a path only Jasper merges").
+- **Evidence:** `npm run can-merge -- 230` at 78dd0a7: "FAIL  Tiny or normal tier: the **Tier:** line names more than one tier (normal, risky)". [PR 230](https://github.com/Jaspyplayz/League-Web-App/pull/230).
+- **Root cause:** the same as on 2026-10-30. When a PR touches the risky list, the natural reason is that it's on the risky list, and `readTier` (`scripts/can-merge-gates.ts:476-489`) counts tier words on the whole line. The fix this class's first entry pointed to, dropping backticked text, wouldn't have stopped it: "risky list" here was outside backticks.
+- **Rung:** none yet
+- **Fix:** JAS-117, a design fix: count tier words only before the line's first colon. It's in `scripts/can-merge-gates.ts`, a risky path, so it gets its own PR.
