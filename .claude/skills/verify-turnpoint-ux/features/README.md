@@ -8,7 +8,7 @@ This directory is the maintained source for verifying how Turnpoint's flows beha
 - `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> | --pr <number>]` reports `home page ok` and `ok` for each capability the journey needs.
 - Test player `Hide on bush#KR1` on `kr`; sample game `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221` (stored, so it needs no Riot key).
 - Signed out, fresh browser context, `reducedMotion: "reduce"`.
-- The current UI, not Soft Rounded. Assert behavior, not colors or radii.
+- The current UI, whichever look a page has. Assert behavior, not colors or radii.
 
 ## Driving conventions
 

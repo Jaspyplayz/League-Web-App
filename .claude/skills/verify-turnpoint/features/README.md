@@ -13,7 +13,7 @@ This directory is the maintained source for verifying that Turnpoint's player-fa
 ## Driving conventions
 
 - Drive through `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey>`. Each feature file names its journey.
-- Prefer ARIA roles and accessible names (`getByRole`, `getByLabel`) over CSS classes or position. Turnpoint's visual style will change (Soft Rounded is planned); its labels and regions should not.
+- Prefer ARIA roles and accessible names (`getByRole`, `getByLabel`) over CSS classes or position. Turnpoint's visual style is changing (pages are moving to the Review board look); its labels and regions should not.
 - Headings render uppercase through CSS (`text-transform`), so `innerText` is uppercase. Match accessible names, or match text case-insensitively.
 - Type and click the way a player does. Go straight to a URL only when the recipe's entry point is a pasted link.
 - Wait for a role or URL, not a fixed sleep. Cold dev compiles and Riot lookups take up to ~45 s.
