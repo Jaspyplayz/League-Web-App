@@ -45,9 +45,9 @@ describe("readMatchNote", () => {
     expect(await readMatchNote("user-1", "NA1_1")).toEqual({ ok: true, text: "" });
   });
 
-  // JAS-71: like readMyPlayer, a database that's set up but can't be
-  // reached isn't the same as no note.
-  it("reports a failed read when the database can't be reached", async () => {
+  // JAS-71: like readMyPlayer, a DATABASE_URL that gives no usable database
+  // (getDb throws, for example on a malformed URL) isn't the same as no note.
+  it("reports a failed read when DATABASE_URL gives no usable database", async () => {
     connects = false;
     expect(await readMatchNote("user-1", "NA1_1")).toEqual({ ok: false });
   });

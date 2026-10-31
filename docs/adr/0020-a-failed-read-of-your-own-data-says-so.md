@@ -20,7 +20,7 @@ Option 2. `readMyPlayer` and `readQuestions` return `{ ok: false }` when the que
 ## Consequences
 
 - A database blip can no longer clear a player's "This is me" or make their Ask history look empty.
-- A new read of data the player made should follow the same shape, not `readCache`. Nothing checks that; the reviewer would have to spot it.
-- `readDayNotes` and `readMatchNote` follow the same shape: since JAS-71 they also return `{ ok: false }` when `DATABASE_URL` is set and the database can't be reached, not only when their query throws. `readCache` stays for Riot data.
+- A new read of data the player made should go through `readOwnData` (`src/lib/own-data.ts`, added in JAS-71), not `readCache`. Nothing checks that; the reviewer would have to spot it.
+- Since JAS-71, `readMyPlayer`, `readQuestions`, `readDayNotes` and `readMatchNote` all read through `readOwnData`, so the notes reads also return `{ ok: false }` when `DATABASE_URL` is set but gives no usable database, not only when their query throws. `readCache` stays for Riot data.
 - `checkAllowance` on the Ask tab still throws when its query fails, so the tab shows the error page. That's loud rather than misleading, so it stays.
 - A saved "This is me" whose player row has a region Turnpoint doesn't know reads as nothing marked, as before; pressing "This is me" then replaces it.

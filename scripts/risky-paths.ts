@@ -16,6 +16,7 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "drizzle.config.ts", why: "where migrations run" },
   { pattern: "src/lib/*-store.ts", why: "database reads and writes, including deletes" },
   { pattern: "src/lib/my-player.ts", why: "links a user to their player in the database" },
+  { pattern: "src/lib/own-data.ts", why: "how a failed read of a player's own data is reported" },
   { pattern: "scripts/remap-puuids", why: "rewrites player IDs in the live database" },
   { pattern: "scripts/collect-benchmarks", why: "writes and deletes rows in the live database" },
   { pattern: "scripts/check-score", why: "reads the live database" },

@@ -84,6 +84,8 @@ src/lib/analyzer/ Pure match analyzer: trims timelines, finds the opponent, turn
                   review.ts picks the 60-second review's moments from those plays;
                   golden.test.ts checks the analyzer on four real games in fixtures/
 src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back to Riot
+src/lib/own-data.ts  readOwnData: reads data a signed-in player made (notes, "This is me", Ask
+                  history) and says when the read failed, unlike match-store's readCache
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
                   each save also adds changed ranks to rank_history for the LP graph
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view

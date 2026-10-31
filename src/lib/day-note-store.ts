@@ -5,6 +5,7 @@ import { and, eq, gte } from "drizzle-orm";
 import { tables } from "@/db";
 import type { ReadDayNotesResult } from "@/lib/match-note";
 import { database } from "@/lib/match-store";
+import { readOwnData } from "@/lib/own-data";
 
 // Reads and saves the notes on Log tab days, in the day_notes table (see
 // src/db/schema.ts). Works like match-note-store.ts: without a database,
@@ -15,20 +16,14 @@ import { database } from "@/lib/match-store";
 // doesn't know the viewer's timezone, so it can't say exactly which days the
 // page will show; the caller asks for a few days extra.
 export async function readDayNotes(userId: string, since: string): Promise<ReadDayNotesResult> {
-  const db = database();
-  // No DATABASE_URL means notes are off; one set but not connecting is a
-  // failure, like readMyPlayer in my-player.ts.
-  if (!db) return process.env.DATABASE_URL ? { ok: false } : { ok: true, byDay: {} };
-  try {
+  const result = await readOwnData(async (db) => {
     const rows = await db.query.dayNotes.findMany({
       columns: { day: true, text: true },
       where: and(eq(tables.dayNotes.userId, userId), gte(tables.dayNotes.day, since)),
     });
-    return { ok: true, byDay: Object.fromEntries(rows.map((r) => [r.day, r.text])) };
-  } catch (error) {
-    Sentry.captureException(error);
-    return { ok: false };
-  }
+    return Object.fromEntries(rows.map((r) => [r.day, r.text]));
+  }, {});
+  return result.ok ? { ok: true, byDay: result.value } : result;
 }
 
 // Saves the note, or deletes it when the text is empty. Returns false when
