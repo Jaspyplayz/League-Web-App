@@ -17,3 +17,11 @@
 - **Root cause:** the same as on 2026-10-30. When a PR touches the risky list, the natural reason is that it's on the risky list, and `readTier` (`scripts/can-merge-gates.ts:476-489`) counts tier words on the whole line. The fix this class's first entry pointed to, dropping backticked text, wouldn't have stopped it: "risky list" here was outside backticks.
 - **Rung:** none yet
 - **Fix:** JAS-117, a design fix: count tier words only before the line's first colon. It's in `scripts/can-merge-gates.ts`, a risky path, so it gets its own PR.
+
+## 2026-10-31
+
+- **What happened:** Claude wrote PR 238's Tier line as "normal. It fixes one script and changes what `npm run shot -- --phone` does; `scripts/` files here aren't on the risky list." `can-merge` refused it. The reason should have left out where the files sit, or said it with no tier word, such as "paths Claude Code may merge".
+- **Evidence:** `npm run can-merge -- 238` at b4e87d8: "FAIL  Tiny or normal tier: the **Tier:** line names more than one tier (normal, risky)". [PR 238](https://github.com/Jaspyplayz/League-Web-App/pull/238).
+- **Root cause:** the same as the two entries above: the builder gave "not on the risky list" as the reason, and `readTier` (`scripts/can-merge-gates.ts:476-489`) counts tier words on the whole line. The builder didn't read this class file before writing the PR, and nothing checks the Tier line before `can-merge` runs.
+- **Rung:** none yet
+- **Fix:** JAS-117, the design fix already filed for this class. It changes `scripts/can-merge-gates.ts`, a path only Jasper merges, so it can't land in this PR.
