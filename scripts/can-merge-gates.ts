@@ -108,10 +108,10 @@ export type ReviewHistory = {
   /**
    * For a commit the PR added: how many of the PR's commits came after it,
    * every file changed since (a mode-only change counts 0 lines), and the
-   * files the PR changed at that commit. Undefined for any other commit,
-   * such as one from main or one a force push dropped.
+   * files the PR changed at that commit, and the files added since. Undefined
+   * for any other commit, such as one from main or one a force push dropped.
    */
-  since: (sha: string) => { commits: number; lines: ChangedLines; files: string[] } | undefined;
+  since: (sha: string) => { commits: number; lines: ChangedLines; files: string[]; created: string[] } | undefined;
 };
 
 export type Gate = { name: string; pass: boolean; detail: string };
@@ -152,14 +152,14 @@ function isTest(path: string): boolean {
 export const TINY_LINES = 30;
 // A no-blockers verdict still counts after later commits that change up to
 // this many lines outside docs, so a should-fix or a postmortem entry doesn't
-// need another review (0017). A new test is free, but a deleted test line
-// counts, so a test can't be weakened unseen.
+// need another review (0017). A test file added since the verdict is free;
+// a change to one that was already there counts, so a test can't be
+// weakened unseen.
 export const CARRY_OVER_LINES = 40;
 
-function size(lines: ChangedLines, path: string, onlyDeleted = false): number {
+function size(lines: ChangedLines, path: string): number {
   const change = lines[path];
-  if (!change) return 0;
-  return onlyDeleted ? change.deleted : change.added + change.deleted;
+  return change ? change.added + change.deleted : 0;
 }
 
 function total(lines: ChangedLines, paths: string[]): number {
@@ -315,14 +315,18 @@ function reviewerResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Re
     return fail(`the Review section has no "Reviewer agent at <sha>: no blockers" line${skip.detail}${unread}`);
   }
   const placed = verdicts.flatMap((verdict) => {
-    if (pr.headRefOid.startsWith(verdict.sha)) return [{ ...verdict, commits: 0, lines: {} as ChangedLines, files: [] as string[] }];
+    if (pr.headRefOid.startsWith(verdict.sha)) {
+      return [{ ...verdict, commits: 0, lines: {} as ChangedLines, files: [] as string[], created: [] as string[] }];
+    }
     const since = history.since(verdict.sha);
     return since ? [{ ...verdict, ...since }] : [];
   });
   // A blockers verdict on a commit a force push dropped would otherwise
-  // vanish and let an older clean verdict count again.
+  // vanish and let an older clean verdict count again. A clean review of the
+  // head itself still clears it.
   const lost = verdicts.find((verdict) => !placed.some(({ line }) => line === verdict.line) && !isClean(verdict.verdict));
-  if (lost) return fail(`"${lost.line}" names a commit that isn't on the branch any more, and a fix for a blocker needs a new review`);
+  const cleanAtHead = placed.some(({ commits, verdict }) => commits === 0 && isClean(verdict));
+  if (lost && !cleanAtHead) return fail(`"${lost.line}" names a commit that isn't on the branch any more, and a fix for a blocker needs a new review`);
   if (placed.length === 0) {
     const shas = verdicts.map(({ sha }) => sha.slice(0, 7)).join(", ");
     return fail(`the reviewer saw ${shas}, which isn't the head commit ${pr.headRefOid.slice(0, 7)} or one this PR added before it${unread}`);
@@ -374,8 +378,11 @@ function tinySkip(pr: ReviewInput, history: ReviewHistory, tier: Tier): Result {
   return fail(`, which a tiny PR needs once it changes more than ${TINY_LINES} lines outside docs (${lines} in ${code.join(", ")})`);
 }
 
-function carryOver(pr: ReviewInput, verdict: Verdict & { commits: number; lines: ChangedLines; files: string[] }): Result {
-  const { line, sha, commits, lines, files } = verdict;
+function carryOver(
+  pr: ReviewInput,
+  verdict: Verdict & { commits: number; lines: ChangedLines; files: string[]; created: string[] },
+): Result {
+  const { line, sha, commits, lines, files, created } = verdict;
   if (commits === 0) return pass(line);
   // The PR's files now and at the verdict, so a file put back to main's
   // version still counts. Main's changes to other files, merged in, don't.
@@ -387,7 +394,7 @@ function carryOver(pr: ReviewInput, verdict: Verdict & { commits: number; lines:
     const named = [...new Set(guarded)].join(", ");
     return fail(`${named} changed after the verdict at ${sha.slice(0, 7)}, and a change to a rule file or risky path needs a new review`);
   }
-  const counted = after.filter((path) => !isDoc(path)).reduce((sum, path) => sum + size(lines, path, isTest(path)), 0);
+  const counted = total(lines, after.filter((path) => !isDoc(path) && !(isTest(path) && created.includes(path))));
   if (counted > CARRY_OVER_LINES) {
     return fail(
       `${counted} lines outside docs changed after the verdict at ${sha.slice(0, 7)}, more than the ${CARRY_OVER_LINES} a verdict carries over`,

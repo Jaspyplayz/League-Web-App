@@ -97,6 +97,7 @@ describe("changedLines and reviewHistory", () => {
     expect(since?.files.sort()).toEqual(["src/a.ts", "src/guard.ts"]);
     // guard.ts went back to main's version, so it shows as changed.
     expect(since?.lines["src/guard.ts"]).toEqual({ added: 1, deleted: 2 });
+    expect(since?.created.sort()).toEqual(["public/font.bin", "src/main-only.ts", "src/tab\tname.ts"]);
   });
 
   it("works with a 7-character commit", () => {

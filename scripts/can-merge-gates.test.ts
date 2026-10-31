@@ -422,7 +422,8 @@ describe("decide", () => {
   ])("reads a re-review's %s like a full review's", (verdict, failing) => {
     const since = OLDER.slice(0, 7);
     const review = [`Reviewer agent at ${OLDER}: 2 blockers`, `Reviewer agent at ${HEAD}: ${verdict} (re-review since ${since})`];
-    const older = (sha: string) => (sha === OLDER ? { commits: 1, lines: changes({ "src/components/habit-card.tsx": 2 }), files: pr().files } : undefined);
+    const older = (sha: string) =>
+      sha === OLDER ? { commits: 1, lines: changes({ "src/components/habit-card.tsx": 2 }), files: pr().files, created: [] } : undefined;
     const decision = decide(pr({ body: body({ review }) }), main(), history({ since: older }));
     expect(failed(decision)).toEqual(failing);
     expect(detail(decision, "Reviewer cleared the PR")).toContain(`${verdict} (re-review since ${since})`);
@@ -473,14 +474,19 @@ describe("decide", () => {
     const gateOf = (review: string[], since: ReviewHistory["since"], changed = files) =>
       decide(pr({ body: body({ review }), files: changed }), main(), history({ since }, changed));
     const after =
-      (lines: ChangedLines, { commits = 2, at = files }: { commits?: number; at?: string[] } = {}) =>
+      (lines: ChangedLines, { commits = 2, at = files, created = [] as string[] } = {}) =>
       (sha: string) =>
-        sha === OLDER ? { commits, lines, files: at } : sha === MIDDLE ? { commits: 1, lines, files: at } : undefined;
+        sha === OLDER ? { commits, lines, files: at, created } : sha === MIDDLE ? { commits: 1, lines, files: at, created } : undefined;
     const reviewer = (decision: Decision) => detail(decision, "Reviewer cleared the PR");
 
-    it("carries over a no-blockers verdict past small fixes, docs and new tests", () => {
-      const lines = changes({ "src/components/habit-card.tsx": CARRY_OVER_LINES, "src/components/habit-card.test.tsx": 300, "docs/habits.md": 80 });
-      const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(lines));
+    it("carries over a no-blockers verdict past small fixes, docs and a new test file", () => {
+      const changed = [...files, "src/components/habit-card-2.test.tsx"];
+      const lines = changes({ "src/components/habit-card.tsx": CARRY_OVER_LINES, "src/components/habit-card-2.test.tsx": 300, "docs/habits.md": 80 });
+      const decision = gateOf(
+        [`Reviewer agent at ${OLDER}: no blockers`],
+        after(lines, { created: ["src/components/habit-card-2.test.tsx"] }),
+        changed,
+      );
       expect(decision.ok).toBe(true);
       expect(reviewer(decision)).toBe(
         `Reviewer agent at ${OLDER}: no blockers, carried over 2 commits with ${CARRY_OVER_LINES} lines outside docs`,
@@ -494,8 +500,12 @@ describe("decide", () => {
       expect(reviewer(decision)).toContain(`${CARRY_OVER_LINES + 1} lines outside docs changed after the verdict`);
     });
 
-    it("counts deleted test lines, so a test can't be weakened unseen", () => {
-      const lines = { "src/components/habit-card.test.tsx": { added: 0, deleted: CARRY_OVER_LINES + 1 } };
+    // An early return or a mock added to an existing test weakens it as surely as a deletion.
+    it.each([
+      ["deleted", { added: 0, deleted: CARRY_OVER_LINES + 1 }],
+      ["added", { added: CARRY_OVER_LINES + 1, deleted: 0 }],
+    ])("counts %s lines in a test file that was already there, so a test can't be weakened unseen", (_, change) => {
+      const lines = { "src/components/habit-card.test.tsx": change };
       expect(failed(gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(lines)))).toEqual(["Reviewer cleared the PR"]);
     });
 
@@ -545,6 +555,12 @@ describe("decide", () => {
         after(changes({ "src/components/habit-card.tsx": 1 })),
       );
       expect(reviewer(decision)).toContain("isn't on the branch any more");
+    });
+
+    it("lets a clean review of the head clear a blockers verdict a force push dropped", () => {
+      const dropped = "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432";
+      const decision = gateOf([`Reviewer agent at ${dropped}: 1 blockers`, `Reviewer agent at ${HEAD}: no blockers`], () => undefined);
+      expect(decision.ok).toBe(true);
     });
 
     it("doesn't count files the PR never changed, such as main merged in", () => {

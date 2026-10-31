@@ -63,7 +63,8 @@ export function reviewHistory(base: string, head: string, cwd?: string, otherBas
       if (!isAncestor(sha, head, cwd) || bases.some((b) => isAncestor(sha, b, cwd))) return undefined;
       // Only the PR's own commits, not main's commits merged in after it.
       const commits = Number(git(["rev-list", "--count", `${sha}..${head}`, ...bases.map((b) => `^${b}`)], cwd));
-      return { commits, lines: changedLines([sha, head], cwd), files: changedPaths(base, sha, cwd) };
+      const created = git(["diff", "--name-only", "--no-renames", "--diff-filter=A", "-z", sha, head], cwd).split("\0").filter(Boolean);
+      return { commits, lines: changedLines([sha, head], cwd), files: changedPaths(base, sha, cwd), created };
     },
   };
 }
