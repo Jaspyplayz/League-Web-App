@@ -46,9 +46,9 @@ Search, profile sections and Insights views are plain URLs, so shoot the page an
 
 The pages, with their paths, labels and traps, are in [features/README.md](features/README.md).
 
-## A page stuck on "Loading…" in the built-in browser
+## A page stuck loading in the built-in browser
 
-Claude's built-in browser pane draws no frames while it's hidden. React shows a page's streamed sections (each `<Suspense>` boundary) only on the next drawn frame, so there a page can sit on its "Loading…" text forever with the content already downloaded. Champions and Insights did this (JAS-91). Before calling it a bug, take a screenshot, which draws a frame, then check again. In the console, `$RB.length` above 0 with `typeof $RT` `"undefined"` means sections are waiting for a frame. If the page still shows "Loading…" after a screenshot, or in `npm run shot`, which draws frames, it's a real bug.
+Claude's built-in browser pane draws no frames while it's hidden. Until a page's first streamed section (a `<Suspense>` boundary) appears, React waits for a drawn frame to show it. So in a hidden pane a page can sit on its loading text ("Loading champions…") or grey skeleton forever, with the content already downloaded. Champions and Insights did this (JAS-91). Before calling it a bug, take a screenshot, which draws a frame, then check again. In the console, `$RB.length` above 0 with `typeof $RT` `"undefined"` means sections are waiting for a frame; `$RB is not defined` means no section has arrived from the server yet, so this isn't the cause. If the page still shows its loading text or skeleton after a screenshot, it's a real bug. `npm run shot` draws frames but takes its picture after at most 15 seconds, so a page still loading there may just be slow: compare its time with the live site.
 
 ## Evidence
 
