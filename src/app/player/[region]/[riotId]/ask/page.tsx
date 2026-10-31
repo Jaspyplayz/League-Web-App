@@ -126,11 +126,14 @@ async function AskContent({
   return (
     <>
       {!allowed.ok && <p className="text-behind">{allowed.message}</p>}
+      {!history.ok && (
+        <p className="text-behind">Couldn&apos;t load your past questions. Reload to try again.</p>
+      )}
       <AskBox
         region={region}
         riotId={riotId}
         playerPath={playerPath}
-        history={history}
+        history={history.ok ? history.questions : []}
         left={allowed.ok ? allowed.left : 0}
       />
     </>

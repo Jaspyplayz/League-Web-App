@@ -39,7 +39,10 @@ export async function AccountMenu() {
     );
   }
 
-  const me = await readMyPlayer(user.id);
+  // If the read fails, the menu shows the account without a My profile link,
+  // as when no profile is marked. It offers nothing that changes the mark.
+  const mine = await readMyPlayer(user.id);
+  const me = mine.ok ? mine.player : null;
   const [rank, dd] = me
     ? await Promise.all([savedSoloRank(me.puuid), getDataDragon().catch(() => null)])
     : [null, null];

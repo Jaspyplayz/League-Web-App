@@ -3,7 +3,7 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { eq } from "drizzle-orm";
 import { tables, type Db } from "@/db";
-import { database, readCache } from "@/lib/match-store";
+import { database } from "@/lib/match-store";
 import { isRegion, type Region } from "@/lib/regions";
 
 // The player a signed-in account marked with "This is me", stored in the
@@ -19,8 +19,17 @@ export type MyPlayer = {
   profileIconId: number | null;
 };
 
-export async function readMyPlayer(userId: string): Promise<MyPlayer | null> {
-  const row = await readCache(async (db) => {
+// A failed read isn't the same as no player marked. If it were, the "This is
+// me" button would offer to mark a profile that already is, and clicking it
+// would clear the saved one (#167). So unlike readCache, this says so.
+export type ReadMyPlayerResult = { ok: true; player: MyPlayer | null } | { ok: false };
+
+export async function readMyPlayer(userId: string): Promise<ReadMyPlayerResult> {
+  const db = database();
+  // No DATABASE_URL means the feature is off; one set but not connecting is
+  // a failure.
+  if (!db) return process.env.DATABASE_URL ? { ok: false } : { ok: true, player: null };
+  try {
     // Join players for the current name and region, which change on that
     // player's next profile refresh if they rename themselves.
     const [found] = await db
@@ -35,9 +44,12 @@ export async function readMyPlayer(userId: string): Promise<MyPlayer | null> {
       .innerJoin(tables.players, eq(tables.userPlayers.puuid, tables.players.puuid))
       .where(eq(tables.userPlayers.userId, userId))
       .limit(1);
-    return found;
-  });
-  return row && isRegion(row.region) ? { ...row, region: row.region } : null;
+    const player = found && isRegion(found.region) ? { ...found, region: found.region } : null;
+    return { ok: true, player };
+  } catch (error) {
+    Sentry.captureException(error);
+    return { ok: false };
+  }
 }
 
 // Returns false when it couldn't be saved, for example a PUUID Turnpoint has

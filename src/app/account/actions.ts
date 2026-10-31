@@ -27,7 +27,10 @@ export async function toggleMyPlayer(formData: FormData) {
   if (!user || typeof puuid !== "string" || puuid === "") return;
 
   const current = await readMyPlayer(user.id);
-  if (current?.puuid === puuid) {
+  // Without knowing what's saved, toggling could clear the profile you meant
+  // to keep (#167), so change nothing.
+  if (!current.ok) return;
+  if (current.player?.puuid === puuid) {
     await forgetMyPlayer(user.id);
   } else {
     await saveMyPlayer(user.id, puuid);

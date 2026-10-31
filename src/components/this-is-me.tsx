@@ -23,7 +23,8 @@ export function ThisIsMe(props: Props) {
   );
 }
 
-async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props) {
+// Exported for its tests; pages use ThisIsMe.
+export async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props) {
   if (!supabaseConfig()) return null;
 
   const user = await getCurrentUser();
@@ -41,7 +42,22 @@ async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props) {
     );
   }
 
-  const isMine = (await readMyPlayer(user.id))?.puuid === puuid;
+  const mine = await readMyPlayer(user.id);
+  if (!mine.ok) {
+    // We can't tell whether this profile is already yours, so offer nothing
+    // that could mark or clear it (#167).
+    return (
+      <button
+        type="button"
+        disabled
+        title="Couldn't check whether this profile is yours. Reload to try again."
+        className={`${button} ${off} cursor-not-allowed opacity-60`}
+      >
+        This is me
+      </button>
+    );
+  }
+  const isMine = mine.player?.puuid === puuid;
   return (
     <form action={toggleMyPlayer}>
       <input type="hidden" name="puuid" value={puuid} />
