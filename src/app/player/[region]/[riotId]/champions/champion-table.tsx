@@ -1,18 +1,19 @@
 import type { ReactNode } from "react";
 import { ChampionIcon } from "@/components/game-icons";
-import { panelClass } from "@/components/ui/panel";
-import { SegmentBar } from "@/components/ui/segment-bar";
 import type { ChampionLine, ChampionStats } from "@/lib/champion-stats";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import { ChampionRowGroup } from "./champion-row-group";
+import { ChampionSearch } from "./champion-search";
 
 // The Champions tab's table, like op.gg's: a row for all champions together,
 // then one per champion, most played first. Each champion's row opens to
 // list the enemy champions it faced in the same role (champion-row-group.tsx).
 //
-// It's wider than a phone, so it scrolls sideways inside its box with the
-// champion column pinned on the left.
+// It's wider than a phone, so it scrolls sideways inside its panel with the
+// champion column pinned on the left. The panel itself, with the search box
+// above the table, is champion-search.tsx.
 
+// Each column's name, and what it means, shown when the pointer rests on it.
 const HEADINGS: { label: string; title?: string }[] = [
   { label: "Champion" },
   { label: "Played", title: "Wins and losses, and the win rate" },
@@ -30,160 +31,153 @@ const HEADINGS: { label: string; title?: string }[] = [
   { label: "Wards", title: "Wards placed / wards killed per game, then control wards placed" },
   { label: "CS", title: "CS per game, and per minute" },
   { label: "Gold", title: "Gold per game, and per minute" },
-];
-// Under one "Multikills" heading, so the four columns can stay narrow.
-const MULTIKILLS = [
   { label: "2×", title: "Double kills" },
   { label: "3×", title: "Triple kills" },
   { label: "4×", title: "Quadra kills" },
   { label: "5×", title: "Penta kills" },
 ];
-// The headings, the multikills and the chevron.
-const COLUMNS = HEADINGS.length + MULTIKILLS.length + 1;
+// The headings and the chevron.
+const COLUMNS = HEADINGS.length + 1;
 
 // The pinned first column. Its background has to be solid, or the columns
-// scrolling under it would show through; it follows the row's hover and
-// open states (data-open is set by ChampionRowGroup).
-const PINNED =
-  "sticky left-0 z-10 bg-surface group-hover:bg-surface-hover group-data-[open=true]:bg-surface-hover";
+// scrolling under it would show through, so an open or hovered row is
+// `raised` rather than the see-through `select`. It follows the row's hover
+// and open states (data-open is set by ChampionRowGroup) at the same speed.
+export const PINNED =
+  "sticky left-0 z-10 bg-panel transition-colors duration-320 ease-out group-hover:bg-raised group-hover:duration-120 group-data-[open=true]:bg-raised motion-reduce:transition-none";
 
-export function ChampionTable({ stats, dd }: { stats: ChampionStats; dd: DataDragon | null }) {
-  return (
-    <div className={`${panelClass} overflow-x-auto`}>
-      <table className="w-full min-w-[940px] border-collapse text-note">
-        <thead className="font-mono text-label tracking-[0.08em] text-faint uppercase">
-          <tr>
-            {HEADINGS.map((h, i) => (
-              <th
-                key={h.label}
-                scope="col"
-                rowSpan={2}
-                title={h.title}
-                className={`px-1.5 py-3 text-center font-medium ${i === 0 ? `${PINNED} pl-4 text-left` : ""}`}
-              >
-                {h.label}
-              </th>
-            ))}
-            <th scope="colgroup" colSpan={MULTIKILLS.length} className="px-1.5 pt-3 font-medium">
-              Multikills
+export function ChampionTable({
+  stats,
+  dd,
+  heading,
+}: {
+  stats: ChampionStats;
+  dd: DataDragon | null;
+  heading: ReactNode; // "Season 2026", the game count and Load more, above the table
+}) {
+  const head = (
+    <>
+      <thead>
+        <tr className="border-b border-divider">
+          {HEADINGS.map((h, i) => (
+            <th
+              key={h.label}
+              scope="col"
+              title={h.title}
+              className={`px-2 py-2.5 text-left text-note font-medium whitespace-nowrap text-quiet ${
+                h.title ? "cursor-help" : ""
+              } ${i === 0 ? `${PINNED} pl-4` : ""}`}
+            >
+              {h.label}
             </th>
-            <th rowSpan={2} />
-          </tr>
-          <tr>
-            {MULTIKILLS.map((h) => (
-              <th key={h.label} scope="col" title={h.title} className="px-1.5 pb-3 font-medium">
-                {h.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="border-t border-line">
-          <tr className="group">
-            <th scope="row" className={`${PINNED} py-2.5 pr-2 pl-4 text-left`}>
-              <span className="flex items-center gap-3">
-                <span className="soft-round-sm flex size-9 shrink-0 items-center justify-center bg-line-strong font-display text-label font-bold text-ink-soft">
-                  ALL
-                </span>
-                <span className="font-display text-body font-semibold tracking-[0.04em] uppercase">
-                  All champions
-                </span>
+          ))}
+          {/* Relative, so the hidden label stays inside the table's scroll box
+              instead of widening the whole page on a phone. */}
+          <th className="relative w-10">
+            <span className="sr-only">Enemy champions</span>
+          </th>
+        </tr>
+      </thead>
+      {/* The thicker line sets the total apart from the champions under it. */}
+      <tbody className="border-b-2 border-divider">
+        <tr className="group">
+          <th scope="row" className={`${PINNED} py-2.5 pr-2 pl-4 text-left font-semibold`}>
+            <span className="flex items-center gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-raised text-note text-quiet">
+                All
               </span>
-            </th>
-            <StatCells line={stats.all} />
-            <td />
-          </tr>
-        </tbody>
-        {stats.champions.map((champion, i) => {
-          const name = championName(dd, champion.championName);
-          return (
-            <ChampionRowGroup
-              key={champion.championName}
-              columns={COLUMNS}
-              label={`${name}'s games by enemy champion`}
-              cells={
-                <>
-                  <th scope="row" className={`${PINNED} py-2.5 pr-2 pl-4 text-left`}>
-                    <span className="flex items-center gap-3">
-                      <span className="w-5 shrink-0 text-right font-mono text-label text-placeholder max-sm:hidden">
-                        {i + 1}
-                      </span>
-                      <ChampionIcon
-                        dd={dd}
-                        name={champion.championName}
-                        size={36}
-                        className="soft-round-sm"
-                      />
-                      <span className="max-w-32 truncate font-display text-body font-semibold tracking-[0.04em] uppercase max-sm:max-w-20">
-                        {name}
-                      </span>
-                    </span>
-                  </th>
-                  <StatCells line={champion} />
-                </>
-              }
-              opponents={champion.opponents.map((opponent) => (
-                <tr key={opponent.championName} className="bg-page">
-                  <th
-                    scope="row"
-                    className="sticky left-0 z-10 bg-page py-2 pr-2 pl-12 text-left font-normal max-sm:pl-4"
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <span className="font-mono text-label text-placeholder">vs</span>
-                      <ChampionIcon
-                        dd={dd}
-                        name={opponent.championName}
-                        size={28}
-                        className="soft-round-sm"
-                      />
-                      <span className="max-w-28 truncate font-medium text-ink-soft max-sm:max-w-20">
-                        {championName(dd, opponent.championName)}
-                      </span>
-                    </span>
-                  </th>
-                  <StatCells line={opponent} />
-                  <td />
-                </tr>
-              ))}
-            />
-          );
-        })}
-      </table>
-    </div>
+              <span className="whitespace-nowrap">All champions</span>
+            </span>
+          </th>
+          <StatCells line={stats.all} />
+          <td />
+        </tr>
+      </tbody>
+    </>
   );
+
+  const champions = stats.champions.map((champion) => {
+    const name = championName(dd, champion.championName);
+    return {
+      name,
+      group: (
+        <ChampionRowGroup
+          key={champion.championName}
+          columns={COLUMNS}
+          label={`${name}'s games by enemy champion`}
+          cells={
+            <>
+              <th scope="row" className={`${PINNED} py-2.5 pr-2 pl-4 text-left font-medium`}>
+                <span className="flex items-center gap-3">
+                  <ChampionIcon
+                    dd={dd}
+                    name={champion.championName}
+                    size={32}
+                    className="rounded-md"
+                  />
+                  <span className="max-w-32 truncate max-sm:max-w-24">{name}</span>
+                </span>
+              </th>
+              <StatCells line={champion} />
+            </>
+          }
+          opponents={champion.opponents.map((opponent) => (
+            <tr key={opponent.championName} className="bg-page">
+              <th
+                scope="row"
+                className="sticky left-0 z-10 bg-page py-2 pr-2 pl-12 text-left font-normal max-sm:pl-4"
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="text-note text-quiet">vs</span>
+                  <ChampionIcon
+                    dd={dd}
+                    name={opponent.championName}
+                    size={28}
+                    className="rounded-md"
+                  />
+                  <span className="max-w-28 truncate max-sm:max-w-20">
+                    {championName(dd, opponent.championName)}
+                  </span>
+                </span>
+              </th>
+              <StatCells line={opponent} />
+              <td />
+            </tr>
+          ))}
+        />
+      ),
+    };
+  });
+
+  return <ChampionSearch heading={heading} head={head} champions={champions} />;
 }
 
 // Every column after the champion's name. Two lines per cell, like op.gg:
-// the headline number, then the detail in a fainter colour.
+// the headline number, then the detail in quiet text.
 function StatCells({ line }: { line: ChampionLine }) {
   const losses = line.games - line.wins;
   const winRate = line.games ? line.wins / line.games : 0;
   return (
     <>
-      <td className="px-1.5 py-2">
-        <div className="flex items-center gap-2">
-          <WinLossBar wins={line.wins} losses={losses} />
-          <span className={`w-9 font-mono ${winRate >= 0.5 ? "text-ahead" : "text-behind"}`}>
+      <Cell
+        top={`${line.wins}W ${losses}L`}
+        bottom={
+          <span className={winRate >= 0.5 ? "text-ahead" : "text-behind"}>
             {Math.round(winRate * 100)}%
           </span>
-        </div>
-      </td>
+        }
+      />
       <Cell
-        top={<span className="font-semibold text-ink">{line.kda.toFixed(2)}:1</span>}
+        top={`${line.kda.toFixed(2)}:1`}
         bottom={`${line.kills.toFixed(1)} / ${line.deaths.toFixed(1)} / ${line.assists.toFixed(1)} (${percent(line.killParticipation)})`}
       />
-      <td className="px-1.5 py-2">
+      <td className="px-2 py-2.5">
         {line.score === null ? (
           <Dash />
         ) : (
-          <div className="mx-auto flex w-12 flex-col items-center gap-1">
-            <span className="font-mono font-semibold text-ink">{Math.round(line.score)}</span>
-            <SegmentBar
-              filled={line.score / 100}
-              segments={10}
-              className="h-1 w-full gap-[2px]"
-              label={`Average game score ${Math.round(line.score)} out of 100`}
-            />
-          </div>
+          <span className="inline-flex h-7 min-w-9 items-center justify-center rounded-md bg-raised px-1.5 font-semibold">
+            {Math.round(line.score)}
+          </span>
         )}
       </td>
       <Cell
@@ -217,50 +211,17 @@ function StatCells({ line }: { line: ChampionLine }) {
   );
 }
 
-function Cell({ top, bottom }: { top: ReactNode; bottom: string }) {
+function Cell({ top, bottom }: { top: ReactNode; bottom: ReactNode }) {
   return (
-    <td className="px-1.5 py-2 text-center whitespace-nowrap">
-      <div className="font-mono text-ink-soft">{top}</div>
-      <div className="text-label text-faint">{bottom}</div>
+    <td className="px-2 py-2.5 leading-snug whitespace-nowrap">
+      <div className="font-medium">{top}</div>
+      <div className="text-note text-quiet">{bottom}</div>
     </td>
   );
 }
 
 function Multikill({ count }: { count: number }) {
-  return (
-    <td className="px-1.5 py-2 text-center font-mono">
-      {count > 0 ? <span className="text-ink-soft">{count}</span> : <Dash />}
-    </td>
-  );
-}
-
-// Wins in blue and losses in red, side by side, each as wide as its share.
-// Never so thin that its count can't fit.
-function WinLossBar({ wins, losses }: { wins: number; losses: number }) {
-  return (
-    <div
-      role="img"
-      aria-label={`${wins} wins, ${losses} losses`}
-      className="flex h-5 w-20 overflow-hidden rounded-md font-mono text-label font-semibold text-page"
-    >
-      {wins > 0 && (
-        <span
-          className="flex min-w-8 basis-0 items-center bg-ahead px-1.5"
-          style={{ flexGrow: wins }}
-        >
-          {wins}W
-        </span>
-      )}
-      {losses > 0 && (
-        <span
-          className="flex min-w-8 basis-0 items-center justify-end bg-behind px-1.5"
-          style={{ flexGrow: losses }}
-        >
-          {losses}L
-        </span>
-      )}
-    </div>
-  );
+  return <td className="px-2 py-2.5">{count > 0 ? count : <Dash />}</td>;
 }
 
 // "+4.2 CS" in blue or "−1.5 CS" in red. A signed number rather than
@@ -268,7 +229,7 @@ function WinLossBar({ wins, losses }: { wins: number; losses: number }) {
 // it's a lead over.
 function CsLead({ lead }: { lead: number }) {
   const rounded = Math.round(lead * 10) / 10;
-  if (rounded === 0) return <span className="text-muted">Even</span>;
+  if (rounded === 0) return <span className="text-quiet">Even</span>;
   return (
     <span className={rounded > 0 ? "text-ahead" : "text-behind"}>
       {rounded > 0 ? "+" : "−"}
@@ -278,7 +239,7 @@ function CsLead({ lead }: { lead: number }) {
 }
 
 function Dash() {
-  return <span className="text-placeholder">–</span>;
+  return <span className="text-quiet">–</span>;
 }
 
 function percent(share: number): string {
