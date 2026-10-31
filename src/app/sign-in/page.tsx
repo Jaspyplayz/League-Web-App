@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { DiscordLogo, GoogleLogo } from "@/components/icons";
-import { Eyebrow } from "@/components/ui/eyebrow";
 import { Panel } from "@/components/ui/panel";
-import { signIn } from "@/app/auth/actions";
-import { PROVIDERS, safeNextPath, type Provider } from "@/lib/sign-in";
+import { QUESTIONS_PER_DAY } from "@/lib/ask-rules";
 import { supabaseConfig } from "@/lib/supabase/config";
+import { SignInPanel } from "./sign-in-panel";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -14,81 +12,61 @@ export const metadata: Metadata = {
 
 type SearchParams = Promise<{ next?: string; error?: string }>;
 
-const LOGOS: Record<Provider, typeof GoogleLogo> = {
-  google: GoogleLogo,
-  discord: DiscordLogo,
-};
+// The page's link style, the same as How it works: the text colour with a
+// quiet underline, since blue means you and red the opponent.
+const LINK = "text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main";
 
-// Shown when a sign-in attempt bounces back here with ?error=.
-const ERRORS: Record<string, string> = {
-  provider: "That sign-in option isn't available.",
-  start: "Couldn't start signing in. Please try again.",
-  callback: "Signing in didn't finish. If you pressed Cancel, that's fine: try again any time.",
-};
+// What signing in gets you, so a visitor has a reason to. Each one is a
+// feature that only works for a signed-in account.
+const ACCOUNT_ADDS = [
+  { name: "This is me", text: "Mark one profile as yours, and the header links straight to it." },
+  { name: "Game notes", text: "A private notes box on every game page, for what you'd do differently." },
+  { name: "Ask", text: `Ask Claude about a player's games, ${QUESTIONS_PER_DAY} questions a day.` },
+];
 
 export default function SignInPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <main className="mx-auto flex w-full max-w-[460px] flex-col gap-6 px-6 pb-[88px] pt-16">
-      <div className="flex flex-col gap-3">
-        <Eyebrow>Your account</Eyebrow>
-        <h1 className="font-display text-5xl font-bold uppercase tracking-[0.01em]">Sign in</h1>
-        <p className="text-muted">
-          Use your Google or Discord account. Turnpoint never sees your password. Signing in
-          with your Riot account is coming once Riot approves the app.
+    <main className="mx-auto flex w-full max-w-[480px] flex-col gap-5 px-4 pb-14 pt-8 sm:gap-[22px] sm:px-10 sm:pb-[88px] sm:pt-[72px]">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-title font-semibold">Sign in</h1>
+        <p className="text-body text-quiet">
+          Use your Google or Discord account. Turnpoint never sees your password.
         </p>
       </div>
       {/* The buttons read ?next= and ?error= from the address, which only exist
           per request, so they stream in behind a boundary. */}
-      <Suspense fallback={<Panel className="h-[152px]" />}>
+      <Suspense fallback={<Panel className="h-[122px]" />}>
         <SignInOptions searchParams={searchParams} />
       </Suspense>
-      <p className="text-sm text-faint">
-        Signing in stores your name and email address. See the{" "}
-        <Link href="/privacy" className="text-ahead-soft hover:text-ahead-bright">
-          privacy policy
-        </Link>
-        .
-      </p>
+      <section aria-labelledby="account-adds" className="flex flex-col gap-2">
+        <h2 id="account-adds" className="text-body font-semibold">
+          What an account adds
+        </h2>
+        <ul className="flex flex-col gap-2 text-sm text-quiet">
+          {ACCOUNT_ADDS.map(({ name, text }) => (
+            <li key={name}>
+              <span className="font-semibold text-main">{name}.</span> {text}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <div className="flex flex-col gap-1.5 border-t border-divider pt-3.5 text-note text-quiet">
+        <p>Signing in with your Riot account comes once Riot approves the app.</p>
+        <p>
+          Signing in stores your name and email address. See the{" "}
+          <Link href="/privacy" className={LINK}>
+            privacy policy
+          </Link>
+          .
+        </p>
+      </div>
     </main>
   );
 }
 
+// Reads the address, then hands plain values to the panel, so the panel can
+// be rendered in a test without a request (sign-in-panel.test.tsx).
 async function SignInOptions({ searchParams }: { searchParams: SearchParams }) {
   const { next, error } = await searchParams;
-
-  if (!supabaseConfig()) {
-    return (
-      <Panel className="p-6 text-muted">
-        Sign-in isn&apos;t set up on this copy of the site yet.
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel className="flex flex-col gap-3 p-6">
-      {error && (
-        <p role="alert" className="text-sm text-behind">
-          {ERRORS[error] ?? ERRORS.start}
-        </p>
-      )}
-      {/* Each button is its own small form, so it works before any JavaScript
-          loads. The hidden fields tell signIn() what was picked. */}
-      {(Object.keys(PROVIDERS) as Provider[]).map((provider) => {
-        const Logo = LOGOS[provider];
-        return (
-          <form key={provider} action={signIn}>
-            <input type="hidden" name="provider" value={provider} />
-            <input type="hidden" name="next" value={safeNextPath(next)} />
-            <button
-              type="submit"
-              className="soft-round flex w-full items-center justify-center gap-3 border border-line-strong px-5 py-3 font-semibold text-ink transition-colors hover:border-ahead hover:bg-page"
-            >
-              <Logo />
-              Continue with {PROVIDERS[provider]}
-            </button>
-          </form>
-        );
-      })}
-    </Panel>
-  );
+  return <SignInPanel configured={supabaseConfig() !== null} next={next} error={error} />;
 }
