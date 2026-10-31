@@ -1,0 +1,66 @@
+name: Agent merge
+
+# Merges Claude Code's tiny and normal PRs without a Claude session (JAS-121,
+# docs/adr/0024-a-github-action-runs-can-merge.md). Each time one of a PR's
+# checks finishes, this runs `can-merge --merge` on it from main. can-merge
+# checks every gate at the PR's head commit and merges only if all pass, so
+# most runs end in a refusal while another check is still going, and the last
+# check to finish is the one that merges.
+#
+# A workflow_run workflow always runs as this file is on main, never a PR's
+# copy, and the job checks out main. The PR's code is never checked out or
+# run here, so no PR can change what this job does with its write token.
+on:
+  workflow_run:
+    # Every workflow that reports a check on a PR. Vercel's check comes from
+    # Vercel's app, which starts no workflow run, but the smoke test starts
+    # only once Vercel's preview is live and takes minutes, so Vercel has
+    # reported by the time it finishes.
+    workflows: [CI, Reviewer, Smoke test, Dependency review]
+    types: [completed]
+
+# Nothing by default; the job asks for only what merging needs.
+permissions: {}
+
+jobs:
+  merge:
+    # Only a successful run on one of Claude's branches in this repo. Anything
+    # else (main, Jasper's branches, Dependabot's, a fork, a failed or
+    # cancelled run) never starts a runner, since can-merge couldn't merge it.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'claude/') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    # One run per branch at a time, so two checks finishing together can't
+    # both merge or both comment. A newer run waits rather than cancelling one
+    # that may be mid-merge.
+    concurrency:
+      group: agent-merge-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # merge the PR
+      pull-requests: write # read and merge the PR
+      issues: write # the gates comment and the merged-by-claude label
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          # The whole history: can-merge diffs the PR against main and reads
+          # main's merges and reverts.
+          fetch-depth: 0
+          # Don't leave the token in .git/config. The repo is public, so git
+          # fetches the PR's commits without it.
+          persist-credentials: false
+      # No npm cache: PR workflows fill caches too, and this job holds a
+      # write token, so it installs from npm itself.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci
+      - run: npx tsx scripts/can-merge-action.ts
+        env:
+          # Only this step gets the token; npm ci's install scripts never see it.
+          GH_TOKEN: ${{ github.token }}
+          # gh fills in can-merge's {owner}/{repo} from this.
+          GH_REPO: ${{ github.repository }}

@@ -303,6 +303,11 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
   },
 ];
 
+// can-merge exits with this code when a gate fails, and with 1 when it
+// crashes (Node's code for an uncaught error). The Agent merge workflow tells
+// them apart: a refusal is normal while checks still run, a crash isn't.
+export const REFUSED_EXIT_CODE = 2;
+
 // Every gate runs, even after one fails, so the output lists every reason.
 export function decide(pr: PrSnapshot, main: MainState, history: ReviewHistory): Decision {
   const context: Context = { pr, main, history, tier: readTier(pr.body) };
