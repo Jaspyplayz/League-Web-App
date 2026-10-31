@@ -92,28 +92,81 @@ export type MainState = {
   claudeMerges: ClaudeMerge[];
 };
 
+/** Lines added and deleted in one file. */
+export type FileChange = { added: number; deleted: number };
+export type ChangedLines = Record<string, FileChange>;
+
+// git shows no line counts for a binary file, so one counts as this many
+// added lines: more than either limit below, so a binary outside docs always
+// gets the reviewer.
+export const BINARY_LINES = 1000;
+
+/** What git says about a PR's commits, for the reviewer gate. */
+export type ReviewHistory = {
+  /** Lines the PR changes against its base. */
+  lines: ChangedLines;
+  /**
+   * For a commit the PR added: how many of the PR's commits came after it,
+   * every file changed since (a mode-only change counts 0 lines), and the
+   * files the PR changed at that commit, and the files added since. Undefined
+   * for any other commit, such as one from main or one a force push dropped.
+   */
+  since: (sha: string) => { commits: number; lines: ChangedLines; files: string[]; created: string[] } | undefined;
+};
+
 export type Gate = { name: string; pass: boolean; detail: string };
 export type Decision = { ok: boolean; gates: Gate[] };
 
 type Tier = { ok: true; tier: "tiny" | "normal" } | { ok: false; why: string };
-type Context = { pr: PrSnapshot; main: MainState; tier: Tier };
+type Context = { pr: PrSnapshot; main: MainState; history: ReviewHistory; tier: Tier };
 type Result = { pass: boolean; detail: string };
 
-// A PR names its own tier, so tiny skips the reviewer only when every file it
-// changes is a doc: a .md file or image in docs/, or the root README.md or
-// ARCHITECTURE.md. Agents follow docs/workflow.md, any CLAUDE or AGENTS file
-// and anything in a dot folder as rules, so those aren't docs. Windows ignores
-// case, so this does too (JAS-12).
-function isDoc(path: string): boolean {
+// Agents follow docs/workflow.md, the skill setup in docs/agents/, any CLAUDE
+// or AGENTS file and anything in a dot folder as rules, so a change to one
+// always gets the reviewer, whatever the tier (JAS-12). Windows ignores case,
+// so this does too.
+function isRuleFile(path: string): boolean {
   const lower = path.toLowerCase();
-  if (lower === "readme.md" || lower === "architecture.md") return true;
   return (
-    /^docs\/.*\.(md|png|jpg|gif|webp)$/.test(lower) &&
-    lower !== "docs/workflow.md" &&
-    !/(^|\/)\./.test(lower) &&
-    !/(^|\/)(claude|agents)[^/]*\.md$/.test(lower)
+    lower === "docs/workflow.md" ||
+    lower.startsWith("docs/agents/") ||
+    /(^|\/)\./.test(lower) ||
+    /(^|\/)(claude|agents)[^/]*\.md$/.test(lower)
   );
 }
+
+// A doc is a .md file or image in docs/, or the root README.md,
+// ARCHITECTURE.md or GLOSSARY.md, and never a rule file.
+function isDoc(path: string): boolean {
+  const lower = path.toLowerCase();
+  if (lower === "readme.md" || lower === "architecture.md" || lower === "glossary.md") return true;
+  return /^docs\/.*\.(md|png|jpg|gif|webp)$/.test(lower) && !isRuleFile(lower);
+}
+
+function isTest(path: string): boolean {
+  return /\.test\.(ts|tsx|mts|mjs|js)$/i.test(path);
+}
+
+// A tiny PR skips the reviewer up to this many changed lines outside docs
+// (decision record 0017). Past it, "tiny" is a guess the reviewer should check.
+export const TINY_LINES = 30;
+// A no-blockers verdict still counts after later commits that change up to
+// this many lines outside docs, so a should-fix or a postmortem entry doesn't
+// need another review (0017). A test file added since the verdict is free;
+// a change to one that was already there counts, so a test can't be
+// weakened unseen.
+export const CARRY_OVER_LINES = 40;
+
+function size(lines: ChangedLines, path: string): number {
+  const change = lines[path];
+  return change ? change.added + change.deleted : 0;
+}
+
+function total(lines: ChangedLines, paths: string[]): number {
+  return paths.reduce((sum, path) => sum + size(lines, path), 0);
+}
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 const pass = (detail: string): Result => ({ pass: true, detail });
 const fail = (detail: string): Result => ({ pass: false, detail });
@@ -125,7 +178,7 @@ const SAID: Record<CheckState, string> = {
   skipped: "skipped",
 };
 
-const REVIEWER_GATE = "Reviewer cleared the head commit";
+const REVIEWER_GATE = "Reviewer cleared the PR";
 
 const GATES: { name: string; check: (context: Context) => Result }[] = [
   {
@@ -213,7 +266,7 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
       return pass("check, smoke and Vercel passed, and no other check failed or is still running");
     },
   },
-  { name: REVIEWER_GATE, check: ({ pr, tier }) => reviewerResult(pr, tier) },
+  { name: REVIEWER_GATE, check: ({ pr, history, tier }) => reviewerResult(pr, history, tier) },
   {
     name: "Acceptance criteria ticked",
     check: ({ pr, tier }) => {
@@ -236,8 +289,8 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
 ];
 
 // Every gate runs, even after one fails, so the output lists every reason.
-export function decide(pr: PrSnapshot, main: MainState): Decision {
-  const context: Context = { pr, main, tier: readTier(pr.body) };
+export function decide(pr: PrSnapshot, main: MainState, history: ReviewHistory): Decision {
+  const context: Context = { pr, main, history, tier: readTier(pr.body) };
   const gates = GATES.map(({ name, check }) => ({ name, ...check(context) }));
   return { ok: gates.every((gate) => gate.pass), gates };
 }
@@ -247,15 +300,51 @@ type ReviewInput = Pick<PrSnapshot, "body" | "headRefOid" | "files">;
 // The reviewer gate on its own. GitHub's required `reviewer` check runs it too
 // (scripts/can-merge-reviewer-check.ts), so GitHub and can-merge can't
 // disagree about whether a PR was reviewed (JAS-15).
-export function reviewerCleared(pr: ReviewInput): Gate {
-  return { name: REVIEWER_GATE, ...reviewerResult(pr, readTier(pr.body)) };
+export function reviewerCleared(pr: ReviewInput, history: ReviewHistory): Gate {
+  return { name: REVIEWER_GATE, ...reviewerResult(pr, history, readTier(pr.body)) };
 }
 
-function reviewerResult(pr: ReviewInput, tier: Tier): Result {
-  const tiny = tier.ok && tier.tier === "tiny";
-  const code = pr.files.filter((path) => !isDoc(path));
-  if (tiny && code.length === 0) return pass("a tiny PR that changes only docs skips the reviewer");
-  const lines = section(pr.body, "Review").map((line) => line.replace(/[*_`]/g, "").trim());
+// In this order: a verdict, if there is one, decides, so a tiny PR can't skip
+// past blockers the reviewer found. With none, a small tiny PR skips the
+// reviewer. A verdict on an earlier commit carries over small changes.
+function reviewerResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Result {
+  const { verdicts, unread } = readVerdicts(pr.body);
+  if (verdicts.length === 0) {
+    const skip = tinySkip(pr, history, tier);
+    if (skip.pass) return skip;
+    return fail(`the Review section has no "Reviewer agent at <sha>: no blockers" line${skip.detail}${unread}`);
+  }
+  const placed = verdicts.flatMap((verdict) => {
+    if (pr.headRefOid.startsWith(verdict.sha)) {
+      return [{ ...verdict, commits: 0, lines: {} as ChangedLines, files: [] as string[], created: [] as string[] }];
+    }
+    const since = history.since(verdict.sha);
+    return since ? [{ ...verdict, ...since }] : [];
+  });
+  // A blockers verdict on a commit a force push dropped would otherwise
+  // vanish and let an older clean verdict count again. A clean review of the
+  // head itself still clears it.
+  const lost = verdicts.find((verdict) => !placed.some(({ line }) => line === verdict.line) && !isClean(verdict.verdict));
+  const cleanAtHead = placed.some(({ commits, verdict }) => commits === 0 && isClean(verdict));
+  if (lost && !cleanAtHead) return fail(`"${lost.line}" names a commit that isn't on the branch any more, and a fix for a blocker needs a new review`);
+  if (placed.length === 0) {
+    const shas = verdicts.map(({ sha }) => sha.slice(0, 7)).join(", ");
+    return fail(`the reviewer saw ${shas}, which isn't the head commit ${pr.headRefOid.slice(0, 7)} or one this PR added before it${unread}`);
+  }
+  // The newest verdict is the one with the fewest of the PR's commits after it.
+  const fewest = Math.min(...placed.map(({ commits }) => commits));
+  const newest = placed.filter(({ commits }) => commits === fewest);
+  const blocked = newest.find(({ verdict }) => !isClean(verdict));
+  if (blocked) return fail(`blockers in the newest verdict: "${blocked.line}". A fix for a blocker needs a new review`);
+  return carryOver(pr, newest[0]);
+}
+
+type Verdict = { sha: string; verdict: string; line: string };
+
+const isClean = (verdict: string) => /^no blockers\b/i.test(verdict);
+
+function readVerdicts(body: string): { verdicts: Verdict[]; unread: string } {
+  const lines = section(body, "Review").map((line) => line.replace(/[*_`]/g, "").trim());
   const verdicts = lines.flatMap((line) => {
     const match = line.match(/Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
     return match ? [{ sha: match[1].toLowerCase(), verdict: match[2].trim(), line: match[0].trim() }] : [];
@@ -272,17 +361,46 @@ function reviewerResult(pr: ReviewInput, tier: Tier): Result {
     misread.size === 0
       ? ""
       : `; couldn't read ${[...misread].map((line) => `"${line}"`).join(", ")}: a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`;
-  if (verdicts.length === 0) {
-    const missing = 'the Review section has no "Reviewer agent at <sha>: no blockers" line';
-    return fail(`${tiny ? `${missing}, which a tiny PR needs once it changes ${code.join(", ")}` : missing}${unread}`);
+  return { verdicts, unread };
+}
+
+// A pass, or a fail whose detail says why a tiny PR still needs the reviewer.
+function tinySkip(pr: ReviewInput, history: ReviewHistory, tier: Tier): Result {
+  if (!(tier.ok && tier.tier === "tiny")) return fail("");
+  const rules = pr.files.filter(isRuleFile);
+  if (rules.length > 0) return fail(`, which a tiny PR needs once it changes ${rules.join(", ")}`);
+  const risky = riskyFiles(pr.files).map(({ path }) => path);
+  if (risky.length > 0) return fail(`, which a tiny PR needs once it changes ${risky.join(", ")}`);
+  const code = pr.files.filter((path) => !isDoc(path));
+  if (code.length === 0) return pass("a tiny PR that changes only docs skips the reviewer");
+  const lines = total(history.lines, code);
+  if (lines <= TINY_LINES) return pass(`a tiny PR that changes ${lines} lines outside docs (up to ${TINY_LINES}) skips the reviewer`);
+  return fail(`, which a tiny PR needs once it changes more than ${TINY_LINES} lines outside docs (${lines} in ${code.join(", ")})`);
+}
+
+function carryOver(
+  pr: ReviewInput,
+  verdict: Verdict & { commits: number; lines: ChangedLines; files: string[]; created: string[] },
+): Result {
+  const { line, sha, commits, lines, files, created } = verdict;
+  if (commits === 0) return pass(line);
+  // The PR's files now and at the verdict, so a file put back to main's
+  // version still counts. Main's changes to other files, merged in, don't.
+  // Main's changes to these files do, which can ask for a review nobody
+  // needed but never skips one.
+  const after = [...new Set([...pr.files, ...files])].filter((path) => path in lines);
+  const guarded = [...after.filter(isRuleFile), ...riskyFiles(after).map(({ path }) => path)];
+  if (guarded.length > 0) {
+    const named = [...new Set(guarded)].join(", ");
+    return fail(`${named} changed after the verdict at ${sha.slice(0, 7)}, and a change to a rule file or risky path needs a new review`);
   }
-  const atHead = verdicts.filter(({ sha }) => pr.headRefOid.startsWith(sha));
-  if (atHead.length === 0) {
-    const shas = verdicts.map(({ sha }) => sha.slice(0, 7)).join(", ");
-    return fail(`the reviewer saw ${shas}, not the head commit ${pr.headRefOid.slice(0, 7)}${unread}`);
+  const counted = total(lines, after.filter((path) => !isDoc(path) && !(isTest(path) && created.includes(path))));
+  if (counted > CARRY_OVER_LINES) {
+    return fail(
+      `${counted} lines outside docs changed after the verdict at ${sha.slice(0, 7)}, more than the ${CARRY_OVER_LINES} a verdict carries over`,
+    );
   }
-  const blocked = atHead.find(({ verdict }) => !/^no blockers\b/i.test(verdict));
-  return blocked ? fail(`blockers at the head commit: "${blocked.line}"`) : pass(atHead[0].line);
+  return pass(`${line}, carried over ${plural(commits, "commit")} with ${plural(counted, "line")} outside docs`);
 }
 
 // The template's placeholder, "tiny, normal or risky", names all three, so a

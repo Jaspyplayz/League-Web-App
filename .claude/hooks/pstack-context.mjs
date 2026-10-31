@@ -15,6 +15,9 @@
 // can't find. Its poteto-agent also looks for poteto-mode in the plugin cache,
 // which a cloud session doesn't have. pstack's files stay unchanged, so a note
 // after the text overrides both, with the path a poteto-agent should read.
+// The note also keeps the interrogate panel off Fable, which Jasper doesn't
+// use (decision record 0017), since a cloud session has no pstack-models.md
+// sheet to say so and the panel's default list has a Fable reviewer.
 //
 // Like the plugin's hook, it prints nothing when the pstack-models.md sheet has
 // the line `session hook: off`, so that switch still works in this project.
@@ -31,6 +34,7 @@ const namesNote = (potetoModePath) =>
     "This overrides pstack's own files: poteto-mode's Subagents section says the bare name `poteto-agent` errors, but here the `pstack:` agent names are the ones that don't exist. As `subagent_type`, use `poteto-agent`, `comment-sicko`, `thermo-nuclear-review-subagent` and `thermo-nuclear-code-quality-review-subagent`.",
     `When you start a \`poteto-agent\`, give it this path to poteto-mode's SKILL.md, because without one it searches the plugin cache: ${potetoModePath}`,
     "Where a pstack skill says to run a script from the installed plugin, run it from `.claude/skills/` instead.",
+    "This project doesn't use Fable: when `interrogate` starts its reviewers, leave out any Fable entry, so with no `interrogate reviewers` line the panel is Opus, Sonnet and Haiku.",
   ].join("\n");
 
 // Read the sheet the way the plugin's hook does: Windows PowerShell may save it

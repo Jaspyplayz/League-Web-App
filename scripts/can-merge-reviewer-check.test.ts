@@ -10,7 +10,8 @@ const WORKFLOW = ".github/workflows/reviewer.yml";
 
 // GitHub runs the script with the PR's event file, from a checkout that holds
 // both commits. This builds the same: a repo with a base commit, a head that
-// changes only docs, and a head that changes code.
+// changes only docs, a head that changes one line of code, a small fix after
+// it, and a big change after that.
 describe("the reviewer check GitHub requires", () => {
   const repo = mkdtempSync(join(tmpdir(), "reviewer-check-"));
   const events = mkdtempSync(join(tmpdir(), "reviewer-check-events-"));
@@ -26,7 +27,7 @@ describe("the reviewer check GitHub requires", () => {
     git("commit", "-q", "-m", path);
     return git("rev-parse", "HEAD");
   };
-  const heads = { base: "", docs: "", code: "" };
+  const heads = { base: "", docs: "", code: "", fix: "", big: "" };
 
   beforeAll(() => {
     git("init", "-q", "-b", "main");
@@ -35,6 +36,8 @@ describe("the reviewer check GitHub requires", () => {
     heads.docs = commit("docs/habits.md", "Habits.\n");
     git("switch", "-q", "-c", "code", "main");
     heads.code = commit("src/lib/habits.ts", "export const habits = 1;\n");
+    heads.fix = commit("src/lib/habits.ts", "export const habits = 2;\n");
+    heads.big = commit("src/lib/streaks.ts", "export const streak = 0;\n".repeat(41));
   });
   afterAll(() => {
     rmSync(repo, { recursive: true, force: true });
@@ -57,31 +60,55 @@ describe("the reviewer check GitHub requires", () => {
 
   it("passes once the reviewer cleared the head commit", () => {
     const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.code}: no blockers`]), heads.code);
-    expect(out).toContain(`PASS Reviewer cleared the head commit: Reviewer agent at ${heads.code}: no blockers`);
+    expect(out).toContain(`PASS Reviewer cleared the PR: Reviewer agent at ${heads.code}: no blockers`);
     expect(code).toBe(0);
   });
 
   it("fails until the Review section has the verdict line", () => {
     const { code, out } = check(body("normal. A habit card."), heads.code);
-    expect(out).toContain('FAIL Reviewer cleared the head commit: the Review section has no "Reviewer agent at <sha>: no blockers" line');
+    expect(out).toContain('FAIL Reviewer cleared the PR: the Review section has no "Reviewer agent at <sha>: no blockers" line');
     expect(code).toBe(1);
   });
 
-  it("fails when a new commit lands after the review", () => {
+  it("fails a verdict on a commit that isn't on the branch", () => {
     const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.docs}: no blockers`]), heads.code);
-    expect(out).toContain(`not the head commit ${heads.code.slice(0, 7)}`);
+    expect(out).toContain(`isn't the head commit ${heads.code.slice(0, 7)} or one this PR added before it`);
+    expect(code).toBe(1);
+  });
+
+  it("fails a verdict on the base commit, which the PR didn't add", () => {
+    const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.base}: no blockers`]), heads.fix);
+    expect(out).toContain("or one this PR added before it");
+    expect(code).toBe(1);
+  });
+
+  it("carries a verdict over a small fix after the review", () => {
+    const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.code}: no blockers`]), heads.fix);
+    expect(out).toContain("carried over 1 commit with 2 lines outside docs");
+    expect(code).toBe(0);
+  });
+
+  it("fails when a big change lands after the review", () => {
+    const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.code}: no blockers`]), heads.big);
+    expect(out).toContain("43 lines outside docs changed after the verdict");
     expect(code).toBe(1);
   });
 
   it("passes a tiny PR that changes only docs, without the reviewer", () => {
     const { code, out } = check(body("tiny. Docs only."), heads.docs);
-    expect(out).toContain("PASS Reviewer cleared the head commit: a tiny PR that changes only docs skips the reviewer");
+    expect(out).toContain("PASS Reviewer cleared the PR: a tiny PR that changes only docs skips the reviewer");
     expect(code).toBe(0);
   });
 
-  it("fails a tiny PR that changes code, and names the file", () => {
+  it("passes a tiny PR that changes one line of code, without the reviewer", () => {
     const { code, out } = check(body("tiny. A copy fix."), heads.code);
-    expect(out).toContain("src/lib/habits.ts");
+    expect(out).toContain("PASS Reviewer cleared the PR: a tiny PR that changes 1 lines outside docs");
+    expect(code).toBe(0);
+  });
+
+  it("fails a tiny PR past the limit, and names the files", () => {
+    const { code, out } = check(body("tiny. A copy fix."), heads.big);
+    expect(out).toContain("src/lib/habits.ts, src/lib/streaks.ts");
     expect(code).toBe(1);
   });
 
@@ -89,7 +116,7 @@ describe("the reviewer check GitHub requires", () => {
   // Claude adds the Review section.
   it("fails a PR with no description", () => {
     const { code, out } = check(null, heads.code);
-    expect(out).toContain("FAIL Reviewer cleared the head commit");
+    expect(out).toContain("FAIL Reviewer cleared the PR");
     expect(code).toBe(1);
   });
 });
@@ -104,7 +131,7 @@ describe(WORKFLOW, () => {
     expect(workflow()).toMatch(/^ {4}branches: \[main\]$/m);
   });
 
-  // So a new verdict line passes it, and a new commit fails it again.
+  // So a new verdict line passes it, and a new commit checks it again.
   it("runs again when the description is edited and when a commit is pushed", () => {
     const types = workflow().match(/^ {4}types: \[(.*)\]$/m)?.[1].split(/,\s*/);
     expect(types).toEqual(expect.arrayContaining(["opened", "edited", "synchronize", "reopened"]));
