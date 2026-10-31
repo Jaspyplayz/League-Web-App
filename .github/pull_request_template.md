@@ -1,6 +1,6 @@
 **Tier:** tiny, normal or risky, and why.
 **Builder:** Claude Code on Opus 5.5, in a local or cloud session.
-**Ready to merge:** no. The builder changes this to yes as its last step; the Agent merge workflow merges only then (docs/workflow.md step 11).
+**Ready to merge:** no. As its last step the builder changes this to `yes at <head sha>`; the Agent merge workflow merges only then, and a later push holds it again (docs/workflow.md step 11).
 Closes #
 
 ## Summary

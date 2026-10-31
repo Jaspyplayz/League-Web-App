@@ -52,7 +52,7 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | No PR merges before the reviewer clears it (its head, or an earlier commit with only small changes since) | GitHub's required `reviewer` check |
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
 | A PR that touches the risky list is Jasper's to merge | `npm run can-merge`, which refuses it (`scripts/risky-paths.ts`) |
-| The Agent merge workflow merges only a PR whose builder wrote `**Ready to merge:** yes` | `readyToMerge` in `scripts/can-merge-action-steps.ts` and its tests |
+| The Agent merge workflow merges only a PR whose builder wrote `**Ready to merge:** yes at <head sha>` | `readyToMerge` in `scripts/can-merge-action-steps.ts` and its tests |
 | Every agent mistake entry has all five lines | `scripts/agent-mistakes.test.ts` |
 | Each line in the reviewer's Judgement calls checklist names a class file that exists | `scripts/agent-mistakes.test.ts` |
 | Every reviewer blocker ends with a `Check could catch this:` line, kept in the PR's Review section | Nothing yet: `.claude/agents/reviewer.md` and `docs/workflow.md`; check 5 of [the wellness check](wellness.md#check-5-agent-mistakes) reads it twice a month |

@@ -7,6 +7,7 @@ import {
   openPullsPath,
   outcomeOf,
   pullsOnBranch,
+  pullsToMerge,
   readyToMerge,
   shouldRetry,
   WorkflowRunEvent,
@@ -15,6 +16,7 @@ import {
 import { REFUSED_EXIT_CODE } from "./can-merge-gates";
 
 const REPO = "Jaspyplayz/League-Web-App";
+const HEAD = "4d2a4fefeaef178f0565d274999c22b752383437";
 
 function source(path: string): string {
   return readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -32,8 +34,8 @@ function event(branch: string | null, repo: string | null = REPO): WorkflowRunEv
   });
 }
 
-function pull(number: number, ref: string, repo: string | null = REPO, body = "**Ready to merge:** yes"): OpenPull {
-  return { number, body, head: { ref, repo: repo === null ? null : { full_name: repo } } };
+function pull(number: number, ref: string, repo: string | null = REPO, body = "**Ready to merge:** yes at 4d2a4fe"): OpenPull {
+  return { number, body, head: { ref, sha: HEAD, repo: repo === null ? null : { full_name: repo } } };
 }
 
 describe("branchToTry", () => {
@@ -75,8 +77,8 @@ describe("finding the PR", () => {
   });
 
   it("reads GitHub's answer", () => {
-    const answer = [{ number: 240, title: "Agent merge", body: null, head: { ref: "claude/x", sha: "abc", repo: { full_name: REPO } } }];
-    expect(OpenPulls.parse(answer)).toEqual([{ number: 240, body: null, head: { ref: "claude/x", repo: { full_name: REPO } } }]);
+    const answer = [{ number: 240, title: "Agent merge", body: null, head: { ref: "claude/x", sha: HEAD, repo: { full_name: REPO } } }];
+    expect(OpenPulls.parse(answer)).toEqual([{ number: 240, body: null, head: { ref: "claude/x", sha: HEAD, repo: { full_name: REPO } } }]);
   });
 
   it("keeps only the branch's PR in this repo, whatever GitHub answers", () => {
@@ -86,28 +88,59 @@ describe("finding the PR", () => {
 });
 
 describe("readyToMerge", () => {
-  it("merges only once the builder writes yes", () => {
-    expect(readyToMerge("**Tier:** tiny\n**Ready to merge:** yes\n")).toEqual({ ready: true });
-    expect(readyToMerge("**Ready to merge:** Yes, steps 7 to 10 are done")).toEqual({ ready: true });
+  it("merges only once the builder names the head commit", () => {
+    expect(readyToMerge("**Tier:** tiny\n**Ready to merge:** yes at 4d2a4fe\n", HEAD)).toEqual({ ready: true });
+    expect(readyToMerge(`**Ready to merge:** Yes at ${HEAD.toUpperCase()}.`, HEAD)).toEqual({ ready: true });
   });
 
-  it("holds a PR that says no, says nothing, or has no body", () => {
-    expect(readyToMerge("**Ready to merge:** no, until the screenshots are in")).toEqual({
+  it("holds the PR again after a push, until the builder names the new head", () => {
+    expect(readyToMerge("**Ready to merge:** yes at cf65cb6", HEAD)).toEqual({
       ready: false,
-      why: '**Ready to merge:** says "no, until the screenshots are in", not yes',
+      why: "**Ready to merge:** names cf65cb6, but the head is 4d2a4fe",
     });
-    expect(readyToMerge("**Tier:** tiny")).toEqual({ ready: false, why: "no **Ready to merge:** line" });
-    expect(readyToMerge(null)).toEqual({ ready: false, why: "no **Ready to merge:** line" });
-    expect(readyToMerge("**Ready to merge:** yesterday")).toMatchObject({ ready: false });
+  });
+
+  it("holds a PR that says no, says nothing, has no body, or adds a condition", () => {
+    expect(readyToMerge("**Ready to merge:** no, until the screenshots are in", HEAD)).toEqual({
+      ready: false,
+      why: '**Ready to merge:** says "no, until the screenshots are in", not "yes at <head sha>"',
+    });
+    expect(readyToMerge("**Tier:** tiny", HEAD)).toEqual({ ready: false, why: "no **Ready to merge:** line" });
+    expect(readyToMerge(null, HEAD)).toEqual({ ready: false, why: "no **Ready to merge:** line" });
+    expect(readyToMerge("**Ready to merge:** yes", HEAD)).toMatchObject({ ready: false });
+    expect(readyToMerge("**Ready to merge:** yes at 4d2a4fe once Jasper checks the screenshots", HEAD)).toMatchObject({ ready: false });
+    expect(readyToMerge("**Ready to merge:** yes at 4d2a", HEAD)).toMatchObject({ ready: false });
   });
 
   it("holds a PR whose yes is hidden or doubled, like the other fields", () => {
-    expect(readyToMerge("```\n**Ready to merge:** yes\n```")).toMatchObject({ ready: false });
-    expect(readyToMerge("<!-- **Ready to merge:** yes -->")).toMatchObject({ ready: false });
-    expect(readyToMerge("**Ready to merge:** no\n**Ready to merge:** yes")).toEqual({
+    expect(readyToMerge("```\n**Ready to merge:** yes at 4d2a4fe\n```", HEAD)).toMatchObject({ ready: false });
+    expect(readyToMerge("<!-- **Ready to merge:** yes at 4d2a4fe -->", HEAD)).toMatchObject({ ready: false });
+    expect(readyToMerge("**Ready to merge:** no\n**Ready to merge:** yes at 4d2a4fe", HEAD)).toEqual({
       ready: false,
       why: "2 lines start with **Ready to merge:**; keep one",
     });
+  });
+});
+
+describe("pullsToMerge", () => {
+  it("hands can-merge only the branch's PRs marked ready at their head, and says why it held the rest", () => {
+    const answer = [
+      pull(1, "claude/x"),
+      pull(2, "claude/x", REPO, "**Ready to merge:** no"),
+      pull(3, "claude/y"),
+      pull(4, "claude/x", "someone/League-Web-App"),
+    ];
+    expect(pullsToMerge(answer, "claude/x", REPO)).toEqual({
+      ready: [1],
+      held: [{ number: 2, why: '**Ready to merge:** says "no", not "yes at <head sha>"' }],
+    });
+  });
+
+  it("is the only way the script picks a PR, and it runs can-merge only on those", () => {
+    const script = source("scripts/can-merge-action.ts");
+    expect(script.match(/spawnSync\(/g)).toHaveLength(1);
+    expect(script).toMatch(/const \{ ready, held \} = pullsToMerge\(pulls, target\.branch, repository\);/);
+    expect(script).toMatch(/for \(const number of ready\) \{\n\s+for \(let attempt = 1; attempt <= ATTEMPTS; attempt\+\+\) \{\n.*\n\s+const result = spawnSync\("npx", \["tsx", "scripts\/can-merge\.ts", String\(number\), "--merge"\]/);
   });
 });
 

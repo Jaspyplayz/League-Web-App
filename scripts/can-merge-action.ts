@@ -15,8 +15,7 @@ import {
   OpenPulls,
   openPullsPath,
   outcomeOf,
-  pullsOnBranch,
-  readyToMerge,
+  pullsToMerge,
   shouldRetry,
   WorkflowRunEvent,
 } from "./can-merge-action-steps";
@@ -55,19 +54,18 @@ if ("skip" in target) {
   process.exit(0);
 }
 
-const pulls = pullsOnBranch(OpenPulls.parse(api(openPullsPath(repository, target.branch))), target.branch, repository);
-if (pulls.length === 0) {
+const pulls = OpenPulls.parse(api(openPullsPath(repository, target.branch)));
+const { ready, held } = pullsToMerge(pulls, target.branch, repository);
+if (ready.length === 0 && held.length === 0) {
   summary(`Nothing to merge: ${target.branch} has no open PR.`);
   process.exit(0);
 }
+for (const { number, why } of held) {
+  summary(`#${number}: not marked ready (${why}). The builder writes **Ready to merge:** yes at <head sha> as its last step.`);
+}
 
 let failed = false;
-for (const { number, body } of pulls) {
-  const ready = readyToMerge(body);
-  if (!ready.ready) {
-    summary(`#${number}: not marked ready yet (${ready.why}). The builder writes **Ready to merge:** yes as its last step.`);
-    continue;
-  }
+for (const number of ready) {
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     console.log(`\n${event.workflow_run.name} finished on ${target.branch}. Asking can-merge about #${number} (try ${attempt}).\n`);
     const result = spawnSync("npx", ["tsx", "scripts/can-merge.ts", String(number), "--merge"], { stdio: "inherit" });

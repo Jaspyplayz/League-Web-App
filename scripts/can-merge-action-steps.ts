@@ -49,6 +49,7 @@ export const OpenPulls = z.array(
     body: z.string().nullable(),
     head: z.object({
       ref: z.string(),
+      sha: z.string(),
       // null once a fork's repository is deleted.
       repo: z.object({ full_name: z.string() }).nullable(),
     }),
@@ -67,15 +68,38 @@ export const READY_LABEL = "Ready to merge";
 // The builder's say-so that its own steps are done (docs/workflow.md steps
 // 7 to 10), since every gate can pass before then: a tiny PR's checks can
 // finish before its screenshots, and a normal PR's verdict before its
-// postmortem entry. It's `**Ready to merge:** yes`; anything else, or no such
-// line, holds the PR. Changing it edits the description, which reruns the
-// Reviewer workflow, which runs this again. It isn't a can-merge gate, so a
-// session running can-merge itself isn't held by it.
-export function readyToMerge(body: string | null): { ready: true } | { ready: false; why: string } {
+// postmortem entry. It's `**Ready to merge:** yes at <head sha>`, so a push
+// after it, such as a postmortem entry for a failure the builder then
+// found, holds the PR again until the builder names the new head. Anything
+// else, or no such line, holds it. Changing it edits the description, which
+// reruns the Reviewer workflow, which runs this again. It isn't a can-merge
+// gate, so a session running can-merge itself isn't held by it.
+export function readyToMerge(body: string | null, headSha: string): { ready: true } | { ready: false; why: string } {
   const line = field(body ?? "", READY_LABEL);
   if (!("value" in line)) return { ready: false, why: line.why };
-  if (!/^yes\b/i.test(line.value)) return { ready: false, why: `**${READY_LABEL}:** says "${line.value}", not yes` };
+  const named = line.value.match(/^yes at ([0-9a-f]{7,40})\.?$/i)?.[1].toLowerCase();
+  if (!named) return { ready: false, why: `**${READY_LABEL}:** says "${line.value}", not "yes at <head sha>"` };
+  if (!headSha.toLowerCase().startsWith(named)) {
+    return { ready: false, why: `**${READY_LABEL}:** names ${named}, but the head is ${headSha.slice(0, 7)}` };
+  }
   return { ready: true };
+}
+
+// Which of GitHub's answers to hand to can-merge: the branch's PRs in this
+// repo whose builder marked their head ready. The rest are held, with why.
+export function pullsToMerge(
+  pulls: OpenPull[],
+  branch: string,
+  repository: string,
+): { ready: number[]; held: { number: number; why: string }[] } {
+  const ready: number[] = [];
+  const held: { number: number; why: string }[] = [];
+  for (const pull of pullsOnBranch(pulls, branch, repository)) {
+    const verdict = readyToMerge(pull.body, pull.head.sha);
+    if (verdict.ready) ready.push(pull.number);
+    else held.push({ number: pull.number, why: verdict.why });
+  }
+  return { ready, held };
 }
 
 export type Outcome = "passed" | "refused" | "crashed";
