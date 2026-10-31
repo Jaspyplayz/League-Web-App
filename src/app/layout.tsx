@@ -16,7 +16,7 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 // Rubik is the body font (JAS-97). It's a variable font, so one file covers
-// every weight from 400 to 700. Barlow Condensed and IBM Plex Mono stay for
+// every weight the site uses (400 to 700). Barlow Condensed and IBM Plex Mono stay for
 // the headings and labels that still use them, until their pages move over.
 const rubik = Rubik({
   variable: "--font-rubik",
