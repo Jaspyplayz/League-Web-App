@@ -22,8 +22,9 @@ const TABS: { id: Tab; label: string }[] = [
 // from a row of champion icons.
 //
 // Overview, Team analysis and every rune page are drawn on the server and
-// passed in, since the match data is already there. Builds need the match timeline, which the
-// profile doesn't load, so they're fetched the first time Build is opened.
+// passed in, since the match data is already there. Builds need the match
+// timeline, which the profile doesn't load, so they're fetched the first
+// time Build is opened.
 export function MatchTabs({
   region,
   matchId,

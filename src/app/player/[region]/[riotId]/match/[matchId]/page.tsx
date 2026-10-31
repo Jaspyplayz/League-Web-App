@@ -83,7 +83,7 @@ async function Analysis({ params }: { params: Params }) {
     return (
       <>
         {back}
-        <p className="text-muted">
+        <p className="text-quiet">
           {id.gameName}#{id.tagLine} isn&apos;t in this match.
         </p>
       </>
@@ -110,7 +110,7 @@ async function Analysis({ params }: { params: Params }) {
       <>
         {back}
         {header}
-        <p className={`${panelClass} px-5 py-4 text-muted`}>
+        <p className={`${panelClass} px-5 py-4 text-quiet`}>
           {skipped} Here&apos;s the scoreboard.
         </p>
         {scoreboard}
@@ -167,7 +167,7 @@ async function Analysis({ params }: { params: Params }) {
               riotId={riotId}
               puuid={me.puuid}
               playerPath={`/player/${region}/${toSlug(id)}`}
-              game={`${label(me.championName)} game on ${gameDate(match)}`}
+              game={`${label(me.championName)} game on ${gameDate(match)} (${matchId})`}
             />
           </Suspense>
         }
@@ -177,8 +177,7 @@ async function Analysis({ params }: { params: Params }) {
 }
 
 // The day the game was played, like "Oct 18", the way Ask's answers name
-// games (gameLabel in src/lib/ask-rules.ts), so a question that names it
-// reads the same.
+// games (gameLabel in src/lib/ask-rules.ts).
 function gameDate(match: Match): string {
   return new Date(match.info.gameStartTimestamp).toLocaleDateString("en-US", {
     month: "short",
@@ -205,7 +204,7 @@ function BackLink({ region, id }: { region: Region; id: RiotId }) {
   return (
     <Link
       href={`/player/${region}/${toSlug(id)}`}
-      className="inline-flex min-h-10 items-center gap-2 self-start text-sm text-muted hover:text-ink"
+      className="inline-flex min-h-10 items-center gap-2 self-start text-sm text-quiet hover:text-main"
     >
       <svg
         width="16"

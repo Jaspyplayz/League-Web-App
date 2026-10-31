@@ -170,8 +170,9 @@ export function AnalysisSections({
         </a>
       </p>
 
-      {/* Beside each other from 1280px (xl), where the replay still has room
-          for its map and scoreboard; the Ask panel goes under it below that. */}
+      {/* Beside each other from 1280px (xl), the Ask panel under the replay
+          below that. Beside Ask, the replay's scoreboard drops under its map,
+          as it does on narrower screens. */}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Replay
           replay={a.replay}

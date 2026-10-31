@@ -1,3 +1,5 @@
+import "server-only";
+
 import { SignInLink } from "@/components/sign-in-link";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
@@ -12,10 +14,11 @@ import { AskBox } from "./ask-box";
 // answers from Turnpoint's analysis of them (see src/lib/ask.ts). Anyone
 // signed in can ask, up to 10 questions a day (src/lib/ask-rules.ts).
 //
-// The panel puts this game first: its heading and example questions name
-// it by champion and date, the way Claude's answers refer to games. Claude
-// still reads the player's games with the same tools as before, so it finds
-// this one when it's among their latest games.
+// The panel puts this game first: its example questions name it by
+// champion, date and match ID. Claude's analyze_game tool reads any game the
+// player played from its match ID, so a question that keeps the ID reaches
+// this game even when it's older than the 20 recent_games lists, without
+// changing what Ask sends, its limits or what it spends.
 //
 // The Ask button is a Server Action, which gets the page's time limit, so
 // the match page sets maxDuration for it.
@@ -30,7 +33,7 @@ export function AskPanel({
   riotId: string; // the slug from the address, "Name-TAG"
   puuid: string;
   playerPath: string;
-  game: string; // this game in words, "Ahri game on Oct 18"
+  game: string; // this game in words with its ID, "Ahri game on Oct 18 (NA1_123)"
 }) {
   return (
     <section aria-labelledby="ask-heading" className={`${panelClass} flex flex-col gap-4 p-6`}>
@@ -65,7 +68,8 @@ function AskIllustration() {
   );
 }
 
-async function AskContent({
+// Exported for its test.
+export async function AskContent({
   region,
   riotId,
   puuid,
@@ -95,12 +99,21 @@ async function AskContent({
     );
   }
 
-  const [history, allowed] = await Promise.all([
-    readQuestions(user.id, puuid),
-    checkAllowance(user.id),
-  ]);
+  // checkAllowance throws when its queries fail. On the old Ask page that
+  // showed the error page; here it would take the whole match page with it,
+  // so the panel says so instead and the analysis stays.
+  let loaded;
+  try {
+    loaded = await Promise.all([readQuestions(user.id, puuid), checkAllowance(user.id)]);
+  } catch {
+    return <p className="text-behind">Couldn&apos;t load Ask. Reload to try again.</p>;
+  }
+  const [history, allowed] = loaded;
   return (
     <>
+      <p className="text-note text-quiet">
+        To ask about this game, keep its match ID in your question, as the first two examples do.
+      </p>
       {!allowed.ok && <p className="text-behind">{allowed.message}</p>}
       <AskBox
         region={region}
