@@ -6,12 +6,20 @@ name: Smoke test
 # Guide: https://vercel.com/guides/how-can-i-run-end-to-end-tests-after-my-vercel-preview-deployment
 on: deployment_status
 
+# Read-only, like CI: the job only checks out the code and tests the preview.
+# Uploading the screenshots uses the artifact service, not this token.
+permissions:
+  contents: read
+
 jobs:
   smoke:
     if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Don't leave the token in .git/config for later steps to read.
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc

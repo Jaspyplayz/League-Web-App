@@ -5,11 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+# The token GitHub gives the job can only read the repo, like
+# dependency-review.yml's. Nothing here writes to GitHub, so a bad package
+# that runs during `npm ci` can't push or comment with it.
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Don't leave the token in .git/config for later steps to read.
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
