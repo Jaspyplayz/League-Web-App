@@ -55,7 +55,7 @@ export default function GlobalError({
             </span>
             Turnpoint
           </a>
-          <h1 className="mt-3.5 text-2xl font-semibold sm:text-[28px]">Something went wrong</h1>
+          <h1 className="mt-3.5 text-2xl font-semibold sm:text-title">Something went wrong</h1>
           <p className="text-body text-quiet">
             The site hit an error we didn&apos;t expect. It&apos;s been reported.
           </p>

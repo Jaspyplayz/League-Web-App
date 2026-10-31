@@ -33,7 +33,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [Re-review line written in the wrong shape](agent-mistakes/re-review-line-shape.md) | 1 | check |
 | [Text read as if it had Unix line endings](agent-mistakes/windows-line-endings.md) | 1 | check |
 | [Jasper's own writing listed as his to-do](agent-mistakes/owner-writing-listed-as-todo.md) | 2 | design |
-| [Tier line names a second tier word](agent-mistakes/tier-line-names-two-tiers.md) | 4 | none yet |
+| [Tier line names a second tier word](agent-mistakes/tier-line-names-two-tiers.md) | 5 | none yet |
 | [A check left to a local session that the cloud could run](agent-mistakes/check-left-for-a-local-session.md) | 1 | CLAUDE.md line |
 | [Merge Danger understated on a risky path](agent-mistakes/merge-danger-understated.md) | 3 | none yet |
 | [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 6 | check |

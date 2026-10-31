@@ -12,7 +12,7 @@ export default function NotFound() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:py-16">
       <div className="flex max-w-[640px] flex-col gap-3.5">
-        <h1 className="text-2xl font-semibold sm:text-[28px]">We couldn&apos;t find that page</h1>
+        <h1 className="text-2xl font-semibold sm:text-title">We couldn&apos;t find that page</h1>
         <p className="text-body text-quiet">
           The link may have a typo in the region, the Riot ID or the match. Search for the
           player again, or open the example game.
