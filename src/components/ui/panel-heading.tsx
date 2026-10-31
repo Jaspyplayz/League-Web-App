@@ -4,7 +4,7 @@ import type { ComponentProps } from "react";
 // points"). Same style as SectionHeading, one size down: Rubik in sentence
 // case, as the Review board look has no all-caps or condensed type.
 export function PanelHeading({ className = "", ...props }: ComponentProps<"h2">) {
-  return <h2 className={`text-[17px] font-semibold leading-snug ${className}`} {...props} />;
+  return <h2 className={`text-subheading font-semibold ${className}`} {...props} />;
 }
 
 // A small label for one part of a panel, like each chart and list in "How

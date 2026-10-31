@@ -22,7 +22,7 @@ export function UnexpectedError({
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:py-12">
       <div className="flex max-w-[640px] flex-col gap-3.5">
-        <h1 className="text-2xl font-semibold sm:text-[28px]">Something went wrong</h1>
+        <h1 className="text-2xl font-semibold sm:text-title">Something went wrong</h1>
         <p className="text-body text-quiet">
           This page hit an error we didn&apos;t expect. It&apos;s been reported.
         </p>
