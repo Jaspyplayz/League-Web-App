@@ -19,9 +19,10 @@
 // Everything here runs on the server: the page gets the chance at every
 // second and the graded plays, not the model.
 
+import type { MapPosition } from "@/lib/riot/types";
 import { formatClock, listNames } from "./format";
 import type { ObjectiveKind } from "./objectives";
-import { between, goldAt, type ReplayData } from "./replay";
+import { between, goldAt, type ReplayData, type ReplayKill } from "./replay";
 import type { TrimmedTimeline } from "./trim";
 import {
   blueWinChance,
@@ -46,6 +47,8 @@ export type Play = {
   // True when you got a kill or assist in it, died in it, or helped take one
   // of its epic monsters. Riot doesn't log who took a tower.
   mine: boolean;
+  // Its grade (see gradePlay), worked out once here so the page doesn't.
+  grade: Grade;
 };
 
 export type ReplayChances = {
@@ -94,7 +97,10 @@ export function replayChances(
         const k = replay.kills[i];
         return k.killerId === meId || k.victimId === meId || k.assists.includes(meId);
       }) || objectives.some((i) => myMonsters.has(replay.objectives[i].timestamp));
-    return { from, to, kills, objectives, before: chanceAt(from - 1), after: chanceAt(to), mine };
+    const before = chanceAt(from - 1);
+    const after = chanceAt(to);
+    const grade = gradePlay({ kills, before, after }, replay);
+    return { from, to, kills, objectives, before, after, mine, grade };
   });
   return { perSecond, plays };
 }
@@ -169,7 +175,22 @@ function chanceReader(
 
 // --- Grades and words, for the plays list ---
 
-export type Grade = "Great" | "Good" | "Even" | "Inaccuracy" | "Mistake";
+// Chess-style grades, best first. Chess.com's scale also has Best, Miss
+// and Book, which Turnpoint leaves out on purpose (decision record 0023):
+// Best needs the other options a player had, Miss the absence of a play,
+// and Book an opening move that isn't a kill or an objective.
+export const GRADES = [
+  "Brilliant",
+  "Great",
+  "Excellent",
+  "Good",
+  "Even",
+  "Inaccuracy",
+  "Mistake",
+  "Blunder",
+] as const;
+
+export type Grade = (typeof GRADES)[number];
 
 // Where the replay jumps to for a play: the first whole second of it, so the
 // clock, scoreboard and win chance all count its first event.
@@ -183,15 +204,138 @@ export function playSwing(play: Pick<Play, "before" | "after">): number {
   return Math.round((play.after - play.before) * 1000) / 10;
 }
 
-// Great from +4 points, Good from +1, Inaccuracy from −1, Mistake from −4,
-// and Even in between. It grades what a play did to the chance, not whether
-// it was the right call.
-export function gradeOf(swing: number): Grade {
-  if (swing >= 4) return "Great";
-  if (swing >= 1) return "Good";
-  if (swing <= -4) return "Mistake";
-  if (swing <= -1) return "Inaccuracy";
+// The lines between the grades, in points of win chance.
+const SMALL_SWING = 1;
+const BIG_SWING = 4;
+// Great and Blunder also need the play to change your team's band, below.
+// Without this, an early lone kill that tips the chance from 43% to 39%
+// would be a Blunder.
+const TURNING_SWING = 8;
+
+// Your team is losing under 40%, winning over 60%, and even in between
+// (40% and 60% included). Moving across one of these lines is what makes a
+// big play Great or a Blunder: it changed who was ahead, not just by how
+// much.
+const LOSING_BELOW = 0.4;
+const WINNING_ABOVE = 0.6;
+
+// A fight is Brilliant when your team won it with at least this many fewer
+// champions than the enemy. One fewer isn't enough: in a big fight the
+// losing side nearly always shows all five, so a 4 against 5 is usually a
+// teammate who stayed out of it, not a risk.
+const OUTNUMBERED_BY = 2;
+// A play can run on as long as its events are less than 20 seconds apart,
+// so for Brilliant its kills are split into fights. A kill joins a fight only
+// when it comes less than this long after the fight's last kill: three
+// pickoffs 15 seconds apart are three 1 against 1 fights, not one 1 against 3.
+const FIGHT_GAP_MS = 10_000;
+// ...and when it's this close (in game units, out of 14,900 across) to one of
+// the fight's kills: a dive top while bot lane wins a 2 against 2 is two
+// fights, not one 3 against 5. In the golden games, kills less than 10
+// seconds apart were either 3,423 apart or closer, or 4,460 or further, so
+// this sits in that gap.
+const FIGHT_RANGE = 4000;
+
+// A play's grade, from how much it moved your team's chance to win:
+//
+// - 4 points or more: Brilliant when one of its fights was won while
+//   outnumbered by 2 or more, Great for 8 points or more that moved your
+//   team up a band (losing, even, winning), Excellent otherwise.
+// - 1 to 4 points: Good. Less than 1 either way: Even. −1 to −4: Inaccuracy.
+// - −4 or more: Blunder for −8 or more that dropped your team down a band,
+//   Mistake otherwise.
+//
+// It grades what a play did to the chance, not whether it was the right
+// call.
+export function gradePlay(
+  play: Pick<Play, "before" | "after" | "kills">,
+  replay: Pick<ReplayData, "kills" | "players" | "myTeamId">,
+): Grade {
+  const swing = playSwing(play);
+  const moved = band(play.after) - band(play.before);
+  if (swing >= BIG_SWING) {
+    if (fights(play.kills, replay).some((fight) => wonOutnumbered(fightSides(fight, replay)))) {
+      return "Brilliant";
+    }
+    return swing >= TURNING_SWING && moved > 0 ? "Great" : "Excellent";
+  }
+  if (swing >= SMALL_SWING) return "Good";
+  if (swing <= -BIG_SWING) return swing <= -TURNING_SWING && moved < 0 ? "Blunder" : "Mistake";
+  if (swing <= -SMALL_SWING) return "Inaccuracy";
   return "Even";
+}
+
+// The page shows the chance to a tenth of a percent, so the band reads it
+// the same way: 39.996% shows as 40.0%, which is even.
+function band(chance: number): number {
+  const shown = Math.round(chance * 1000) / 1000;
+  if (shown < LOSING_BELOW) return 0;
+  if (shown > WINNING_ABOVE) return 2;
+  return 1;
+}
+
+// A play's kills (indexes into ReplayData.kills, in time order) cut into
+// fights. A kill joins every fight whose last kill was less than FIGHT_GAP_MS
+// before it and that has a kill within FIGHT_RANGE of it, so a kill between
+// two groups (the end of a chase) makes them one fight. With no such fight it
+// starts one. Two fights at once on different parts of the map stay apart
+// this way. A kill Riot gave no position is a fight of its own, since there's
+// no telling which fight it was in.
+function fights(kills: number[], replay: Pick<ReplayData, "kills">): number[][] {
+  let out: number[][] = [];
+  for (const i of kills) {
+    const kill = replay.kills[i];
+    const joins = (f: number[]) => {
+      const last = replay.kills[f[f.length - 1]];
+      if (kill.timestamp - last.timestamp >= FIGHT_GAP_MS) return false;
+      return f.some((j) => near(replay.kills[j].position, kill.position));
+    };
+    const joined = [...out.filter(joins).flat(), i];
+    out = [...out.filter((f) => !joins(f)), joined];
+  }
+  return out;
+}
+
+function near(a: MapPosition | null, b: MapPosition | null): boolean {
+  return a !== null && b !== null && Math.hypot(a.x - b.x, a.y - b.y) < FIGHT_RANGE;
+}
+
+// True when your team won the fight (more enemy deaths than yours), had at
+// least one champion in it, and had OUTNUMBERED_BY or more fewer than the
+// enemy team.
+function wonOutnumbered({ won, lost, ours, theirs }: FightSides): boolean {
+  return won > lost && ours.size > 0 && theirs.size - ours.size >= OUTNUMBERED_BY;
+}
+
+export type FightSides = {
+  // Enemy deaths and your team's deaths.
+  won: number;
+  lost: number;
+  // The champions in it on each side: whoever killed, helped or died. Riot
+  // counts anyone who did damage as a helper, but an enemy who ran away
+  // untouched isn't counted at all.
+  ours: Set<number>;
+  theirs: Set<number>;
+};
+
+// Who won some kills (indexes into ReplayData.kills) and who was in them,
+// from your team's side.
+export function fightSides(
+  kills: number[],
+  replay: Pick<ReplayData, "kills" | "players" | "myTeamId">,
+): FightSides {
+  const teamOf = new Map(replay.players.map((p) => [p.participantId, p.teamId]));
+  const isOurs = (id: number) => teamOf.get(id) === replay.myTeamId;
+  const sides: FightSides = { won: 0, lost: 0, ours: new Set(), theirs: new Set() };
+  for (const i of kills) {
+    const k: ReplayKill = replay.kills[i];
+    if (isOurs(k.victimId)) sides.lost++;
+    else sides.won++;
+    // killerId is 0 when a tower or minions got the kill.
+    const champions = [k.victimId, ...(k.killerId > 0 ? [k.killerId] : []), ...k.assists];
+    for (const id of champions) (isOurs(id) ? sides.ours : sides.theirs).add(id);
+  }
+  return sides;
 }
 
 // 7.6 -> "+7.6%", -2 -> "−2.0%" (with a real minus sign), 0 -> "0.0%".
@@ -205,13 +349,9 @@ export function formatSwing(swing: number): string {
 // took Baron". `names` gives each participantId's champion.
 export function playTitle(play: Play, replay: ReplayData, names: Record<number, string>): string {
   const ours = (teamId: number) => teamId === replay.myTeamId;
-  const teamOf = new Map(replay.players.map((p) => [p.participantId, p.teamId]));
   const kills = play.kills.map((i) => replay.kills[i]);
   const objectives = play.objectives.map((i) => replay.objectives[i]);
-
-  // Kills by your team are the enemy team's deaths.
-  const won = kills.filter((k) => !ours(teamOf.get(k.victimId) ?? 0)).length;
-  const lost = kills.length - won;
+  const { won, lost } = fightSides(play.kills, replay);
   const fight =
     kills.length === 0
       ? null

@@ -5,7 +5,7 @@
 // every champion was and each player's level, kills, CS, gold and items at
 // any moment. Above them, your team's chance to win at that second; under the
 // timeline, a play bar with the controls and the play the replay is on; and
-// beside the map every play of the game, graded by how much it changed that
+// beside the map every play of the game, graded by what it did to that
 // chance (replay-plays.tsx). For junglers it adds the tempo strip and why
 // each moment got its call (tempo.tsx). What the colors and marks mean sits
 // behind "How to read this", so the replay itself comes first. How the numbers are worked out is in
@@ -269,7 +269,7 @@ export function Replay({
           shows where every champion was at that moment, and the scoreboard their level, kills, CS,
           gold and items.
           {chances
-            ? " The line on top is your team's chance to win, and the bar under the timeline shows the play the replay is on, graded by how much it moved that chance."
+            ? " The line on top is your team's chance to win, and the bar under the timeline shows the play the replay is on, graded by what it did to that chance."
             : ""}
           {tempo ? " The tempo strip shows which jungler had the time advantage." : ""}
         </p>

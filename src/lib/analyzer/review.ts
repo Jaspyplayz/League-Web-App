@@ -10,7 +10,15 @@
 // verdict.
 
 import { formatClock } from "./format";
-import { playStart, playSwing, playTitle, type Play, type ReplayChances } from "./plays";
+import {
+  fightSides,
+  playStart,
+  playSwing,
+  playTitle,
+  type Grade,
+  type Play,
+  type ReplayChances,
+} from "./plays";
 import type { ReplayData } from "./replay";
 import { stretchAt, type TempoTimeline } from "./tempo";
 
@@ -26,6 +34,8 @@ export type Moment = {
   before: number;
   after: number;
   swing: number;
+  // Its grade, as the replay's plays list shows it.
+  grade: Grade;
   question: string;
   // For junglers, who had tempo just before it. Null for everyone else.
   tempo: string | null;
@@ -70,6 +80,7 @@ export function reviewMoments(
       before: play.before,
       after: play.after,
       swing: playSwing(play),
+      grade: play.grade,
       question: momentQuestion(play, replay, meId),
       tempo: tempo ? tempoWords(tempo, play.from - 1, names) : null,
       noteLine: `${clock} ${title}: `,
@@ -81,11 +92,10 @@ export function reviewMoments(
 // knew or saw, never what you should have done: Riot doesn't allow apps to
 // dictate decisions, and the grade can't tell a bad call from bad luck.
 export function momentQuestion(play: Play, replay: ReplayData, meId: number): string {
-  const teamOf = new Map(replay.players.map((p) => [p.participantId, p.teamId]));
   const kills = play.kills.map((i) => replay.kills[i]);
   const objectives = play.objectives.map((i) => replay.objectives[i]);
   const ours = (teamId: number) => teamId === replay.myTeamId;
-  const won = kills.filter((k) => !ours(teamOf.get(k.victimId) ?? 0)).length;
+  const { won } = fightSides(play.kills, replay);
   const theyTook = objectives.some((o) => !ours(o.teamId));
   const weTook = objectives.some((o) => ours(o.teamId));
 

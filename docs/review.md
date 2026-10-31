@@ -17,7 +17,7 @@ A play's size is Win Probability Added: how much it changed your team's chance t
 ## Each moment
 
 - **The time and what happened**, named the way the replay's plays list names it: "Won a fight 3 for 0, your team took Dragon".
-- **The grade and the chance before and after**: "Mistake −4.1%, from 52.2% to 48.1%".
+- **The grade and the chance before and after**: "Mistake −4.1%, from 52.2% to 48.1%". The grade is the replay's, from Brilliant to Blunder ([how the plays are graded](replay.md#how-the-plays-are-graded)). The moments are the biggest moves, so they're mostly Excellent, Great, Mistake or Blunder, with Good or Inaccuracy in a quiet game.
 - **For junglers, who had tempo** just before it, from the [tempo timeline](tempo.md).
 - **A question to think over**, picked by what happened:
 
