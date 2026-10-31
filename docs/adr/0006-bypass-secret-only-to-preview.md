@@ -19,7 +19,7 @@ Vercel's preview protection shows a login page to anyone without a Vercel accoun
 
 ## Decision
 
-`passPreviewLogin(context, origin)` in `e2e/preview-login.ts` routes every request in a browser context and adds the header only when the request's origin is the preview's. `e2e/fixtures.ts` calls it for each test's context, and every spec imports `test` from there. `npm run shot` uses the same function. After each test, the fixture checks which sites the test's requests went to, and fails the test if any site other than the preview got the header. `e2e/preview-secret.spec.ts` checks that this check has something to catch: on the sample game, the preview gets the header and the page also loads from other sites.
+`passPreviewLogin(context, origin)` in `e2e/preview-login.ts` routes every request in a browser context and adds the header only when the request's origin is the preview's. `e2e/fixtures.ts` calls it for each test's context, and every spec that opens a page imports `test` from there. A spec that opens no page and only sends requests with Playwright's `request` fixture, such as `e2e/mcp.spec.ts` (JAS-56), adds the header itself to its requests to the preview's own address and follows no redirects (`maxRedirects: 0`), so a redirect answer fails the test without the header being sent anywhere else. `npm run shot` uses the same function. After each test, the fixture checks which sites the test's requests went to, and fails the test if any site other than the preview got the header. `e2e/preview-secret.spec.ts` checks that this check has something to catch: on the sample game, the preview gets the header and the page also loads from other sites.
 
 ## Consequences
 
