@@ -83,8 +83,10 @@ describe("both themes", () => {
 // move to the new names (JAS-96's table). The contract ticket deletes the old
 // names and this part of the test with them.
 describe("Review board tokens", () => {
-  // Every approved value as [dark, light]: JAS-94's table, and the grades from
-  // JAS-77. A typo in globals.css fails here instead of shipping.
+  // Every approved value as [dark, light]: JAS-94's table (with light ahead,
+  // light behind and dark behind nudged to pass 4.5:1, which Jasper approved on
+  // PR 231), and the grades from JAS-77. A typo in globals.css fails here
+  // instead of shipping.
   const SPEC: Record<string, [dark: string, light: string]> = {
     page: ["#21201d", "#f1efeb"],
     panel: ["#2b2925", "#ffffff"],
@@ -94,13 +96,13 @@ describe("Review board tokens", () => {
     main: ["#f2efe9", "#1e1c19"],
     quiet: ["#aaa498", "#645e55"],
     placeholder: ["#7d786f", "#9a948a"],
-    ahead: ["#62a8ff", "#1c66d6"],
+    ahead: ["#62a8ff", "#105dcc"],
     "ahead-soft": ["#8fc0ff", "#1857b8"],
     "ahead-bright": ["#b8d8ff", "#134a9e"],
-    behind: ["#ff6a63", "#cb2c2c"],
+    behind: ["#ff6d65", "#bf1c21"],
     // The blue and red above at 32% and 30% in dark, 22% and 20% in light.
-    "ahead-fill": ["rgb(98 168 255 / 32%)", "rgb(28 102 214 / 22%)"],
-    "behind-fill": ["rgb(255 106 99 / 30%)", "rgb(203 44 44 / 20%)"],
+    "ahead-fill": ["rgb(98 168 255 / 32%)", "rgb(16 93 204 / 22%)"],
+    "behind-fill": ["rgb(255 109 101 / 30%)", "rgb(191 28 33 / 20%)"],
     "grade-brilliant": ["#3cc8e4", "#0b8aa8"],
     "grade-great": ["#4f9dff", "#1c66d6"],
     "grade-best": ["#9cc4ff", "#7aa6e6"],

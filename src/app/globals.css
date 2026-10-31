@@ -43,10 +43,10 @@
   --color-ahead: #62a8ff;
   --color-ahead-soft: #8fc0ff;
   --color-ahead-bright: #b8d8ff;
-  --color-behind: #ff6a63;
+  --color-behind: #ff6d65;
   /* The areas under the gold chart's line. */
   --color-ahead-fill: rgb(98 168 255 / 32%);
-  --color-behind-fill: rgb(255 106 99 / 30%);
+  --color-behind-fill: rgb(255 109 101 / 30%);
 
   /*
    * Play grades, chess.com's ten plus Turnpoint's own Even. Good grades run
@@ -134,12 +134,12 @@
 
   /* In dark mode "soft" and "bright" are lighter blues for text on black;
      on white they go darker instead, so links and highlights still stand out. */
-  --color-ahead: #1c66d6;
+  --color-ahead: #105dcc;
   --color-ahead-soft: #1857b8;
   --color-ahead-bright: #134a9e;
-  --color-behind: #cb2c2c;
-  --color-ahead-fill: rgb(28 102 214 / 22%);
-  --color-behind-fill: rgb(203 44 44 / 20%);
+  --color-behind: #bf1c21;
+  --color-ahead-fill: rgb(16 93 204 / 22%);
+  --color-behind-fill: rgb(191 28 33 / 20%);
 
   --color-grade-brilliant: #0b8aa8;
   --color-grade-great: #1c66d6;
