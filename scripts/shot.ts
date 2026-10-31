@@ -3,7 +3,7 @@
 // Agents use it through the verify skill (.claude/skills/verify/SKILL.md).
 //
 //   npm run shot -- /settings                       the local dev server
-//   npm run shot -- --pr 155 / --light --phone      that PR's Vercel preview
+//   npm run shot -- --pr 155 / --light --phone      that PR's Vercel preview, 390px wide
 //   npm run shot -- --check --pr 155                is that site worth driving?
 //
 // Screenshots go to the git-ignored .cache/verify/. A page that isn't the app
@@ -38,6 +38,12 @@ const { values: options, positionals: paths } = parseArgs({
     check: { type: "boolean", default: false },
   },
 });
+
+// The design rules (.claude/rules/design.md) check every restyle at 390px
+// wide, the width of most iPhones. Pixel 7 is 412px, so --phone keeps its
+// touch, phone browser and pixel ratio and narrows the page to 390.
+const pixel7 = devices["Pixel 7"];
+const PHONE = { ...pixel7, viewport: { ...pixel7.viewport, width: 390 } };
 
 type Look = { outcome: Outcome; reason: string; text: string };
 
@@ -169,7 +175,7 @@ async function main() {
 
   const browser = await chromium.launch();
   try {
-    const context = await browser.newContext(devices[options.phone ? "Pixel 7" : "Desktop Chrome"]);
+    const context = await browser.newContext(options.phone ? PHONE : devices["Desktop Chrome"]);
     if (options.light) await context.addInitScript((key) => localStorage.setItem(key, "light"), THEME_KEY);
     if (preview) await passPreviewLogin(context, preview);
 
