@@ -77,7 +77,7 @@ Copy `.env.example` to `.env.local` (git-ignored); production values live in Ver
 
 ## Design
 
-Dark "scouting report" style with a light theme. **Blue = you / ahead / win, red = opponent / behind / loss**, never green and red. The full rules (tokens for both themes, panels, text sizes, the approved mockups) are in [.claude/rules/design.md](.claude/rules/design.md), which loads when Claude opens a page, a component or `globals.css`.
+The "Review board" look: warm graphite with a light theme, Rubik, 6px corners and borderless panels. **Blue = you / ahead / win, red = opponent / behind / loss**, never green and red. The full rules (tokens for both themes, grades, type, corners, the mockup and screenshot steps, the approved mockups) are in [.claude/rules/design.md](.claude/rules/design.md), which loads when Claude opens a page, a component or `globals.css`.
 
 ## Code rules
 

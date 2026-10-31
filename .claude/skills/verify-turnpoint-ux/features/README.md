@@ -8,13 +8,13 @@ This directory is the maintained source for verifying how Turnpoint's flows beha
 - `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> | --pr <number>]` reports `home page ok` and `ok` for each capability the journey needs.
 - Test player `Hide on bush#KR1` on `kr`; sample game `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221` (stored, so it needs no Riot key).
 - Signed out, fresh browser context, `reducedMotion: "reduce"`.
-- The current UI, not Soft Rounded. Assert behavior, not colors or radii.
+- The current UI, whichever look a page has. Assert behavior, not colors or radii.
 
 ## Driving conventions
 
 - Drive through `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey>`.
 - Arrive the way a player does: click the home card, the tab, the button. A direct URL is used only where the recipe says the player arrives from a pasted link.
-- Use roles and accessible names. Headings render uppercase through CSS; match names, or match text case-insensitively.
+- Use roles and accessible names. Headings on pages still in the old look render uppercase through CSS; match names, or match text case-insensitively.
 - "Calm" = no `role=alert` with text (Next's `<next-route-announcer>` is skipped) and the page is the app. Check it after every navigation the player makes.
 - "On screen" = the heading's box is inside the viewport, checked after the scroll.
 - Read-only journeys. Nothing to restore.
