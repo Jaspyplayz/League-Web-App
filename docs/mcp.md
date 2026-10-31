@@ -20,6 +20,7 @@ Address: `https://league-web-app.vercel.app/api/mcp`
 2. **`src/lib/mcp/tools.ts`** does the work with the same loaders as the website: `loadProfile`, `loadMatches`, `loadMatch` and `loadMatchFacts`. Anything already saved in Postgres costs no Riot calls.
 3. **`src/lib/mcp/answers.ts`** shapes the results into small JSON answers with clear field names (`winRatePercent`, `minutes`). It's pure, so it has unit tests.
 4. When Riot refuses (busy, key expired), the tool returns a plain message marked as an error, so Claude can tell the person what happened instead of making something up. Other errors go to Sentry.
+5. **The smoke test covers the route.** `e2e/mcp.spec.ts` runs on every Vercel preview with the rest of `e2e/`. It sends `initialize` and then `tools/list` to the preview's `/api/mcp` and fails unless the three tools come back, so an `mcp-handler` or MCP SDK update that breaks the route at runtime shows up on its PR. Each request gets 15 seconds, so a route that hangs fails quickly instead of waiting out Vercel's 300 s limit (JAS-44). It doesn't call the tools, since that would spend Riot calls.
 
 ## Guarding the Riot rate limit
 
