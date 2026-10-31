@@ -14,11 +14,12 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { chromium, devices, type BrowserContext, type Page } from "@playwright/test";
+import { chromium, type BrowserContext, type Page } from "@playwright/test";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { THEME_KEY } from "@/lib/theme";
 import { passPreviewLogin } from "../e2e/preview-login";
 import { loadEnv, previewUrl } from "./preview";
+import { browserFor } from "./shot-device";
 import { classify, OUTCOMES, type Outcome } from "./shot-outcome";
 
 const USAGE = `Usage: npm run shot -- [--pr <number> | --base <url>] [--light] [--phone] [--tab <name>] [--expect <outcome>] <path>...
@@ -38,12 +39,6 @@ const { values: options, positionals: paths } = parseArgs({
     check: { type: "boolean", default: false },
   },
 });
-
-// The design rules (.claude/rules/design.md) check every restyle at 390px
-// wide, the width of most iPhones. Pixel 7 is 412px, so --phone keeps its
-// touch, phone browser and pixel ratio and narrows the page to 390.
-const pixel7 = devices["Pixel 7"];
-const PHONE = { ...pixel7, viewport: { ...pixel7.viewport, width: 390 } };
 
 type Look = { outcome: Outcome; reason: string; text: string };
 
@@ -175,7 +170,7 @@ async function main() {
 
   const browser = await chromium.launch();
   try {
-    const context = await browser.newContext(options.phone ? PHONE : devices["Desktop Chrome"]);
+    const context = await browser.newContext(browserFor(options.phone));
     if (options.light) await context.addInitScript((key) => localStorage.setItem(key, "light"), THEME_KEY);
     if (preview) await passPreviewLogin(context, preview);
 
