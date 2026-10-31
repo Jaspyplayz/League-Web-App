@@ -10,7 +10,7 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
-import { branchToTry, mainCiDispatchPath, mergePull, OpenPulls, openPullsPath, pullsToMerge, WorkflowRunEvent } from "./can-merge-action-steps";
+import { branchToTry, mainCiDispatchArgs, mergePull, OpenPulls, openPullsPath, pullsToMerge, WorkflowRunEvent } from "./can-merge-action-steps";
 
 const eventPath = process.env.GITHUB_EVENT_PATH;
 const repository = process.env.GITHUB_REPOSITORY;
@@ -66,8 +66,7 @@ for (const number of ready) {
     },
     isMerged: () => isMerged(number),
     waitBeforeRetry: () => execFileSync("sleep", ["30"]),
-    // POST with {"ref": "main"}; GitHub answers 204 with no body.
-    startMainCi: () => execFileSync("gh", ["api", "-X", "POST", mainCiDispatchPath(repository), "-f", "ref=main"], { encoding: "utf8" }),
+    startMainCi: () => execFileSync("gh", mainCiDispatchArgs(repository), { encoding: "utf8" }),
     log: (line) => console.log(line),
     summary,
   });

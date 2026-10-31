@@ -6,7 +6,8 @@ on:
   pull_request:
   # The Agent merge workflow starts this on main after each of its merges,
   # since GitHub doesn't run it for a push that workflow's token makes
-  # (JAS-123). It also puts a "Run workflow" button on the Actions tab.
+  # (JAS-123). It also puts a "Run workflow" button on the Actions tab, which
+  # the first step below allows only on main.
   workflow_dispatch:
 
 # The token GitHub gives the job can only read the repo, like
@@ -19,6 +20,14 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # Starting CI by hand is for main only. A run started on a PR's branch
+      # would test it without main's newer commits, yet become the PR's
+      # newest `check`, the one can-merge and GitHub's ruleset read, so it
+      # fails here instead of passing for the PR (JAS-123).
+      - if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Start CI by hand only on main. A PR's CI runs from its pull_request event."
+          exit 1
       - uses: actions/checkout@v7
         with:
           # Don't leave the token in .git/config for later steps to read.

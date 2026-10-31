@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ATTEMPTS,
   branchToTry,
-  mainCiDispatchPath,
+  mainCiDispatchArgs,
   mergePull,
   OpenPulls,
   openPullsPath,
@@ -143,42 +143,58 @@ describe("pullsToMerge", () => {
     const script = source("scripts/can-merge-action.ts");
     expect(script.match(/spawnSync\(/g)).toHaveLength(1);
     expect(script.match(/mergePull\(/g)).toHaveLength(1);
+    // The one call that starts CI on main, so a no-op or another ref fails here.
+    expect(script).toContain('startMainCi: () => execFileSync("gh", mainCiDispatchArgs(repository), { encoding: "utf8" }),');
     expect(script).toMatch(/const \{ ready, held \} = pullsToMerge\(pulls, target\.branch, repository\);/);
     expect(script).toMatch(/for \(const number of ready\) \{\n\s+const \{ failed: thisFailed \} = mergePull\(number, \{\n\s+runCanMerge: \(attempt\) => \{\n.*\n\s+const result = spawnSync\("npx", \["tsx", "scripts\/can-merge\.ts", String\(number\), "--merge"\]/);
   });
 });
 
 // One PR's run through can-merge, with GitHub faked: each can-merge try
-// returns the next status in the list, and the PR counts as merged once a try
-// passes or `mergedAfterCrash` says a crash came after the merge.
-function fakeRun(statuses: (number | null)[], { mergedAfterCrash = false, dispatchFails = false } = {}) {
+// returns the next status in the list, and each "is it merged?" question the
+// next answer in `merged` (false once they run out).
+function fakeRun(statuses: (number | null)[], { merged = [] as boolean[], dispatchFails = false } = {}) {
   const calls: string[] = [];
   const summary: string[] = [];
+  const log: string[] = [];
   let tries = 0;
+  let asked = 0;
   const result = mergePull(240, {
     runCanMerge: (attempt): CanMergeRun => {
       calls.push(`can-merge try ${attempt}`);
       const status = statuses[tries++];
       return { status, why: `exit ${status}` };
     },
-    isMerged: () => mergedAfterCrash,
+    isMerged: () => merged[asked++] ?? false,
     waitBeforeRetry: () => calls.push("wait"),
     startMainCi: () => {
       calls.push("start CI on main");
-      if (dispatchFails) throw new Error("HTTP 403: Resource not accessible by integration");
+      // What execFileSync throws when gh exits non-zero.
+      if (dispatchFails) {
+        throw new Error(
+          "Command failed: gh api -X POST repos/Jaspyplayz/League-Web-App/actions/workflows/ci.yml/dispatches -f ref=main\ngh: Resource not accessible by integration (HTTP 403)\n",
+        );
+      }
     },
-    log: () => {},
+    log: (line) => log.push(line),
     summary: (line) => summary.push(line),
   });
-  return { ...result, calls, summary };
+  return { ...result, calls, summary, log };
 }
 
 // GitHub doesn't start workflows for a push this job's token makes, so the
 // merge would never run ci.yml on main (JAS-123). Starting it through
 // workflow_dispatch is the one way the token can.
 describe("mergePull starts CI on main after each merge", () => {
-  it("asks GitHub to start ci.yml on main", () => {
-    expect(mainCiDispatchPath(REPO)).toBe("repos/Jaspyplayz/League-Web-App/actions/workflows/ci.yml/dispatches");
+  it("asks GitHub to start ci.yml on main, with a JSON body", () => {
+    expect(mainCiDispatchArgs(REPO)).toEqual([
+      "api",
+      "-X",
+      "POST",
+      "repos/Jaspyplayz/League-Web-App/actions/workflows/ci.yml/dispatches",
+      "-f",
+      "ref=main",
+    ]);
   });
 
   it("starts it after can-merge merges the PR", () => {
@@ -189,7 +205,7 @@ describe("mergePull starts CI on main after each merge", () => {
   });
 
   it("starts it after a crash that came after the merge, since main still changed", () => {
-    const run = fakeRun([1], { mergedAfterCrash: true });
+    const run = fakeRun([1], { merged: [true] });
     expect(run.calls).toEqual(["can-merge try 1", "start CI on main"]);
     expect(run.failed).toBe(true);
     expect(run.summary[0]).toBe("#240: merged, but a step after the merge failed (exit 1). The log above says which.");
@@ -199,9 +215,25 @@ describe("mergePull starts CI on main after each merge", () => {
     expect(fakeRun([1, 0]).calls).toEqual(["can-merge try 1", "wait", "can-merge try 2", "start CI on main"]);
   });
 
+  it("starts it when the retry is refused because the first try had merged after all", () => {
+    // GitHub couldn't say the PR merged after the crash, so it retried, and
+    // can-merge refused a PR that's no longer open.
+    const run = fakeRun([1, REFUSED_EXIT_CODE], { merged: [false, true] });
+    expect(run.calls).toEqual(["can-merge try 1", "wait", "can-merge try 2", "start CI on main"]);
+    expect(run.failed).toBe(true);
+    expect(run.summary[0]).toBe("#240: merged, but a step after the merge failed (exit 1). The log above says which.");
+  });
+
   it("never starts it after a refusal", () => {
     const run = fakeRun([REFUSED_EXIT_CODE]);
     expect(run.calls).toEqual(["can-merge try 1"]);
+    expect(run.failed).toBe(false);
+    expect(run.log).toEqual(["::notice title=Not merged::#240: can-merge refused. See the gate lines in the log."]);
+  });
+
+  it("never starts it after a refusal that follows a crash, when the PR didn't merge", () => {
+    const run = fakeRun([1, REFUSED_EXIT_CODE]);
+    expect(run.calls).toEqual(["can-merge try 1", "wait", "can-merge try 2"]);
     expect(run.failed).toBe(false);
   });
 
@@ -217,8 +249,9 @@ describe("mergePull starts CI on main after each merge", () => {
     expect(run.failed).toBe(true);
     expect(run.summary).toEqual([
       "#240: every gate passed and can-merge merged it.",
-      "#240: merged, but starting CI on main failed (HTTP 403: Resource not accessible by integration), so main's CI hasn't run on it. Start it from the Actions tab: CI, Run workflow, on main.",
+      "#240: merged, but starting CI on main failed (gh: Resource not accessible by integration (HTTP 403)), so main's CI hasn't run on it. Start it from the Actions tab: CI, Run workflow, on main.",
     ]);
+    expect(run.log).toEqual(["::error title=CI on main not started::#240 merged, but GitHub didn't start CI on main. The run's summary says what to do."]);
   });
 });
 
@@ -322,6 +355,18 @@ describe(".github/workflows/ci.yml", () => {
     const on = code.indexOf("on:");
     const end = code.findIndex((line, i) => i > on && !line.startsWith(" "));
     expect(code.slice(on + 1, end).map((line) => line.trim())).toEqual(["push:", "branches: [main]", "pull_request:", "workflow_dispatch:"]);
+  });
+
+  it("fails at once when started by hand anywhere but main", () => {
+    // A run started on a PR's branch would test it without main's newer
+    // commits and become the PR's newest check, which can-merge reads.
+    const steps = code.slice(code.indexOf("    steps:") + 1);
+    expect(steps.slice(0, 4).map((line) => line.trim())).toEqual([
+      "- if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'",
+      "run: |",
+      'echo "::error::Start CI by hand only on main. A PR\'s CI runs from its pull_request event."',
+      "exit 1",
+    ]);
   });
 
   it("asks only to read the repo", () => {
