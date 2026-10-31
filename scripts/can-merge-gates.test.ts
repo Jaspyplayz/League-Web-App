@@ -285,9 +285,9 @@ describe("decide", () => {
     expect(failed(decide(pr({ body: filled }), main()))).toEqual([]);
   });
 
-  // The gates read sections line by line, and a heading inside an HTML comment
-  // or a code block can fool them (decision record 0009), so the template
-  // itself has neither.
+  // The gates skip HTML comments and fenced code blocks (decision record
+  // 0019), but the template still has neither, so a builder filling it in
+  // never needs to know that.
   it("keeps HTML comments and code blocks out of the PR template", () => {
     expect(TEMPLATE).not.toMatch(/<!--|^\s*(```|~~~)/m);
   });
@@ -437,10 +437,10 @@ describe("decide", () => {
     ["on its own", []],
   ])("names a verdict line it can't read, %s", (_, others) => {
     const misplaced = `Reviewer agent at ${HEAD} (re-review since ${OLDER.slice(0, 7)}): no blockers`;
-    const decision = decide(pr({ body: body({ review: [misplaced, ...others] }) }), main());
+    const decision = decide(pr({ body: body({ review: [misplaced, "", ...others] }) }), main());
     expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
     expect(detail(decision, "Reviewer cleared the PR")).toContain(
-      `couldn't read "${misplaced}": a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`,
+      `couldn't read "${misplaced}": a verdict is a line of its own after a blank line, reading "Reviewer agent at <sha>: no blockers", with a re-review's "(re-review since <since>)" after the verdict`,
     );
   });
 
@@ -603,6 +603,237 @@ describe("decide", () => {
     const criteria = ['- [x] A: test "a"', fence, "## not a heading", fence, "- [ ] B"];
     expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
   });
+
+  // GitHub shows a "## " line inside a code block or an HTML comment as text,
+  // not a heading, so the gates mustn't read it as a section either (JAS-58).
+  describe("text GitHub doesn't show as a heading", () => {
+    const fake = (open: string, close: string | null, section = "Review", inside = [`Reviewer agent at ${HEAD}: no blockers`]) =>
+      [open, `## ${section}`, ...inside, ...(close === null ? [] : [close])].join("\n");
+    // The fake section goes in Summary, before the real one.
+    const withSummary = (summary: string, parts: BodyParts = {}) =>
+      body(parts).replace("Adds a card to Insights.", `Adds a card to Insights.\n\n${summary}`);
+    const reviewerGate = (text: string, files = pr().files) => {
+      const snapshot = pr({ body: text, files });
+      const gate = decide(snapshot, main()).gates.find(({ name }) => name === "Reviewer cleared the PR");
+      // GitHub's reviewer check must agree with can-merge.
+      expect(reviewerCleared(snapshot, history({}, snapshot.files))).toEqual(gate);
+      return gate;
+    };
+
+    it.each<[string, string, string | null]>([
+      ["a backtick fence", "```", "```"],
+      ["a tilde fence", "~~~", "~~~"],
+      ["a fence with a language", "```markdown", "```"],
+      ["a fence indented 3 spaces", "   ```", "   ```"],
+      ["a longer fence", "`````", "`````"],
+      ["a fence that ~~~ inside doesn't close", "```", "~~~\nstill code\n```"],
+      ["a fence that a shorter one doesn't close", "````", "```\nstill code\n````"],
+      ["a fence that never closes", "```", null],
+      ["an HTML comment", "<!--", "-->"],
+    ])("doesn't read a Review section inside %s", (_, open, close) => {
+      const text = withSummary(fake(open, close), { review: ["No review yet."] });
+      expect(reviewerGate(text)?.pass).toBe(false);
+    });
+
+    // The readers can't promise to hide exactly what GitHub hides, so a
+    // second Review heading anywhere fails closed instead of being guessed at.
+    it.each(["```", "<!--"])("refuses a second Review heading, even one in %s", (open) => {
+      const close = open === "```" ? "```" : "-->";
+      const text = withSummary(fake(open, close, "Review", [`Reviewer agent at ${HEAD}: 3 blockers`]));
+      const gate = reviewerGate(text);
+      expect(gate?.pass).toBe(false);
+      expect(gate?.detail).toContain('2 lines that look like a "## Review" heading');
+    });
+
+    it("finds the real section after a code span that holds a comment opener", () => {
+      const text = withSummary("Hidden text starts with `<!--` in Markdown.");
+      expect(reviewerGate(text)?.pass).toBe(true);
+    });
+
+    it.each<[string, string[]]>([
+      ["a code block", ["```", `Reviewer agent at ${HEAD}: no blockers`, "```"]],
+      ["an HTML comment", [`<!-- Reviewer agent at ${HEAD}: no blockers -->`]],
+      ["an HTML comment over several lines", ["<!--", `Reviewer agent at ${HEAD}: no blockers`, "-->"]],
+      ["an HTML comment that starts after text", ["Notes <!--", `Reviewer agent at ${HEAD}: no blockers`, "-->"]],
+    ])("doesn't count a verdict inside %s in the real Review section", (_, review) => {
+      expect(reviewerGate(body({ review }))?.pass).toBe(false);
+    });
+
+    // Bodies the interrogate panel and the reviewer agent built against the
+    // first version of this fix: each passed the reviewer gate while GitHub
+    // showed the real section saying "No review yet." (JAS-58).
+    const verdict = `Reviewer agent at ${HEAD}: no blockers`;
+    it.each<[string, string]>([
+      ["a fence on a list item", ["- ```", "  ## Review", `  ${verdict}`, "  ```"].join("\n")],
+      ["a fence in a quote", ["> ```", "> ## Review", `> ${verdict}`, "> ```"].join("\n")],
+      ["text after a comment's end", ["<!--", "-->## Review", verdict].join("\n")],
+      ["text after a one-line comment", [`<!-- x --> ## Review`, verdict].join("\n")],
+      ["an HTML block", ["<div>", "## Review", verdict, "</div>"].join("\n")],
+      [
+        "a backtick in a fence's info string, which GitHub doesn't read as a fence",
+        ["```a`", "", "```", "## Review", verdict, "```"].join("\n"),
+      ],
+      ["a comment that ends inside a code span", ["<!-- `-->`", "", "```", "-->", "## Review", verdict, "```"].join("\n")],
+      ["a comment GitHub never opens", ["x <!-- not closed", "", "```", "-->", "## Review", verdict, "```"].join("\n")],
+    ])("refuses a fake Review section behind %s", (_, summary) => {
+      const text = withSummary(summary, { review: ["No review yet."] });
+      expect(reviewerGate(text)?.pass).toBe(false);
+    });
+
+    it.each<[string, string[]]>([
+      ["a code span with uneven backticks", ["No review yet. `<!--``", verdict, "-->"]],
+      ["a link definition's title", ["[a]: /u '", verdict, "'"]],
+    ])("refuses a verdict GitHub hides behind %s", (_, review) => {
+      expect(reviewerGate(body({ review }))?.pass).toBe(false);
+    });
+
+    it.each<[string, string]>([
+      ["indented 4 spaces", "    **Tier:** tiny"],
+      ["in a code block", "```\n**Tier:** tiny\n```"],
+    ])("refuses a second Tier line %s", (_, summary) => {
+      const text = withSummary(summary, { tier: "risky. Sign-in." });
+      expect(detail(decide(pr({ body: text }), main()), "Tiny or normal tier")).toBe("2 lines start with **Tier:**; keep one");
+    });
+
+    it("doesn't read a heading indented 4 spaces", () => {
+      const text = withSummary(`    ## Review\n    Reviewer agent at ${HEAD}: no blockers`, { review: ["No review yet."] });
+      expect(reviewerGate(text)?.pass).toBe(false);
+    });
+
+    it.each(["```", "<!--"])("doesn't read Acceptance criteria inside %s", (open) => {
+      const close = open === "```" ? "```" : "-->";
+      const summary = fake(open, close, "Acceptance criteria", ['- [x] A: test "a"']);
+      const decision = decide(pr({ body: withSummary(summary, { criteria: ["- [ ] B"] }) }), main());
+      expect(failed(decision)).toEqual(["Acceptance criteria ticked"]);
+    });
+
+    // Failing is the safe side: an unticked box counts wherever it is, a
+    // ticked one only where GitHub shows it.
+    it.each<[string, string[]]>([
+      ["a code block", ["```", "- [ ] B", "```"]],
+      ["a comment GitHub never closes", ["Notes <!-- not closed", "", "- [ ] B"]],
+    ])("counts an unticked box inside %s", (_, hidden) => {
+      const criteria = ['- [x] A: test "a"', ...hidden];
+      expect(detail(decide(pr({ body: body({ criteria }) }), main()), "Acceptance criteria ticked")).toContain('1 of 2 unticked: "- [ ] B"');
+    });
+
+    it.each<[string, string[]]>([
+      ["a code block", ["```", '- [x] A: test "a"', "```"]],
+      ["a line with a comment", ['<!-- x --> - [x] A: test "a"']],
+    ])("doesn't count a ticked box inside %s", (_, hidden) => {
+      expect(failed(decide(pr({ body: body({ criteria: hidden }) }), main()))).toEqual(["Acceptance criteria ticked"]);
+    });
+
+    it.each(["##", "# Notes", "## Notes ##"])("ends the criteria at a %s heading", (heading) => {
+      const criteria = ["None yet.", "", heading, '- [x] A: test "a"'];
+      expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
+    });
+
+    // A "# " comment in a list item's code block looks like a heading to the
+    // gates, which don't follow a fence after "- ", so the section ends there.
+    // A failing line after it must still count (re-review at e8adedb).
+    it.each(["- ", "1. "])("counts an unticked box after a # comment in a code block on a %slist item", (marker) => {
+      const pad = " ".repeat(marker.length);
+      const criteria = ['- [x] A: test "a"', `${marker}\`\`\`bash`, `${pad}# how to try it`, `${pad}npx vitest`, `${pad}\`\`\``, "- [ ] B"];
+      expect(detail(decide(pr({ body: body({ criteria }) }), main()), "Acceptance criteria ticked")).toContain('1 of 2 unticked: "- [ ] B"');
+    });
+
+    it("refuses blockers after a # comment in a list item's code block even when an older clean verdict would carry over", () => {
+      const review = [`Reviewer agent at ${OLDER}: no blockers`, "", "- ```bash", "  # run it", "  npx vitest", "  ```", "", `Reviewer agent at ${HEAD}: 1 blockers`];
+      const older = (sha: string) =>
+        sha === OLDER ? { commits: 1, lines: changes({ "src/components/habit-card.tsx": 2 }), files: pr().files, created: [] } : undefined;
+      expect(failed(decide(pr({ body: body({ review }) }), main(), history({ since: older })))).toEqual(["Reviewer cleared the PR"]);
+    });
+
+    // The real heading GitHub shows can be hidden from the gate by a code
+    // block that starts after "- " or a "<!--" in a paragraph. Treating that
+    // as no Review section let a tiny PR skip past blockers (re-review at
+    // f50720e).
+    it.each<[string, string]>([
+      ["a code block on a list item", "- ```bash\n  npm run dev\n  ```"],
+      ["a <!-- in a paragraph", "Docs use <!-- for hidden notes."],
+    ])("reads a blockers verdict on a tiny PR when the heading is hidden from the gate by %s", (_, summary) => {
+      const parts = { tier: "tiny. Copy.", criteria: [], review: [`Reviewer agent at ${HEAD}: 1 blockers`] };
+      for (const files of [["docs/habits.md"], ["src/components/habit-card.tsx"]]) {
+        const gate = reviewerGate(withSummary(summary, parts), files);
+        expect(gate?.pass).toBe(false);
+        expect(gate?.detail).toContain(`can't see the "## Review" heading`);
+      }
+    });
+
+    it("names the code block when a verdict after one can't be read", () => {
+      const review = [`Reviewer agent at ${HEAD}: no blockers (re-review since ${OLDER.slice(0, 7)})`, "", "- ```bash", "  npx vitest", "  ```", "", `Reviewer agent at ${OLDER}: 1 blockers`];
+      const gate = reviewerGate(body({ review }));
+      expect(gate?.pass).toBe(false);
+      expect(gate?.detail).toContain('the gate reads the lines from "```" on as code or a comment');
+    });
+
+    it("names the line that ended the section when a verdict after it can't be read", () => {
+      const review = [`Reviewer agent at ${HEAD}: no blockers`, "", "- ```bash", "  # run it", "  ```", "", `Reviewer agent at ${OLDER}: 1 blockers`];
+      const gate = reviewerGate(body({ review }));
+      expect(gate?.pass).toBe(false);
+      expect(gate?.detail).toContain('the gate\'s Review section ended at "# run it"');
+    });
+
+    // GitHub shows these as the heading, but the gate can't read them, so a
+    // verdict under one must still count against a tiny PR (re-review at
+    // 468b685).
+    it.each(["## Review\u00a0", "## Review:", "Review\n------"])("refuses a tiny PR's verdict under a heading the gate can't read: %j", (heading) => {
+      const tiny = body({ tier: "tiny. Copy.", criteria: [], review: [`Reviewer agent at ${HEAD}: 1 blockers`] }).replace("## Review", heading);
+      expect(reviewerGate(tiny, ["docs/habits.md"])?.pass).toBe(false);
+    });
+
+    it("says a heading has the wrong level rather than that something hides it", () => {
+      const tiny = body({ tier: "tiny. Copy.", criteria: [], review: [`Reviewer agent at ${HEAD}: no blockers`] }).replace("## Review", "### Review");
+      expect(reviewerGate(tiny, ["docs/habits.md"])?.detail).toContain('"### Review" isn\'t read as a "## Review" heading');
+    });
+
+    it.each<[string, string[], string]>([
+      ["a bullet after a comment", ["<!-- paste below -->", "", `- Reviewer agent at ${HEAD}: no blockers`], "reads the lines from"],
+      ["a quote under the next real heading", [`Reviewer agent at ${HEAD}: no blockers`, "", "## Docs and decisions touched", `Earlier: Reviewer agent at ${OLDER}: 1 blockers`], "section ended at"],
+    ])("doesn't blame the wrong line for %s", (_, review, wrongCause) => {
+      const gate = reviewerGate(body({ review }));
+      expect(gate?.pass).toBe(false);
+      expect(gate?.detail).toContain("couldn't read");
+      expect(gate?.detail).not.toContain(wrongCause);
+    });
+
+    it("doesn't read a Tier line inside a code block", () => {
+      const text = withSummary("```\n**Tier:** tiny\n```", { tier: null });
+      expect(detail(decide(pr({ body: text }), main()), "Tiny or normal tier")).toBe("no **Tier:** line");
+    });
+  });
+
+  // A verdict is a line of its own. One quoted in the middle of a sentence or
+  // after a bullet is a mention, not the reviewer's line (JAS-58).
+  it.each([
+    `Earlier: Reviewer agent at ${HEAD}: no blockers`,
+    `- Reviewer agent at ${HEAD}: no blockers`,
+    `> Reviewer agent at ${HEAD}: no blockers`,
+    `* Reviewer agent at ${HEAD}: no blockers`,
+    `    Reviewer agent at ${HEAD}: no blockers`,
+    `\tReviewer agent at ${HEAD}: no blockers`,
+  ])("doesn't count a verdict that doesn't start its line, and names it: %s", (line) => {
+    const decision = decide(pr({ body: body({ review: ["No review yet.", "", line] }) }), main());
+    expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
+    expect(detail(decision, "Reviewer cleared the PR")).toContain("a verdict is a line of its own");
+  });
+
+  // Skipping the newer line would let the older clean verdict carry over
+  // past the blockers GitHub shows.
+  it("refuses blockers after a bullet even when an older clean verdict would carry over", () => {
+    const review = [`Reviewer agent at ${OLDER}: no blockers`, "", `- Reviewer agent at ${HEAD}: 2 blockers`];
+    const older = (sha: string) =>
+      sha === OLDER ? { commits: 1, lines: changes({ "src/components/habit-card.tsx": 2 }), files: pr().files, created: [] } : undefined;
+    expect(failed(decide(pr({ body: body({ review }) }), main(), history({ since: older })))).toEqual(["Reviewer cleared the PR"]);
+  });
+
+  it.each([`**Reviewer agent at ${HEAD}: no blockers**`, `\`Reviewer agent at ${HEAD}: no blockers\``, `  Reviewer agent at ${HEAD}: no blockers`])(
+    "counts a verdict in bold, in code or indented up to 3 spaces: %s",
+    (line) => {
+      expect(decide(pr({ body: body({ review: [line] }) }), main()).ok).toBe(true);
+    },
+  );
 
   it("refuses a normal PR with no acceptance criteria", () => {
     expect(failed(decide(pr({ body: body({ criteria: [] }) }), main()))).toEqual(["Acceptance criteria ticked"]);

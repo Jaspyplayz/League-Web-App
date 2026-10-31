@@ -231,7 +231,7 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
         pr.isCrossRepository && "the branch is in a fork",
         builderProblem(builder),
       ].filter((problem) => problem !== false);
-      return problems.length > 0 ? fail(problems.join("; ")) : pass(`${pr.headRefName}, Builder: ${builder}`);
+      return problems.length > 0 ? fail(problems.join("; ")) : pass(`${pr.headRefName}, Builder: ${"value" in builder ? builder.value : ""}`);
     },
   },
   {
@@ -274,10 +274,25 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
       // A box in any list GitHub renders ("-", "*", "+", "1." or "1)"), nested
       // or inside a ">" quote. Only "[x]" counts as ticked, and a "[text](url)"
       // link isn't a box.
-      const boxes = section(pr.body, "Acceptance criteria").flatMap((line) => {
-        const match = line.match(/^\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[([^\]]*)\](?!\()/);
-        return match ? [{ ticked: /^x$/i.test(match[1]), text: line.trim() }] : [];
+      // Fail closed (JAS-58): a ticked box counts only on a line GitHub shows
+      // whole, but an unticked one counts even inside a code block or comment.
+      const criteria = section(pr.body, "Acceptance criteria");
+      if ("why" in criteria) return fail(criteria.why);
+      const box = (line: string) => line.match(/^\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[([^\]]*)\](?!\()/);
+      const boxes = criteria.shown.flatMap((line, i) => {
+        const raw = criteria.raw[i];
+        const match = line === raw ? box(line) : null;
+        if (match) return [{ ticked: /^x$/i.test(match[1]), text: line.trim() }];
+        const hidden = box(raw);
+        return hidden && !/^x$/i.test(hidden[1]) ? [{ ticked: false, text: raw.trim() }] : [];
       });
+      // The section may end early where GitHub shows no heading, such as at
+      // a "# " comment in a list item's code block, so an unticked box later
+      // in the body still counts.
+      for (const raw of criteria.rest) {
+        const hidden = box(raw);
+        if (hidden && !/^x$/i.test(hidden[1])) boxes.push({ ticked: false, text: raw.trim() });
+      }
       if (boxes.length === 0) return fail("the Acceptance criteria section has no boxes");
       const open = boxes.filter(({ ticked }) => !ticked);
       if (open.length > 0) {
@@ -308,11 +323,13 @@ export function reviewerCleared(pr: ReviewInput, history: ReviewHistory): Gate {
 // past blockers the reviewer found. With none, a small tiny PR skips the
 // reviewer. A verdict on an earlier commit carries over small changes.
 function reviewerResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Result {
-  const { verdicts, unread } = readVerdicts(pr.body);
+  const read = readVerdicts(pr.body);
+  if ("why" in read) return fail(read.why);
+  const { verdicts } = read;
   if (verdicts.length === 0) {
     const skip = tinySkip(pr, history, tier);
     if (skip.pass) return skip;
-    return fail(`the Review section has no "Reviewer agent at <sha>: no blockers" line${skip.detail}${unread}`);
+    return fail(`the Review section has no "Reviewer agent at <sha>: no blockers" line${skip.detail}`);
   }
   const placed = verdicts.flatMap((verdict) => {
     if (pr.headRefOid.startsWith(verdict.sha)) {
@@ -329,7 +346,7 @@ function reviewerResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Re
   if (lost && !cleanAtHead) return fail(`"${lost.line}" names a commit that isn't on the branch any more, and a fix for a blocker needs a new review`);
   if (placed.length === 0) {
     const shas = verdicts.map(({ sha }) => sha.slice(0, 7)).join(", ");
-    return fail(`the reviewer saw ${shas}, which isn't the head commit ${pr.headRefOid.slice(0, 7)} or one this PR added before it${unread}`);
+    return fail(`the reviewer saw ${shas}, which isn't the head commit ${pr.headRefOid.slice(0, 7)} or one this PR added before it`);
   }
   // The newest verdict is the one with the fewest of the PR's commits after it.
   const fewest = Math.min(...placed.map(({ commits }) => commits));
@@ -343,25 +360,76 @@ type Verdict = { sha: string; verdict: string; line: string };
 
 const isClean = (verdict: string) => /^no blockers\b/i.test(verdict);
 
-function readVerdicts(body: string): { verdicts: Verdict[]; unread: string } {
-  const lines = section(body, "Review").map((line) => line.replace(/[*_`]/g, "").trim());
-  const verdicts = lines.flatMap((line) => {
-    const match = line.match(/Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
-    return match ? [{ sha: match[1].toLowerCase(), verdict: match[2].trim(), line: match[0].trim() }] : [];
+// A verdict is the reviewer's first line, copied in as written: up to 3
+// spaces, at most bold or code around it, and the start of a paragraph or
+// right after another verdict. Any other line that names a
+// commit like a verdict fails the gate instead of being skipped, such as one
+// after a bullet or other words, one GitHub hides in a comment or shows as
+// code, or PR 209's "Reviewer agent at <sha> (re-review since <since>): no
+// blockers". Skipping it could let an older clean verdict count over newer
+// blockers (JAS-58).
+const VERDICT = /^ {0,3}(?:\*\*|__|`+)?Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)$/i;
+const LOOKS_LIKE_VERDICT = /Reviewer agent at [0-9a-f]{7,40}\b[^:]*:/i;
+
+function readVerdicts(body: string): { verdicts: Verdict[] } | { why: string } {
+  const review = section(body, "Review");
+  if ("why" in review && !("missing" in review)) return { why: review.why };
+  if ("why" in review) {
+    // No heading the gate can read, but GitHub may show one it doesn't, such
+    // as "## Review:" or a setext heading, so a verdict anywhere still fails
+    // rather than letting a tiny PR skip past it.
+    const stray = body.split(/\r?\n/).filter((line) => LOOKS_LIKE_VERDICT.test(line.replace(/[*_`]/g, "")));
+    if (stray.length === 0) return { verdicts: [] };
+    const quoted = stray.map((line) => `"${line.trim()}"`).join(", ");
+    return { why: `found no "## Review" heading the gate can read, but ${quoted} names a commit like a verdict. Put verdicts under a "## Review" line of their own` };
+  }
+  const verdicts: Verdict[] = [];
+  const unread = new Set<string>();
+  // Where the gate's reading of the section went wrong, if it did, so the
+  // message can name the cause and not just the verdict it couldn't read.
+  // Only for a verdict the gate reads as code or a comment, or one after the
+  // section ended somewhere other than a real heading.
+  let hiddenFrom: string | undefined;
+  let cause: string | undefined;
+  let afterVerdict = false;
+  review.shown.forEach((line, i) => {
+    const raw = review.raw[i];
+    // Reset at each line GitHub surely shows, so the cause is the nearest one.
+    if (line !== raw) hiddenFrom ??= raw.trim();
+    else if (raw.trim() !== "") hiddenFrom = undefined;
+    // Right after the heading, a blank line or another verdict, nothing
+    // earlier in a paragraph can hide this line.
+    const paragraph = i === 0 || review.raw[i - 1].trim() === "" || afterVerdict;
+    const match = line === raw && paragraph ? line.match(VERDICT) : null;
+    afterVerdict = match !== null;
+    if (match) {
+      const verdict = match[2].replace(/[*_`]/g, "").trim();
+      const text = `Reviewer agent at ${match[1]}: ${verdict}`;
+      verdicts.push({ sha: match[1].toLowerCase(), verdict, line: text });
+    } else if (LOOKS_LIKE_VERDICT.test(raw.replace(/[*_`]/g, ""))) {
+      unread.add(raw.trim());
+      if (line !== raw && hiddenFrom !== undefined && hiddenFrom !== raw.trim()) {
+        cause ??= `the gate reads the lines from "${hiddenFrom}" on as code or a comment`;
+      }
+    }
   });
-  // A line that names a commit but isn't a verdict, such as PR 209's
-  // "Reviewer agent at <sha> (re-review since <since>): no blockers", is
-  // skipped, so a failure names it instead of only the commits it did read.
-  // Only a line with a colon after the commit looks like a verdict; one that
-  // just mentions a commit in passing isn't quoted.
-  const misread = new Set(
-    lines.filter((line) => /Reviewer agent at [0-9a-f]{7,40}\b[^:]+:/i.test(line) && !/Reviewer agent at [0-9a-f]{7,40}:/i.test(line)),
-  );
-  const unread =
-    misread.size === 0
-      ? ""
-      : `; couldn't read ${[...misread].map((line) => `"${line}"`).join(", ")}: a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`;
-  return { verdicts, unread };
+  // The section may end early where GitHub shows no heading, so a verdict
+  // later in the body is never safe to skip either.
+  for (const raw of review.rest) {
+    if (LOOKS_LIKE_VERDICT.test(raw.replace(/[*_`]/g, ""))) {
+      unread.add(raw.trim());
+      const end = review.rest[0];
+      if (!/^#{1,2}[ \t]/.test(end)) cause ??= `the gate's Review section ended at "${end.trim()}", which it reads as a heading`;
+    }
+  }
+  if (unread.size > 0) {
+    const quoted = [...unread].map((line) => `"${line}"`).join(", ");
+    const fix = cause ? ` (${cause}; start a code block's fence on a line of its own, not after "- " or "1. ")` : "";
+    return {
+      why: `couldn't read ${quoted}${fix}: a verdict is a line of its own after a blank line, reading "Reviewer agent at <sha>: no blockers", with a re-review's "(re-review since <since>)" after the verdict. Quote other reviews without their "at <sha>:"`,
+    };
+  }
+  return { verdicts };
 }
 
 // A pass, or a fail whose detail says why a tiny PR still needs the reviewer.
@@ -406,8 +474,9 @@ function carryOver(
 // The template's placeholder, "tiny, normal or risky", names all three, so a
 // line that names more than one tier is refused rather than guessed at.
 function readTier(body: string): Tier {
-  const line = field(body, "Tier");
-  if (line === undefined) return { ok: false, why: "no **Tier:** line" };
+  const tier = field(body, "Tier");
+  if (!("value" in tier)) return { ok: false, why: tier.why };
+  const line = tier.value;
   const first = line.match(/^\W*(\w+)/)?.[1].toLowerCase();
   const named = new Set([...line.matchAll(/\b(tiny|normal|risky)\b/gi)].map((match) => match[1].toLowerCase()));
   if (first === "risky") return { ok: false, why: "risky tier, so Jasper merges it" };
@@ -420,10 +489,10 @@ function readTier(body: string): Tier {
   return { ok: true, tier: first };
 }
 
-function builderProblem(builder: string | undefined): string | false {
-  if (builder === undefined) return "no **Builder:** line";
-  if (!/claude code/i.test(builder)) return "the **Builder:** line doesn't name Claude Code";
-  if (/cursor|cloud agent|grok|composer/i.test(builder)) return "the **Builder:** line names another builder too";
+function builderProblem(builder: Field): string | false {
+  if (!("value" in builder)) return builder.why;
+  if (!/claude code/i.test(builder.value)) return "the **Builder:** line doesn't name Claude Code";
+  if (/cursor|cloud agent|grok|composer/i.test(builder.value)) return "the **Builder:** line names another builder too";
   return false;
 }
 
@@ -431,24 +500,117 @@ function lines(text: string): string[] {
   return text.split(/\r?\n/);
 }
 
-// The text after "**Label:**" on the first line that starts with it.
-function field(body: string, label: string): string | undefined {
+type Field = { value: string } | { why: string };
+
+// Ignores list and quote markers and indentation, to count every line that
+// could pass for a heading or field somewhere GitHub shows it differently.
+const CONTAINER = String.raw`^(?:\s|>|[-+*]\s|\d+[.)]\s)*`;
+
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// The text after "**Label:**" on the one line that starts with it. A second
+// such line anywhere, even in a code block or comment, fails closed: the
+// readers below can't promise to agree with GitHub on which one it shows.
+function field(body: string, label: string): Field {
   const prefix = `**${label}:**`;
-  const line = lines(body).find((text) => text.trim().startsWith(prefix));
-  return line?.trim().slice(prefix.length).trim();
+  const candidates = new RegExp(`${CONTAINER}${escape(prefix)}`);
+  const count = lines(body).filter((line) => candidates.test(line)).length;
+  if (count > 1) return { why: `${count} lines start with ${prefix}; keep one` };
+  const { raw, shown } = bodyLines(body);
+  const index = shown.findIndex((text, i) => text === raw[i] && /^ {0,3}\S/.test(text) && text.trim().startsWith(prefix));
+  if (index === -1) return { why: `no ${prefix} line` };
+  return { value: shown[index].trim().slice(prefix.length).trim() };
 }
 
-// The lines under "## Heading", up to the next "## ".
-function section(body: string, heading: string): string[] {
-  const all = lines(body);
-  const start = all.findIndex((line) => line.trim().toLowerCase() === `## ${heading.toLowerCase()}`);
-  if (start === -1) return [];
-  const rest = all.slice(start + 1);
-  // A "## " line inside a code block isn't a heading.
-  let inCode = false;
-  const end = rest.findIndex((line) => {
-    if (/^\s*(```|~~~)/.test(line)) inCode = !inCode;
-    return !inCode && line.startsWith("## ");
+// A fence opens a code block: up to 3 spaces, then 3 or more backticks with
+// no backtick after them on the line, or 3 or more tildes. Only a fence of
+// the same character, at least as long, with nothing after it closes the
+// block, and one that never closes runs to the end.
+const FENCE = /^ {0,3}(?:(`{3,})(?!.*`)|(~{3,}))/;
+
+// An inline code span: a run of backticks, closed by a run of the same
+// length, so "`<!--``" isn't one.
+const CODE_SPAN = /(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)/g;
+
+// The body's lines as written, and as GitHub shows them as text: a line
+// inside a code block is "", and so is the part of a line inside an HTML
+// comment. The two lists line up, so a reader can compare a line with what
+// was written (JAS-58).
+function bodyLines(body: string): { raw: string[]; shown: string[] } {
+  const raw = lines(body);
+  let fence: string | undefined;
+  let inComment = false;
+  const shown = raw.map((line) => {
+    if (fence !== undefined) {
+      const close = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = undefined;
+      return "";
+    }
+    const open = inComment ? null : line.match(FENCE);
+    if (open) {
+      fence = open[1] ?? open[2];
+      return "";
+    }
+    // A "<!--" inside a code span is text, so look for one with code spans
+    // blanked out. A comment ends at the first "-->", code span or not.
+    const marks = line.replace(CODE_SPAN, (span) => " ".repeat(span.length));
+    let text = "";
+    let at = 0;
+    while (at < line.length) {
+      if (inComment) {
+        const end = line.indexOf("-->", at);
+        if (end === -1) return text;
+        inComment = false;
+        at = end + 3;
+      } else {
+        const start = marks.indexOf("<!--", at);
+        if (start === -1) return text + line.slice(at);
+        text += line.slice(at, start);
+        inComment = true;
+        at = start + 4;
+      }
+    }
+    return text;
   });
-  return end === -1 ? rest : rest.slice(0, end);
+  return { raw, shown };
+}
+
+// The text of a "## " heading GitHub shows: up to 3 spaces before it, since
+// 4 make a code block, and optional closing #s. "##" alone is an empty one.
+function headingText(line: string): string | undefined {
+  const match = line.match(/^ {0,3}##(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/);
+  return match ? (match[1] ?? "") : undefined;
+}
+
+type Section = { shown: string[]; raw: string[]; rest: string[] } | { why: string; missing?: true };
+
+// The lines under "## Heading", as written and as shown, up to the next "#"
+// or "##" heading, and the raw lines after it. A "# " line GitHub shows as
+// code, such as a comment in a list item's code block, ends it too early, so
+// the gates still look for failing lines in the rest. Fails closed when
+// anything else in the body could pass for the same heading, such as one in
+// a list item's code block, since GitHub might show that one and hide this
+// one (JAS-58).
+function section(body: string, heading: string): Section {
+  const { raw, shown } = bodyLines(body);
+  const lookalike = new RegExp(`${CONTAINER}#{1,6}\\s*${escape(heading)}[\\s#]*$`, "i");
+  const count = raw.filter((line) => lookalike.test(line)).length;
+  if (count > 1) return { why: `the description has ${count} lines that look like a "## ${heading}" heading; keep only the real one` };
+  const start = shown.findIndex((line, i) => line === raw[i] && headingText(line)?.toLowerCase() === heading.toLowerCase());
+  if (start === -1 && count === 1) {
+    // GitHub may well show it while the gate can't, such as after a code
+    // block that starts after "- ", so it isn't safe to treat as missing: a
+    // tiny PR would skip past blockers under it.
+    const at = raw.findIndex((line) => lookalike.test(line));
+    if (shown[at] === raw[at]) {
+      return { why: `"${raw[at].trim()}" isn't read as a "## ${heading}" heading; write it as "## ${heading}" on a line of its own` };
+    }
+    return {
+      why: `the gate can't see the "## ${heading}" heading: something above it, such as a code block that starts after "- " or a "<!--" in a paragraph, hides it. Start the fence on a line of its own, or put the "<!--" in backticks`,
+    };
+  }
+  if (start === -1) return { why: `no "## ${heading}" section`, missing: true };
+  const end = shown.findIndex((line, i) => i > start && /^ {0,3}#{1,2}(?:[ \t]|$)/.test(line));
+  const stop = end === -1 ? raw.length : end;
+  return { shown: shown.slice(start + 1, stop), raw: raw.slice(start + 1, stop), rest: raw.slice(stop) };
 }

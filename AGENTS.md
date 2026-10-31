@@ -27,5 +27,8 @@ do not start a parallel implementation of the same issue.
 Only the reviewer agent starts its report with `Reviewer agent at <sha>:`.
 Any other review, such as the `interrogate` panel on a risky pull request,
 starts with its own name instead, like `Interrogate panel at <sha>:`, and never
-writes `Reviewer agent at`. GitHub's `reviewer` check counts any line
-containing `Reviewer agent at <sha>:` as the reviewer's verdict.
+writes `Reviewer agent at`. GitHub's `reviewer` check counts a line that
+starts with `Reviewer agent at <sha>:` as the reviewer's verdict, after a
+blank line, the heading or another verdict, and fails the PR on any other line
+naming a commit that way, so quote another review without its `at <sha>:`
+(decision record 0019).
