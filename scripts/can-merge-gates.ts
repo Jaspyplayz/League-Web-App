@@ -471,20 +471,27 @@ function carryOver(
   return pass(`${line}, carried over ${plural(commits, "commit")} with ${plural(counted, "line")} outside docs`);
 }
 
-// The template's placeholder, "tiny, normal or risky", names all three, so a
-// line that names more than one tier is refused rather than guessed at.
+// The tier is the text before the line's first colon or full stop, as in
+// "normal: <reason>" or "normal. <reason>". Only that part is read, so a
+// reason that says "not on the risky list" or names `scripts/risky-paths.ts`
+// doesn't count as a second tier (JAS-117). The template's placeholder,
+// "tiny, normal or risky, and why.", still names all three before its full
+// stop, so a tier that names more than one is refused rather than guessed at.
 function readTier(body: string): Tier {
-  const tier = field(body, "Tier");
-  if (!("value" in tier)) return { ok: false, why: tier.why };
-  const line = tier.value;
-  const first = line.match(/^\W*(\w+)/)?.[1].toLowerCase();
-  const named = new Set([...line.matchAll(/\b(tiny|normal|risky)\b/gi)].map((match) => match[1].toLowerCase()));
+  const line = field(body, "Tier");
+  if (!("value" in line)) return { ok: false, why: line.why };
+  const tier = line.value.split(/[:.]/)[0];
+  const first = tier.match(/^\W*(\w+)/)?.[1].toLowerCase();
+  const named = new Set([...tier.matchAll(/\b(tiny|normal|risky)\b/gi)].map((match) => match[1].toLowerCase()));
   if (first === "risky") return { ok: false, why: "risky tier, so Jasper merges it" };
   if (first !== "tiny" && first !== "normal") {
     return { ok: false, why: `the **Tier:** line starts with "${first ?? ""}", not tiny or normal` };
   }
   if (named.size > 1) {
-    return { ok: false, why: `the **Tier:** line names more than one tier (${[...named].join(", ")})` };
+    return {
+      ok: false,
+      why: `the **Tier:** line names more than one tier before its first colon or full stop (${[...named].join(", ")})`,
+    };
   }
   return { ok: true, tier: first };
 }

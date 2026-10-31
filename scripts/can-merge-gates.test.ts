@@ -334,6 +334,37 @@ describe("decide", () => {
     expect(failed(decide(pr({ body: body({ tier }) }), main()))).toEqual(["Tiny or normal tier"]);
   });
 
+  // Real Tier lines that can-merge refused for naming "risky" in the reason
+  // (docs/agent-mistakes/tier-line-names-two-tiers.md). Only the tier itself,
+  // up to the first colon or full stop, counts, so each reads as normal.
+  it.each([
+    ["PR 211", "normal: docs plus a new test, nothing on the risky list"],
+    ["PR 211, reworded", "normal: none of its files is in `scripts/risky-paths.ts`"],
+    ["PR 230", "normal: it adds a check and loosens nothing. But it adds a file in `e2e/`, which is on the risky list."],
+    ["PR 234", "normal. Shared components with two timers, no data changes, nothing on the risky list."],
+    [
+      "PR 237",
+      "normal: one area, the header. Jasper merges, because it edits files on `scripts/risky-paths.ts`: the browser tests in `e2e/`, the `verify` skill's Settings feature file, one sentence of `src/app/privacy/page.tsx` and two comments in `src/app/globals.css`.",
+    ],
+    [
+      "PR 238",
+      "normal. It fixes one script and changes what `npm run shot -- --phone` does; `scripts/` files here aren't on the risky list.",
+    ],
+  ])("reads %s's Tier line as normal, though its reason says risky", (_, tier) => {
+    expect(failed(decide(pr({ body: body({ tier }) }), main()))).toEqual([]);
+  });
+
+  it.each([
+    ["the template's placeholder", "tiny, normal or risky, and why."],
+    ["two tiers before a colon", "tiny or normal: a copy fix"],
+    ["two tiers before a full stop", "normal, maybe risky. A copy fix."],
+    ["two tiers and no colon or full stop", "normal, maybe risky"],
+  ])("still refuses %s for naming more than one tier", (_, tier) => {
+    expect(detail(decide(pr({ body: body({ tier }) }), main()), "Tiny or normal tier")).toMatch(
+      /^the \*\*Tier:\*\* line names more than one tier/,
+    );
+  });
+
   it("refuses a risky file even when the tier says tiny, and names it", () => {
     const tiny = body({ tier: "tiny. One query.", criteria: [] });
     const decision = decide(pr({ body: tiny, files: ["docs/database.md", "src/db/schema.ts"] }), main());

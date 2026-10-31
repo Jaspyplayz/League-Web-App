@@ -1,6 +1,6 @@
 # Tier line names a second tier word
 
-`npm run can-merge` reads a PR's **Tier:** line and refuses one that names more than one of tiny, normal and risky anywhere on it, even inside a file name in backticks, so a reason that mentions "the risky list" blocks the merge.
+`npm run can-merge` reads a PR's **Tier:** line and refuses one that names more than one of tiny, normal and risky anywhere on it, even inside a file name in backticks, so a reason that mentions "the risky list" blocks the merge. Since JAS-117 it counts tier words only in the tier itself, the text before the line's first colon or full stop, so the reason can say anything.
 
 ## 2026-10-30
 
@@ -39,5 +39,5 @@
 - **What happened:** a local Claude session rewrote PR 237's Tier line to name one tier, as its review asked, but gave the reason as "it edits files on `scripts/risky-paths.ts`". The filename itself holds the tier word, so `can-merge` still read two tiers. Jasper merged the PR himself, so nothing was blocked.
 - **Evidence:** `npm run can-merge -- 237` at 8e1cd33: "FAIL  Tiny or normal tier: the **Tier:** line names more than one tier (normal, risky)". [PR 237](https://github.com/Jaspyplayz/League-Web-App/pull/237).
 - **Root cause:** the same as the four entries above. `readTier` (`scripts/can-merge-gates.ts:476-489`) counts tier words anywhere on the line, even inside a backticked path, and the session didn't run `can-merge` after editing the description.
-- **Rung:** none yet
-- **Fix:** JAS-117, already filed; it counts tier words only before the line's first colon, which this line would pass.
+- **Rung:** design
+- **Fix:** JAS-117: `readTier` in `scripts/can-merge-gates.ts` reads only the text before the line's first colon or full stop, the full stop for PRs 234 and 238. The tests in `scripts/can-merge-gates.test.ts` ("reads PR 237's Tier line as normal" and the others) hold the refused lines from PRs 211, 230, 234, 237 and 238, which failed before the change and pass after it. The template's placeholder, "tiny, normal or risky, and why.", is still refused.
