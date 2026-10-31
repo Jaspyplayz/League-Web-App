@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decide, MERGE_MARKER, type CheckState, type Decision, type MainState } from "./can-merge-gates";
+import { decide, MERGE_MARKER, type CheckState, type Decision, type MainState, type ReviewHistory } from "./can-merge-gates";
 import {
   CheckRunPage,
   mergeRequest,
@@ -35,6 +35,8 @@ function answers(overrides: Partial<RestAnswers> = {}): RestAnswers {
   return { pull: PR_195, ...CHECKS_195, ...overrides };
 }
 
+// These tests read checks, not lines; PR 195's verdict names its head commit.
+const NO_HISTORY: ReviewHistory = { lines: {}, since: () => undefined };
 const MAIN: MainState = { agentMerge: { on: true, since: "2026-10-25" }, changedGateCode: [], reverts: [], claudeMerges: [] };
 
 function gate(decision: Decision, name: string) {
@@ -74,7 +76,7 @@ describe("toPrSnapshot", () => {
   });
 
   it("passes #195's checks and refuses it as already merged", () => {
-    const decision = decide(toPrSnapshot(answers(), FILES), MAIN);
+    const decision = decide(toPrSnapshot(answers(), FILES), MAIN, NO_HISTORY);
     expect(gate(decision, "Checks pass at the head commit")?.pass).toBe(true);
     expect(gate(decision, "Open and ready")).toMatchObject({ pass: false, detail: "the PR is merged" });
   });
@@ -95,7 +97,7 @@ describe("toPrSnapshot", () => {
       }),
       FILES,
     );
-    expect(gate(decide(pr, MAIN), "Checks pass at the head commit")?.pass).toBe(passes);
+    expect(gate(decide(pr, MAIN, NO_HISTORY), "Checks pass at the head commit")?.pass).toBe(passes);
   });
 
   it("reads a draft", () => {
@@ -126,7 +128,7 @@ describe("toPrSnapshot", () => {
   it("reads a bot author", () => {
     const pr = toPrSnapshot(answers({ pull: Pull.parse(fixture("pull-188-dependabot.json")) }), FILES);
     expect(pr.author).toEqual({ login: "dependabot[bot]", isBot: true });
-    expect(gate(decide(pr, MAIN), "Built by Claude Code")?.detail).toContain("opened by a bot (dependabot[bot])");
+    expect(gate(decide(pr, MAIN, NO_HISTORY), "Built by Claude Code")?.detail).toContain("opened by a bot (dependabot[bot])");
   });
 
   it("reads a closed PR that didn't merge as closed", () => {
@@ -140,7 +142,7 @@ describe("toPrSnapshot", () => {
     const checkRuns = CHECKS_195.checkRuns.map((run) =>
       run.name === "check" ? { ...run, check_suite: { id: reviewerSuite } } : run,
     );
-    const decision = decide(toPrSnapshot(answers({ checkRuns }), FILES), MAIN);
+    const decision = decide(toPrSnapshot(answers({ checkRuns }), FILES), MAIN, NO_HISTORY);
     expect(gate(decision, "Checks pass at the head commit")).toMatchObject({
       pass: false,
       detail: "check hasn't reported from the CI workflow",
@@ -157,7 +159,7 @@ describe("toPrSnapshot", () => {
       { ...ciCheck, started_at: "2026-10-29T05:00:00Z", check_suite: { id: 1 } },
     ];
     const pr = toPrSnapshot(answers({ checkRuns, workflowRuns: [...CHECKS_195.workflowRuns, other] }), FILES);
-    expect(gate(decide(pr, MAIN), "Checks pass at the head commit")).toMatchObject({
+    expect(gate(decide(pr, MAIN, NO_HISTORY), "Checks pass at the head commit")).toMatchObject({
       pass: false,
       detail: "check failed",
     });

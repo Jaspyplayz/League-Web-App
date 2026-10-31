@@ -14,7 +14,7 @@
 import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { z } from "zod";
-import { changedPaths } from "./can-merge-files";
+import { changedLines, changedPaths, reviewHistory } from "./can-merge-files";
 import {
   decide,
   MERGE_MARKER,
@@ -26,6 +26,7 @@ import {
   type ClaudeMerge,
   type Decision,
   type MainState,
+  type ReviewHistory,
 } from "./can-merge-gates";
 import {
   CheckRunPage,
@@ -70,7 +71,7 @@ function wholeList<T>(what: string, total: number, items: T[]): T[] {
   return items;
 }
 
-function readPr(number: string): Pr {
+function readPr(number: string): { pr: Pr; history: ReviewHistory } {
   const pull = Pull.parse(api(`repos/{owner}/{repo}/pulls/${number}`));
   const sha = pull.head.sha;
   // The files come from the exact commit the checks ran on, so a push after
@@ -87,7 +88,7 @@ function readPr(number: string): Pr {
   const runs = CheckRunPage.parse(api(`repos/{owner}/{repo}/commits/${sha}/check-runs?filter=all&per_page=100`));
   const workflows = WorkflowRunPage.parse(api(`repos/{owner}/{repo}/actions/runs?head_sha=${sha}&per_page=100`));
   const status = StatusPage.parse(api(`repos/{owner}/{repo}/commits/${sha}/status?per_page=100`));
-  return toPrSnapshot(
+  const pr = toPrSnapshot(
     {
       pull,
       checkRuns: wholeList("check runs", runs.total_count, runs.check_runs),
@@ -96,6 +97,13 @@ function readPr(number: string): Pr {
     },
     files,
   );
+  // Like the files, the lines take the larger count against main or GitHub's base.
+  const fromBase = reviewHistory(pull.base.sha, sha);
+  const fromMain = changedLines([`origin/main...${sha}`]);
+  for (const [path, count] of Object.entries(fromMain)) {
+    fromBase.lines[path] = Math.max(fromBase.lines[path] ?? 0, count);
+  }
+  return { pr, history: fromBase };
 }
 
 function readMain(): MainState {
@@ -220,8 +228,8 @@ if (positionals.length !== 1 || !/^\d+$/.test(positionals[0])) {
 
 run("git", ["fetch", "--quiet", "origin", "main"]);
 const main = readMain();
-const pr = readPr(positionals[0]);
-const decision = decide(pr, main);
+const { pr, history } = readPr(positionals[0]);
+const decision = decide(pr, main, history);
 
 console.log(`#${pr.number} at ${pr.headRefOid}`);
 for (const line of gateLines(decision)) console.log(line);

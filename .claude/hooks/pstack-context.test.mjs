@@ -42,6 +42,13 @@ describe("the pstack startup hook", () => {
     }
   });
 
+  // interrogate's default panel has a Fable reviewer, and a cloud session has
+  // no pstack-models.md to drop it (decision record 0017).
+  it("keeps the interrogate panel off Fable", () => {
+    const note = runHook().stdout.slice(context.length);
+    expect(note).toContain("leave out any Fable entry, so with no `interrogate reviewers` line the panel is Opus, Sonnet and Haiku");
+  });
+
   // Without a path, poteto-agent looks for poteto-mode in the plugin cache,
   // which a cloud session doesn't have.
   it("gives the path a poteto-agent should read, under the project folder", () => {

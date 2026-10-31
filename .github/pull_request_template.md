@@ -19,8 +19,8 @@ or "none: it's new".
 - [ ] Criterion: screenshot or test name
 
 ## Tested
-Each command you ran and its result, such as `npm test`: `Tests <n> passed`.
-A test count must not fall; if tests were removed, say which and why.
+Each command you ran and whether it passed, such as `npm test`: passed. No
+test counts: CI shows the real ones. If you removed a test, say which and why.
 
 ## Not tested
 What you didn't run or couldn't check, in plain words, or "nothing".
@@ -43,7 +43,9 @@ not "some players".
 ## Review
 The reviewer's first line, `Reviewer agent at <sha>: no blockers`, then its
 findings, each fixed (with the test that shows it) or rejected (with the
-evidence).
+evidence). A tiny PR under the line limit has no review, so write "none:
+tiny". A no-blockers verdict covers small commits after it, such as fixes for
+should-fixes or a postmortem entry (decision record 0017).
 
 Each reviewer blocker keeps its `Check could catch this: yes, <which check>`
 or `Check could catch this: no, judgement call` line as written, on a line of
