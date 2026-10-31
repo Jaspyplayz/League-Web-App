@@ -4,20 +4,25 @@
 // the merge. It calls GitHub only with `gh api`, never `gh pr`, because a cloud
 // session's GitHub proxy refuses the GraphQL API that `gh pr` uses (JAS-26).
 // Run it from an up-to-date main checkout, since it refuses when its own code
-// differs from origin/main's.
+// differs from origin/main's. The Agent merge workflow
+// (.github/workflows/agent-merge.yml) runs it from main after each check
+// finishes, so a PR merges without a Claude session (JAS-121).
 //
 //   npm run can-merge -- 170            print each gate, PASS or FAIL
 //   npm run can-merge -- 170 --merge    the same, then merge if every gate passed
 //
-// It exits with an error when any gate fails, and then merges nothing.
+// It exits with REFUSED_EXIT_CODE (2) when any gate fails, and then merges
+// nothing. Any other error exits with 1.
 
 import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { z } from "zod";
+import { readyToMerge } from "./can-merge-action-steps";
 import { changedLines, changedPaths, reviewHistory } from "./can-merge-files";
 import {
   decide,
   MERGE_MARKER,
+  REFUSED_EXIT_CODE,
   MERGED_BY_CLAUDE,
   parseAgentMerge,
   parseReverts,
@@ -160,7 +165,8 @@ function gateLines(decision: Decision): string[] {
   return decision.gates.map((gate) => `${gate.pass ? "PASS" : "FAIL"}  ${gate.name}: ${gate.detail}`);
 }
 
-// gh runs as Jasper, so GitHub shows him as the merger. The marker in the
+// gh runs as Jasper on his PC, and as github-actions[bot] in the Agent merge
+// workflow, so GitHub shows one of them as the merger. The marker in the
 // merge commit is the record the revert gate reads; the label and comment are
 // for people reading the PR on GitHub.
 function merge(pr: Pr, decision: Decision) {
@@ -234,9 +240,13 @@ const decision = decide(pr, main, history);
 
 console.log(`#${pr.number} at ${pr.headRefOid}`);
 for (const line of gateLines(decision)) console.log(line);
+// Not a gate: the Agent merge workflow's own hold. It's printed so a builder
+// checking a PR by hand sees why the workflow hasn't merged it yet.
+const ready = readyToMerge(pr.body, pr.headRefOid);
+console.log(`NOTE  Agent merge: ${ready.ready ? "marked ready at the head commit" : `held, since ${ready.why}`} (not a gate)`);
 if (!decision.ok) {
   console.log(`\nClaude Code can't merge #${pr.number}.`);
-  process.exit(1);
+  process.exit(REFUSED_EXIT_CODE);
 }
 console.log(`\nEvery gate passed for #${pr.number}.`);
 if (values.merge) merge(pr, decision);
