@@ -112,7 +112,7 @@ export function SearchForm() {
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center gap-2 rounded-md bg-main px-6 font-semibold text-page transition-opacity hover:opacity-90 disabled:opacity-60 max-sm:w-full"
+          className="inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center gap-2 rounded-md bg-main px-6 font-semibold text-page transition-opacity duration-320 ease-out hover:opacity-90 hover:duration-120 motion-reduce:transition-none disabled:opacity-60 max-sm:w-full"
         >
           {pending ? "Looking up…" : "Analyze"}
           <ArrowRightIcon />

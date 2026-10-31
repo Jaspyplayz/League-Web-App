@@ -13,7 +13,15 @@ vi.mock("@/lib/profile-store", () => ({
 vi.mock("@/lib/ddragon", () => ({ getDataDragon: async () => null }));
 vi.mock("@/lib/supabase/config", () => ({ supabaseConfig: () => ({ url: "x", key: "y" }) }));
 // The real link reads the address, which needs Next's router.
-vi.mock("./sign-in-link", () => ({ SignInLink: () => <a href="/sign-in">Sign in</a> }));
+// The stand-in records hideOnSignInPage, so a test can check the header asks
+// for it (sign-in-link.test.tsx checks what the real link does with it).
+vi.mock("./sign-in-link", () => ({
+  SignInLink: ({ hideOnSignInPage }: { hideOnSignInPage?: boolean }) => (
+    <a href="/sign-in" data-hide-on-sign-in-page={String(Boolean(hideOnSignInPage))}>
+      Sign in
+    </a>
+  ),
+}));
 
 const player = { puuid: "player-1", region: "na" as const, gameName: "Jaspy", tagLine: "CA1", profileIconId: null };
 
@@ -30,7 +38,10 @@ beforeEach(signedIn);
 describe("AccountMenu", () => {
   it("shows Sign in when nobody is signed in", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(null);
-    expect(await render()).toContain("Sign in");
+    const html = await render();
+    expect(html).toContain("Sign in");
+    // Hidden on /sign-in, where it would only lead back to the same page.
+    expect(html).toContain(`data-hide-on-sign-in-page="true"`);
   });
 
   it("links your name and rank to the profile marked as yours, beside Sign out", async () => {
