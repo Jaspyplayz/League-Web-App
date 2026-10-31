@@ -202,9 +202,14 @@ describe("a saved row from a server the player never played on", () => {
     expect(profile.stored).toBe(true);
   });
 
-  it("is replaced through the Update button too", async () => {
+  // The page fetches EUW again when it reloads, and that visit replaces the
+  // row, so the click itself has nothing to do (JAS-71).
+  it("is replaced on the reload after Update, not by the click, which asks Riot nothing", async () => {
     saveEmptyNaRow(dayAgo);
     expect(await updateProfile("euw", "p1")).toEqual({ status: "updated" });
+    expect(getMatchIds).not.toHaveBeenCalled();
+    expect(player).toMatchObject({ region: "na", summonerLevel: null });
+    await loadProfile("euw", account);
     expect(player).toMatchObject({ region: "euw", summonerLevel: 12 });
   });
 
@@ -213,6 +218,55 @@ describe("a saved row from a server the player never played on", () => {
     vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("not-found", "no summoner on KR"));
     await loadProfile("kr", account);
     expect(player).toMatchObject({ region: "na", summonerLevel: null });
+  });
+
+  it("isn't replaced when Riot fails to answer about the summoner", async () => {
+    saveEmptyNaRow();
+    vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("unavailable", "summoner-v4 is down"));
+    vi.mocked(getMatchIds).mockResolvedValue(["EUW1_real"]);
+    const profile = await loadProfile("euw", account);
+    expect(player).toMatchObject({ region: "na", summonerLevel: null, matchIds: [] });
+    expect(profile).toMatchObject({ matchIds: ["EUW1_real"], stored: false });
+  });
+});
+
+// JAS-71: a saved level of null means "no summoner on this server", which
+// lets another server take the row, so only Riot's "not found" may save one.
+describe("a summoner call that fails for another reason than not found", () => {
+  const outage = () =>
+    vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("unavailable", "summoner-v4 is down"));
+
+  it("keeps the saved profile's summoner, and shows the saved profile", async () => {
+    saveEuwProfile(dayAgo);
+    outage();
+    vi.mocked(getMatchIds).mockResolvedValue(["EUW1_new"]);
+    const profile = await loadProfile("euw", account);
+    expect(player).toMatchObject({ region: "euw", summonerLevel: 300, matchIds: ["EUW1_saved"] });
+    expect(ranked).toEqual([euwRank]);
+    expect(profile).toMatchObject({ summonerLevel: 300, matchIds: ["EUW1_saved"], stored: true });
+  });
+
+  it("so another server with a summoner can't take the row afterwards", async () => {
+    saveEuwProfile(dayAgo);
+    outage();
+    await loadProfile("euw", account);
+    vi.mocked(getSummoner).mockResolvedValue({ puuid: "p1", profileIconId: 7, summonerLevel: 12 });
+    await loadProfile("na", account);
+    expect(player).toMatchObject({ region: "euw", summonerLevel: 300 });
+  });
+
+  it("saves nothing on a first visit, but still shows the page", async () => {
+    outage();
+    const profile = await loadProfile("na", account);
+    expect(player).toBeUndefined();
+    expect(profile).toMatchObject({ summonerLevel: null, matchIds: ["NA1_new"], stored: false });
+  });
+
+  it("makes Update say it failed, since the page would show the old snapshot", async () => {
+    saveEuwProfile(dayAgo);
+    outage();
+    expect(await updateProfile("euw", "p1")).toEqual({ status: "failed", kind: "unavailable" });
+    expect(player).toMatchObject({ summonerLevel: 300, matchIds: ["EUW1_saved"] });
   });
 });
 

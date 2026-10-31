@@ -13,7 +13,9 @@ import { database } from "@/lib/match-store";
 
 export async function readMatchNote(userId: string, matchId: string): Promise<ReadNoteResult> {
   const db = database();
-  if (!db) return { ok: true, text: "" };
+  // No DATABASE_URL means notes are off; one set but not connecting is a
+  // failure, like readMyPlayer in my-player.ts.
+  if (!db) return process.env.DATABASE_URL ? { ok: false } : { ok: true, text: "" };
   try {
     const row = await db.query.matchNotes.findFirst({
       columns: { text: true },

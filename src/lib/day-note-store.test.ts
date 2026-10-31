@@ -6,14 +6,19 @@ vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 
 const findMany = vi.fn();
+let connects = true;
 vi.mock("@/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/db")>()),
-  getDb: () => ({ query: { dayNotes: { findMany } } }),
+  getDb: () => {
+    if (!connects) throw new Error("can't connect");
+    return { query: { dayNotes: { findMany } } };
+  },
 }));
 
 beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "postgres://test");
   findMany.mockReset();
+  connects = true;
   vi.mocked(Sentry.captureException).mockClear();
 });
 
@@ -44,6 +49,13 @@ describe("readDayNotes", () => {
   it("returns nothing saved without a database, not a failure", async () => {
     vi.stubEnv("DATABASE_URL", "");
     expect(await readDayNotes("user-1", "2026-09-25")).toEqual({ ok: true, byDay: {} });
+  });
+
+  // JAS-71: like readMyPlayer, a database that's set up but can't be
+  // reached isn't the same as no notes.
+  it("reports a failed read when the database can't be reached", async () => {
+    connects = false;
+    expect(await readDayNotes("user-1", "2026-09-25")).toEqual({ ok: false });
   });
 
   it("reports a failed read when the query throws", async () => {

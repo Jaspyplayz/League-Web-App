@@ -99,12 +99,15 @@ describe("loadProfile", () => {
     await expect(loadProfile("na", account)).rejects.toThrow(RiotApiError);
   });
 
-  it("still loads without the icon and level", async () => {
-    vi.mocked(getSummoner).mockRejectedValue(new RiotApiError("not-found", "none"));
-    const profile = await loadProfile("na", account);
-    expect(profile.summonerLevel).toBeNull();
-    expect(profile.matchIds).toEqual(["NA1_new"]);
-  });
+  it.each(["not-found", "unavailable"] as const)(
+    "still loads without the icon and level when the summoner call fails with %s",
+    async (kind) => {
+      vi.mocked(getSummoner).mockRejectedValue(new RiotApiError(kind, "none"));
+      const profile = await loadProfile("na", account);
+      expect(profile.summonerLevel).toBeNull();
+      expect(profile.matchIds).toEqual(["NA1_new"]);
+    },
+  );
 });
 
 describe("updateProfile", () => {

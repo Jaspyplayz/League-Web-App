@@ -48,7 +48,11 @@ export async function loadProfile(region: Region, account: Account): Promise<Pro
   if (saved && isFresh(saved.updatedAt, TTL_MS.profile)) return saved;
 
   try {
-    return await fetchProfile(region, account);
+    const fetched = await fetchProfile(region, account);
+    // Riot didn't say whether the player has a summoner here, so the fresh
+    // profile wasn't saved and has no icon or level: the saved one is better.
+    if (fetched.summonerError && saved) return saved;
+    return fetched.profile;
   } catch (error) {
     // Riot is down or busy: a day-old profile beats an error message.
     if (saved && error instanceof RiotApiError) return saved;
@@ -71,20 +75,32 @@ export async function updateProfile(region: Region, puuid: string): Promise<Upda
   // No database, or nothing saved yet: the page fetches a fresh profile on
   // its own when it reloads, so there's nothing to do here.
   if (!player) return { status: "updated" };
-  // A real profile saved for another region doesn't change from this page,
-  // which fetches a fresh one on every load anyway, so the click costs no
-  // Riot calls here, and the cooldown can't be dodged by picking a region.
-  if (player.region !== region && player.summonerLevel !== null) return { status: "updated" };
+  // A profile saved for another region isn't this page's to refresh. The
+  // page fetches a fresh profile on every load anyway, and that fetch also
+  // replaces a saved row with no summoner when it finds one, so the click
+  // costs no Riot calls here and the cooldown can't be dodged by picking a
+  // region.
+  if (player.region !== region) return { status: "updated" };
 
   const secondsLeft = secondsUntilUpdate(player.matchIdsFetchedAt);
   if (secondsLeft > 0) return { status: "cooldown", secondsLeft };
 
   const result = await settle(fetchProfile(region, player));
-  return result.ok ? { status: "updated" } : { status: "failed", kind: result.error.kind };
+  if (!result.ok) return { status: "failed", kind: result.error.kind };
+  // Nothing was saved, so the page would show the old snapshot: say so.
+  if (result.value.summonerError) return { status: "failed", kind: result.value.summonerError };
+  return { status: "updated" };
 }
 
+type Fetched = {
+  profile: Profile;
+  // Set when Riot failed to answer about the summoner (anything but "not
+  // found"), so the profile wasn't saved.
+  summonerError: RiotErrorKind | null;
+};
+
 // Asks Riot for everything on the profile at once (3 calls) and saves it.
-async function fetchProfile(region: Region, account: Account): Promise<Profile> {
+async function fetchProfile(region: Region, account: Account): Promise<Fetched> {
   const { puuid } = account;
   const [summoner, ranked, matchIds] = await Promise.all([
     // The icon and level are nice to have, so the page still works without
@@ -102,10 +118,17 @@ async function fetchProfile(region: Region, account: Account): Promise<Profile> 
     updatedAt: new Date(),
     stored: false,
   };
+  // A saved level of null means "no summoner on this server", which lets a
+  // visit to another server take the row (see saveProfile). Only Riot's
+  // "not found" proves that: a summoner call that failed for another reason,
+  // such as an outage, says nothing, so nothing is saved (JAS-71).
+  if (!summoner.ok && summoner.error.kind !== "not-found") {
+    return { profile, summonerError: summoner.error.kind };
+  }
   // Saved before returning, not after the response like matches are: after
   // an Update the page reloads straight away and must read the new snapshot.
   const stored = await saveProfile(region, account, profile);
-  return { ...profile, stored };
+  return { profile: { ...profile, stored }, summonerError: null };
 }
 
 // The player's saved solo queue tier ("GOLD"), so the match page can use

@@ -16,7 +16,9 @@ import { database } from "@/lib/match-store";
 // page will show; the caller asks for a few days extra.
 export async function readDayNotes(userId: string, since: string): Promise<ReadDayNotesResult> {
   const db = database();
-  if (!db) return { ok: true, byDay: {} };
+  // No DATABASE_URL means notes are off; one set but not connecting is a
+  // failure, like readMyPlayer in my-player.ts.
+  if (!db) return process.env.DATABASE_URL ? { ok: false } : { ok: true, byDay: {} };
   try {
     const rows = await db.query.dayNotes.findMany({
       columns: { day: true, text: true },
