@@ -31,10 +31,10 @@ Tokens live in `src/app/globals.css`. `src/app/soft-rounded.test.ts` fails if `h
 
 | Token | Utility | Use |
 |---|---|---|
-| `--radius-soft` (20px) | `soft-round`, `rounded-soft`, `rounded-t-soft`, `rounded-b-soft` | Cards (`panelClass` / `softPanelClass` in `src/components/ui/panel.tsx`), menus, composers, primary buttons about 52px tall |
-| `--radius-soft-sm` (12px) | `soft-round-sm` | Icon buttons, portraits, controls about 40px tall |
+| `--radius-soft` (6px since JAS-97) | `soft-round`, `rounded-soft`, `rounded-t-soft`, `rounded-b-soft` | Cards (`panelClass` / `softPanelClass` in `src/components/ui/panel.tsx`), menus, composers, primary buttons about 52px tall |
+| `--radius-soft-sm` (4px since JAS-97) | `soft-round-sm` | Icon buttons, portraits, controls about 40px tall |
 
-A 20px radius on a 40px square is a circle. Header icon buttons and the profile icon in the header stay on `soft-round-sm` for that reason.
+The Review board look moved both tokens to 6px and 4px (decision record 0022), so the class names stay until each page moves to Tailwind's `rounded-md` and `rounded-sm`, and the contract ticket deletes them with this skill.
 
 Keep `rounded-full` on controls that were already pills (queue filters, role tags, the Ask suggestion chips, the trinket slot, rune icons).
 

@@ -64,6 +64,11 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "package.json", why: "the commands CI runs, and dependencies" },
   { pattern: "package-lock.json", why: "dependencies" },
 
+  // The look's foundations (JAS-94): the palette and the test that guards it.
+  // Page restyles that only use the tokens stay off this list.
+  { pattern: "src/app/globals.css", why: "the palette in both themes, the corners and the fonts" },
+  { pattern: "src/app/themes.test.ts", why: "the check that every colour has a light value" },
+
   // The merge rules themselves.
   { pattern: ".claude/agent-merge.json", why: "the switch for agent merging" },
   { pattern: "scripts/can-merge", why: "the merge gates" },

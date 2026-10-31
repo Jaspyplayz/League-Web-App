@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Barlow_Condensed, IBM_Plex_Mono, Rubik } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeWatcher } from "@/components/theme-watcher";
@@ -15,9 +15,11 @@ const barlowCondensed = Barlow_Condensed({
   subsets: ["latin"],
 });
 
-// IBM Plex Sans is a variable font, so one file covers every weight.
-const plexSans = IBM_Plex_Sans({
-  variable: "--font-plex-sans",
+// Rubik is the body font (JAS-97). It's a variable font, so one file covers
+// every weight the site uses (400 to 700). Barlow Condensed and IBM Plex Mono stay for
+// the headings and labels that still use them, until their pages move over.
+const rubik = Rubik({
+  variable: "--font-rubik",
   subsets: ["latin"],
 });
 
@@ -46,7 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       data-theme="dark"
       suppressHydrationWarning
-      className={`${barlowCondensed.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${barlowCondensed.variable} ${rubik.variable} ${plexMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

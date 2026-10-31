@@ -14,31 +14,73 @@
  * Views of both teams (scoreboards, Team analysis) color by result instead:
  * the winning team is blue and the losing team red, like op.gg. Your own
  * row gets an outline so you can find it either way.
+ *
+ * "static" makes Tailwind write out every variable here, even one no class
+ * uses yet. Without it the new tokens that pages haven't moved to (select,
+ * the fills, the grades) would be left out of the dark theme, and anything
+ * reading them with var() would get nothing.
  */
-@theme {
-  /* "Clean HUD": steel-blue darks like League's in-game interface. */
-  --color-page: #0a0f14;
-  --color-surface: #101820;
-  --color-surface-hover: #16212c;
-  --color-line: #1f2d3a;
-  --color-line-strong: #2a3a4a;
-  /* The steel outline around cards, like the frames in the game's HUD. */
-  --color-frame: #3a4f63;
+@theme static {
+  /*
+   * "Review board" (JAS-77, JAS-94): warm graphite in dark, warm light grey
+   * in light. A panel is one fill step off the page, with no border.
+   */
+  --color-page: #21201d;
+  --color-panel: #2b2925;
+  /* A fill inside a panel: phase tiles, step buttons. */
+  --color-raised: #353330;
+  /* The selected row, your own row, and hover. */
+  --color-select: rgb(255 255 255 / 7%);
+  --color-divider: #3e3b36;
+  --color-main: #f2efe9;
+  --color-quiet: #aaa498;
+  --color-placeholder: #7d786f;
   /* Summoner's Rift in the game's own colors, the same in both themes, so
      the replay's drawing of the map matches Riot's picture of it. */
   --color-rift-ground: #919a70;
   --color-rift-wall: #000a13;
 
-  --color-ink: #e8ecf2;
-  --color-ink-soft: #c3cad5;
-  --color-muted: #a9b2bf;
-  --color-faint: #8b95a5;
-  --color-placeholder: #6b7586;
+  --color-ahead: #62a8ff;
+  --color-ahead-soft: #8fc0ff;
+  --color-ahead-bright: #b8d8ff;
+  --color-behind: #ff6d65;
+  /* The areas under the gold chart's line. */
+  --color-ahead-fill: rgb(98 168 255 / 32%);
+  --color-behind-fill: rgb(255 109 101 / 30%);
 
-  --color-ahead: #5a8cff;
-  --color-ahead-soft: #8fb0ff;
-  --color-ahead-bright: #b9ceff;
-  --color-behind: #f4615a;
+  /*
+   * Play grades, chess.com's ten plus Turnpoint's own Even. Good grades run
+   * cyan to blue and bad ones yellow to red; each sits on a circle with its
+   * own symbol, so they differ in shape as well as colour.
+   */
+  --color-grade-brilliant: #3cc8e4;
+  --color-grade-great: #4f9dff;
+  --color-grade-best: #9cc4ff;
+  --color-grade-excellent: #c9dcf7;
+  --color-grade-good: #ddd6ca;
+  --color-grade-even: #8f8a81;
+  --color-grade-book: #c49a6c;
+  --color-grade-inaccuracy: #f2c230;
+  --color-grade-mistake: #ff9a4a;
+  --color-grade-miss: #ff7aa8;
+  --color-grade-blunder: #ff5f57;
+
+  /*
+   * The old names, each pointed at its new token so every page takes the
+   * new look before it is moved to the new names (JAS-96's expand step).
+   * An alias follows its token into the light theme by itself. The contract
+   * ticket deletes these once no page uses them.
+   */
+  --color-surface: var(--color-panel);
+  --color-surface-hover: var(--color-raised);
+  --color-line: var(--color-divider);
+  --color-line-strong: var(--color-divider);
+  --color-ink: var(--color-main);
+  --color-ink-soft: var(--color-main);
+  --color-muted: var(--color-quiet);
+  --color-faint: var(--color-quiet);
+  /* Panels have no outline now, so the old frame draws nothing. */
+  --color-frame: transparent;
 
   /*
    * Text sizes beyond Tailwind's defaults, so the site sticks to a few:
@@ -51,18 +93,17 @@
   --text-body: 15px;
 
   --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
-  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-sans: var(--font-rubik), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
   /*
-   * Soft Rounded radii. Cards, composers and tall primary buttons use
-   * --radius-soft (rounded-soft / soft-round). Icon buttons, portraits and
-   * shorter controls use --radius-soft-sm (rounded-soft-sm / soft-round-sm),
-   * so a 40px control stays a soft square instead of a circle.
-   * A full pill (rounded-full) is only for a control that is already a pill.
+   * Corners. The Review board uses 6px, and 4px for small pieces. The Soft
+   * Rounded names stay, pointed at the new sizes, until each page moves to
+   * Tailwind's rounded-md and rounded-sm (JAS-94). A full pill (rounded-full)
+   * is only for a control that is already a pill.
    */
-  --radius-soft: 20px;
-  --radius-soft-sm: 12px;
+  --radius-soft: 6px;
+  --radius-soft-sm: 4px;
 }
 
 /*
@@ -73,38 +114,52 @@
  *
  * Same meanings as dark: blue = you / ahead / win, red = opponent / behind /
  * loss. The blues and red are darker here so text in them stays readable on
- * white: at least 4.5:1 contrast, the WCAG AA bar, on the page, on cards and
- * on the 10% blue and red tints over the page (the match list's win and loss
- * rows). On the 15-20% tints, use ahead-soft or ahead-bright for text.
+ * white: at least 4.5:1 contrast, the WCAG AA bar, on the page and on panels.
+ * That holds on the 10% blue and red tints over the page too (the match list's
+ * win and loss rows): ahead and behind reach 4.58:1 there, after the nudge
+ * Jasper chose in decision record 0022. On the 15% tints use ahead-soft or
+ * ahead-bright for text, and on the 20% tint over the page only ahead-bright.
  */
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --color-page: #eef2f5;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f3f6f8;
-  --color-line: #d3dce4;
-  --color-line-strong: #c3cfd9;
-  --color-frame: #8fa3b5;
-
-  --color-ink: #141922;
-  --color-ink-soft: #323b49;
-  --color-muted: #4f5a69;
-  --color-faint: #586372;
-  --color-placeholder: #8a93a1;
+  --color-page: #f1efeb;
+  --color-panel: #ffffff;
+  --color-raised: #f6f5f2;
+  --color-select: rgb(30 28 25 / 6%);
+  --color-divider: #dedad2;
+  --color-main: #1e1c19;
+  --color-quiet: #645e55;
+  --color-placeholder: #9a948a;
 
   /* In dark mode "soft" and "bright" are lighter blues for text on black;
      on white they go darker instead, so links and highlights still stand out. */
-  --color-ahead: #2459d1;
-  --color-ahead-soft: #1b4cba;
-  --color-ahead-bright: #163f9e;
-  --color-behind: #b62f28;
+  --color-ahead: #105dcc;
+  --color-ahead-soft: #1857b8;
+  --color-ahead-bright: #134a9e;
+  --color-behind: #bf1c21;
+  --color-ahead-fill: rgb(16 93 204 / 22%);
+  --color-behind-fill: rgb(191 28 33 / 20%);
+
+  --color-grade-brilliant: #0b8aa8;
+  --color-grade-great: #1c66d6;
+  --color-grade-best: #7aa6e6;
+  --color-grade-excellent: #bcd2f0;
+  --color-grade-good: #d8d1c4;
+  --color-grade-even: #8a857c;
+  --color-grade-book: #a8784a;
+  --color-grade-inaccuracy: #f0bd1d;
+  --color-grade-mistake: #e0731f;
+  --color-grade-miss: #c93a74;
+  --color-grade-blunder: #cb2c2c;
+
+  --color-frame: transparent;
 }
 
 /*
- * Soft Rounded chrome, the same language as the home Riot ID bar and the
- * Ask composer. Names match the classes already used there (soft-round)
- * and point at the radius tokens above, so a later change is one number.
+ * Soft Rounded chrome, kept by name until the contract ticket. Both point at
+ * the radius tokens above, so the whole site took the 6px corners from one
+ * number each.
  */
 @utility soft-round {
   border-radius: var(--radius-soft);

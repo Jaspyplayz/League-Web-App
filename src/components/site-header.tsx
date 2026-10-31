@@ -8,8 +8,8 @@ import { navTabClass } from "./nav-tab-style";
 
 export const REPO_URL = "https://github.com/Jaspyplayz/League-Web-App";
 
-// Soft square icon buttons for search and settings. 12px on a 40px
-// button stays a square, which a 20px radius would turn into a circle.
+// Soft square icon buttons for search and settings, with the small 4px corner
+// the design rules give icon buttons.
 const iconButton =
   "soft-round-sm flex size-10 items-center justify-center border border-frame text-ink-soft transition-colors hover:bg-surface hover:text-ink";
 

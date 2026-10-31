@@ -27,10 +27,10 @@ describe("Soft Rounded chrome", () => {
     expect(hits).toEqual([]);
   });
 
-  it("defines the two radii the cards and controls share", () => {
+  it("points the two radii at the Review board's 6px and 4px corners", () => {
     const css = readFileSync("src/app/globals.css", "utf8");
-    expect(css).toContain("--radius-soft: 20px");
-    expect(css).toContain("--radius-soft-sm: 12px");
+    expect(css).toContain("--radius-soft: 6px");
+    expect(css).toContain("--radius-soft-sm: 4px");
     expect(css).toContain("@utility soft-round");
     expect(css).toContain("@utility soft-round-sm");
 
