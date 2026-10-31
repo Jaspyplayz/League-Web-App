@@ -26,7 +26,7 @@ const ACCOUNT_ADDS = [
 
 export default function SignInPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <main className="mx-auto flex w-full max-w-[480px] flex-col gap-5 px-4 pb-14 pt-8 sm:gap-[22px] sm:px-10 sm:pb-[88px] sm:pt-[72px]">
+    <main className="mx-auto flex w-full max-w-[432px] flex-col gap-5 px-4 pb-14 pt-8 sm:max-w-[480px] sm:gap-[22px] sm:px-10 sm:pb-[88px] sm:pt-[72px]">
       <div className="flex flex-col gap-2">
         <h1 className="text-title font-semibold">Sign in</h1>
         <p className="text-body text-quiet">
@@ -34,8 +34,9 @@ export default function SignInPage({ searchParams }: { searchParams: SearchParam
         </p>
       </div>
       {/* The buttons read ?next= and ?error= from the address, which only exist
-          per request, so they stream in behind a boundary. */}
-      <Suspense fallback={<Panel className="h-[122px]" />}>
+          per request, so they stream in behind a boundary. The stand-in is
+          the two-button panel's height, so the page doesn't jump. */}
+      <Suspense fallback={<Panel className="h-[140px]" />}>
         <SignInOptions searchParams={searchParams} />
       </Suspense>
       <section aria-labelledby="account-adds" className="flex flex-col gap-2">
