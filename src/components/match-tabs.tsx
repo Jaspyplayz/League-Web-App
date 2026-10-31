@@ -5,7 +5,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { loadBuildsAction } from "@/app/player/[region]/[riotId]/actions";
 import { BuildView } from "@/components/build-view";
 import { BuildSkeleton } from "@/components/loading-skeleton";
-import { teamOrder } from "@/lib/analyzer/team-analysis";
+import { PlayerPicker, type PickerPlayer } from "@/components/player-picker";
 import type { BuildsResult } from "@/lib/match-builds";
 
 type Tab = "overview" | "team" | "build" | "runes";
@@ -16,23 +16,13 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "runes", label: "Runes" },
 ];
 
-export type PickerPlayer = {
-  participantId: number;
-  teamId: number;
-  ally: boolean; // on the profile player's team
-  won: boolean; // on the winning team, which decides the ring color
-  label: string; // "Ahri (Player#NA1)", for the button's accessible name
-  icon: ReactNode; // the champion icon, drawn on the server
-};
-
 // The tabs inside an open match row, like op.gg's: Overview (the
 // scoreboard), Team analysis (both teams stat by stat), Build (items and
 // skill order) and Runes. Build and Runes show one player at a time, picked
 // from a row of champion icons.
 //
 // Overview, Team analysis and every rune page are drawn on the server and
-// passed in, since
-// the match data is already there. Builds need the match timeline, which the
+// passed in, since the match data is already there. Builds need the match timeline, which the
 // profile doesn't load, so they're fetched the first time Build is opened.
 export function MatchTabs({
   region,
@@ -76,7 +66,7 @@ export function MatchTabs({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider">
         <div role="tablist" aria-label="Match details" className="flex gap-1">
           {TABS.map((t) => (
             <button
@@ -85,7 +75,7 @@ export function MatchTabs({
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => open(t.id)}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition-colors ${tab === t.id ? "border-ahead text-ink" : "border-transparent text-faint hover:text-ink-soft"}`}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition-colors ${tab === t.id ? "border-ahead text-main" : "border-transparent text-quiet hover:text-main"}`}
             >
               {t.label}
             </button>
@@ -95,7 +85,7 @@ export function MatchTabs({
           // Expanding to the full page: the same match analysis page as before.
           <Link
             href={analysisHref}
-            className="soft-round-sm mb-1.5 border border-ahead/40 px-3 py-1 text-[13px] font-semibold text-ahead-soft transition-colors hover:bg-ahead/10"
+            className="mb-1.5 rounded-md border border-ahead/40 px-3 py-1 text-note font-semibold text-ahead-soft transition-colors hover:bg-ahead/10"
           >
             Full analysis →
           </Link>
@@ -122,7 +112,7 @@ function BuildTab({ result, playerId }: { result: BuildsResult | null; playerId:
   if (!result) return <BuildSkeleton />;
   if (result.status === "failed") {
     return (
-      <p className="text-[13px] text-behind">
+      <p className="text-note text-behind">
         {result.kind === "rate-limited"
           ? "Riot's request limit is used up for now. Open the tab again in a minute."
           : "Couldn't load builds from Riot. Open the tab again to retry."}
@@ -131,41 +121,4 @@ function BuildTab({ result, playerId }: { result: BuildsResult | null; playerId:
   }
   const build = result.builds[playerId];
   return build ? <BuildView build={build} /> : null;
-}
-
-// Ten champion icons, your team then the enemy's, to pick whose build or
-// runes to show. The picked one gets a ring in its team's color: blue for the
-// winners, red for the losers, like the scoreboards.
-function PlayerPicker({
-  players,
-  selected,
-  onSelect,
-}: {
-  players: PickerPlayer[];
-  selected: number;
-  onSelect: (participantId: number) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-4">
-      {teamOrder(players.find((p) => p.ally)?.teamId).map((teamId) => (
-        <div key={teamId} className="flex gap-1.5">
-          {players
-            .filter((p) => p.teamId === teamId)
-            .map((p) => (
-              <button
-                key={p.participantId}
-                type="button"
-                aria-pressed={p.participantId === selected}
-                aria-label={p.label}
-                title={p.label}
-                onClick={() => onSelect(p.participantId)}
-                className={`soft-round-sm p-0.5 transition-opacity ${p.participantId === selected ? (p.won ? "ring-2 ring-ahead" : "ring-2 ring-behind") : "opacity-50 hover:opacity-100"}`}
-              >
-                {p.icon}
-              </button>
-            ))}
-        </div>
-      ))}
-    </div>
-  );
 }

@@ -3,7 +3,7 @@
 // The 60-second review, near the top of the Summary tab: the plays
 // you were in that moved your team's chance to win the most (picked in
 // src/lib/analyzer/review.ts), each with a question to think over. "Watch in
-// replay" opens the Deep dive tab with the replay at that moment, and "Add
+// replay" opens the Replay tab with the replay at that moment, and "Add
 // to notes" starts a line about it in your notes (review-links.tsx).
 //
 // It's a Client Component for those two buttons. The moments arrive ready

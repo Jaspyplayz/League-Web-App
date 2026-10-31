@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { AskPanel } from "@/components/ask/ask-panel";
 import { MatchSkeleton } from "@/components/loading-skeleton";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { panelClass } from "@/components/ui/panel";
 import { analyzeMatch, findPlayer, findPlayerByRiotId, whyNotAnalyzed } from "@/lib/analyzer";
 import { replayChances } from "@/lib/analyzer/plays";
 import { championName, getDataDragon } from "@/lib/ddragon";
+import { buildViews } from "@/lib/match-builds";
 import { loadMatch, loadTimeline } from "@/lib/match-store";
 import { savedSoloTier } from "@/lib/profile-store";
 import { isMatchIdFor, isRegion, type Region } from "@/lib/regions";
@@ -33,6 +35,12 @@ export const metadata = {
   description:
     "One League of Legends game minute by minute: the lead over your lane opponent, the turning points and each team's chance to win.",
 };
+
+// The Ask panel on the Replay tab sends questions with a Server Action,
+// which gets this page's time limit. Claude reads several games one round at
+// a time, so give it three minutes rather than the default (the old Ask page
+// had the same).
+export const maxDuration = 180;
 
 export default function MatchPage({ params }: { params: Params }) {
   return (
@@ -149,11 +157,34 @@ async function Analysis({ params }: { params: Params }) {
         phases={ratePhases(match, timeline.value, me.participantId)}
         dd={dd}
         label={label}
+        builds={buildViews(timeline.value.events, dd)}
         recap={<MatchRecap region={region} matchId={matchId} puuid={me.puuid} />}
         notes={notes}
+        ask={
+          <Suspense fallback={<p className="text-quiet">Loading Ask…</p>}>
+            <AskPanel
+              region={region}
+              riotId={riotId}
+              puuid={me.puuid}
+              playerPath={`/player/${region}/${toSlug(id)}`}
+              game={`${label(me.championName)} game on ${gameDate(match)}`}
+            />
+          </Suspense>
+        }
       />
     </>
   );
+}
+
+// The day the game was played, like "Oct 18", the way Ask's answers name
+// games (gameLabel in src/lib/ask-rules.ts), so a question that names it
+// reads the same.
+function gameDate(match: Match): string {
+  return new Date(match.info.gameStartTimestamp).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 // Finds the searched player in the match by the Riot ID in the URL. If they

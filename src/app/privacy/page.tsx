@@ -98,7 +98,7 @@ export default function PrivacyPage() {
 
       <h2>Ask</h2>
       <p>
-        If you ask a question on a player&apos;s Ask tab, Turnpoint sends your question, that
+        If you ask a question in the Ask panel on a match page, Turnpoint sends your question, that
         player&apos;s Riot ID and their game stats (the same ones shown on their match pages) to
         Anthropic, which runs the Claude AI model, so it can write the answer. No account
         details or notes are sent. Turnpoint saves your question, the answer and which games it read with

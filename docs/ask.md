@@ -1,6 +1,8 @@
 # Ask (ask your history)
 
-A player profile's **Ask** tab lets anyone signed in type a question about that player's games, like "What do my losses have in common?". Claude reads the games through Turnpoint's own tools and answers in a few sentences, with links to the games it read. A signed-out visitor sees one labeled illustration of an answer and the sign-in link. The illustration is not about the player in the address, and the page does not call Claude.
+The **Ask** panel sits beside the replay on every game's Replay tab (under it on screens narrower than 1280px). Anyone signed in can type a question about that player's games, like "What decided my Ahri game on Oct 18?". Claude reads the games through Turnpoint's own tools and answers in a few sentences, with links to the games it read. A signed-out visitor sees one labeled illustration of an answer and the sign-in link. The illustration is not about the player in the address, and the page does not call Claude.
+
+The panel puts the game it sits beside first: its example questions name that game by champion and date, the way Claude's answers name games. What Claude is sent is the same as anywhere else, so it finds the game through `recent_games`, which lists the player's 20 latest games. A question about an older game, like the home page's sample game, may get an answer about other games; telling Claude which game is open would change what Ask sends, so it's left for its own ticket. Ask used to be a profile tab at `/player/<region>/<Name-TAG>/ask`; that address now redirects to the profile (`src/app/player/[region]/[riotId]/ask/route.ts`). The panel's code is in `src/components/ask/`.
 
 ## How it works
 
@@ -41,7 +43,7 @@ A question usually costs 5 to 20 cents: Sonnet is $2 per million tokens in and $
 
 ## Setup
 
-Uses the same `ANTHROPIC_API_KEY` as recaps, plus sign-in and the database. Without any of them the tab says Ask isn't available. Apply the migrations with `npm run db:migrate` (0018 makes `ask_questions`, 0019 `ask_spend`, and 0020 copies the costs saved before `ask_spend` existed into it).
+Uses the same `ANTHROPIC_API_KEY` as recaps, plus sign-in and the database. Without any of them the panel says Ask isn't available. Apply the migrations with `npm run db:migrate` (0018 makes `ask_questions`, 0019 `ask_spend`, and 0020 copies the costs saved before `ask_spend` existed into it).
 
 ## Ask from your own Claude instead
 

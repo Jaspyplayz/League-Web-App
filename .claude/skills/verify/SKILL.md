@@ -34,7 +34,7 @@ It loads the home page, the sample game (needs only the database) and Hide on bu
 ```
 npm run shot -- --pr 155 /how-it-works
 npm run shot -- --pr 155 --light --phone /how-it-works
-npm run shot -- --pr 155 --tab "Deep dive" "/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221"
+npm run shot -- --pr 155 --tab "Replay" "/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221"
 ```
 
 - `--light` and `--phone` cover the issue template's "on a phone, and in light mode" criterion. `--phone` is a Pixel 7 screen.

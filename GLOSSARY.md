@@ -133,7 +133,7 @@ One item in the 60-second review.
 _Avoid_: Using "moment" for turning points, swings or plays
 
 **Replay**:
-The map view that plays a game back from Riot's data, with its plays beside it. It is in beta.
+The map view that plays a game back from Riot's data, with its plays beside it, on the game's Replay tab. It is in beta.
 _Avoid_: Video, VOD
 
 **Tempo**:
@@ -207,7 +207,7 @@ A run of games a player played back to back.
 _Avoid_: Session (on its own), streak
 
 **Ask**:
-The profile tab where a signed-in person asks Claude questions about that profile's games.
+The panel beside the replay, on a game's Replay tab, where a signed-in person asks Claude questions about that player's games, with that game named in its examples.
 _Avoid_: Chat, assistant, AI coach
 
 ### Your notes

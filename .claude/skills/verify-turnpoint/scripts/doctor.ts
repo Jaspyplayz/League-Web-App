@@ -81,8 +81,15 @@ async function run() {
   const home = await probe("/", "Find the minute");
   const db = await probe(SAMPLE_MATCH_PATH, "60-second review");
   const riot = await probe(TEST_PLAYER.path, "Recent matches");
-  let supa = await probe(`${TEST_PLAYER.path}/ask`, "to ask questions");
-  if (supa !== "ok" && riot === "ok") supa = `${supa}; Ask is off here (needs ANTHROPIC_API_KEY + Supabase + DATABASE_URL)`;
+  // Ask sits on the sample game's Replay tab, hidden until it's opened, so
+  // open it before reading the page.
+  let supa = await probe(SAMPLE_MATCH_PATH, "60-second review");
+  if (supa === "ok") {
+    await page.getByRole("tab", { name: "Replay" }).click();
+    const text = await page.locator("body").innerText();
+    supa = text.includes("to ask questions") ? "ok" : 'missing "to ask questions"';
+  }
+  if (supa !== "ok" && db === "ok") supa = `${supa}; Ask is off here (needs ANTHROPIC_API_KEY + Supabase + DATABASE_URL)`;
   const leaks = await leaked();
   await browser.close();
   console.log(`home page            [needs: nothing]  ${home}`);

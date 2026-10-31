@@ -123,11 +123,22 @@ const journeys: Journey[] = [
       await step("watch the first moment in the replay", async () => {
         const review = page.getByRole("region", { name: "60-second review" });
         await review.getByRole("button", { name: "Watch in replay" }).first().click();
-        await expect(page.getByRole("tab", { name: "Deep dive" })).toHaveAttribute("aria-selected", "true");
+        await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true");
         await expect(page.getByRole("tabpanel", { name: "Summary" })).toBeHidden();
         await expect(page.getByRole("heading", { name: "Replay", exact: true })).toBeVisible();
         await page.waitForTimeout(500); // reducedMotion is set; this only lets the scroll land
         await inViewport(page, "Replay");
+      });
+      await step("ask sits beside the replay", async () => {
+        const ask = page.getByRole("heading", { name: "Ask about this game" });
+        await expect(ask).toBeVisible();
+        // Beside it from 1280px wide, under it below that.
+        const replayBox = (await page.getByRole("heading", { name: "Replay", exact: true }).boundingBox())!;
+        const askBox = (await ask.boundingBox())!;
+        const wide = page.viewportSize()!.width >= 1280;
+        note("askPlacement", askBox.x > replayBox.x + 200 ? "beside" : "under");
+        if (wide && askBox.x <= replayBox.x + 200) throw new Error("Ask is under the replay at 1280px or wider");
+        if (!wide && askBox.y <= replayBox.y) throw new Error("Ask isn't under the replay below 1280px");
       });
       await step("back to summary keeps the review", async () => {
         await page.getByRole("tab", { name: "Summary" }).click();
@@ -138,19 +149,27 @@ const journeys: Journey[] = [
   {
     name: "ux-signed-out-teasers",
     feature: "signed-out-teasers.md",
-    needs: ["riot", "supabase"],
+    needs: ["database", "supabase"],
     run: async ({ page, step }) => {
-      await step("ask tab signed out", async () => {
+      await step("old ask address lands on the profile", async () => {
         await page.goto(`${TEST_PLAYER.path}/ask`, LOAD);
+        // goto follows the redirect, so the page's address is where it landed.
+        expect(new URL(page.url()).pathname).toBe(TEST_PLAYER.path);
+      });
+      await step("ask panel signed out", async () => {
+        await page.goto("/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221", LOAD);
+        await page.getByRole("tab", { name: "Replay" }).click();
         await expectCalm(page);
-        const main = page.getByRole("main");
-        await expect(main.getByText("to ask questions about this player")).toBeVisible(LOAD);
-        await expect(main.getByText("Illustration · not a real game")).toBeVisible();
-        await expect(main.getByRole("textbox")).toHaveCount(0);
+        // The Game recap teaser on Summary has its own illustration, so look
+        // only inside the Ask panel.
+        const ask = page.getByRole("region", { name: "Ask about this game" });
+        await expect(ask.getByText("to ask questions about this player")).toBeVisible(LOAD);
+        await expect(ask.getByText("Illustration · not a real game")).toBeVisible();
+        await expect(ask.getByRole("textbox")).toHaveCount(0);
       });
       await step("sign in from the teaser keeps the way back", async () => {
-        await page.getByRole("main").getByRole("link", { name: "Sign in" }).click();
-        await expect(page).toHaveURL(/\/sign-in\?next=%2Fplayer%2Fkr%2FHide%2520on%2520bush-KR1%2Fask/, LOAD);
+        await page.getByRole("region", { name: "Ask about this game" }).getByRole("link", { name: "Sign in" }).click();
+        await expect(page).toHaveURL(/\/sign-in\?next=%2Fplayer%2Fkr%2FHide%2520on%2520bush-KR1%2Fmatch%2FKR_8416261221/, LOAD);
         await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
         await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
         await expect(page.getByRole("button", { name: "Continue with Discord" })).toBeVisible();

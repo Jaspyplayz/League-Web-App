@@ -6,7 +6,7 @@ import { GANKS_HELP, GankLists, gankSummary } from "./ganks";
 import { HowToRead } from "./how-to-read";
 import { PATHING_HELP, PathingGrid, pathingSummary } from "./pathing";
 
-// "Early jungle" on the Deep dive tab, for junglers: one line on the early
+// "Early jungle" on the Stats tab, for junglers: one line on the early
 // game, then early pathing on the left and both junglers' early ganks on the
 // right. What the grid and lists mean sits behind "How to read this". It
 // used to be two panels, Early pathing and Early ganks, each with its own

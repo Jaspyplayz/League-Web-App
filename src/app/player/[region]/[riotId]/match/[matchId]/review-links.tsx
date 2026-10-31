@@ -3,7 +3,7 @@
 import { createContext, useContext } from "react";
 
 // How the 60-second review reaches the rest of the match page: "Watch in
-// replay" moves the replay (on the Deep dive tab) to a moment, and "Add to
+// replay" moves the replay (on the Replay tab) to a moment, and "Add to
 // notes" puts a line in your notes box. The tabs hold this (analysis-tabs.tsx)
 // since they decide which tab shows, and the replay and notes box read it.
 //
