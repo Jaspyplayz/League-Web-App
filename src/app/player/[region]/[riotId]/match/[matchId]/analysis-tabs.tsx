@@ -9,23 +9,33 @@ import {
   type ReviewLinks,
 } from "./review-links";
 
-type Tab = "summary" | "deep";
+type Tab = "summary" | "replay" | "stats";
 const TABS: { id: Tab; label: string }[] = [
   { id: "summary", label: "Summary" },
-  { id: "deep", label: "Deep dive" },
+  { id: "replay", label: "Replay" },
+  { id: "stats", label: "Stats" },
 ];
 
-// "Summary | Deep dive" under the match header. Summary holds what most
+// "Summary | Replay | Stats" under the match header. Summary holds what most
 // people come for (scoreboard, verdict, lead and win chance), so the page
-// isn't a wall of charts; Deep dive holds the replay and the detailed stats.
+// isn't a wall of charts; Replay holds the replay with Ask beside it, and
+// Stats the detailed tables.
 //
-// Both tabs are drawn on the server and stay in the page, only hidden, so
-// switching is instant and the replay keeps its spot when you come back.
+// All three tabs are drawn on the server and stay in the page, only hidden,
+// so switching is instant and the replay keeps its spot when you come back.
 //
 // The tabs also pass on the 60-second review's buttons (review-links.tsx):
-// "Watch in replay" opens Deep dive with the replay at that moment, and "Add
-// to notes" puts a line in the notes box on Summary.
-export function AnalysisTabs({ summary, deepDive }: { summary: ReactNode; deepDive: ReactNode }) {
+// "Watch in replay" opens Replay at that moment, and "Add to notes" puts a
+// line in the notes box on Summary.
+export function AnalysisTabs({
+  summary,
+  replay,
+  stats,
+}: {
+  summary: ReactNode;
+  replay: ReactNode;
+  stats: ReactNode;
+}) {
   const [tab, setTab] = useState<Tab>("summary");
   const [replayRequest, setReplayRequest] = useState<ReplayRequest | null>(null);
   const [noteRequest, setNoteRequest] = useState<NoteRequest | null>(null);
@@ -35,10 +45,10 @@ export function AnalysisTabs({ summary, deepDive }: { summary: ReactNode; deepDi
       replayRequest,
       noteRequest,
       watch: (ms) => {
-        // flushSync draws the Deep dive tab first, so there's a replay to
+        // flushSync draws the Replay tab first, so there's a replay to
         // scroll to.
         flushSync(() => {
-          setTab("deep");
+          setTab("replay");
           setReplayRequest({ ms });
         });
         document
@@ -65,7 +75,13 @@ export function AnalysisTabs({ summary, deepDive }: { summary: ReactNode; deepDi
 
   return (
     <ReviewLinksContext value={links}>
-      <div role="tablist" aria-label="Match analysis" className="flex gap-1 border-b border-line">
+      {/* On phones the three tabs share the bar evenly; from sm up they sit
+          at the start, as wide as their labels. */}
+      <div
+        role="tablist"
+        aria-label="Match analysis"
+        className="grid grid-cols-3 gap-1 border-b border-divider sm:flex"
+      >
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -77,8 +93,8 @@ export function AnalysisTabs({ summary, deepDive }: { summary: ReactNode; deepDi
             onClick={() => setTab(t.id)}
             className={`-mb-px border-b-2 px-[18px] py-3 ${
               tab === t.id
-                ? "border-ahead font-semibold text-ink"
-                : "border-transparent font-medium text-faint hover:text-ink"
+                ? "border-ahead font-semibold text-main"
+                : "border-transparent font-medium text-quiet hover:text-main"
             }`}
           >
             {t.label}
@@ -94,7 +110,7 @@ export function AnalysisTabs({ summary, deepDive }: { summary: ReactNode; deepDi
           hidden={tab !== t.id}
           className="flex flex-col gap-7"
         >
-          {t.id === "summary" ? summary : deepDive}
+          {{ summary, replay, stats }[t.id]}
         </div>
       ))}
     </ReviewLinksContext>

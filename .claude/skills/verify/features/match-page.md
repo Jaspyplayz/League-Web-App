@@ -1,6 +1,6 @@
 # Match page
 
-One game, minute by minute, against the enemy in the same role. The Summary tab has the result, the biggest swings and the 60-second review. The Deep dive tab has the replay, the lane comparison, team gold and deaths.
+One game, minute by minute, against the enemy in the same role. The Summary tab has the result, the biggest swings and the 60-second review. The Replay tab has the replay with the Ask panel beside it. The Stats tab has the lane comparison at 10 and 15 minutes, team gold and deaths, early jungle, Team analysis, and each player's build and runes.
 
 ## Sub-features
 
@@ -19,7 +19,8 @@ One game, minute by minute, against the enemy in the same role. The Summary tab 
 Preconditions: `npm run shot -- --check` says `ok` for the sample game.
 
 - **Summary.** `npm run shot -- --pr <n> "/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221"` shows the `Match summary` region with "Victory" and the "Biggest swings" section.
-- **Deep dive.** Add `--tab "Deep dive"`. The screenshot shows the `Replay` heading, the plays list and the two team tables.
+- **Replay.** Add `--tab "Replay"`. The screenshot shows the beta note, the `Replay` heading, the plays list and the two team tables, with `Ask about this game` beside it from 1280px wide.
+- **Stats.** Add `--tab "Stats"`. The screenshot shows the 10 and 15 minute table, team gold and deaths; `Team analysis` and `Build and runes` are further down.
 - **Phone and light mode.** Add `--phone`, `--light` or both to either of the above.
 
 ## Gotchas

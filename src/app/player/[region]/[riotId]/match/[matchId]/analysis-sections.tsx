@@ -1,20 +1,32 @@
 import type { ReactNode } from "react";
 import type { TurningPointMarker } from "@/components/diff-chart";
+import { ChampionIcon } from "@/components/game-icons";
+import { RunePage } from "@/components/rune-page";
 import { REPO_URL } from "@/components/site-header";
+import { TeamAnalysis } from "@/components/team-analysis";
 import { panelClass } from "@/components/ui/panel";
+import { PanelHeading } from "@/components/ui/panel-heading";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
 import type { PhaseRating } from "@/lib/analyzer/phase-score";
 import type { ReplayChances } from "@/lib/analyzer/plays";
 import { reviewMoments } from "@/lib/analyzer/review";
 import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
-import { championIconUrl, itemIconUrl, itemName, riftMapUrl, type DataDragon } from "@/lib/ddragon";
+import {
+  championIconUrl,
+  itemIconUrl,
+  itemName,
+  riftMapUrl,
+  type DataDragon,
+} from "@/lib/ddragon";
 import { scoreGame } from "@/lib/game-score";
+import type { BuildView } from "@/lib/match-builds";
 import type { Region } from "@/lib/regions";
 import type { Match } from "@/lib/riot/types";
 import { supabaseConfig } from "@/lib/supabase/config";
 import type { MatchWinChance } from "@/lib/win-chance";
 import { AnalysisTabs } from "./analysis-tabs";
+import { BuildAndRunes } from "./build-and-runes";
 import { Deaths } from "./deaths";
 import { EarlyJungle } from "./early-jungle";
 import { GameTimeline } from "./game-timeline";
@@ -28,17 +40,20 @@ import { SnapshotTable } from "./snapshot-table";
 import { TeamGold } from "./team-gold";
 
 // Everything below the match header, once the match has been analyzed, in
-// two tabs so the vital part comes first (Jasper's order, 2026-10-19):
+// three tabs so the vital part comes first (Jasper's order, 2026-10-19, and
+// the Summary, Replay and Stats split, JAS-105):
 // - Summary: the scoreboard; one strip with you vs your opponent and your
 //   early, mid, late and overall ratings; the 60-second review; "How the
 //   game went", the lead and win chance charts on one time axis with the
 //   turning points and biggest swings beside them; then the recap and your
 //   notes side by side (the "shared timeline" layout, 2026-10-20).
-// - Deep dive: the replay first (beta, with the tempo timeline for
-//   junglers), then one table of you vs your opponent at 10 and 15 minutes,
-//   team gold with objectives beside your deaths and, for junglers, one
-//   "Early jungle" panel with early pathing and both junglers' ganks
-//   ("tighter, replay first", 2026-10-20).
+// - Replay: a one-line beta note, then the replay (with the tempo timeline
+//   for junglers) and the Ask panel beside it on wide screens, under it on
+//   narrower ones.
+// - Stats: one table of you vs your opponent at 10 and 15 minutes, team gold
+//   with objectives beside your deaths, for junglers one "Early jungle"
+//   panel with early pathing and both junglers' ganks, then Team analysis,
+//   and each player's build and runes.
 export function AnalysisSections({
   region,
   match,
@@ -48,8 +63,10 @@ export function AnalysisSections({
   phases,
   dd,
   label,
+  builds,
   recap,
   notes,
+  ask,
 }: {
   region: Region;
   match: Match;
@@ -64,9 +81,12 @@ export function AnalysisSections({
   phases: PhaseRating[];
   dd: DataDragon | null;
   label: (championName: string) => string;
+  // Every player's items and skill order, keyed by participantId.
+  builds: Record<number, BuildView>;
   // Drawn by the page, since they load their own data.
   recap: ReactNode;
   notes: ReactNode;
+  ask: ReactNode;
 }) {
   const { participants } = match.info;
   const byId = new Map(participants.map((p) => [p.participantId, p]));
@@ -138,20 +158,40 @@ export function AnalysisSections({
     </>
   );
 
-  const deepDive = (
+  const replay = (
     <>
-      <Replay
-        replay={a.replay}
-        chances={chances}
-        tempo={a.tempo}
-        people={replayPeople(participants, a, dd, label)}
-        items={replayItems(a, dd)}
-        winningTeamId={participants.find((p) => p.win)?.teamId ?? 0}
-        mapUrl={dd ? riftMapUrl(dd) : null}
-        docsHref={`${REPO_URL}/blob/main/docs/replay.md`}
-        tempoDocsHref={`${REPO_URL}/blob/main/docs/tempo.md`}
-      />
+      <p className="text-note text-quiet">
+        Beta: the replay is rebuilt from Riot&apos;s timeline, so it can be a little off.{" "}
+        <a
+          href={`${REPO_URL}/blob/main/docs/replay.md`}
+          className="font-medium text-ahead-soft hover:underline"
+        >
+          How it&apos;s checked
+        </a>
+      </p>
 
+      {/* Beside each other from 1280px (xl), the Ask panel under the replay
+          below that. Beside Ask, the replay's scoreboard drops under its map,
+          as it does on narrower screens. */}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <Replay
+          replay={a.replay}
+          chances={chances}
+          tempo={a.tempo}
+          people={replayPeople(participants, a, dd, label)}
+          items={replayItems(a, dd)}
+          winningTeamId={participants.find((p) => p.win)?.teamId ?? 0}
+          mapUrl={dd ? riftMapUrl(dd) : null}
+          docsHref={`${REPO_URL}/blob/main/docs/replay.md`}
+          tempoDocsHref={`${REPO_URL}/blob/main/docs/tempo.md`}
+        />
+        {ask}
+      </div>
+    </>
+  );
+
+  const stats = (
+    <>
       {a.opponent && (
         <SnapshotTable
           snapshots={[a.at10, a.at15].filter((s) => s !== null)}
@@ -169,10 +209,42 @@ export function AnalysisSections({
         ganks={a.ganks}
         enemyJungler={a.opponent ? label(a.opponent.championName) : null}
       />
+
+      <section
+        aria-labelledby="team-analysis-heading"
+        className={`${panelClass} flex flex-col gap-4 p-6`}
+      >
+        <PanelHeading id="team-analysis-heading">Team analysis</PanelHeading>
+        <TeamAnalysis
+          dd={dd}
+          participants={participants}
+          youId={a.me.participantId}
+          opponentId={a.opponent?.participantId}
+        />
+      </section>
+
+      <BuildAndRunes
+        builds={builds}
+        runePages={Object.fromEntries(
+          participants.map((p) => [
+            p.participantId,
+            <RunePage key={p.participantId} dd={dd} perks={p.perks} />,
+          ]),
+        )}
+        players={participants.map((p) => ({
+          participantId: p.participantId,
+          teamId: p.teamId,
+          ally: p.teamId === a.me.teamId,
+          won: p.win,
+          label: [label(p.championName), p.riotIdGameName].filter(Boolean).join(", "),
+          icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="rounded-md" />,
+        }))}
+        defaultPlayerId={a.me.participantId}
+      />
     </>
   );
 
-  return <AnalysisTabs summary={summary} deepDive={deepDive} />;
+  return <AnalysisTabs summary={summary} replay={replay} stats={stats} />;
 }
 
 // Everyone in the replay's scoreboard, your team first and each team in role

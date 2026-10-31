@@ -20,4 +20,13 @@ describe("AskBox", () => {
     const html = renderToStaticMarkup(<AskBox {...props} history={[]} historyFailed />);
     expect(html).toContain("Couldn&#x27;t load your past questions. Reload to try again.");
   });
+
+  // The match page's Ask panel names its game in the examples.
+  it("offers the example questions it's given", () => {
+    const html = renderToStaticMarkup(
+      <AskBox {...props} history={[]} historyFailed={false} examples={["What decided my Ahri game on Oct 18?"]} />,
+    );
+    expect(html).toContain("What decided my Ahri game on Oct 18?");
+    expect(html).not.toContain("What do my losses have in common?");
+  });
 });

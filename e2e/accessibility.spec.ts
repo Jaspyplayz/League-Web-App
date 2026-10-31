@@ -78,7 +78,7 @@ test("scan the home page", async ({ page }) => {
   await scan(page, "Home");
 });
 
-test("scan the sample analysis, both tabs", async ({ page }) => {
+test("scan the sample analysis, all three tabs", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "See a sample analysis" }).click();
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
@@ -87,9 +87,16 @@ test("scan the sample analysis, both tabs", async ({ page }) => {
   );
   await scan(page, "Sample analysis, Summary tab");
 
-  await page.getByRole("tab", { name: "Deep dive" }).click();
+  // Replay has the Ask panel beside it, whichever state Ask is in on the
+  // preview (usually not set up there, since previews have no sign-in).
+  await page.getByRole("tab", { name: "Replay" }).click();
   await expect(page.getByRole("heading", { name: "Replay", exact: true })).toBeVisible();
-  await scan(page, "Sample analysis, Deep dive tab");
+  await expect(page.getByRole("heading", { name: "Ask about this game" })).toBeVisible();
+  await scan(page, "Sample analysis, Replay tab");
+
+  await page.getByRole("tab", { name: "Stats" }).click();
+  await expect(page.getByRole("heading", { name: "Build and runes" })).toBeVisible();
+  await scan(page, "Sample analysis, Stats tab");
 });
 
 test("scan a player page, in both themes", async ({ page }) => {
