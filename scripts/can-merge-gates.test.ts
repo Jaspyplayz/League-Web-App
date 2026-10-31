@@ -775,6 +775,29 @@ describe("decide", () => {
       expect(gate?.detail).toContain('the gate\'s Review section ended at "# run it"');
     });
 
+    // GitHub shows these as the heading, but the gate can't read them, so a
+    // verdict under one must still count against a tiny PR (re-review at
+    // 468b685).
+    it.each(["## Review\u00a0", "## Review:", "Review\n------"])("refuses a tiny PR's verdict under a heading the gate can't read: %j", (heading) => {
+      const tiny = body({ tier: "tiny. Copy.", criteria: [], review: [`Reviewer agent at ${HEAD}: 1 blockers`] }).replace("## Review", heading);
+      expect(reviewerGate(tiny, ["docs/habits.md"])?.pass).toBe(false);
+    });
+
+    it("says a heading has the wrong level rather than that something hides it", () => {
+      const tiny = body({ tier: "tiny. Copy.", criteria: [], review: [`Reviewer agent at ${HEAD}: no blockers`] }).replace("## Review", "### Review");
+      expect(reviewerGate(tiny, ["docs/habits.md"])?.detail).toContain('"### Review" isn\'t read as a "## Review" heading');
+    });
+
+    it.each<[string, string[], string]>([
+      ["a bullet after a comment", ["<!-- paste below -->", "", `- Reviewer agent at ${HEAD}: no blockers`], "reads the lines from"],
+      ["a quote under the next real heading", [`Reviewer agent at ${HEAD}: no blockers`, "", "## Docs and decisions touched", `Earlier: Reviewer agent at ${OLDER}: 1 blockers`], "section ended at"],
+    ])("doesn't blame the wrong line for %s", (_, review, wrongCause) => {
+      const gate = reviewerGate(body({ review }));
+      expect(gate?.pass).toBe(false);
+      expect(gate?.detail).toContain("couldn't read");
+      expect(gate?.detail).not.toContain(wrongCause);
+    });
+
     it("doesn't read a Tier line inside a code block", () => {
       const text = withSummary("```\n**Tier:** tiny\n```", { tier: null });
       expect(detail(decide(pr({ body: text }), main()), "Tiny or normal tier")).toBe("no **Tier:** line");

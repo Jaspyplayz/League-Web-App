@@ -373,17 +373,30 @@ const LOOKS_LIKE_VERDICT = /Reviewer agent at [0-9a-f]{7,40}\b[^:]*:/i;
 
 function readVerdicts(body: string): { verdicts: Verdict[] } | { why: string } {
   const review = section(body, "Review");
-  if ("why" in review) return "missing" in review ? { verdicts: [] } : { why: review.why };
+  if ("why" in review && !("missing" in review)) return { why: review.why };
+  if ("why" in review) {
+    // No heading the gate can read, but GitHub may show one it doesn't, such
+    // as "## Review:" or a setext heading, so a verdict anywhere still fails
+    // rather than letting a tiny PR skip past it.
+    const stray = body.split(/\r?\n/).filter((line) => LOOKS_LIKE_VERDICT.test(line.replace(/[*_`]/g, "")));
+    if (stray.length === 0) return { verdicts: [] };
+    const quoted = stray.map((line) => `"${line.trim()}"`).join(", ");
+    return { why: `found no "## Review" heading the gate can read, but ${quoted} names a commit like a verdict. Put verdicts under a "## Review" line of their own` };
+  }
   const verdicts: Verdict[] = [];
   const unread = new Set<string>();
   // Where the gate's reading of the section went wrong, if it did, so the
   // message can name the cause and not just the verdict it couldn't read.
+  // Only for a verdict the gate reads as code or a comment, or one after the
+  // section ended somewhere other than a real heading.
   let hiddenFrom: string | undefined;
   let cause: string | undefined;
   let afterVerdict = false;
   review.shown.forEach((line, i) => {
     const raw = review.raw[i];
+    // Reset at each line GitHub surely shows, so the cause is the nearest one.
     if (line !== raw) hiddenFrom ??= raw.trim();
+    else if (raw.trim() !== "") hiddenFrom = undefined;
     // Right after the heading, a blank line or another verdict, nothing
     // earlier in a paragraph can hide this line.
     const paragraph = i === 0 || review.raw[i - 1].trim() === "" || afterVerdict;
@@ -395,7 +408,7 @@ function readVerdicts(body: string): { verdicts: Verdict[] } | { why: string } {
       verdicts.push({ sha: match[1].toLowerCase(), verdict, line: text });
     } else if (LOOKS_LIKE_VERDICT.test(raw.replace(/[*_`]/g, ""))) {
       unread.add(raw.trim());
-      if (hiddenFrom !== undefined && hiddenFrom !== raw.trim()) {
+      if (line !== raw && hiddenFrom !== undefined && hiddenFrom !== raw.trim()) {
         cause ??= `the gate reads the lines from "${hiddenFrom}" on as code or a comment`;
       }
     }
@@ -405,7 +418,8 @@ function readVerdicts(body: string): { verdicts: Verdict[] } | { why: string } {
   for (const raw of review.rest) {
     if (LOOKS_LIKE_VERDICT.test(raw.replace(/[*_`]/g, ""))) {
       unread.add(raw.trim());
-      cause ??= `the gate's Review section ended at "${review.rest[0].trim()}", which it reads as a heading`;
+      const end = review.rest[0];
+      if (!/^#{1,2}[ \t]/.test(end)) cause ??= `the gate's Review section ended at "${end.trim()}", which it reads as a heading`;
     }
   }
   if (unread.size > 0) {
@@ -573,12 +587,13 @@ type Section = { shown: string[]; raw: string[]; rest: string[] } | { why: strin
 // The lines under "## Heading", as written and as shown, up to the next "#"
 // or "##" heading, and the raw lines after it. A "# " line GitHub shows as
 // code, such as a comment in a list item's code block, ends it too early, so
-// the gates still look for failing lines in the rest. Fails closed when anything else in the body could pass for
-// the same heading, such as one in a list item's code block, since GitHub
-// might show that one and hide this one (JAS-58).
+// the gates still look for failing lines in the rest. Fails closed when
+// anything else in the body could pass for the same heading, such as one in
+// a list item's code block, since GitHub might show that one and hide this
+// one (JAS-58).
 function section(body: string, heading: string): Section {
   const { raw, shown } = bodyLines(body);
-  const lookalike = new RegExp(`${CONTAINER}#{1,6}[ \\t]*${escape(heading)}[ \\t#]*$`, "i");
+  const lookalike = new RegExp(`${CONTAINER}#{1,6}\\s*${escape(heading)}[\\s#]*$`, "i");
   const count = raw.filter((line) => lookalike.test(line)).length;
   if (count > 1) return { why: `the description has ${count} lines that look like a "## ${heading}" heading; keep only the real one` };
   const start = shown.findIndex((line, i) => line === raw[i] && headingText(line)?.toLowerCase() === heading.toLowerCase());
@@ -586,6 +601,10 @@ function section(body: string, heading: string): Section {
     // GitHub may well show it while the gate can't, such as after a code
     // block that starts after "- ", so it isn't safe to treat as missing: a
     // tiny PR would skip past blockers under it.
+    const at = raw.findIndex((line) => lookalike.test(line));
+    if (shown[at] === raw[at]) {
+      return { why: `"${raw[at].trim()}" isn't read as a "## ${heading}" heading; write it as "## ${heading}" on a line of its own` };
+    }
     return {
       why: `the gate can't see the "## ${heading}" heading: something above it, such as a code block that starts after "- " or a "<!--" in a paragraph, hides it. Start the fence on a line of its own, or put the "<!--" in backticks`,
     };
