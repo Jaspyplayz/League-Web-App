@@ -75,7 +75,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts --base https://league-w
 | `insights-others` | riot, database | [features/insights-others.md](features/insights-others.md) |
 | `ask-teaser` | riot, supabase | [features/ask-teaser.md](features/ask-teaser.md) |
 
-Handles the journeys use (all from the source, stable across restyles such as the planned Soft Rounded look): `role=search name="Player lookup"`, labels `Riot ID` / `Region`, button `Analyze`, `navigation "Profile sections"`, `region "Recent matches"`, `tablist "Match analysis"` with tabs `Summary` / `Deep dive`, `region "60-second review"`, `navigation "Insights views"`, `region /^You vs /`, `form "Compare with a rank"`, `region "Compare with a player"`. Test player: `Hide on bush#KR1` on KR → `/player/kr/Hide%20on%20bush-KR1`. Sample game: `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221`.
+Handles the journeys use (all from the source, stable across restyles such as the Review board look): `role=search name="Player lookup"`, labels `Riot ID` / `Region`, button `Analyze`, `navigation "Profile sections"`, `region "Recent matches"`, `tablist "Match analysis"` with tabs `Summary` / `Deep dive`, `region "60-second review"`, `navigation "Insights views"`, `region /^You vs /`, `form "Compare with a rank"`, `region "Compare with a player"`. Test player: `Hide on bush#KR1` on KR → `/player/kr/Hide%20on%20bush-KR1`. Sample game: `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221`.
 
 To add a journey: add an entry to `journeys` in `scripts/drive.ts` (each `step(name, act)` is one user action plus its expectations, written with `page.getByRole/getByLabel` and Playwright `expect`), add or update its feature file, and run it once.
 

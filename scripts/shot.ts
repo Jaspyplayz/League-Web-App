@@ -3,7 +3,7 @@
 // Agents use it through the verify skill (.claude/skills/verify/SKILL.md).
 //
 //   npm run shot -- /settings                       the local dev server
-//   npm run shot -- --pr 155 / --light --phone      that PR's Vercel preview
+//   npm run shot -- --pr 155 / --light --phone      that PR's Vercel preview, 390px wide
 //   npm run shot -- --check --pr 155                is that site worth driving?
 //
 // Screenshots go to the git-ignored .cache/verify/. A page that isn't the app
@@ -14,11 +14,12 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { chromium, devices, type BrowserContext, type Page } from "@playwright/test";
+import { chromium, type BrowserContext, type Page } from "@playwright/test";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { THEME_KEY } from "@/lib/theme";
 import { passPreviewLogin } from "../e2e/preview-login";
 import { loadEnv, previewUrl } from "./preview";
+import { browserFor } from "./shot-device";
 import { classify, OUTCOMES, type Outcome } from "./shot-outcome";
 
 const USAGE = `Usage: npm run shot -- [--pr <number> | --base <url>] [--light] [--phone] [--tab <name>] [--expect <outcome>] <path>...
@@ -169,7 +170,7 @@ async function main() {
 
   const browser = await chromium.launch();
   try {
-    const context = await browser.newContext(devices[options.phone ? "Pixel 7" : "Desktop Chrome"]);
+    const context = await browser.newContext(browserFor(options.phone));
     if (options.light) await context.addInitScript((key) => localStorage.setItem(key, "light"), THEME_KEY);
     if (preview) await passPreviewLogin(context, preview);
 
