@@ -334,6 +334,64 @@ describe("decide", () => {
     expect(failed(decide(pr({ body: body({ tier }) }), main()))).toEqual(["Tiny or normal tier"]);
   });
 
+  // Real Tier lines that can-merge refused for naming "risky" in the reason
+  // (docs/agent-mistakes/tier-line-names-two-tiers.md), and the other ways
+  // this repo's PRs end a tier. Only the tier itself counts, up to the first
+  // colon, semicolon, bracket, dash or full stop.
+  it.each([
+    ["PR 211", "normal: docs plus a new test, nothing on the risky list", "normal"],
+    ["PR 211, reworded", "normal: none of its files is in `scripts/risky-paths.ts`", "normal"],
+    ["PR 230", "normal: it adds a check and loosens nothing. But it adds a file in `e2e/`, which is on the risky list.", "normal"],
+    ["PR 234", "normal. Shared components with two timers, no data changes, nothing on the risky list.", "normal"],
+    [
+      "PR 237",
+      "normal: one area, the header. Jasper merges, because it edits files on `scripts/risky-paths.ts`: the browser tests in `e2e/`, the `verify` skill's Settings feature file, one sentence of `src/app/privacy/page.tsx` and two comments in `src/app/globals.css`.",
+      "normal",
+    ],
+    [
+      "PR 238",
+      "normal. It fixes one script and changes what `npm run shot -- --phone` does; `scripts/` files here aren't on the risky list.",
+      "normal",
+    ],
+    ["a semicolon", "normal; not on the risky list", "normal"],
+    ["an em dash", "normal — nothing on the risky list", "normal"],
+    ["an en dash", "normal – nothing on the risky list", "normal"],
+    ["a spaced hyphen", "normal - nothing on the risky list", "normal"],
+    ["a bracket", "tiny (docs only, nothing on the risky list)", "tiny"],
+  ])("reads the tier before %s, though the reason says risky", (_, tier, expected) => {
+    const decision = decide(pr({ body: body({ tier }) }), main());
+    expect(failed(decision)).toEqual([]);
+    expect(detail(decision, "Tiny or normal tier")).toBe(expected);
+  });
+
+  it.each([
+    ["the template's placeholder", "tiny, normal or risky, and why."],
+    ["two tiers before a colon", "tiny or normal: a copy fix"],
+    ["two tiers before a full stop", "normal, maybe risky. A copy fix."],
+    ["two tiers around a file name's dot", "normal, `docs/a.md` and risky: a copy fix"],
+    // A comma can't end the tier, or the placeholder would read as tiny.
+    ["a reason after a comma", "normal, because nothing is on the risky list"],
+  ])("still refuses %s for naming more than one tier, and says how to fix it", (_, tier) => {
+    expect(detail(decide(pr({ body: body({ tier }) }), main()), "Tiny or normal tier")).toMatch(
+      /^the tier on the \*\*Tier:\*\* line names more than one tier \(.+\); name one, then a colon and the reason/,
+    );
+  });
+
+  // Tier words in the reason no longer stop a tiny PR (JAS-117), so a tiny PR
+  // whose reason says normal or risky skips the reviewer only within the
+  // usual limits.
+  it("lets a tiny PR whose reason names other tiers skip the reviewer only within the limits", () => {
+    const tiny = body({ tier: "tiny. Arguably normal, and nothing on the risky list.", criteria: [], review: [] });
+    const small = decide(pr({ body: tiny, files: ["src/x.ts"] }), main());
+    expect(failed(small)).toEqual([]);
+    expect(detail(small, "Reviewer cleared the PR")).toContain("skips the reviewer");
+    const files = ["src/x.ts"];
+    const big = decide(pr({ body: tiny, files }), main(), history({ lines: { "src/x.ts": TINY_LINES + 1 } }, files));
+    expect(failed(big)).toEqual(["Reviewer cleared the PR"]);
+    const risky = decide(pr({ body: tiny, files: ["src/db/schema.ts"] }), main());
+    expect(failed(risky)).toEqual(["No risky files", "Reviewer cleared the PR"]);
+  });
+
   it("refuses a risky file even when the tier says tiny, and names it", () => {
     const tiny = body({ tier: "tiny. One query.", criteria: [] });
     const decision = decide(pr({ body: tiny, files: ["docs/database.md", "src/db/schema.ts"] }), main());
