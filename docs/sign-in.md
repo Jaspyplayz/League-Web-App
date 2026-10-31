@@ -5,7 +5,8 @@ Players can sign in with **Google** or **Discord**. Signing in with Riot comes l
 What an account does today:
 
 - **This is me**: a button next to a player's name marks that profile as yours, and the header's account button (picture, name and rank) links to it. It's saved in the `user_players` table, one player per account. It isn't checked with Riot, so anyone could pick any player, but only they see the result. Riot sign-in could verify it later.
-- **Match notes**: a private notes box at the bottom of every match page, for what you'd do differently. Saved in `match_notes`, one note per account per game, up to 2,000 characters. Clearing a note and saving deletes it.
+- **Game notes**: a private notes box at the bottom of every game page, for what you'd do differently. Saved in `match_notes`, one note per account per game, up to 2,000 characters. Clearing a note and saving deletes it.
+- **Ask**: ask Claude about a player's games, up to 10 questions a day ([ask.md](ask.md)).
 
 Focus goals and recent players still live in the browser.
 
