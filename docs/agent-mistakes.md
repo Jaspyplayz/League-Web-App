@@ -33,7 +33,8 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [Re-review line written in the wrong shape](agent-mistakes/re-review-line-shape.md) | 1 | check |
 | [Text read as if it had Unix line endings](agent-mistakes/windows-line-endings.md) | 1 | check |
 | [Jasper's own writing listed as his to-do](agent-mistakes/owner-writing-listed-as-todo.md) | 2 | design |
-| [Tier line names a second tier word](agent-mistakes/tier-line-names-two-tiers.md) | 3 | none yet |
+| [Tier line names a second tier word](agent-mistakes/tier-line-names-two-tiers.md) | 4 | none yet |
+| [A check left to a local session that the cloud could run](agent-mistakes/check-left-for-a-local-session.md) | 1 | CLAUDE.md line |
 | [Merge Danger understated on a risky path](agent-mistakes/merge-danger-understated.md) | 3 | none yet |
 | [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 6 | check |
 
@@ -54,4 +55,5 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Each line in the reviewer's Judgement calls checklist names a class file that exists | `scripts/agent-mistakes.test.ts` |
 | Every reviewer blocker ends with a `Check could catch this:` line, kept in the PR's Review section | Nothing yet: `.claude/agents/reviewer.md` and `docs/workflow.md`; check 5 of [the wellness check](wellness.md#check-5-agent-mistakes) reads it twice a month |
 | Every agent mistake gets an entry | Nothing yet: the `postmortem` skill and step 10 of `docs/workflow.md`; check 5 of [the wellness check](wellness.md#check-5-agent-mistakes) looks for missed ones twice a month |
+| A cloud session tries a criterion, screenshot or review on the preview before leaving it to a local session | Nothing yet: `AGENTS.md`, Cloud sessions; `npm run can-merge` refuses an unticked criterion at merge time |
 | Jasper's Dev Log why and what-I-learned lines are never listed as his to-do | Nothing yet: a line in Jasper's `~/.claude/CLAUDE.md` |

@@ -1,11 +1,7 @@
 import type { ComponentProps } from "react";
 
-// Condensed uppercase heading for page sections ("How it works", "Recent games").
+// Heading for a page section ("How it works", "Recent games"): Rubik in
+// sentence case, one size up from PanelHeading.
 export function SectionHeading({ className = "", ...props }: ComponentProps<"h2">) {
-  return (
-    <h2
-      className={`font-display text-4xl font-bold uppercase tracking-[0.01em] ${className}`}
-      {...props}
-    />
-  );
+  return <h2 className={`text-[19px] font-semibold leading-snug ${className}`} {...props} />;
 }

@@ -86,11 +86,21 @@
    * Text sizes beyond Tailwind's defaults, so the site sticks to a few:
    * text-label (11px, the small uppercase mono labels), text-note (13px,
    * captions and footnotes) and text-body (15px, sentences on a page).
-   * Headings use PanelHeading and SectionHeading.
+   * The Review board's headings: text-title (28px, a page's title),
+   * text-heading (19px, a section) and text-subheading (17px, a panel), so
+   * no page needs a made-up size like text-[28px].
    */
   --text-label: 11px;
   --text-note: 13px;
   --text-body: 15px;
+  --text-title: 28px;
+  --text-heading: 19px;
+  --text-subheading: 17px;
+  /* Headings sit tighter than sentences: without these, a wrapped 28px title
+     takes the page's 1.5 line height. */
+  --text-title--line-height: 1.25;
+  --text-heading--line-height: 1.375;
+  --text-subheading--line-height: 1.375;
 
   --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
   --font-sans: var(--font-rubik), system-ui, sans-serif;
