@@ -124,3 +124,89 @@ export const ATTEMPTS = 2;
 export function shouldRetry(outcome: Outcome, merged: boolean, attempt: number): boolean {
   return outcome === "crashed" && !merged && attempt < ATTEMPTS;
 }
+
+// GitHub doesn't start workflows for anything this job's token does, so a
+// merge from here gets no CI run on main, the run that catches two PRs that
+// pass alone but break main together. workflow_dispatch is the exception
+// GitHub makes for that token (JAS-123, docs/adr/0024), so after each merge
+// the script asks GitHub to start ci.yml on main this way. These are gh's
+// arguments: -f sends {"ref": "main"} as the JSON body, and GitHub answers
+// 204 with no body.
+export function mainCiDispatchArgs(repository: string): string[] {
+  return ["api", "-X", "POST", `repos/${repository}/actions/workflows/ci.yml/dispatches`, "-f", "ref=main"];
+}
+
+// One try of can-merge: its exit code (null if it never ran or was killed),
+// and why, in words, for the log.
+export type CanMergeRun = { status: number | null; why: string };
+
+// Everything merging one PR does outside this file, passed in so the tests
+// can fake GitHub. startMainCi throws if GitHub refuses.
+export type MergeEffects = {
+  runCanMerge: (attempt: number) => CanMergeRun;
+  isMerged: () => boolean;
+  waitBeforeRetry: () => void;
+  startMainCi: () => void;
+  log: (line: string) => void;
+  summary: (line: string) => void;
+};
+
+// Runs can-merge on one ready PR, tries a crash before the merge once more,
+// and starts CI on main whenever the PR merged. `failed` turns the run red,
+// so Jasper sees it: two crashes, a step after the merge failing, or GitHub
+// refusing to start CI.
+export function mergePull(number: number, effects: MergeEffects): { failed: boolean } {
+  let crash = ""; // why the last try crashed, if one did
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    const run = effects.runCanMerge(attempt);
+    const outcome = outcomeOf(run.status);
+    if (outcome === "passed") {
+      effects.summary(`#${number}: every gate passed and can-merge merged it.`);
+      return { failed: !dispatchMainCi(number, effects) };
+    }
+    if (outcome === "refused") {
+      // After a crash, can-merge also refuses a PR that's no longer open: the
+      // crash came after the merge, but GitHub couldn't say so at the time.
+      if (crash && effects.isMerged()) return mergedThenCrashed(number, crash, effects);
+      effects.summary(`#${number}: not merged, since a gate failed (the log above lists each one). A later check may still merge it.`);
+      effects.log(`::notice title=Not merged::#${number}: can-merge refused. See the gate lines in the log.`);
+      return { failed: false };
+    }
+    crash = run.why;
+    const merged = effects.isMerged();
+    if (merged) return mergedThenCrashed(number, crash, effects);
+    if (!shouldRetry(outcome, merged, attempt)) break;
+    effects.log(`can-merge crashed (${crash}) before merging, which is often a race. Trying again in 30 seconds.`);
+    effects.waitBeforeRetry();
+  }
+  effects.summary(`#${number}: can-merge crashed (${crash}) and wasn't merged. The log above says why.`);
+  return { failed: true };
+}
+
+// The comment or label failed after the merge. Main still changed, so its CI
+// still needs to run, and the run is red either way.
+function mergedThenCrashed(number: number, why: string, effects: MergeEffects): { failed: boolean } {
+  effects.summary(`#${number}: merged, but a step after the merge failed (${why}). The log above says which.`);
+  dispatchMainCi(number, effects);
+  return { failed: true };
+}
+
+// Returns whether GitHub accepted. A refusal can't undo the merge, so the
+// summary says the PR merged and how to start CI by hand.
+function dispatchMainCi(number: number, effects: MergeEffects): boolean {
+  try {
+    effects.startMainCi();
+    effects.summary(`#${number}: started CI on main for the merge.`);
+    return true;
+  } catch (error) {
+    // execFileSync's message starts with the whole command; gh's own error
+    // is its last line.
+    const message = error instanceof Error ? error.message : String(error);
+    const why = message.trim().split("\n").at(-1);
+    effects.summary(
+      `#${number}: merged, but starting CI on main failed (${why}), so main's CI hasn't run on it. Start it from the Actions tab: CI, Run workflow, on main.`,
+    );
+    effects.log(`::error title=CI on main not started::#${number} merged, but GitHub didn't start CI on main. The run's summary says what to do.`);
+    return false;
+  }
+}
