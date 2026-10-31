@@ -42,7 +42,7 @@ describe("glanceRows", () => {
     const [winChance, score, phases] = glanceRows(models);
     expect(winChance.learnedFrom).toBe("18,178 ranked games, patches 16.16 to 16.20");
     expect(winChance.result).toBe(
-      "Right 80% of the time at 20:00, where “more gold wins” gets 78% (both flattered; see How it’s checked)",
+      "Right 80% of the time at 20:00, where “more gold wins” gets 78% (both flattered; see Win chance)",
     );
     expect(score.learnedFrom).toBe("86 games, 860 players");
     expect(score.result).toBe("Picks the winning side 81% of the time on 35,326 later games");

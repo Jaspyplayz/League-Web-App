@@ -57,7 +57,7 @@ export function glanceRows({ winChance, score, phases }: Models): GlanceRow[] {
       gives: "Each team’s chance to win at every minute",
       learnedFrom: `${count(winChance.games)} ranked games, patches ${winChance.patches[0]} to ${winChance.patches.at(-1)}`,
       result: quoted
-        ? `Right ${percent(quoted.accuracy)} of the time at ${quoted.minute}:00, where “more gold wins” gets ${percent(quoted.goldRule)} (both flattered; see How it’s checked)`
+        ? `Right ${percent(quoted.accuracy)} of the time at ${quoted.minute}:00, where “more gold wins” gets ${percent(quoted.goldRule)} (both flattered; see Win chance)`
         : `Right ${percent(winChance.evaluation.accuracy)} of the time`,
     },
     {
