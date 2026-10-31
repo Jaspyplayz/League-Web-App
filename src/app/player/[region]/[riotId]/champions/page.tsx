@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { LoadingBlock, LoadingSection } from "@/components/ui/loading";
 import { panelClass } from "@/components/ui/panel";
+import { EmptyPanel, ProblemPanel, secondButtonClass } from "@/components/ui/state-panel";
+import { TryAgainButton } from "@/components/ui/try-again-button";
 import { GAMES_PER_VIEW, loadChampionTab } from "@/lib/champion-store";
 import { getDataDragon } from "@/lib/ddragon";
 import { loadProfile } from "@/lib/profile-store";
@@ -15,6 +19,7 @@ import { fromSlug, toSlug } from "@/lib/riot-id";
 import { SEASON } from "@/lib/season";
 import { QueueTabs } from "../queue-tabs";
 import { ChampionTable } from "./champion-table";
+import { emptyAction } from "./empty-action";
 import { LoadMoreGames } from "./load-more-games";
 
 // The Champions tab: every champion the player played this season, with
@@ -42,8 +47,8 @@ export default function ChampionsPage({
   searchParams: SearchParams;
 }) {
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 pb-20 pt-7">
-      <Suspense fallback={<p className="text-muted">Loading champions…</p>}>
+    <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-6 px-4 pb-20 pt-7 sm:px-6">
+      <Suspense fallback={<ChampionsLoading />}>
         <Champions params={params} searchParams={searchParams} />
       </Suspense>
     </main>
@@ -67,9 +72,9 @@ async function Champions({ params, searchParams }: { params: Params; searchParam
 
   const header = (
     <>
-      <h1 className="font-display text-[52px] font-bold leading-none tracking-[0.01em]">
+      <h1 className="text-title font-semibold">
         {gameName}
-        <span className="font-semibold text-placeholder">#{tagLine}</span>
+        <span className="font-normal text-quiet">#{tagLine}</span>
       </h1>
       <ProfileTabs playerPath={playerPath} current="champions" />
     </>
@@ -92,38 +97,87 @@ async function Champions({ params, searchParams }: { params: Params; searchParam
     getDataDragon().catch(() => null),
   ]);
 
+  const modeName = queue.id === "all" ? "" : `${queue.label} `;
+  const allLoaded = !stats || stats.loaded >= stats.total;
+  const loadMore = (
+    <LoadMoreGames count={GAMES_PER_VIEW} busy={stats?.error?.kind === "rate-limited"} />
+  );
+
   return (
     <>
       {header}
       <QueueTabs playerPath={`${playerPath}/champions`} current={queue} defaultId={DEFAULT_QUEUE} />
-      {stats ? (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <p className="text-note text-faint">
-              {SEASON.label} · {queue.label} · {stats.all.games}{" "}
-              {stats.all.games === 1 ? "game" : "games"}.{" "}
-              {stats.loaded < stats.total
-                ? `${stats.loaded} of ${stats.total} season games loaded so far, ${GAMES_PER_VIEW} more each visit.`
-                : `All ${stats.total} season games loaded.`}
-            </p>
-            {stats.loaded < stats.total && (
-              <LoadMoreGames count={GAMES_PER_VIEW} busy={stats.error?.kind === "rate-limited"} />
-            )}
-          </div>
-          {stats.champions.length > 0 ? (
-            <ChampionTable stats={stats} dd={dd} />
-          ) : (
-            <p className={`${panelClass} p-5 text-faint`}>
-              No {queue.id === "all" ? "" : `${queue.label} `}games this season yet.
-            </p>
-          )}
-        </>
+      {!stats ? (
+        <ProblemPanel title="Champion stats can't load right now" actions={<TryAgainButton />}>
+          <p>Turnpoint couldn&apos;t add up this season&apos;s games just now. Try again in a minute.</p>
+        </ProblemPanel>
+      ) : stats.champions.length === 0 ? (
+        <EmptyPanel
+          title={`No ${modeName}games this season yet`}
+          action={
+            emptyAction(queue.id, allLoaded) === "load-more" ? (
+              loadMore
+            ) : emptyAction(queue.id, allLoaded) === "every-mode" ? (
+              <Link href={`${playerPath}/champions?queue=all`} className={secondButtonClass}>
+                Show every mode
+              </Link>
+            ) : undefined
+          }
+        >
+          {allLoaded
+            ? "Champions add up every game since the season started."
+            : `Champions add up every game since the season started. ${stats.loaded} of ${stats.total} are loaded so far, ${GAMES_PER_VIEW} more each visit.`}
+        </EmptyPanel>
       ) : (
-        <p className={`${panelClass} p-5 text-faint`}>
-          Champion stats need the saved games in Turnpoint&apos;s database, which can&apos;t be
-          reached right now. Try again in a minute.
-        </p>
+        <ChampionTable
+          stats={stats}
+          dd={dd}
+          heading={
+            <div className="flex min-w-0 flex-col gap-2">
+              <div>
+                <h2 className="text-subheading font-semibold">{SEASON.label}</h2>
+                <p className="text-note text-quiet">
+                  {queue.label} · {stats.all.games} {stats.all.games === 1 ? "game" : "games"}.{" "}
+                  {allLoaded
+                    ? `All ${stats.total} season games loaded.`
+                    : `${stats.loaded} of ${stats.total} season games loaded so far, ${GAMES_PER_VIEW} more each visit.`}
+                </p>
+              </div>
+              {!allLoaded && loadMore}
+            </div>
+          }
+        />
       )}
+    </>
+  );
+}
+
+// While the page loads: the player's name and the tabs as grey blocks, then
+// the table's rows, each with a portrait and a few numbers, in grey.
+function ChampionsLoading() {
+  return (
+    <>
+      <div aria-hidden="true" className="flex flex-col gap-6 motion-safe:animate-pulse">
+        <LoadingBlock className="h-9 w-64" />
+        <LoadingBlock className="h-11 w-full max-w-md" />
+      </div>
+      <LoadingSection label="Adding up this season's games">
+        <div className={`${panelClass} px-4 py-2`}>
+          {[1, 2, 3, 4, 5, 6].map((row) => (
+            <div
+              key={row}
+              className="flex h-13 items-center gap-3.5 border-b border-divider last:border-b-0"
+            >
+              <LoadingBlock className="size-8 shrink-0" />
+              <LoadingBlock className="h-3.5 w-24 sm:w-36" />
+              <LoadingBlock className="ml-auto h-3.5 w-14 shrink-0" />
+              <LoadingBlock className="h-3.5 w-14 shrink-0" />
+              <LoadingBlock className="h-3.5 w-20 shrink-0 max-sm:hidden" />
+              <LoadingBlock className="h-3.5 w-20 shrink-0 max-sm:hidden" />
+            </div>
+          ))}
+        </div>
+      </LoadingSection>
     </>
   );
 }
