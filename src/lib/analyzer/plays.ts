@@ -225,15 +225,16 @@ const WINNING_ABOVE = 0.6;
 // teammate who stayed out of it, not a risk.
 const OUTNUMBERED_BY = 2;
 // A play can run on as long as its events are less than 20 seconds apart,
-// so for Brilliant its kills are split into fights wherever two are this far
-// apart. Three pickoffs 15 seconds apart are three 1 against 1 fights, not
-// one 1 against 3.
+// so for Brilliant its kills are split into fights. A kill joins a fight only
+// when it comes less than this long after the fight's last kill: three
+// pickoffs 15 seconds apart are three 1 against 1 fights, not one 1 against 3.
 const FIGHT_GAP_MS = 10_000;
-// Kills this far apart on the map (in game units, out of 14,900 across) are
-// in different fights, even seconds apart: a dive top while bot lane wins a
-// 2 against 2 is two fights, not one 3 against 5. It's a little wider than a
-// side lane, so kills in one chase still join up.
-const FIGHT_RANGE = 3000;
+// ...and when it's this close (in game units, out of 14,900 across) to one of
+// the fight's kills: a dive top while bot lane wins a 2 against 2 is two
+// fights, not one 3 against 5. In the golden games, kills less than 10
+// seconds apart were either 3,423 apart or closer, or 4,460 or further, so
+// this sits in that gap.
+const FIGHT_RANGE = 4000;
 
 // A play's grade, from how much it moved your team's chance to win:
 //
@@ -274,22 +275,24 @@ function band(chance: number): number {
 }
 
 // A play's kills (indexes into ReplayData.kills, in time order) cut into
-// fights. A kill joins the latest fight whose last kill was less than
-// FIGHT_GAP_MS before it and that has a kill within FIGHT_RANGE of it;
-// otherwise it starts a fight. Two fights at once on different parts of the
-// map stay apart this way. A kill Riot gave no position is a fight of its
-// own, since there's no telling which fight it was in.
+// fights. A kill joins every fight whose last kill was less than FIGHT_GAP_MS
+// before it and that has a kill within FIGHT_RANGE of it, so a kill between
+// two groups (the end of a chase) makes them one fight. With no such fight it
+// starts one. Two fights at once on different parts of the map stay apart
+// this way. A kill Riot gave no position is a fight of its own, since there's
+// no telling which fight it was in.
 function fights(kills: number[], replay: Pick<ReplayData, "kills">): number[][] {
-  const out: number[][] = [];
+  let out: number[][] = [];
   for (const i of kills) {
     const kill = replay.kills[i];
-    const fight = out.findLast((f) => {
+    const joins = (f: number[]) => {
       const last = replay.kills[f[f.length - 1]];
       if (kill.timestamp - last.timestamp >= FIGHT_GAP_MS) return false;
       return f.some((j) => near(replay.kills[j].position, kill.position));
-    });
-    if (fight) fight.push(i);
-    else out.push([i]);
+    };
+    // Indexes stay in time order, so each fight's last kill is its latest.
+    const joined = [...out.filter(joins).flat(), i].sort((a, b) => a - b);
+    out = [...out.filter((f) => !joins(f)), joined];
   }
   return out;
 }

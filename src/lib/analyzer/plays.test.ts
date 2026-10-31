@@ -28,6 +28,9 @@ const players = participants();
 const MID = { x: 7400, y: 7400 };
 const TOP = { x: 2000, y: 12000 };
 const BOT = { x: 12500, y: 2000 };
+// Two spots 6,000 apart, each 3,000 from MID.
+const WEST = { x: 4400, y: 7400 };
+const EAST = { x: 10400, y: 7400 };
 const BLUE = 100;
 const RED = 200;
 const AHRI = 3;
@@ -199,7 +202,14 @@ describe("gradePlay", () => {
   // 13 10:00 Darius kills 1 top (Kaisa, Syndra help)  } two fights at once:
   // 14 10:01 4 kills 9 bot (5 helps)                  } 1 against 3 top, lost,
   // 15 10:02 5 kills 10 bot (4 helps)                 } and 2 against 2 bot, won
-  // All but 13 to 15 are in the middle of the map.
+  // 16 12:00 1 kills Darius top           } two fights in turn: 1 alone
+  // 17 12:01 9 kills 4 bot (10 helps)     } against Darius, Kaisa and
+  // 18 12:02 1 kills Kaisa top            } Syndra top, won 3 for 0, and
+  // 19 12:03 1 kills Syndra top           } a lost pickoff bot between
+  // 20 13:00 1 kills Darius, 6,000 units  } one chase: 20 and 21 are too
+  // 21 13:04 1 kills Kaisa  apart         } far apart, but 22 is near
+  // 22 13:06 1 kills Syndra between them  } both, so it joins them
+  // The rest is in the middle of the map.
   const timeline = game([
     kill("4:32", 7, VI, [6, 9], MID),
     kill("4:34", AHRI, 7, [], MID),
@@ -216,6 +226,13 @@ describe("gradePlay", () => {
     kill("10:00", 6, 1, [7, SYNDRA], TOP),
     kill("10:01", 4, 9, [5], BOT),
     kill("10:02", 5, 10, [4], BOT),
+    kill("12:00", 1, 6, [], TOP),
+    kill("12:01", 9, 4, [10], BOT),
+    kill("12:02", 1, 7, [], TOP),
+    kill("12:03", 1, SYNDRA, [], TOP),
+    kill("13:00", 1, 6, [], WEST),
+    kill("13:04", 1, 7, [], EAST),
+    kill("13:06", 1, SYNDRA, [], MID),
   ]);
   const replay = replayData(timeline, players, BLUE);
   // A play that moved your team's chance from `before` to `after` (0 to 1).
@@ -305,6 +322,18 @@ describe("gradePlay", () => {
     // Together they'd be 3 against 5, won 2 for 1. Apart, top is lost and
     // bot is an even 2 against 2.
     expect(grade(0.5, 0.55, [13, 14, 15])).toBe("Excellent");
+  });
+
+  it("keeps two fights apart when their kills take turns", () => {
+    // Top is 1 against 3, won 3 for 0, though a bot kill comes between.
+    expect(grade(0.5, 0.55, [16, 17, 18, 19])).toBe("Brilliant");
+  });
+
+  it("joins two fights when a kill is near both", () => {
+    // One chase, 1 against 3, won 3 for 0.
+    expect(grade(0.5, 0.55, [20, 21, 22])).toBe("Brilliant");
+    // Without the kill between them, they're two 1 against 1 fights.
+    expect(grade(0.5, 0.55, [20, 21])).toBe("Excellent");
   });
 
   it("counts a kill with no position as a fight of its own", () => {
