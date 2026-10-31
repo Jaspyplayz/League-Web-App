@@ -1,92 +1,141 @@
+import Image from "next/image";
 import Link from "next/link";
+import { cache } from "react";
 import { signOut } from "@/app/auth/actions";
 import { getCurrentUser } from "@/lib/auth";
-import { getDataDragon } from "@/lib/ddragon";
+import { getDataDragon, profileIconUrl, type DataDragon } from "@/lib/ddragon";
 import { formatTier } from "@/lib/match-summary";
 import { readMyPlayer } from "@/lib/my-player";
 import { savedSoloRank } from "@/lib/profile-store";
 import { toSlug } from "@/lib/riot-id";
 import { supabaseConfig } from "@/lib/supabase/config";
-import { AccountDropdown } from "./account-dropdown";
-import { ProfileIcon } from "./game-icons";
+import { headerLinkClass, hoverFade, iconButton } from "./header-style";
+import { SignOutIcon } from "./icons";
 import { SignInLink } from "./sign-in-link";
 
-// A thin line between the icon buttons and the account, part of this
-// component so it disappears along with sign-in when Supabase isn't set up.
-const divider = <span aria-hidden="true" className="mx-1.5 h-8 w-px bg-line" />;
-
-const menuItem =
-  "px-4 py-2.5 text-left text-[15px] text-ink transition-colors hover:bg-surface-hover";
-
-// The right end of the header, like the League client's corner: a Sign in
-// button, or who's signed in. Once they've picked "This is me" on a profile
-// it shows that player's icon, Riot ID and solo rank, all from the database
-// so it costs no Riot calls. Clicking it opens My profile and Sign out.
+// The right end of the header (JAS-86): Sign in, or who's signed in. Once
+// they've picked "This is me" on a profile it shows that player's picture,
+// Riot ID and solo rank, all from the database so it costs no Riot calls, as
+// one link to their profile, with a sign-out button beside it. Phones show
+// only the picture; sign-out moves into the menu (MenuSignOut below).
 // Reads cookies, so the header wraps it in <Suspense> and the rest of the
 // header can still be prerendered.
+
+// The account and the phone menu's Sign out both ask who's signed in; cache()
+// keeps the answer for the rest of the request, so the token is checked once.
+const currentUser = cache(getCurrentUser);
+
 export async function AccountMenu() {
   // Hide sign-in entirely where Supabase isn't configured, rather than show a
   // button that can't work.
   if (!supabaseConfig()) return null;
 
-  const user = await getCurrentUser();
+  const user = await currentUser();
   if (!user) {
+    // The main button: text-colored with page-colored words. The sign-in page
+    // itself doesn't show it.
     return (
-      <>
-        {divider}
-        <SignInLink className="soft-round-sm flex min-h-10 items-center bg-ahead px-4 font-mono text-xs font-semibold tracking-[0.12em] text-page uppercase transition-colors hover:bg-ahead-soft" />
-      </>
+      <SignInLink
+        hideOnSignInPage
+        className="flex h-11 items-center rounded-md bg-main px-3.5 text-body font-medium text-page transition-opacity duration-320 ease-out hover:opacity-85 hover:duration-120 motion-reduce:transition-none lg:h-10 lg:px-4"
+      />
     );
   }
 
-  // If the read fails, the menu shows the account without a My profile link
-  // and says so, rather than telling you nothing is marked (#167).
+  // If the read fails, it says so rather than "no profile marked" (#167).
   const mine = await readMyPlayer(user.id);
   const me = mine.ok ? mine.player : null;
   const [rank, dd] = me
     ? await Promise.all([savedSoloRank(me.puuid), getDataDragon().catch(() => null)])
     : [null, null];
   const name = me?.gameName ?? user.name;
+  const picture = <Avatar dd={dd} iconId={me?.profileIconId ?? null} name={name} />;
 
-  const trigger = (
-    <>
-      <ProfileIcon dd={dd} iconId={me?.profileIconId ?? null} level={null} name={name} size={40} />
-      <span className="hidden max-w-[180px] flex-col sm:flex">
-        <span className="truncate font-display text-lg leading-tight font-semibold tracking-[0.06em] uppercase">
-          {name}
-        </span>
-        <span className="font-mono text-[10px] tracking-[0.1em] text-faint uppercase">
-          {rank ? `${formatTier(rank)} · ${rank.leaguePoints} LP` : me ? "Unranked" : "Signed in"}
-        </span>
-      </span>
-      <span className="sr-only">Account menu</span>
-    </>
+  const signOutButton = (
+    <form action={signOut} className="hidden lg:block">
+      <button type="submit" aria-label="Sign out" title="Sign out" className={`${iconButton} lg:w-8`}>
+        <SignOutIcon />
+      </button>
+    </form>
   );
 
+  if (!me) {
+    // Signed in, but no profile marked (or it couldn't be read): nothing to
+    // link to yet, so the name is plain text with a hint under it.
+    const hint = mine.ok ? "No profile marked" : "Couldn't load your profile";
+    return (
+      <>
+        <span
+          className="flex h-11 items-center gap-2.5 px-1.5 text-main"
+          title={mine.ok ? 'Press "This is me" on your profile to show it here.' : "Reload to try again."}
+        >
+          {picture}
+          <span className="sr-only lg:hidden">{name}</span>
+          <span className="hidden max-w-[180px] flex-col leading-tight lg:flex">
+            <span className="truncate text-body font-medium">{name}</span>
+            <span className="text-note text-quiet">{hint}</span>
+          </span>
+        </span>
+        {signOutButton}
+      </>
+    );
+  }
+
+  const rankText = rank ? formatTier(rank) : "Unranked";
   return (
     <>
-      {divider}
-      <AccountDropdown trigger={trigger}>
-        {me ? (
-          <Link href={`/player/${me.region}/${toSlug(me)}`} className={menuItem}>
-            My profile
-          </Link>
-        ) : mine.ok ? (
-          <p className="px-4 py-2.5 text-[13px] text-faint">
-            Press &quot;This is me&quot; on your profile to see your rank here.
-          </p>
-        ) : (
-          <p className="px-4 py-2.5 text-[13px] text-faint">
-            Couldn&apos;t load your profile. Reload to try again.
-          </p>
-        )}
-        <div className="my-1.5 h-px bg-line" />
-        <form action={signOut}>
-          <button type="submit" className={`${menuItem} w-full text-ink-soft`}>
-            Sign out
-          </button>
-        </form>
-      </AccountDropdown>
+      <Link
+        href={`/player/${me.region}/${toSlug(me)}`}
+        aria-label={`${me.gameName}#${me.tagLine}, ${rankText}. Open your profile`}
+        className={`flex h-11 items-center gap-2.5 rounded-md px-1.5 text-main lg:pr-2.5 ${hoverFade}`}
+      >
+        {picture}
+        <span aria-hidden="true" className="hidden max-w-[200px] flex-col leading-tight lg:flex">
+          <span className="truncate text-body font-medium">
+            {me.gameName} <span className="font-normal text-quiet">#{me.tagLine}</span>
+          </span>
+          <span className="text-note text-quiet">{rankText}</span>
+        </span>
+      </Link>
+      {signOutButton}
     </>
+  );
+}
+
+// Sign out, as a row in the phone menu. Renders nothing when signed out.
+export async function MenuSignOut() {
+  if (!supabaseConfig()) return null;
+  if (!(await currentUser())) return null;
+  return (
+    <form action={signOut} className="flex flex-col">
+      <button type="submit" className={`${headerLinkClass(false, true)} text-left`}>
+        Sign out
+      </button>
+    </form>
+  );
+}
+
+// The player's profile picture, 32px with 6px corners, or their initial on a
+// tile when there's no picture (no profile marked, or Data Dragon is down).
+function Avatar({ dd, iconId, name }: { dd: DataDragon | null; iconId: number | null; name: string }) {
+  if (dd && iconId !== null) {
+    return (
+      <Image
+        src={profileIconUrl(dd, iconId)}
+        alt=""
+        width={32}
+        height={32}
+        unoptimized
+        className="size-8 shrink-0 rounded-md bg-raised"
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="flex size-8 shrink-0 items-center justify-center rounded-md bg-raised text-sm font-semibold"
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
   );
 }

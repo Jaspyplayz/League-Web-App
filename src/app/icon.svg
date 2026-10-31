@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 30 30"><rect width="30" height="30" rx="8" fill="#5A8CFF"/><rect x="8" y="8" width="14" height="3.6" rx="1.2" fill="#FFFFFF"/><rect x="13.2" y="8" width="3.6" height="14" rx="1.2" fill="#FFFFFF"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 30 30">
+  <!-- The browser tab follows the device's light or dark setting, not the
+       theme picked on the site, so the favicon does too. Without the media
+       rule (a browser that ignores it) it stays the light-theme version. -->
+  <style>
+    .tile { fill: #1e1c19; }
+    .t { fill: #f1efeb; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #f2efe9; }
+      .t { fill: #21201d; }
+    }
+  </style>
+  <rect class="tile" width="30" height="30" rx="8"/>
+  <rect class="t" x="8" y="8" width="14" height="3.6" rx="1.2"/>
+  <rect class="t" x="13.2" y="8" width="3.6" height="14" rx="1.2"/>
+</svg>

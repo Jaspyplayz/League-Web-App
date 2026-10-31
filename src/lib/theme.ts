@@ -1,7 +1,10 @@
-// Light or dark colors, picked on the Settings page and kept in this
-// browser's localStorage. The colors themselves live in src/app/globals.css:
+// Light or dark colors, picked with the theme switch in the header and kept
+// in this browser's localStorage. The colors themselves live in src/app/globals.css:
 // dark is the default, and data-theme="light" on <html> swaps in the light set.
 
+// "system" follows the device. The header's switch only saves dark or light,
+// but the old Settings page offered System too, so a browser that saved it
+// keeps following its device until the switch is pressed.
 export type ThemeChoice = "dark" | "light" | "system";
 export type Theme = "dark" | "light";
 
@@ -56,4 +59,35 @@ export function saveThemeChoice(choice: ThemeChoice) {
 export function applyTheme(choice: ThemeChoice = readThemeChoice()) {
   const deviceIsLight = window.matchMedia(LIGHT_QUERY).matches;
   document.documentElement.dataset.theme = resolveTheme(choice, deviceIsLight);
+}
+
+// The theme the page shows right now, read from <html>.
+export function shownTheme(): Theme {
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
+// The switch's label says what a click does, not what's showing.
+export function themeSwitchLabel(shown: Theme): string {
+  return shown === "dark" ? "Switch to light theme" : "Switch to dark theme";
+}
+
+// Header links and buttons fade their colors on hover, and a theme change
+// changes those same colors, so without this they would fade into the new
+// theme while the rest of the page snaps. A style turns every transition off,
+// the theme changes, and reading a computed style makes the browser apply the
+// new colors right then, before the style is removed again.
+export function applyThemeWithoutFading(choice: ThemeChoice = readThemeChoice()) {
+  const noFade = document.createElement("style");
+  noFade.textContent = "*,*::before,*::after{transition:none!important}";
+  document.head.appendChild(noFade);
+  applyTheme(choice);
+  void window.getComputedStyle(document.body).color;
+  setTimeout(() => noFade.remove(), 1);
+}
+
+// What the header's switch does: saves the other theme and shows it.
+export function switchTheme() {
+  const next: Theme = shownTheme() === "dark" ? "light" : "dark";
+  saveThemeChoice(next);
+  applyThemeWithoutFading(next);
 }

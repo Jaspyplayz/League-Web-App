@@ -57,7 +57,8 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   .../log/ the Log tab (one card per day, src/lib/daily-log.ts),
                   .../champions/ the season's stats per champion and enemy
                   champion (src/lib/champion-stats.ts);
-                  settings/ holds preferences saved in the browser (theme);
+                  settings/ only sends the old Settings page home (the theme
+                  switch is in the header);
                   api/mcp/ is the MCP server, with its tools in src/lib/mcp/;
                   api/cron/season-sync/ the daily job that saves "This is me"
                   players' new games (docs/database.md);

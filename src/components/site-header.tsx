@@ -1,62 +1,82 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { AccountMenu } from "./account-menu";
-import { GearIcon, SearchIcon } from "./icons";
+import { AccountMenu, MenuSignOut } from "./account-menu";
+import { HeaderLink } from "./header-link";
+import { HeaderMenu } from "./header-menu";
+import { HeaderSearch, HeaderSearchUnlessHome } from "./header-search";
+import { HEADER_LINKS, headerLinkClass } from "./header-style";
 import { LogoMark } from "./logo";
-import { NavTab } from "./nav-tab";
-import { navTabClass } from "./nav-tab-style";
+import { ThemeSwitch } from "./theme-switch";
 
 export const REPO_URL = "https://github.com/Jaspyplayz/League-Web-App";
 
-// Soft square icon buttons for search and settings, with the small 4px corner
-// the design rules give icon buttons.
-const iconButton =
-  "soft-round-sm flex size-10 items-center justify-center border border-frame text-ink-soft transition-colors hover:bg-surface hover:text-ink";
-
-// The "client bar": like the top of the League client. The logo (which also
-// takes you home) and a How it works tab on the left; search, settings and
-// your account on the right. GitHub lives in the footer.
+// The header on every page (JAS-86, take D). On wide screens it's one 68px
+// bar in three columns: the logo and two links on the left, the player
+// search in the middle, and the theme switch and your account on the right.
+// The side columns never shrink below their contents, so on narrower wide
+// screens the search gives up the room instead.
+// On phones the links move into a menu button, and the search becomes a
+// second row under the logo. Home has no search here; its own big box is
+// the first thing on the page.
+//
+// The parts that read the address (the links, the search) or your cookies
+// (the account) wait inside <Suspense>, so the rest of the header is
+// prerendered and arrives with the first byte of every page.
 export function SiteHeader() {
   return (
-    <header className="border-b border-line">
-      <nav
-        aria-label="Main"
-        className="mx-auto flex min-h-16 max-w-[1200px] flex-wrap items-stretch gap-x-6 gap-y-2 px-6"
-      >
-        <Link href="/" className="flex items-center gap-2.5 text-ink">
-          <LogoMark />
-          <span className="font-display text-[26px] font-bold uppercase tracking-[0.04em]">
+    // relative: the phone menu drops down from the header's bottom edge.
+    <header className="relative border-b border-divider">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5 lg:grid lg:h-[68px] lg:grid-cols-[1fr_minmax(0,460px)_1fr] lg:px-10 lg:py-0">
+        <div className="-ml-1.5 flex items-center gap-0.5 lg:ml-0 lg:gap-1">
+          <HeaderMenu
+            signOut={
+              <Suspense fallback={null}>
+                <MenuSignOut />
+              </Suspense>
+            }
+          />
+          <Link
+            href="/"
+            aria-label="Turnpoint home"
+            className="flex items-center gap-2.5 whitespace-nowrap rounded-md text-subheading font-semibold tracking-[-0.01em] text-main lg:mr-5 lg:text-heading"
+          >
+            <LogoMark className="size-6 lg:size-7" />
             Turnpoint
-          </span>
-        </Link>
-        {/* NavTab reads the URL to underline the page you're on; until it
-            loads, the same link shows without the underline. */}
-        <Suspense
-          fallback={
-            <Link href="/how-it-works" className={navTabClass(false)}>
-              How it works
-            </Link>
-          }
-        >
-          <NavTab href="/how-it-works">How it works</NavTab>
+          </Link>
+          <nav aria-label="Main" className="hidden gap-0.5 lg:flex">
+            {HEADER_LINKS.map((link) => (
+              // Until the address is known, the link shows without the
+              // "you're here" fill.
+              <Suspense
+                key={link.href}
+                fallback={
+                  <Link href={link.href} className={headerLinkClass(false)}>
+                    {link.label}
+                  </Link>
+                }
+              >
+                <HeaderLink href={link.href}>{link.label}</HeaderLink>
+              </Suspense>
+            ))}
+          </nav>
+        </div>
+
+        {/* Pages whose address is only known per visit (a player, a match)
+            show the search while the address loads; only home hides it. */}
+        <Suspense fallback={<HeaderSearch />}>
+          <HeaderSearchUnlessHome />
         </Suspense>
 
-        <div className="ml-auto flex items-center gap-2.5 py-3">
-          {/* The search box is on the home page; this jumps straight to it. */}
-          <Link href="/#riotId" aria-label="Search for a player" className={iconButton}>
-            <SearchIcon />
-          </Link>
-          <Link href="/settings" aria-label="Settings" className={iconButton}>
-            <GearIcon />
-          </Link>
-          {/* Who's signed in depends on the visitor's cookies, so it streams in
-              after the rest of the header, which stays prerendered. The
-              placeholder holds its space meanwhile so nothing jumps. */}
-          <Suspense fallback={<span aria-hidden="true" className="h-10 w-24" />}>
+        <div className="ml-auto flex items-center gap-1.5 lg:col-start-3 lg:justify-self-end">
+          <ThemeSwitch />
+          {/* Who's signed in depends on the visitor's cookies, so it streams
+              in after the rest of the header. The placeholder holds its
+              space meanwhile so nothing jumps. */}
+          <Suspense fallback={<span aria-hidden="true" className="h-11 w-11 lg:h-10 lg:w-20" />}>
             <AccountMenu />
           </Suspense>
         </div>
-      </nav>
+      </div>
     </header>
   );
 }
