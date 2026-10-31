@@ -181,14 +181,25 @@ async function saveProfile(region: Region, account: Account, profile: Profile) {
     rankedFetchedAt: updatedAt,
     matchIdsFetchedAt: updatedAt,
   };
+  let saved: boolean;
   try {
     // One transaction, so a reader never sees the new rank with the old
     // player row or the other way round.
-    await db.transaction(async (tx) => {
-      await tx
+    saved = await db.transaction(async (tx) => {
+      // Riot accounts are global, so anyone can open a player on a server
+      // they don't play on. A profile saved for another region stays as it
+      // is, ranks and all: only a visit to its own region updates it
+      // (JAS-41, issue #150). The page still shows what this region sent.
+      const written = await tx
         .insert(tables.players)
         .values({ puuid, ...row })
-        .onConflictDoUpdate({ target: tables.players.puuid, set: row });
+        .onConflictDoUpdate({
+          target: tables.players.puuid,
+          set: row,
+          setWhere: eq(tables.players.region, region),
+        })
+        .returning({ puuid: tables.players.puuid });
+      if (written.length === 0) return false;
       // Replace the rank rows rather than update them: a player who dropped
       // out of a queue (or never played it) has no row for it.
       await tx.delete(tables.rankedEntries).where(eq(tables.rankedEntries.puuid, puuid));
@@ -206,12 +217,14 @@ async function saveProfile(region: Region, account: Account, profile: Profile) {
           })),
         );
       }
+      return true;
     });
   } catch (error) {
     // The page still has the fresh profile to show; it just isn't saved.
     Sentry.captureException(error);
     return;
   }
+  if (!saved) return;
 
   // Kept out of the transaction above on purpose: if this fails (say the
   // rank_history table hasn't been created yet), the profile is still saved

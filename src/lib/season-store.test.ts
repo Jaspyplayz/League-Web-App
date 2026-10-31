@@ -11,8 +11,10 @@ vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/riot/api", () => ({ getMatchIds: vi.fn(), getMatch: vi.fn() }));
 
 // A pretend database: the saved season list, the player's saved games (slim
-// rows in season_games, whole games in matches), the "This is me" players,
-// and a record of what was written.
+// rows in season_games, whole games in matches), the region the player's
+// profile is saved for, the "This is me" players, and a record of what was
+// written.
+let savedRegion: string | undefined;
 let savedList: { matchIds: string[]; fetchedAt: Date } | undefined;
 let slimGames: SeasonGame[];
 let wholeGames: SeasonGame[];
@@ -21,7 +23,10 @@ let writtenLists: string[][];
 let writtenGames: { puuid: string; matchId: string }[];
 let hasDatabase: boolean;
 const fakeDb = {
-  query: { playerSeasons: { findFirst: async () => savedList } },
+  query: {
+    playerSeasons: { findFirst: async () => savedList },
+    players: { findFirst: async () => (savedRegion === undefined ? undefined : { region: savedRegion }) },
+  },
   select: () => ({
     from: (table: unknown) =>
       table === tables.seasonGames
@@ -74,6 +79,7 @@ function newMatch(matchId: string) {
 
 beforeEach(() => {
   hasDatabase = true;
+  savedRegion = "na";
   savedList = undefined;
   slimGames = [];
   wholeGames = [];
@@ -179,6 +185,21 @@ describe("loadSeasonStats", () => {
     const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
 
     expect(stats).toMatchObject({ loaded: 1, total: 1 });
+  });
+
+  // JAS-41: the season list belongs to the region the profile is saved for.
+  // Opening the player on another region's page mustn't save that region's
+  // list over it, or show the saved one as this region's.
+  it("neither uses nor saves the season list on another region's page", async () => {
+    savedRegion = "euw";
+    savedList = { matchIds: ["EUW1_1"], fetchedAt: new Date("2026-03-02T00:00:00Z") };
+    vi.mocked(getMatchIds).mockResolvedValue(["NA1_1"]);
+
+    const stats = await loadSeasonStats("na", "player-2", profileUpdatedAt, null, plainPage);
+
+    expect(stats?.total).toBe(1);
+    expect(getMatchIds).toHaveBeenCalledOnce();
+    expect(writtenLists).toEqual([]);
   });
 
   it("returns null without a database to remember games in", async () => {
