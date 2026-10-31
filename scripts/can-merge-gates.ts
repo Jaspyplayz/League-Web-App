@@ -471,26 +471,32 @@ function carryOver(
   return pass(`${line}, carried over ${plural(commits, "commit")} with ${plural(counted, "line")} outside docs`);
 }
 
-// The tier is the text before the line's first colon or full stop, as in
-// "normal: <reason>" or "normal. <reason>". Only that part is read, so a
-// reason that says "not on the risky list" or names `scripts/risky-paths.ts`
-// doesn't count as a second tier (JAS-117). The template's placeholder,
-// "tiny, normal or risky, and why.", still names all three before its full
-// stop, so a tier that names more than one is refused rather than guessed at.
+// The tier is the start of the line, up to its first colon, semicolon,
+// bracket, dash or full stop, as in "normal: <reason>" or "normal. <reason>".
+// Only that part is read, so a reason that says "not on the risky list" or
+// names `scripts/risky-paths.ts` doesn't count as a second tier (JAS-117). A
+// dot counts as a full stop only before a space or the line's end, so the dot
+// in a file name like `docs/a.md` doesn't end the tier. A comma doesn't end it
+// either: the template's placeholder, "tiny, normal or risky, and why.", lists
+// all three with commas, so a tier that names more than one is refused rather
+// than guessed at.
+const TIER_END = /[:;(–—]|\s-\s|\.(?=\s|$)/;
+
 function readTier(body: string): Tier {
-  const line = field(body, "Tier");
-  if (!("value" in line)) return { ok: false, why: line.why };
-  const tier = line.value.split(/[:.]/)[0];
-  const first = tier.match(/^\W*(\w+)/)?.[1].toLowerCase();
-  const named = new Set([...tier.matchAll(/\b(tiny|normal|risky)\b/gi)].map((match) => match[1].toLowerCase()));
+  const tier = field(body, "Tier");
+  if (!("value" in tier)) return { ok: false, why: tier.why };
+  const tierText = tier.value.split(TIER_END)[0];
+  const first = tierText.match(/^\W*(\w+)/)?.[1].toLowerCase();
+  const named = new Set([...tierText.matchAll(/\b(tiny|normal|risky)\b/gi)].map((match) => match[1].toLowerCase()));
   if (first === "risky") return { ok: false, why: "risky tier, so Jasper merges it" };
   if (first !== "tiny" && first !== "normal") {
     return { ok: false, why: `the **Tier:** line starts with "${first ?? ""}", not tiny or normal` };
   }
   if (named.size > 1) {
+    const names = [...named].join(", ");
     return {
       ok: false,
-      why: `the **Tier:** line names more than one tier before its first colon or full stop (${[...named].join(", ")})`,
+      why: `the tier on the **Tier:** line names more than one tier (${names}); end the tier with a colon, as in "normal: <why>", so the reason isn't read as part of it`,
     };
   }
   return { ok: true, tier: first };

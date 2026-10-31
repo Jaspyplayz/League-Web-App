@@ -1,6 +1,6 @@
 # Tier line names a second tier word
 
-`npm run can-merge` reads a PR's **Tier:** line and refuses one that names more than one of tiny, normal and risky anywhere on it, even inside a file name in backticks, so a reason that mentions "the risky list" blocks the merge. Since JAS-117 it counts tier words only in the tier itself, the text before the line's first colon or full stop, so the reason can say anything.
+Until JAS-117, `npm run can-merge` refused a PR whose **Tier:** line named more than one of tiny, normal and risky anywhere on it, even inside a file name in backticks, so a reason that mentioned "the risky list" blocked the merge. Now it counts tier words only in the tier itself, the start of the line up to its first colon, semicolon, bracket, dash or full stop. A comma doesn't end the tier, because the template's placeholder lists the tiers with commas, so "normal, because nothing is on the risky list" is still refused, with a message that says to end the tier with a colon.
 
 ## 2026-10-30
 
@@ -40,4 +40,4 @@
 - **Evidence:** `npm run can-merge -- 237` at 8e1cd33: "FAIL  Tiny or normal tier: the **Tier:** line names more than one tier (normal, risky)". [PR 237](https://github.com/Jaspyplayz/League-Web-App/pull/237).
 - **Root cause:** the same as the four entries above. `readTier` (`scripts/can-merge-gates.ts:476-489`) counts tier words anywhere on the line, even inside a backticked path, and the session didn't run `can-merge` after editing the description.
 - **Rung:** design
-- **Fix:** JAS-117: `readTier` in `scripts/can-merge-gates.ts` reads only the text before the line's first colon or full stop, the full stop for PRs 234 and 238. The tests in `scripts/can-merge-gates.test.ts` ("reads PR 237's Tier line as normal" and the others) hold the refused lines from PRs 211, 230, 234, 237 and 238, which failed before the change and pass after it. The template's placeholder, "tiny, normal or risky, and why.", is still refused.
+- **Fix:** JAS-117 ([PR 241](https://github.com/Jaspyplayz/League-Web-App/pull/241)): `readTier` in `scripts/can-merge-gates.ts` reads only the tier, up to the first colon, semicolon, bracket, dash or full stop, so PRs 234's and 238's full stops end it too. The test "reads the tier before %s, though the reason says risky" holds the refused lines from PRs 211, 230, 234, 237 and 238, which fail on main's gate code and pass now. The template's placeholder is still refused. A reason after a comma is still refused, and the message now says to end the tier with a colon.
