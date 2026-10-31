@@ -35,7 +35,7 @@ describe("Soft Rounded chrome", () => {
     expect(css).toContain("@utility soft-round-sm");
 
     const panel = readFileSync("src/components/ui/panel.tsx", "utf8");
-    expect(panel).toContain('export const panelClass = "soft-round border border-frame bg-surface"');
+    expect(panel).toContain('export const panelClass = "rounded-md border border-transparent bg-panel"');
     expect(panel).toContain("export const softPanelClass = panelClass");
   });
 });
