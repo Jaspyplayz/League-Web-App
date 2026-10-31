@@ -21,7 +21,7 @@ Preconditions:
 
 - **Open home.** Go to `/`. The level-1 heading is `Turnpoint` and the page is calm.
 - **Fit.** `document.documentElement.scrollWidth` ≤ `clientWidth` + 1 (saved as `notes.scrollWidth` and `notes.clientWidth`). The `Search` button's box lies inside the width and is ≥ 44 px tall.
-- **Example.** Scroll the link `Open this game` (exact name; the chart's link is `Open this game: …`) into view. It is visible.
+- **Example.** Scroll the link `Open this game` (exact name) into view. It is visible.
 - **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-phone-home`.
 - **Proof.** `01-open-home-on-a-phone.png` (top of the page) and `03-scroll-to-the-example-game.png`.
 

@@ -31,11 +31,10 @@ export function HomeExamplePanel({ example }: { example: HomeExample | null }) {
       }
       details={example.details}
       chart={
-        <Link
-          href={SAMPLE_MATCH_HREF}
-          aria-label={`Open this game: ${example.champion}'s gold against ${example.opponent} by minute`}
-          className="block rounded-md"
-        >
+        // No aria-label: the link takes its name from the chart's description,
+        // since a label that leaves out the chart's visible numbers fails the
+        // accessibility scan (label-content-name-mismatch).
+        <Link href={SAMPLE_MATCH_HREF} className="block rounded-md">
           <FittedDiffChart
             className={CHART_SLOT}
             points={example.gold}

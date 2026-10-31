@@ -49,8 +49,8 @@ test("search a player and see their profile", async ({ page }) => {
 });
 
 // The sample game is served from the database, so unlike the search above it
-// must work even when the Riot key has expired. Home's chart opens it too, but
-// its link is named "Open this game: ...", so `exact` picks the button.
+// must work even when the Riot key has expired. Home's chart opens it too;
+// `exact` keeps this to the button.
 test("open the sample analysis", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Open this game", exact: true }).click();
