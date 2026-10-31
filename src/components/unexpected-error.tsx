@@ -1,8 +1,8 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useEffect } from "react";
+import { reportError } from "@/lib/report-error";
 import { secondButtonClass } from "./ui/state-panel";
 import { TryAgainButton } from "./ui/try-again-button";
 
@@ -17,11 +17,7 @@ export function UnexpectedError({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
-  // Errors caught here never reach the browser's console handler, so they're
-  // sent to Sentry by hand. That's what makes "It's been reported" true.
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
+  useEffect(() => reportError(error), [error]);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:py-12">

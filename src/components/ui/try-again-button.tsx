@@ -29,24 +29,49 @@ export function TryAgainButton({
   onRetry?: () => void;
 }) {
   const router = useRouter();
-  const [secondsLeft, setSecondsLeft] = useState(waitSeconds);
   const [pending, startTransition] = useTransition();
+  // Bumped with each refresh. A refresh keeps this button's state, so if Riot
+  // is still rate limiting, a new key makes the countdown start over from the
+  // new wait instead of leaving the button pressable at 0.
+  const [attempt, setAttempt] = useState(0);
+
+  function retry() {
+    if (onRetry) return onRetry();
+    startTransition(() => {
+      router.refresh();
+      setAttempt((n) => n + 1);
+    });
+  }
+
+  return (
+    <CountdownButton key={attempt} waitSeconds={waitSeconds} disabled={pending} onClick={retry} />
+  );
+}
+
+function CountdownButton({
+  waitSeconds,
+  disabled,
+  onClick,
+}: {
+  waitSeconds: number;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState(waitSeconds);
 
   useEffect(() => {
     if (waitSeconds <= 0) return;
     return countDown(waitSeconds, setSecondsLeft);
   }, [waitSeconds]);
 
-  function retry() {
-    if (onRetry) onRetry();
-    else startTransition(() => router.refresh());
-  }
-
   return (
     <button
       type="button"
-      onClick={retry}
-      disabled={secondsLeft > 0 || pending}
+      onClick={onClick}
+      disabled={secondsLeft > 0 || disabled}
+      // The button sits in the problem panel, which is a live region. Without
+      // this a screen reader could read every tick ("28s", "27s"...).
+      aria-live="off"
       className={mainButtonClass}
     >
       {secondsLeft > 0 ? `Try again in ${secondsLeft}s` : "Try again"}

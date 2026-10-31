@@ -54,15 +54,15 @@ describe("the loading status line", () => {
 });
 
 describe("a loading section", () => {
-  it("tells screen readers it's busy and hides the grey blocks from them", () => {
+  it("reads the status line to screen readers and hides the grey blocks from them", () => {
     const html = renderToStaticMarkup(
       <LoadingSection label="Looking up Faker#KR1 on Korea">
         <LoadingBlock className="h-12 w-64" />
       </LoadingSection>,
     );
-    expect(html).toContain('aria-busy="true"');
-    expect(html).toContain('role="status"');
-    expect(html).toContain("Looking up Faker#KR1 on Korea");
+    expect(html).toMatch(/role="status"><p[^>]*>.*Looking up Faker#KR1 on Korea/);
+    // A busy live region holds its changes back, so the slow line would go unread.
+    expect(html).not.toContain("aria-busy");
     expect(html).toMatch(/aria-hidden="true" class="[^"]*bg-divider[^"]*h-12 w-64/);
   });
 });

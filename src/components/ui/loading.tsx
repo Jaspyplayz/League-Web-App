@@ -61,6 +61,8 @@ export function LoadingBlock({ className = "" }: { className?: string }) {
 
 // A loading section: the status line, then the blocks. Screen readers hear the
 // status line (and the slow sentence when it's added) and skip the blocks.
+// Only the line is the live region, and it isn't marked busy: aria-busy tells
+// screen readers to hold changes back, so the slow sentence would go unread.
 export function LoadingSection({
   label,
   children,
@@ -71,8 +73,10 @@ export function LoadingSection({
   className?: string;
 }) {
   return (
-    <div role="status" aria-busy="true" className={`flex flex-col gap-4 ${className}`}>
-      <LoadingStatus label={label} />
+    <div className={`flex flex-col gap-4 ${className}`}>
+      <div role="status">
+        <LoadingStatus label={label} />
+      </div>
       <div aria-hidden="true" className="flex flex-col gap-3 motion-safe:animate-pulse">
         {children}
       </div>

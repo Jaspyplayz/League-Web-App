@@ -1,8 +1,8 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { Rubik } from "next/font/google";
 import { useEffect } from "react";
+import { reportError } from "@/lib/report-error";
 import { TryAgainButton } from "@/components/ui/try-again-button";
 import { applyTheme, THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -21,9 +21,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
+  useEffect(() => reportError(error), [error]);
 
   // The root layout's theme script doesn't run here. When the server draws
   // this page, the copy in <head> picks light or dark before paint; when the
