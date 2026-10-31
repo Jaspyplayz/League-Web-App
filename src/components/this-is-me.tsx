@@ -52,16 +52,19 @@ export async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props
         type="button"
         disabled
         title="Couldn't check whether this profile is yours. Reload to try again."
-        className={`${button} cursor-not-allowed border-line-strong text-faint opacity-60`}
+        className={`${button} cursor-not-allowed border-line text-muted`}
       >
         Couldn&apos;t check
       </button>
     );
   }
   const isMine = mine.player?.puuid === puuid;
+  // The form says what the click means, so the action never has to read
+  // again and guess (#167).
   return (
     <form action={toggleMyPlayer}>
       <input type="hidden" name="puuid" value={puuid} />
+      <input type="hidden" name="intent" value={isMine ? "clear" : "mark"} />
       <button
         type="submit"
         aria-pressed={isMine}

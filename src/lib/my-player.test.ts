@@ -1,6 +1,8 @@
 import * as Sentry from "@sentry/nextjs";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readMyPlayer } from "./my-player";
+import { forgetMyPlayer, readMyPlayer } from "./my-player";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
@@ -9,7 +11,7 @@ vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 // the rows or throws.
 const limit = vi.fn();
 const chain = { from: () => chain, innerJoin: () => chain, where: () => chain, limit };
-let db: { select: () => typeof chain } | null;
+let db: { select: () => typeof chain; delete?: () => { where: (condition: SQL) => Promise<void> } } | null;
 vi.mock("@/lib/match-store", () => ({ database: () => db }));
 
 const saved = { puuid: "player-1", region: "na", gameName: "Jaspy", tagLine: "CA1", profileIconId: 29 };
@@ -54,5 +56,18 @@ describe("readMyPlayer", () => {
   it("reports a failed read when the database is set up but can't connect", async () => {
     db = null;
     expect(await readMyPlayer("user-1")).toEqual({ ok: false });
+  });
+});
+
+describe("forgetMyPlayer", () => {
+  // #167: a page that still shows an old mark sends "clear" for that player,
+  // which mustn't clear a different one picked since.
+  it("deletes the mark only when it's this player", async () => {
+    let condition: SQL | undefined;
+    db = { select: () => chain, delete: () => ({ where: async (c: SQL) => void (condition = c) }) };
+    expect(await forgetMyPlayer("user-1", "player-1")).toBe(true);
+    const query = new PgDialect().sqlToQuery(condition!);
+    expect(query.sql).toBe('("user_players"."user_id" = $1 and "user_players"."puuid" = $2)');
+    expect(query.params).toEqual(["user-1", "player-1"]);
   });
 });

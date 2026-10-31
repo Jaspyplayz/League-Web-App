@@ -26,6 +26,7 @@ describe("ThisIsMeButton", () => {
     const html = await render();
     expect(html).toContain("✓ This is you");
     expect(html).toContain('type="submit"');
+    expect(html).toContain('name="intent" value="clear"');
   });
 
   it("offers to mark a profile that isn't yours", async () => {
@@ -33,6 +34,7 @@ describe("ThisIsMeButton", () => {
     const html = await render();
     expect(html).toContain("This is me");
     expect(html).toContain('type="submit"');
+    expect(html).toContain('name="intent" value="mark"');
   });
 
   // #167: a failed read used to look like nothing marked, so this offered
@@ -47,5 +49,8 @@ describe("ThisIsMeButton", () => {
     // The reason shows as the label too, since phones don't show a title.
     expect(html).toContain(">Couldn&#x27;t check</button>");
     expect(html).not.toContain("hover:");
+    // Readable in both themes: muted text, not faded with opacity.
+    expect(html).toContain("text-muted");
+    expect(html).not.toContain("opacity-");
   });
 });

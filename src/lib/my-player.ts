@@ -1,7 +1,7 @@
 import "server-only";
 
 import * as Sentry from "@sentry/nextjs";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { tables, type Db } from "@/db";
 import { database } from "@/lib/match-store";
 import { isRegion, type Region } from "@/lib/regions";
@@ -67,9 +67,13 @@ export async function saveMyPlayer(userId: string, puuid: string): Promise<boole
   );
 }
 
-export async function forgetMyPlayer(userId: string): Promise<boolean> {
+// Only when it's this player, so a page that still shows an old mark can't
+// clear the one picked since.
+export async function forgetMyPlayer(userId: string, puuid: string): Promise<boolean> {
   return write((db) =>
-    db.delete(tables.userPlayers).where(eq(tables.userPlayers.userId, userId)),
+    db
+      .delete(tables.userPlayers)
+      .where(and(eq(tables.userPlayers.userId, userId), eq(tables.userPlayers.puuid, puuid))),
   );
 }
 

@@ -12,6 +12,7 @@ type Props = {
   riotId: string; // the slug from the address, "Name-TAG"
   playerPath: string;
   history: AskedQuestion[];
+  historyFailed: boolean; // the past questions couldn't be read, so history is empty for now
   left: number; // questions this account can still ask today, 0 once any limit is reached
 };
 
@@ -23,7 +24,7 @@ const EXAMPLES = [
 
 // The question box and the answers under it. Runs in the browser to show
 // "Thinking…" while Claude reads the games, which can take up to a minute.
-export function AskBox({ region, riotId, playerPath, history, left }: Props) {
+export function AskBox({ region, riotId, playerPath, history, historyFailed, left }: Props) {
   const [text, setText] = useState("");
   const [answers, setAnswers] = useState(history);
   const [remaining, setRemaining] = useState(left);
@@ -105,6 +106,10 @@ export function AskBox({ region, riotId, playerPath, history, left }: Props) {
         </div>
       </form>
 
+      {/* Where the past questions go, so it still shows under a new answer (#167). */}
+      {historyFailed && (
+        <p className="text-behind">Couldn&apos;t load your past questions. Reload to try again.</p>
+      )}
       {answers.length > 0 && (
         <ol className="flex flex-col gap-4">
           {answers.map((item) => (
