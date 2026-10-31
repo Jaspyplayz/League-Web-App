@@ -34,7 +34,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [Jasper's own writing listed as his to-do](agent-mistakes/owner-writing-listed-as-todo.md) | 2 | design |
 | [Tier line names a second tier word](agent-mistakes/tier-line-names-two-tiers.md) | 1 | none yet |
 | [Merge Danger understated on a risky path](agent-mistakes/merge-danger-understated.md) | 3 | none yet |
-| [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 2 | check |
+| [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 4 | design |
 
 ## Rules and what enforces them
 

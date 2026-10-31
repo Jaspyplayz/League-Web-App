@@ -1,6 +1,6 @@
 # 0009: can-merge covers database code outside src/db/, and tiny PRs that change code get the reviewer
 
-Status: draft, waiting on Jasper's "In my words" (Linear JAS-12). Amends [0008](0008-agents-merge-two-way-doors.md).
+Status: draft, waiting on Jasper's "In my words" (Linear JAS-12). Amends [0008](0008-agents-merge-two-way-doors.md). Amended by [0019](0019-merge-gates-read-the-body-as-github-shows-it.md).
 
 Update on 2026-10-26 (Linear JAS-16): the journey skills `verify-turnpoint` and `verify-turnpoint-ux` moved from `.cursor/skills/` to `.claude/skills/`, so Cursor and Claude Code share one copy. That puts them on the risky list, so Jasper now merges every change to them, a new journey included. `.cursor/skills/` is empty. The rule below that it gets the reviewer still covers any skill added there later.
 
