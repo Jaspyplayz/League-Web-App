@@ -55,25 +55,6 @@ export function SearchIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-export function GearIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
 export function ChevronDownIcon({ size = 12 }: { size?: number }) {
   return (
     <svg
@@ -108,6 +89,77 @@ export function StarIcon({ size = 16, filled = false }: { size?: number; filled?
     >
       <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5-4.8-4.6 6.6-.9z" />
     </svg>
+  );
+}
+
+// The header's icons: the theme switch's moon (showing in dark) and sun
+// (showing in light), the phone menu's open and close, and sign out. They take
+// a className so the theme switch can hide one of its two icons with CSS.
+function HeaderIcon({
+  size,
+  className,
+  children,
+}: {
+  size: number;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      {children}
+    </svg>
+  );
+}
+
+export function MoonIcon({ size = 20, className }: { size?: number; className?: string }) {
+  return (
+    <HeaderIcon size={size} className={className}>
+      <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" />
+    </HeaderIcon>
+  );
+}
+
+export function SunIcon({ size = 20, className }: { size?: number; className?: string }) {
+  return (
+    <HeaderIcon size={size} className={className}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+    </HeaderIcon>
+  );
+}
+
+export function MenuIcon({ size = 22 }: { size?: number }) {
+  return (
+    <HeaderIcon size={size}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </HeaderIcon>
+  );
+}
+
+export function CloseIcon({ size = 22 }: { size?: number }) {
+  return (
+    <HeaderIcon size={size}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </HeaderIcon>
+  );
+}
+
+export function SignOutIcon({ size = 18 }: { size?: number }) {
+  return (
+    <HeaderIcon size={size}>
+      <path d="M9 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3M16 16l4-4-4-4M20 12H10" />
+    </HeaderIcon>
   );
 }
 

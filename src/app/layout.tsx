@@ -41,7 +41,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // The server always sends dark; the script in <head> switches to light
-    // before the page is drawn if that's what this browser picked. Because it
+    // before the page is drawn if that's what this browser picked with the
+    // header's theme switch. Because it
     // changes <html> before React starts, React is told not to warn that
     // data-theme differs from what the server sent.
     <html

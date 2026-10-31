@@ -19,6 +19,6 @@ The pages a player uses, and how to prove each one works with `npm run shot` ([S
 - [Search and profile](./search-and-profile.md): the home page search, a player's profile and its sections.
 - [Match page](./match-page.md): the Summary and Deep dive tabs of one game, including the replay.
 - [Insights](./insights.md): the three Insights views.
-- [Settings](./settings.md): the theme choice, which every page follows.
+- [Theme](./theme.md): the header's dark and light switch, which every page follows.
 
 Not mapped yet: Ask needs a signed-in account, and sign-in needs the Supabase variables a worktree server doesn't have.

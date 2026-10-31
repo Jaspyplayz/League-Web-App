@@ -68,14 +68,35 @@ test("open the sample analysis", async ({ page }) => {
 
 // The theme is applied by a script in <head>, so check it survives a reload:
 // if that script broke, the page would come back dark.
-test("switch to light mode in Settings", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Settings" }).click();
-  await page.getByRole("radio", { name: /^Light/ }).check();
+test("switch to light mode from the header", async ({ page }) => {
+  await page.goto("/how-it-works");
+  await page.getByRole("button", { name: "Switch to light theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(page.getByRole("radio", { name: /^Light/ })).toBeChecked();
+  // The label says what the next click does.
+  await expect(page.getByRole("button", { name: "Switch to dark theme" })).toBeVisible();
+});
+
+// The theme was Settings' only choice, so the page sends old links home.
+test("send the old Settings page home", async ({ page }) => {
+  await page.goto("/settings");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+});
+
+// Every page but home has a search in the header. Reaching the player's
+// address is enough here, so this passes even with an expired Riot key.
+test("search a player from the header on a match page", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await expect(page).toHaveURL(/\/match\/KR_/);
+  const search = page.getByRole("search", { name: "Search a player" });
+  // On a KR player's page the region starts on KR.
+  await expect(search.getByLabel("Region")).toHaveValue("kr");
+  await search.getByLabel("Riot ID").fill("Hide on bush#KR1");
+  await search.getByRole("button", { name: "Search" }).click();
+  await expect(page).toHaveURL(/\/player\/kr\/Hide%20on%20bush-KR1$/);
 });
 
 // A typo in a link should land on our own 404 page with a search box, not a
@@ -84,7 +105,8 @@ test("show the not-found page for a bad link", async ({ page }) => {
   const response = await page.goto("/this-page-does-not-exist");
   expect(response?.status()).toBe(404);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("We couldn't find that page");
-  await expect(page.getByLabel("Riot ID")).toBeVisible();
+  // The page's own search box, not the header's.
+  await expect(page.getByRole("main").getByLabel("Riot ID")).toBeVisible();
 
   // An unknown region calls notFound() from the player page.
   await page.goto("/player/xx/Hide%20on%20bush-KR1");

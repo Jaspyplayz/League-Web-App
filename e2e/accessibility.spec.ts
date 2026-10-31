@@ -30,8 +30,11 @@ function plural(count: number, word: string) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-async function scan(page: Page, pageName: string) {
-  const { violations } = await new AxeBuilder({ page }).withTags(STANDARD).analyze();
+// `only` limits the scan to part of the page, given as a CSS selector.
+async function scan(page: Page, pageName: string, only?: string) {
+  const axe = new AxeBuilder({ page }).withTags(STANDARD);
+  if (only) axe.include(only);
+  const { violations } = await axe.analyze();
 
   const heading =
     violations.length === 0
@@ -50,10 +53,11 @@ async function scan(page: Page, pageName: string) {
   if (FAIL_ON_FINDINGS) expect(violations.map((v) => v.id)).toEqual([]);
 }
 
-// Switch the way a visitor does; the choice stays saved in this browser.
+// Switch the way a visitor does, with the header's sun and moon; the choice
+// stays saved in this browser.
 async function switchToLightMode(page: Page) {
-  await page.goto("/settings");
-  await page.getByRole("radio", { name: /^Light/ }).check();
+  await page.goto("/how-it-works");
+  await page.getByRole("button", { name: "Switch to light theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 }
 
@@ -97,15 +101,36 @@ test("scan a player page, in both themes", async ({ page }) => {
   await scan(page, "Player page, light mode");
 });
 
-test("scan Settings and the not-found page", async ({ page }) => {
-  await page.goto("/settings");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Settings");
-  await scan(page, "Settings");
-
+test("scan the not-found page", async ({ page }) => {
   await page.goto("/this-page-does-not-exist");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("We couldn't find that page");
   await scan(page, "Not-found page");
 });
+
+// On a phone the header's links move into a menu, which is only on the page
+// while it's open, so open it before scanning, in both themes. Only the
+// header is scanned: How it works is just a page that needs no database.
+test("scan the phone header with its menu open", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/how-it-works");
+  await openPhoneMenu(page);
+  await scan(page, "Phone header, menu open", "header");
+
+  await page.getByRole("button", { name: "Switch to light theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  // The click outside the menu closed it.
+  await openPhoneMenu(page);
+  await scan(page, "Phone header, menu open, light mode", "header");
+});
+
+// The menu fades in, and axe would measure its text half faded, so wait
+// until it's fully there.
+async function openPhoneMenu(page: Page) {
+  await page.getByRole("button", { name: "Open menu" }).click();
+  const menu = page.getByRole("navigation", { name: "Main" });
+  await expect(menu).toContainText("Example game");
+  await expect(menu).toHaveCSS("opacity", "1");
+}
 
 // Light mode has its own colors, so its contrast is checked separately.
 test("scan light mode", async ({ page }) => {
