@@ -1,10 +1,11 @@
 name: Reviewer
 
-# Fails a PR into main until the reviewer agent's verdict in its Review
-# section names the head commit with no blockers (JAS-15). Main's ruleset
-# requires this check, so nobody can merge before the review. Editing the
-# description reruns it, so adding the verdict line passes it, and a push
-# reruns it, so a new commit needs a new review.
+# Fails a PR into main until the reviewer agent's newest verdict in its
+# Review section clears it (JAS-15): no blockers on the head commit, or on an
+# earlier commit the PR added with only small changes since (decision record
+# 0017). Main's ruleset requires this check, so nobody can merge before the
+# review. Editing the description reruns it, so adding the verdict line
+# passes it, and a push reruns it, so a big new commit needs a new review.
 on:
   pull_request:
     branches: [main]

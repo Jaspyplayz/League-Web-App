@@ -34,6 +34,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [Jasper's own writing listed as his to-do](agent-mistakes/owner-writing-listed-as-todo.md) | 2 | design |
 | [Tier line names a second tier word](agent-mistakes/tier-line-names-two-tiers.md) | 1 | none yet |
 | [Merge Danger understated on a risky path](agent-mistakes/merge-danger-understated.md) | 3 | none yet |
+| [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 2 | check |
 
 ## Rules and what enforces them
 
@@ -45,7 +46,7 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Files that read secrets import `"server-only"` | Lint rule `turnpoint/server-only-env` |
 | No green in the UI | Lint rule `turnpoint/no-green-classes` |
 | Lint and typecheck pass before Claude commits | The commit hook, `.claude/hooks/check-before-commit.mjs` |
-| No PR merges before the reviewer clears its head commit | GitHub's required `reviewer` check |
+| No PR merges before the reviewer clears it (its head, or an earlier commit with only small changes since) | GitHub's required `reviewer` check |
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
 | A PR that touches the risky list is Jasper's to merge | `npm run can-merge`, which refuses it (`scripts/risky-paths.ts`) |
 | Every agent mistake entry has all five lines | `scripts/agent-mistakes.test.ts` |

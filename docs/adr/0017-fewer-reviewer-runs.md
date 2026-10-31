@@ -20,11 +20,11 @@ Fable credits also ran out on 2026-10-30, and Jasper said not to use Fable.
 ## Decision
 
 Option 2, with a size limit on tiny PRs from option 4:
-- **Tiny PRs** skip the reviewer when they change at most 30 lines outside docs, and no rule file (`docs/workflow.md`, any `CLAUDE` or `AGENTS` file, anything in a dot folder) and no risky path. Past that, a tiny PR needs the reviewer like a normal one.
-- **A carried-over verdict:** the `reviewer` check and `can-merge` read the newest verdict the Review section names, on the head commit or one before it. If it says no blockers, it still counts after commits that change at most 40 lines outside docs and tests, counting only the PR's own files so merging main in doesn't count. A change to a rule file after the verdict always needs a new review.
+- **Tiny PRs** with no verdict skip the reviewer when they change at most 30 lines outside docs, and no rule file (`docs/workflow.md`, `docs/agents/`, any `CLAUDE` or `AGENTS` file, anything in a dot folder) and no risky path. A binary file outside docs counts as more than the limit. Past that, a tiny PR needs the reviewer like a normal one, and a verdict in its Review section always decides, so a tiny PR can't skip past blockers.
+- **A carried-over verdict:** the `reviewer` check and `can-merge` read the newest verdict the Review section names, on the head commit or an earlier commit the PR added (never a main commit). If it says no blockers, it still counts after commits that change at most 40 lines outside docs. A new test is free, but deleted test lines count, so a test can't be weakened unseen. Only files the PR changes now or changed at the verdict count, so main's changes to other files, merged in, don't; main's changes to those same files do, which can ask for a review nobody needed. Any change to a rule file or a risky path after the verdict, even a mode change, needs a new review, and so does a blockers verdict on a commit a force push dropped.
 - **Re-reviews** only follow a review with blockers. They read the new commits and judge each answer, instead of 0011's five conditions.
 - **The reviewer** checks what breaks for players, missing tests, security and claims to players. Paperwork is a nit at most. A one-way door on a tiny or normal PR is still a blocker, since it changes who merges, until JAS-69's gate checks it.
-- **Models:** the reviewer runs on Opus 5.5, and the `interrogate` panel leaves out Fable.
+- **Models:** the reviewer runs on Opus 5.5, and the `interrogate` panel leaves out Fable. That is Jasper's `pstack-models.md` sheet on his PC and a line in the cloud startup note; nothing enforces it beyond those.
 - **The PR template** asks whether each command passed, not how many tests passed.
 
 ## Consequences
@@ -35,6 +35,6 @@ Good:
 - Fewer paperwork blockers means fewer postmortem entries about paperwork.
 
 Bad:
-- Up to 40 lines of fixes after a review can merge without a second look. CI, the golden tests and the smoke test still run on every commit, and risky PRs still wait for Jasper.
+- Up to 40 lines of fixes after a review can merge without a second look. CI, the golden tests and the smoke test still run on every commit, and a fix to a rule file or risky path still gets reviewed.
 - A tiny PR of up to 30 lines merges with no reviewer. A wrong tier on a risky path still fails, because a risky path always needs the reviewer and Jasper merges it.
 - The reviewer and the builder now run on the same model, so the first review is less independent than one from a different model.

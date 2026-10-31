@@ -97,13 +97,14 @@ function readPr(number: string): { pr: Pr; history: ReviewHistory } {
     },
     files,
   );
-  // Like the files, the lines take the larger count against main or GitHub's base.
-  const fromBase = reviewHistory(pull.base.sha, sha);
-  const fromMain = changedLines([`origin/main...${sha}`]);
-  for (const [path, count] of Object.entries(fromMain)) {
-    fromBase.lines[path] = Math.max(fromBase.lines[path] ?? 0, count);
+  // Like the files, the lines take the larger count against main or GitHub's
+  // base, and a verdict on a commit either one has doesn't count.
+  const history = reviewHistory(pull.base.sha, sha, undefined, ["origin/main"]);
+  for (const [path, change] of Object.entries(changedLines([`origin/main...${sha}`]))) {
+    const known = history.lines[path];
+    if (!known || change.added + change.deleted > known.added + known.deleted) history.lines[path] = change;
   }
-  return { pr, history: fromBase };
+  return { pr, history };
 }
 
 function readMain(): MainState {

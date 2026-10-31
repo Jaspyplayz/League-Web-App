@@ -1,7 +1,7 @@
 // The `reviewer` check that main's ruleset requires (JAS-15). It fails a PR
 // until its Review section has a no-blockers verdict on the head commit, or on
 // an earlier one with only small changes since (decision record 0017), by the
-// same rule as can-merge's "Reviewer cleared the head commit" gate.
+// same rule as can-merge's "Reviewer cleared the PR" gate.
 // .github/workflows/reviewer.yml runs it. It reads the PR from the event file
 // GitHub writes, so the description never passes through a shell.
 
@@ -28,7 +28,8 @@ const gate = reviewerCleared(
     headRefOid: pr.head.sha,
     files: changedPaths(pr.base.sha, pr.head.sha),
   },
-  reviewHistory(pr.base.sha, pr.head.sha),
+  // The checkout fetches every branch, so origin/main is here too.
+  reviewHistory(pr.base.sha, pr.head.sha, undefined, ["origin/main"]),
 );
 console.log(`${gate.pass ? "PASS" : "FAIL"} ${gate.name}: ${gate.detail}`);
 if (!gate.pass) process.exitCode = 1;

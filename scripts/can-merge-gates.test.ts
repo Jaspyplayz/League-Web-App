@@ -12,6 +12,7 @@ import {
   type Decision,
   type MainState,
   type PrSnapshot,
+  type ChangedLines,
   type ReviewHistory,
   TINY_LINES,
 } from "./can-merge-gates";
@@ -77,10 +78,18 @@ function pr(overrides: Partial<PrSnapshot> = {}): PrSnapshot {
   };
 }
 
+// Added lines per file, in the shape git's numstat gives.
+function changes(counts: Record<string, number>): ChangedLines {
+  return Object.fromEntries(Object.entries(counts).map(([path, added]) => [path, { added, deleted: 0 }]));
+}
+
 // Every changed file has 5 lines unless a test says otherwise, and no verdict
 // commit is on the branch except the head.
-function history(overrides: Partial<ReviewHistory> = {}, files = pr().files): ReviewHistory {
-  return { lines: Object.fromEntries(files.map((path) => [path, 5])), since: () => undefined, ...overrides };
+function history(
+  { lines, since }: { lines?: Record<string, number>; since?: ReviewHistory["since"] } = {},
+  files = pr().files,
+): ReviewHistory {
+  return { lines: changes(lines ?? Object.fromEntries(files.map((path) => [path, 5]))), since: since ?? (() => undefined) };
 }
 
 function decide(snapshot: PrSnapshot, state: MainState, git: ReviewHistory = history({}, snapshot.files)): Decision {
@@ -100,7 +109,7 @@ describe("decide", () => {
     const decision = decide(pr(), main());
     expect(decision.ok).toBe(true);
     expect(failed(decision)).toEqual([]);
-    expect(detail(decision, "Reviewer cleared the head commit")).toBe(`Reviewer agent at ${HEAD}: no blockers`);
+    expect(detail(decision, "Reviewer cleared the PR")).toBe(`Reviewer agent at ${HEAD}: no blockers`);
   });
 
   it("allows a tiny PR that changes only docs, with no review and no criteria, written on GitHub's website", () => {
@@ -111,7 +120,7 @@ describe("decide", () => {
 
   it("refuses a normal PR that changes only docs without the reviewer", () => {
     const decision = decide(pr({ body: body({ review: [] }), files: ["docs/habits.md"] }), main());
-    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
+    expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
   });
 
   // Agents follow these as rules, so a tiny PR can't loosen them unreviewed (JAS-12).
@@ -130,8 +139,8 @@ describe("decide", () => {
   ])("refuses a tiny PR that changes %s without the reviewer, however small", (file) => {
     const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
     const decision = decide(pr({ body: tiny, files: ["docs/habits.md", file] }), main());
-    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
-    expect(detail(decision, "Reviewer cleared the head commit")).toContain(file);
+    expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
+    expect(detail(decision, "Reviewer cleared the PR")).toContain(file);
   });
 
   // These aren't docs, so their lines count toward the tiny limit (0017).
@@ -148,7 +157,7 @@ describe("decide", () => {
     const small = history({ lines: { "docs/habits.md": 500, [file]: TINY_LINES } }, files);
     const big = history({ lines: { "docs/habits.md": 1, [file]: TINY_LINES + 1 } }, files);
     expect(decide(pr({ body: tiny, files }), main(), small).ok).toBe(true);
-    expect(failed(decide(pr({ body: tiny, files }), main(), big))).toEqual(["Reviewer cleared the head commit"]);
+    expect(failed(decide(pr({ body: tiny, files }), main(), big))).toEqual(["Reviewer cleared the PR"]);
   });
 
   it.each(["docs/.claude/skills/x/SKILL.md", "docs/adr/.cursor/rules/x.md"])(
@@ -157,7 +166,7 @@ describe("decide", () => {
       const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
       expect(failed(decide(pr({ body: tiny, files: [file] }), main()))).toEqual([
         "No risky files",
-        "Reviewer cleared the head commit",
+        "Reviewer cleared the PR",
       ]);
     },
   );
@@ -169,7 +178,7 @@ describe("decide", () => {
     const lines = { "docs/habits.md": 200, "src/lib/analyzer/death-recap.ts": 20, "src/lib/analyzer/death-recap.test.ts": 10 };
     const decision = decide(pr({ body: tiny, files }), main(), history({ lines }, files));
     expect(decision.ok).toBe(true);
-    expect(detail(decision, "Reviewer cleared the head commit")).toBe(
+    expect(detail(decision, "Reviewer cleared the PR")).toBe(
       `a tiny PR that changes 30 lines outside docs (up to ${TINY_LINES}) skips the reviewer`,
     );
   });
@@ -180,8 +189,8 @@ describe("decide", () => {
     const files = ["docs/habits.md", "src/lib/analyzer/death-recap.ts"];
     const lines = { "docs/habits.md": 1, "src/lib/analyzer/death-recap.ts": TINY_LINES + 1 };
     const decision = decide(pr({ body: tiny, files }), main(), history({ lines }, files));
-    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
-    expect(detail(decision, "Reviewer cleared the head commit")).toContain("31 in src/lib/analyzer/death-recap.ts");
+    expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
+    expect(detail(decision, "Reviewer cleared the PR")).toContain("31 in src/lib/analyzer/death-recap.ts");
   });
 
   it("refuses a small tiny PR that touches a risky file without the reviewer, in GitHub's check too", () => {
@@ -390,18 +399,18 @@ describe("decide", () => {
 
   it("refuses a reviewer verdict on a commit that isn't on the branch", () => {
     const decision = decide(pr({ body: body({ review: [`Reviewer agent at ${OLDER.slice(0, 7)}: no blockers`] }) }), main());
-    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
-    expect(detail(decision, "Reviewer cleared the head commit")).toContain("85e30eb, which isn't the head commit 2ee7e1d or one before it");
+    expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
+    expect(detail(decision, "Reviewer cleared the PR")).toContain("85e30eb, which isn't the head commit 2ee7e1d or one this PR added before it");
   });
 
   it("refuses when the reviewer found blockers at the head commit", () => {
     const review = [`Reviewer agent at ${OLDER}: 2 blockers`, `Reviewer agent at ${HEAD.slice(0, 12)}: 1 blockers`];
-    expect(failed(decide(pr({ body: body({ review }) }), main()))).toEqual(["Reviewer cleared the head commit"]);
+    expect(failed(decide(pr({ body: body({ review }) }), main()))).toEqual(["Reviewer cleared the PR"]);
   });
 
   it("refuses a normal PR with no reviewer line in the new format", () => {
     const decision = decide(pr({ body: body({ review: ["Reviewer agent: no blockers."] }) }), main());
-    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
+    expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
   });
 
   // A re-review names the commit it started from (JAS-17). The gate reads the
@@ -409,13 +418,14 @@ describe("decide", () => {
   // it judged the re-review's line, not only the older one.
   it.each<[string, string[]]>([
     ["no blockers", []],
-    ["1 blockers", ["Reviewer cleared the head commit"]],
+    ["1 blockers", ["Reviewer cleared the PR"]],
   ])("reads a re-review's %s like a full review's", (verdict, failing) => {
     const since = OLDER.slice(0, 7);
     const review = [`Reviewer agent at ${OLDER}: 2 blockers`, `Reviewer agent at ${HEAD}: ${verdict} (re-review since ${since})`];
-    const decision = decide(pr({ body: body({ review }) }), main());
+    const older = (sha: string) => (sha === OLDER ? { commits: 1, lines: changes({ "src/components/habit-card.tsx": 2 }), files: pr().files } : undefined);
+    const decision = decide(pr({ body: body({ review }) }), main(), history({ since: older }));
     expect(failed(decision)).toEqual(failing);
-    expect(detail(decision, "Reviewer cleared the head commit")).toContain(`${verdict} (re-review since ${since})`);
+    expect(detail(decision, "Reviewer cleared the PR")).toContain(`${verdict} (re-review since ${since})`);
   });
 
   // PR 209's re-review lines put the suffix before the colon, so the gate
@@ -427,8 +437,8 @@ describe("decide", () => {
   ])("names a verdict line it can't read, %s", (_, others) => {
     const misplaced = `Reviewer agent at ${HEAD} (re-review since ${OLDER.slice(0, 7)}): no blockers`;
     const decision = decide(pr({ body: body({ review: [misplaced, ...others] }) }), main());
-    expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
-    expect(detail(decision, "Reviewer cleared the head commit")).toContain(
+    expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
+    expect(detail(decision, "Reviewer cleared the PR")).toContain(
       `couldn't read "${misplaced}": a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`,
     );
   });
@@ -437,7 +447,7 @@ describe("decide", () => {
     const misplaced = `Reviewer agent at ${HEAD} (re-review since ${OLDER.slice(0, 7)}): no blockers`;
     const mention = `- Fixed: the Reviewer agent at ${OLDER.slice(0, 7)} asked for a test`;
     const decision = decide(pr({ body: body({ review: [misplaced, misplaced, mention] }) }), main());
-    const text = detail(decision, "Reviewer cleared the head commit");
+    const text = detail(decision, "Reviewer cleared the PR");
     expect(text.split(misplaced)).toHaveLength(2);
     expect(text).not.toContain("asked for a test");
   });
@@ -453,7 +463,7 @@ describe("decide", () => {
     ["a tiny PR that changes code", { body: body({ tier: "tiny. A copy fix.", criteria: [], review: [] }), files: ["src/x.ts"] }],
   ])("gives GitHub's reviewer check the same answer for %s", (_, overrides) => {
     const snapshot = pr(overrides);
-    const gate = decide(snapshot, main()).gates.find(({ name }) => name === "Reviewer cleared the head commit");
+    const gate = decide(snapshot, main()).gates.find(({ name }) => name === "Reviewer cleared the PR");
     expect(reviewerCleared(snapshot, history({}, snapshot.files))).toEqual(gate);
   });
 
@@ -462,57 +472,97 @@ describe("decide", () => {
     const files = ["src/components/habit-card.tsx", "src/components/habit-card.test.tsx", "docs/habits.md"];
     const gateOf = (review: string[], since: ReviewHistory["since"], changed = files) =>
       decide(pr({ body: body({ review }), files: changed }), main(), history({ since }, changed));
-    const after = (lines: Record<string, number>, commits = 2) => (sha: string) =>
-      sha === OLDER ? { commits, lines } : sha === MIDDLE ? { commits: 1, lines } : undefined;
+    const after =
+      (lines: ChangedLines, { commits = 2, at = files }: { commits?: number; at?: string[] } = {}) =>
+      (sha: string) =>
+        sha === OLDER ? { commits, lines, files: at } : sha === MIDDLE ? { commits: 1, lines, files: at } : undefined;
+    const reviewer = (decision: Decision) => detail(decision, "Reviewer cleared the PR");
 
-    it("carries over a no-blockers verdict past small fixes, docs and tests", () => {
-      const lines = { "src/components/habit-card.tsx": CARRY_OVER_LINES, "src/components/habit-card.test.tsx": 300, "docs/habits.md": 80 };
+    it("carries over a no-blockers verdict past small fixes, docs and new tests", () => {
+      const lines = changes({ "src/components/habit-card.tsx": CARRY_OVER_LINES, "src/components/habit-card.test.tsx": 300, "docs/habits.md": 80 });
       const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(lines));
       expect(decision.ok).toBe(true);
-      expect(detail(decision, "Reviewer cleared the head commit")).toBe(
-        `Reviewer agent at ${OLDER}: no blockers, carried over 2 commits with ${CARRY_OVER_LINES} lines outside docs and tests`,
+      expect(reviewer(decision)).toBe(
+        `Reviewer agent at ${OLDER}: no blockers, carried over 2 commits with ${CARRY_OVER_LINES} lines outside docs`,
       );
     });
 
-    it("refuses once more than the limit changed outside docs and tests", () => {
-      const lines = { "src/components/habit-card.tsx": CARRY_OVER_LINES + 1 };
+    it("refuses once more than the limit changed outside docs", () => {
+      const lines = changes({ "src/components/habit-card.tsx": CARRY_OVER_LINES + 1 });
       const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(lines));
-      expect(failed(decision)).toEqual(["Reviewer cleared the head commit"]);
-      expect(detail(decision, "Reviewer cleared the head commit")).toContain(`${CARRY_OVER_LINES + 1} lines outside docs and tests`);
+      expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
+      expect(reviewer(decision)).toContain(`${CARRY_OVER_LINES + 1} lines outside docs changed after the verdict`);
     });
 
-    it("refuses when a rule file changed after the verdict, however small", () => {
-      const changed = [...files, "docs/workflow.md"];
-      const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after({ "docs/workflow.md": 1 }), changed);
-      expect(detail(decision, "Reviewer cleared the head commit")).toContain("docs/workflow.md changed after the verdict");
+    it("counts deleted test lines, so a test can't be weakened unseen", () => {
+      const lines = { "src/components/habit-card.test.tsx": { added: 0, deleted: CARRY_OVER_LINES + 1 } };
+      expect(failed(gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(lines)))).toEqual(["Reviewer cleared the PR"]);
+    });
+
+    it.each(["docs/workflow.md", "docs/agents/issue-tracker.md", "src/db/schema.ts", "scripts/can-merge-gates.ts"])(
+      "refuses when %s changed after the verdict, however small",
+      (file) => {
+        const changed = [...files, file];
+        const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(changes({ [file]: 1 })), changed);
+        expect(reviewer(decision)).toContain(`${file} changed after the verdict`);
+      },
+    );
+
+    it("refuses a mode-only change to a rule file after the verdict", () => {
+      const changed = [...files, ".claude/hooks/cloud-setup.mjs"];
+      const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(changes({ ".claude/hooks/cloud-setup.mjs": 0 })), changed);
+      expect(reviewer(decision)).toContain(".claude/hooks/cloud-setup.mjs changed after the verdict");
+    });
+
+    it("counts a file put back to main's version after the verdict", () => {
+      const decision = gateOf(
+        [`Reviewer agent at ${OLDER}: no blockers`],
+        after(changes({ "src/lib/guard.ts": 120 }), { at: [...files, "src/lib/guard.ts"] }),
+      );
+      expect(reviewer(decision)).toContain("120 lines outside docs changed after the verdict");
     });
 
     it("refuses when the newest verdict found blockers", () => {
       const decision = gateOf(
         [`Reviewer agent at ${OLDER}: no blockers`, `Reviewer agent at ${MIDDLE}: 1 blockers`],
-        after({ "src/components/habit-card.tsx": 1 }),
+        after(changes({ "src/components/habit-card.tsx": 1 })),
       );
-      expect(detail(decision, "Reviewer cleared the head commit")).toContain("A fix for a blocker needs a new review");
+      expect(reviewer(decision)).toContain("A fix for a blocker needs a new review");
     });
 
     it("uses the newest verdict when an earlier one found blockers", () => {
       const decision = gateOf(
         [`Reviewer agent at ${OLDER}: 2 blockers`, `Reviewer agent at ${MIDDLE}: no blockers (re-review since ${OLDER.slice(0, 7)})`],
-        after({ "src/components/habit-card.tsx": 3 }),
+        after(changes({ "src/components/habit-card.tsx": 3 })),
       );
       expect(decision.ok).toBe(true);
     });
 
-    it("doesn't count files the PR doesn't change, such as main merged in", () => {
-      const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after({ "src/lib/other.ts": 900, "CLAUDE.md": 4 }));
+    it("refuses when a force push dropped the commit with the blockers verdict", () => {
+      const dropped = "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432";
+      const decision = gateOf(
+        [`Reviewer agent at ${OLDER}: no blockers`, `Reviewer agent at ${dropped}: 1 blockers`],
+        after(changes({ "src/components/habit-card.tsx": 1 })),
+      );
+      expect(reviewer(decision)).toContain("isn't on the branch any more");
+    });
+
+    it("doesn't count files the PR never changed, such as main merged in", () => {
+      const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(changes({ "src/lib/other.ts": 900, "CLAUDE.md": 4 })));
       expect(decision.ok).toBe(true);
     });
 
-    it("refuses a verdict on a commit that isn't on the branch", () => {
+    it("refuses a verdict on a commit the PR didn't add", () => {
       const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], () => undefined);
-      expect(detail(decision, "Reviewer cleared the head commit")).toBe(
-        `the reviewer saw ${OLDER.slice(0, 7)}, which isn't the head commit ${HEAD.slice(0, 7)} or one before it`,
+      expect(reviewer(decision)).toBe(
+        `the reviewer saw ${OLDER.slice(0, 7)}, which isn't the head commit ${HEAD.slice(0, 7)} or one this PR added before it`,
       );
+    });
+
+    it("reads a blockers verdict on a tiny PR under the limit instead of skipping it", () => {
+      const tiny = body({ tier: "tiny. Copy.", criteria: [], review: [`Reviewer agent at ${HEAD}: 1 blockers`] });
+      const decision = decide(pr({ body: tiny, files: ["src/components/habit-card.tsx"] }), main());
+      expect(reviewer(decision)).toContain("blockers in the newest verdict");
     });
   });
 
@@ -552,7 +602,7 @@ describe("decide", () => {
       "Open and ready",
       "Built by Claude Code",
       "No risky files",
-      "Reviewer cleared the head commit",
+      "Reviewer cleared the PR",
     ]);
   });
 });

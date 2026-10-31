@@ -41,8 +41,10 @@ and `npm test`, read `git diff <since>..HEAD` and the code that calls what it
 changes, then:
 - Judge each blocker's answer in the PR's Review section: a fix needs a test
   or a line that shows it, and a rejection needs evidence.
-- Run checks 2 to 7 below on the new commits.
-- Apply the main's-rules check to every file the new commits change.
+- Run checks 2 to 9 below on the new commits, and check 1 on each criterion
+  whose code, test or screenshot page they touch.
+- Apply the main's-rules check to every file the branch changes
+  (`git diff --name-only origin/main...HEAD`), not only the new commits.
 If the new commits do more than answer the earlier findings, such as a new
 feature, or `<since>` isn't an ancestor of HEAD, do a full review instead and
 say why right after your first line.
@@ -110,7 +112,7 @@ other review, such as the `interrogate` panel on a risky PR, starts with its own
 name, like `Interrogate panel at <sha>:`. When a finding quotes a review
 line, leave out its `at <sha>:` part, since a quoted one counts as a review.
 The builder copies it into the PR's Review section, and `npm run can-merge` merges a
-normal PR only when that line names its head commit.
+normal PR only when the newest line clears it.
 
 Report at most 7 findings. For each: severity (blocker, should-fix, nit), file:line,
 the failing case as concrete input and wrong output, and your confidence. If nothing

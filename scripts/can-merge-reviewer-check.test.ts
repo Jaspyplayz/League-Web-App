@@ -60,43 +60,49 @@ describe("the reviewer check GitHub requires", () => {
 
   it("passes once the reviewer cleared the head commit", () => {
     const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.code}: no blockers`]), heads.code);
-    expect(out).toContain(`PASS Reviewer cleared the head commit: Reviewer agent at ${heads.code}: no blockers`);
+    expect(out).toContain(`PASS Reviewer cleared the PR: Reviewer agent at ${heads.code}: no blockers`);
     expect(code).toBe(0);
   });
 
   it("fails until the Review section has the verdict line", () => {
     const { code, out } = check(body("normal. A habit card."), heads.code);
-    expect(out).toContain('FAIL Reviewer cleared the head commit: the Review section has no "Reviewer agent at <sha>: no blockers" line');
+    expect(out).toContain('FAIL Reviewer cleared the PR: the Review section has no "Reviewer agent at <sha>: no blockers" line');
     expect(code).toBe(1);
   });
 
   it("fails a verdict on a commit that isn't on the branch", () => {
     const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.docs}: no blockers`]), heads.code);
-    expect(out).toContain(`isn't the head commit ${heads.code.slice(0, 7)} or one before it`);
+    expect(out).toContain(`isn't the head commit ${heads.code.slice(0, 7)} or one this PR added before it`);
+    expect(code).toBe(1);
+  });
+
+  it("fails a verdict on the base commit, which the PR didn't add", () => {
+    const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.base}: no blockers`]), heads.fix);
+    expect(out).toContain("or one this PR added before it");
     expect(code).toBe(1);
   });
 
   it("carries a verdict over a small fix after the review", () => {
     const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.code}: no blockers`]), heads.fix);
-    expect(out).toContain("carried over 1 commits with 2 lines outside docs and tests");
+    expect(out).toContain("carried over 1 commit with 2 lines outside docs");
     expect(code).toBe(0);
   });
 
   it("fails when a big change lands after the review", () => {
     const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.code}: no blockers`]), heads.big);
-    expect(out).toContain("43 lines outside docs and tests changed after the verdict");
+    expect(out).toContain("43 lines outside docs changed after the verdict");
     expect(code).toBe(1);
   });
 
   it("passes a tiny PR that changes only docs, without the reviewer", () => {
     const { code, out } = check(body("tiny. Docs only."), heads.docs);
-    expect(out).toContain("PASS Reviewer cleared the head commit: a tiny PR that changes only docs skips the reviewer");
+    expect(out).toContain("PASS Reviewer cleared the PR: a tiny PR that changes only docs skips the reviewer");
     expect(code).toBe(0);
   });
 
   it("passes a tiny PR that changes one line of code, without the reviewer", () => {
     const { code, out } = check(body("tiny. A copy fix."), heads.code);
-    expect(out).toContain("PASS Reviewer cleared the head commit: a tiny PR that changes 1 lines outside docs");
+    expect(out).toContain("PASS Reviewer cleared the PR: a tiny PR that changes 1 lines outside docs");
     expect(code).toBe(0);
   });
 
@@ -110,7 +116,7 @@ describe("the reviewer check GitHub requires", () => {
   // Claude adds the Review section.
   it("fails a PR with no description", () => {
     const { code, out } = check(null, heads.code);
-    expect(out).toContain("FAIL Reviewer cleared the head commit");
+    expect(out).toContain("FAIL Reviewer cleared the PR");
     expect(code).toBe(1);
   });
 });
