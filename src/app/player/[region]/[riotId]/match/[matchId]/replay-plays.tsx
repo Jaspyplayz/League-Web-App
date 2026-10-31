@@ -12,7 +12,6 @@ import { formatClock, listNames } from "@/lib/analyzer/format";
 import {
   formatSwing,
   GRADES,
-  gradePlay,
   playLines,
   playStart,
   playSwing,
@@ -25,31 +24,44 @@ import type { ReplayData } from "@/lib/analyzer/replay";
 import { stretchAt, type TempoTimeline } from "@/lib/analyzer/tempo";
 import type { ReplayRequest } from "./review-links";
 
-// The grade's pill: filled for Brilliant, Great and Blunder, shaded for
+// The grade's pill: filled for Brilliant, Great and Blunder, tinted for
 // Excellent and Mistake, outlined for Good and Inaccuracy, grey for Even.
 // Blue when the chance went up, red when down. The Review board restyles
 // these later (JAS-107).
 export const GRADE_CHIP: Record<Grade, string> = {
   Brilliant: "border-ahead-bright bg-ahead-bright text-page",
   Great: "border-ahead bg-ahead text-page",
-  Excellent: "border-ahead bg-surface-hover text-ahead",
+  Excellent: "border-ahead bg-ahead/15 text-ahead-soft",
   Good: "border-ahead text-ahead-soft",
   Even: "border-line-strong text-muted",
   Inaccuracy: "border-behind text-behind",
-  Mistake: "border-behind bg-surface-hover text-behind",
+  Mistake: "border-behind bg-behind/10 text-behind",
   Blunder: "border-behind bg-behind text-page",
 };
 
-// The play's mark on the timeline: bigger the more it moved the chance.
+// The play's mark on the timeline: bigger the more it moved the chance,
+// 2px a step.
 const GRADE_MARK: Record<Grade, string> = {
-  Brilliant: "size-3 bg-ahead-bright",
-  Great: "size-2.5 bg-ahead",
-  Excellent: "size-2 bg-ahead",
+  Brilliant: "size-[13px] bg-ahead-bright",
+  Great: "size-[11px] bg-ahead",
+  Excellent: "size-[9px] bg-ahead",
   Good: "size-[7px] bg-ahead",
   Even: "size-[5px] bg-faint",
   Inaccuracy: "size-[7px] bg-behind",
-  Mistake: "size-2 bg-behind",
-  Blunder: "size-2.5 bg-behind",
+  Mistake: "size-[9px] bg-behind",
+  Blunder: "size-[11px] bg-behind",
+};
+
+// The play's icon in the list: blue for a gain, red for a loss.
+const GRADE_ICON: Record<Grade, string> = {
+  Brilliant: "text-ahead-soft",
+  Great: "text-ahead-soft",
+  Excellent: "text-ahead-soft",
+  Good: "text-ahead-soft",
+  Even: "text-faint",
+  Inaccuracy: "text-behind",
+  Mistake: "text-behind",
+  Blunder: "text-behind",
 };
 
 // Your team's chance to win at the timeline's top: blue above even, red
@@ -93,21 +105,13 @@ export function ChanceRow({ perSecond }: { perSecond: number[] }) {
 
 // A dot at each play, in its grade's color: round for fights, square when
 // it took an objective.
-export function PlayMarks({
-  plays,
-  replay,
-  left,
-}: {
-  plays: Play[];
-  replay: ReplayData;
-  left: (ms: number) => string;
-}) {
+export function PlayMarks({ plays, left }: { plays: Play[]; left: (ms: number) => string }) {
   return (
     <div aria-hidden="true" className="relative h-6">
       {plays.map((play) => (
         <span
           key={play.from}
-          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${GRADE_MARK[gradePlay(play, replay)]} ${
+          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${GRADE_MARK[play.grade]} ${
             play.objectives.length > 0 ? "rounded-[2px]" : "rounded-full"
           }`}
           style={{ left: left(play.from) }}
@@ -138,7 +142,7 @@ export function PlayNow({
   names: Record<number, string>;
 }) {
   const swing = play ? playSwing(play) : 0;
-  const grade = play ? gradePlay(play, replay) : "Even";
+  const grade = play?.grade ?? "Even";
   return (
     <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5 sm:border-l sm:border-line-strong sm:pl-[18px]">
       <span className="font-mono text-label uppercase tracking-[0.12em] text-faint">
@@ -211,10 +215,10 @@ export function GradeNote() {
     <p>
       Plays are every fight, epic monster and building, graded by how much each changed your
       team&apos;s chance to win. Good from +1 point and Inaccuracy from −1. From +4, Excellent, or
-      Brilliant for a fight won with two or more fewer champions than the enemy. From +8, Great
-      when it took your team from losing to even or even to winning (under 40%, 40 to 60%, over
-      60%). From −4, Mistake, and from −8, Blunder when it dropped your team a step the other way.
-      A grade shows what a play did to the game, not whether it was the right call.
+      Brilliant when it had a fight won with two or more fewer champions than the enemy. From +8,
+      Great when it moved your team up at least a step: losing (under 40%), even (40 to 60%) or
+      winning (over 60%). From −4, Mistake, and from −8, Blunder when it moved your team down at
+      least a step. A grade shows what a play did to the game, not whether it was the right call.
     </p>
   );
 }
@@ -264,7 +268,7 @@ export function ReplayPlays({
   }, [current, yoursOnly]);
 
   const counts = GRADES.flatMap((grade) => {
-    const n = plays.filter((play) => play.mine && gradePlay(play, replay) === grade).length;
+    const n = plays.filter((play) => play.mine && play.grade === grade).length;
     return n > 0 ? [`${n} ${grade}`] : [];
   });
   const yours = plays.filter((play) => play.mine).length;
@@ -312,7 +316,7 @@ export function ReplayPlays({
         <ol ref={list} className="relative flex max-h-[30rem] flex-col gap-1 overflow-y-auto pr-1">
           {shown.map((play) => {
             const swing = playSwing(play);
-            const grade = gradePlay(play, replay);
+            const { grade } = play;
             const isCurrent = play === current;
             return (
               <li key={play.from}>
@@ -376,13 +380,7 @@ function PlayIcon({ play, replay, grade }: { play: Play; replay: ReplayData; gra
     kinds.includes(k),
   );
   const big = kinds.some((k) => k === "baron" || k === "elder" || k === "atakhan");
-  // GRADES runs best first, so the ones before Even are gains.
-  const color =
-    grade === "Even"
-      ? "text-faint"
-      : GRADES.indexOf(grade) < GRADES.indexOf("Even")
-        ? "text-ahead-soft"
-        : "text-behind";
+  const color = GRADE_ICON[grade];
   return (
     <svg
       viewBox="0 0 16 16"

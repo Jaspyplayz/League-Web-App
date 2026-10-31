@@ -11,7 +11,7 @@
 
 import { formatClock } from "./format";
 import {
-  gradePlay,
+  fightSides,
   playStart,
   playSwing,
   playTitle,
@@ -80,7 +80,7 @@ export function reviewMoments(
       before: play.before,
       after: play.after,
       swing: playSwing(play),
-      grade: gradePlay(play, replay),
+      grade: play.grade,
       question: momentQuestion(play, replay, meId),
       tempo: tempo ? tempoWords(tempo, play.from - 1, names) : null,
       noteLine: `${clock} ${title}: `,
@@ -92,11 +92,10 @@ export function reviewMoments(
 // knew or saw, never what you should have done: Riot doesn't allow apps to
 // dictate decisions, and the grade can't tell a bad call from bad luck.
 export function momentQuestion(play: Play, replay: ReplayData, meId: number): string {
-  const teamOf = new Map(replay.players.map((p) => [p.participantId, p.teamId]));
   const kills = play.kills.map((i) => replay.kills[i]);
   const objectives = play.objectives.map((i) => replay.objectives[i]);
   const ours = (teamId: number) => teamId === replay.myTeamId;
-  const won = kills.filter((k) => !ours(teamOf.get(k.victimId) ?? 0)).length;
+  const { won } = fightSides(play.kills, replay);
   const theyTook = objectives.some((o) => !ours(o.teamId));
   const weTook = objectives.some((o) => ours(o.teamId));
 

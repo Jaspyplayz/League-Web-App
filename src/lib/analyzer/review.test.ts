@@ -58,6 +58,7 @@ const play = (
   before: 0.5,
   after: 0.5 + swing / 100,
   mine,
+  grade: "Even",
 });
 
 describe("keyPlays", () => {
@@ -115,7 +116,13 @@ describe("reviewMoments", () => {
     enemyId: 7,
     stretches: [stretch(0, clock("4:00"), "ahead"), stretch(clock("4:00"), clock("10:00"), "behind")],
   } as TempoTimeline;
-  const chances = { perSecond: [], plays: [play("3:00", 4, true, [0]), play("4:41", -5, true, [1])] };
+  const chances = {
+    perSecond: [],
+    plays: [
+      { ...play("3:00", 4, true, [0]), grade: "Excellent" as const },
+      { ...play("4:41", -5, true, [1]), grade: "Mistake" as const },
+    ],
+  };
 
   it("lays each moment out for the page, with where the replay jumps to", () => {
     const [first, second] = reviewMoments(chances, replay, AHRI, names, null);

@@ -125,16 +125,18 @@ The grades borrow chess.com's game review scale, which ranks moves from Brillian
 
 | Grade | Your team's chance moved by | And |
 |---|---|---|
-| Brilliant | +4 points or more | Your team won the fight with at least 2 fewer champions in it than the enemy |
-| Great | +8 or more | It moved your team up a step: from losing to even, or even to winning |
+| Brilliant | +4 points or more | Your team won one of its fights with at least 2 fewer champions in it than the enemy |
+| Great | +8 or more | It moved your team up at least a step: from losing to even or winning, or from even to winning |
 | Excellent | +4 or more | Any other gain this big |
 | Good | +1 to +4 | |
 | Even | less than 1 either way | |
 | Inaccuracy | −1 to −4 | |
 | Mistake | −4 or more | Any loss this big that isn't a Blunder |
-| Blunder | −8 or more | It moved your team down a step: from winning to even, or even to losing |
+| Blunder | −8 or more | It moved your team down at least a step: from winning to even or losing, or from even to losing |
 
-Losing means a chance under 40%, winning over 60%, and even in between, 40% and 60% included. Great and Blunder mark the plays that changed who was ahead, not just by how much; the 8 points keep an early lone kill that tips the chance from 43% to 39% from reading as a Blunder. Brilliant is the outnumbered win: a champion is in the fight when they killed, helped or died in it, and Riot counts anyone who did damage to the victim as a helper. One fewer isn't enough, because the losing side of a big fight nearly always shows all five, so a 4 against 5 is usually a teammate who stayed out of it. Brilliant ranks first, so a fight that's both outnumbered and game-turning reads Brilliant.
+Losing means a chance under 40%, winning over 60%, and even in between, 40% and 60% included, read to a tenth of a percent as the page shows it. Great and Blunder mark the plays that changed who was ahead, not just by how much; the 8 points keep an early lone kill that tips the chance from 43% to 39% from reading as a Blunder.
+
+Brilliant is the outnumbered win. A play's kills are split into fights wherever two are 10 seconds or more apart, so three pickoffs 15 seconds apart are three 1 against 1 fights, not one 1 against 3. A champion is in a fight when they killed, helped or died in it, and Riot counts anyone who did damage to the victim as a helper. Your team needs at least one champion in it, so enemies dying to a tower don't count. One fewer isn't enough, because the losing side of a big fight nearly always shows all five, so a 4 against 5 is usually a teammate who stayed out of it. Brilliant ranks first, so a play that's both outnumbered and game-turning reads Brilliant.
 
 Chess.com's Best, Miss and Book are left out on purpose. Best needs the other options a player had, which a chess engine works out and Turnpoint can't: it only measures what a play did. Miss is a slip the enemy made that your team didn't punish, which is the absence of a play, and the win chance only grades plays that happened. Book is a standard opening move, and the opening habits a League game has (level 6 first, first scuttles, first back) aren't kills, epic monsters or buildings, so they aren't plays here.
 
@@ -146,7 +148,7 @@ Things that shape the grades:
 - **Towers and Baron count mostly through their gold.** The model learned that a tower is worth the gold it pays, and Riot doesn't log tower gold, so it reaches the replay spread over the rest of the minute: a tower on its own reads Even. Baron's buff adds about a point at once, and its gold arrives the same way. Dragons, Elder and inhibitors count in full at the second they're taken.
 - **The same play is worth less once a game is decided.** In a 28-minute Qiyana game of Jasper's, a fight won 6 for 3 with two towers added 0.2 points, because the team was already at 99%. That's how win probability works in any sport: the plays that decide a game happen while it's close.
 
-In the golden comeback game (`src/lib/analyzer/fixtures/comeback.json`), the 14 plays the blue jungler was in came out as 2 Great, 5 Excellent, 3 Good, 1 Even, 1 Inaccuracy and 2 Mistake. The first Great was a fight won 5 for 1 with Baron and two towers at 25:10, which took the team from 23.6% to 60.8% (+37.1). The red jungler was in the same fight, and from their side it's a Blunder: 76.4% to 39.2%. None of the golden games has a Brilliant, which is meant to be rare, as it is in chess.
+In the golden comeback game (`src/lib/analyzer/fixtures/comeback.json`), the 14 plays the blue jungler was in came out as 2 Great, 5 Excellent, 3 Good, 1 Even, 1 Inaccuracy and 2 Mistake. The first Great was a fight won 5 for 1 with Baron and two towers at 25:10, which took the team from 23.6% to 60.8% (+37.1). The red jungler was in the same fight, and from their side it's a Blunder: 76.4% to 39.2%. None of the golden games has a Brilliant, which is meant to be rare, as it is in chess. `golden.test.ts` checks each jungler's grade counts in these games, so a change to the grades, to how plays are grouped or to the model shows there.
 
 ## Limits
 

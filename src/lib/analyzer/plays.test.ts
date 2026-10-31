@@ -126,6 +126,8 @@ describe("replayChances", () => {
         before: 0.5,
         after: sigmoid(0.45),
         mine: true,
+        // Even to winning, by 11.1 points.
+        grade: "Great",
       },
     ]);
     expect(playSwing(chances.plays[0])).toBe(11.1);
@@ -135,6 +137,7 @@ describe("replayChances", () => {
     const { chances } = chancesOf(game([]), SYNDRA, RED);
     expect(chances.perSecond[clock("4:30") / 1000]).toBe(389);
     expect(playSwing(chances.plays[0])).toBe(-11.1);
+    expect(chances.plays[0].grade).toBe("Blunder");
     // Syndra died in it, so it's hers too.
     expect(chances.plays[0].mine).toBe(true);
   });
@@ -175,15 +178,33 @@ describe("replayChances", () => {
 });
 
 describe("gradePlay", () => {
-  // Kills, in time order: 0 Ahri kills Syndra (Vi helps), 1 Kaisa kills Vi
-  // (Darius and 9 help), 2 Ahri kills Kaisa, 3 Ahri kills Darius, 4 9 kills
-  // Ahri (10 helps), 5 Vi kills 9 (1, 4 and 5 help).
+  // Kills, in time order (Kaisa is 7, Darius 6):
+  // 0 4:30 Ahri kills Syndra (Vi helps)      } one fight: Ahri and Vi
+  // 1 4:32 Kaisa kills Vi (Darius, 9 help)   } against Syndra, Kaisa,
+  // 2 4:34 Ahri kills Kaisa                  } Darius and 9, won 3 for 1
+  // 3 4:36 Ahri kills Darius                 }
+  // 4 4:50 9 kills Ahri (10 helps)
+  // 5 4:52 Vi kills 9 (1, 4 and 5 help)
+  // 6 6:00 Kaisa kills Vi (Darius, 9 help)  } a trade: Vi against four
+  // 7 6:02 10 dies to a tower                }
+  // 8 7:00 Darius dies to a tower            } no champion of yours
+  // 9 7:02 9 dies to a tower                 }
+  // 10 8:00 Ahri kills Darius                } three pickoffs, 15 seconds
+  // 11 8:15 Ahri kills Kaisa                 } apart: one play, three
+  // 12 8:30 Ahri kills Syndra                } fights
   const timeline = game([
-    kill("4:40", 7, VI, [6, 9]),
-    kill("4:41", AHRI, 7),
-    kill("4:42", AHRI, 6),
+    kill("4:32", 7, VI, [6, 9]),
+    kill("4:34", AHRI, 7),
+    kill("4:36", AHRI, 6),
     kill("4:50", 9, AHRI, [10]),
     kill("4:52", VI, 9, [1, 4, 5]),
+    kill("6:00", 7, VI, [6, 9]),
+    kill("6:02", 0, 10),
+    kill("7:00", 0, 6),
+    kill("7:02", 0, 9),
+    kill("8:00", AHRI, 6),
+    kill("8:15", AHRI, 7),
+    kill("8:30", AHRI, SYNDRA),
   ]);
   const replay = replayData(timeline, players, BLUE);
   // A play that moved your team's chance from `before` to `after` (0 to 1).
@@ -241,8 +262,10 @@ describe("gradePlay", () => {
     expect(grade(0.62, 0.59)).toBe("Inaccuracy");
   });
 
-  it("counts 40% and 60% as even", () => {
+  it("counts 40% and 60% as even, as the page rounds them", () => {
     expect(grade(0.32, 0.4)).toBe("Great");
+    // The page shows 40.0%, so it's even, not losing.
+    expect(grade(0.39996, 0.481)).toBe("Excellent");
     expect(grade(0.52, 0.6)).toBe("Excellent");
     expect(grade(0.6, 0.68)).toBe("Great");
     expect(grade(0.48, 0.4)).toBe("Mistake");
@@ -255,9 +278,19 @@ describe("gradePlay", () => {
     expect(grade(0.55, 0.65, [0, 1, 2, 3])).toBe("Brilliant");
     expect(grade(0.5, 0.53, [0, 1, 2, 3])).toBe("Good");
     expect(grade(0.5, 0.45, [0, 1, 2, 3])).toBe("Mistake");
+    // Ahead of Great, even when it also turned the game.
+    expect(grade(0.3, 0.5, [0, 1, 2, 3])).toBe("Brilliant");
   });
 
-  it("doesn't call it Brilliant when your team wasn't outnumbered by 2 or didn't win the fight", () => {
+  it("looks at each fight in a play, split where kills are 10 seconds apart", () => {
+    // The 2 against 4 is still Brilliant inside a longer play, though the
+    // whole play is 5 against 5.
+    expect(grade(0.5, 0.55, [0, 1, 2, 3, 4, 5])).toBe("Brilliant");
+    // Three pickoffs in a row are three 1 against 1 fights.
+    expect(grade(0.5, 0.58, [10, 11, 12])).toBe("Excellent");
+  });
+
+  it("doesn't call it Brilliant unless your team won a fight outnumbered by 2", () => {
     // Two of yours on Syndra alone.
     expect(grade(0.5, 0.55, [0])).toBe("Excellent");
     // Two of yours against three of theirs: Syndra, Kaisa and Darius.
@@ -266,8 +299,23 @@ describe("gradePlay", () => {
     expect(grade(0.5, 0.55, [3, 5])).toBe("Excellent");
     // Two of yours against four of theirs, but lost 0 for 2.
     expect(grade(0.5, 0.55, [1, 4])).toBe("Excellent");
-    // Traded 1 for 1.
-    expect(grade(0.5, 0.55, [1, 2])).toBe("Excellent");
+    // Traded 1 for 1, with Vi against four.
+    expect(grade(0.5, 0.55, [6, 7])).toBe("Excellent");
+    // Two enemies died to a tower: none of your champions was in it.
+    expect(grade(0.5, 0.55, [8, 9])).toBe("Excellent");
+    // Epic monsters and buildings only.
+    expect(grade(0.5, 0.55)).toBe("Excellent");
+  });
+
+  it("grades from the red side's chance and kills too", () => {
+    const red = replayData(timeline, players, RED);
+    const redGrade = (before: number, after: number, kills: number[]) =>
+      gradePlay({ kills, before, after }, red);
+    // Blue's Brilliant fight is red's Blunder.
+    expect(grade(0.35, 0.65, [0, 1, 2, 3])).toBe("Brilliant");
+    expect(redGrade(0.65, 0.35, [0, 1, 2, 3])).toBe("Blunder");
+    // Red's four on Ahri and Vi aren't outnumbered.
+    expect(redGrade(0.35, 0.65, [1, 4])).toBe("Great");
   });
 });
 
@@ -297,6 +345,7 @@ describe("playTitle and playLines", () => {
     before: 0.5,
     after: 0.5,
     mine: false,
+    grade: "Even",
   });
   const title = (kills: number[], objectives: number[] = []) =>
     playTitle(play(kills, objectives), replay, names);

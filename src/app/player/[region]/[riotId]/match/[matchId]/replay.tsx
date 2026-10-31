@@ -347,7 +347,7 @@ export function Replay({
               {chances && (
                 <>
                   <ChanceRow perSecond={chances.perSecond} />
-                  <PlayMarks plays={chances.plays} replay={replay} left={left} />
+                  <PlayMarks plays={chances.plays} left={left} />
                 </>
               )}
               <MonsterMarks marks={monsterMarks(replay.objectives)} myTeamId={myTeamId} left={left} />

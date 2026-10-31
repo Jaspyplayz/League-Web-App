@@ -20,24 +20,25 @@ Option 3, settled with Jasper on the ticket. Eight grades, best first:
 
 | Grade | Rule |
 |---|---|
-| Brilliant | +4 points or more, in a fight your team won (more enemy deaths than yours) with at least 2 fewer champions in it than the enemy's (killers, helpers and victims) |
-| Great | +8 or more, and it moved your team up a band: losing (under 40%), even (40% to 60%), winning (over 60%) |
+| Brilliant | +4 points or more, and one of its fights (its kills, split where two are 10 seconds or more apart) was won (more enemy deaths than yours) with at least one of your champions in it and at least 2 fewer than the enemy's (killers, helpers and victims) |
+| Great | +8 or more, and it moved your team up at least a band: losing (under 40%), even (40% to 60%), winning (over 60%), read to a tenth of a percent as the page shows it |
 | Excellent | Any other +4 or more |
 | Good | +1 to +4 |
 | Even | Less than 1 either way |
 | Inaccuracy | −1 to −4 |
 | Mistake | Any other −4 or more |
-| Blunder | −8 or more, and it moved your team down a band |
+| Blunder | −8 or more, and it moved your team down at least a band |
 
 - **Bands, not size alone,** make Great and Blunder: they mark the plays that changed who was ahead, which is chess's "turned the game". A +10 point play at 5% isn't a turn.
-- **8 points as well as a band:** with 4, an early lone kill that tipped the chance from 43.7% to 39.5% in a golden game read as a Blunder.
+- **8 points as well as a band:** a first draft used 4, and under it an early lone kill in a golden game (43.7% to 39.5%, −4.2) read as a Blunder. With 8 it reads Mistake.
+- **One fight at a time:** a play runs on while its events are less than 20 seconds apart, so a fed champion's three pickoffs 15 seconds apart would count as 1 against 3. Splitting the kills at 10 seconds makes those three 1 against 1 fights, and still finds a 2 against 4 inside a longer play. A fight needs one of your champions, so enemies dying to a tower aren't a Brilliant.
 - **Outnumbered by 2, not 1:** with 1, all three Brilliants in the golden games were 4-against-5 teamfights won big. The losing side of a big fight nearly always shows all five, so one fewer usually means a teammate stayed out of it, not that the fight was a risk. With 2, the golden games have none, which matches how rare Brilliant is in chess.
 - **Left out:** Best (needs the other options), Miss (an unpunished slip is the absence of a play), Book (opening habits such as first back aren't plays). "Behind" alone doesn't make a Brilliant, since nearly every fight won while losing would count.
-- `gradePlay(play, replay)` in `src/lib/analyzer/plays.ts` replaces `gradeOf(swing)`, because Brilliant needs the play's kills and Great and Blunder its chance before and after. The 60-second review's moments carry their grade.
+- `gradePlay(play, replay)` in `src/lib/analyzer/plays.ts` replaces `gradeOf(swing)`, because Brilliant needs the play's kills and Great and Blunder its chance before and after. `replayChances` sets each play's `grade` once on the server, so the page and the 60-second review read the same grade and don't work it out again.
 
 ## Consequences
 
 - The replay and the 60-second review show the new grades now, with pills and marks built from the existing blue and red tokens; the Review board (JAS-107, JAS-108) restyles them. The MCP tools and Ask pass only the swing, and the game score and phase ratings don't use grades, so they don't change.
 - The same play gets mirrored grades from the two teams' sides (a Great for one is a Blunder for the other), except Brilliant, which only the winning side can earn; the losing side's grade for that play is Mistake or Blunder.
-- Brilliant counts champions from Riot's kill events, so an enemy who was there but neither died nor got a kill or assist isn't counted. It can miss a real outnumbered win, and it won't invent one where every enemy took part.
-- The thresholds (1, 4 and 8 points, 40% and 60%, 2 fewer champions) are constants in `plays.ts`, chosen on the four golden games. A later change that moves them replaces this record.
+- Brilliant counts champions from Riot's kill events, so an enemy who was there but neither died nor got a kill or assist isn't counted, and neither is a teammate who only stood nearby. Either way the count can be wrong, so a Brilliant can be missed or, rarely, awarded to a fight that wasn't really outnumbered.
+- The thresholds (1, 4 and 8 points, 40% and 60%, 2 fewer champions) are constants in `plays.ts`, chosen on the three golden games with a timeline (the remake has none). `golden.test.ts` checks each jungler's grade counts in them. A later change that moves the thresholds replaces this record.

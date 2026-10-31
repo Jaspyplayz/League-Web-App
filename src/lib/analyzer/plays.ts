@@ -21,7 +21,7 @@
 
 import { formatClock, listNames } from "./format";
 import type { ObjectiveKind } from "./objectives";
-import { between, goldAt, type ReplayData } from "./replay";
+import { between, goldAt, type ReplayData, type ReplayKill } from "./replay";
 import type { TrimmedTimeline } from "./trim";
 import {
   blueWinChance,
@@ -46,6 +46,8 @@ export type Play = {
   // True when you got a kill or assist in it, died in it, or helped take one
   // of its epic monsters. Riot doesn't log who took a tower.
   mine: boolean;
+  // Its grade (see gradePlay), worked out once here so the page doesn't.
+  grade: Grade;
 };
 
 export type ReplayChances = {
@@ -94,7 +96,10 @@ export function replayChances(
         const k = replay.kills[i];
         return k.killerId === meId || k.victimId === meId || k.assists.includes(meId);
       }) || objectives.some((i) => myMonsters.has(replay.objectives[i].timestamp));
-    return { from, to, kills, objectives, before: chanceAt(from - 1), after: chanceAt(to), mine };
+    const before = chanceAt(from - 1);
+    const after = chanceAt(to);
+    const grade = gradePlay({ kills, before, after }, replay);
+    return { from, to, kills, objectives, before, after, mine, grade };
   });
   return { perSecond, plays };
 }
@@ -218,10 +223,15 @@ const WINNING_ABOVE = 0.6;
 // losing side nearly always shows all five, so a 4 against 5 is usually a
 // teammate who stayed out of it, not a risk.
 const OUTNUMBERED_BY = 2;
+// A play can run on as long as its events are less than 20 seconds apart,
+// so for Brilliant its kills are split into fights wherever two are this far
+// apart. Three pickoffs 15 seconds apart are three 1 against 1 fights, not
+// one 1 against 3.
+const FIGHT_GAP_MS = 10_000;
 
 // A play's grade, from how much it moved your team's chance to win:
 //
-// - 4 points or more: Brilliant for a fight your team won while
+// - 4 points or more: Brilliant when one of its fights was won while
 //   outnumbered by 2 or more, Great for 8 points or more that moved your
 //   team up a band (losing, even, winning), Excellent otherwise.
 // - 1 to 4 points: Good. Less than 1 either way: Even. −1 to −4: Inaccuracy.
@@ -237,7 +247,9 @@ export function gradePlay(
   const swing = playSwing(play);
   const moved = band(play.after) - band(play.before);
   if (swing >= BIG_SWING) {
-    if (wonOutnumbered(play, replay)) return "Brilliant";
+    if (fights(play.kills, replay).some((fight) => wonOutnumbered(fightSides(fight, replay)))) {
+      return "Brilliant";
+    }
     return swing >= TURNING_SWING && moved > 0 ? "Great" : "Excellent";
   }
   if (swing >= SMALL_SWING) return "Good";
@@ -246,35 +258,64 @@ export function gradePlay(
   return "Even";
 }
 
+// The page shows the chance to a tenth of a percent, so the band reads it
+// the same way: 39.996% shows as 40.0%, which is even.
 function band(chance: number): number {
-  if (chance < LOSING_BELOW) return 0;
-  if (chance > WINNING_ABOVE) return 2;
+  const shown = Math.round(chance * 1000) / 1000;
+  if (shown < LOSING_BELOW) return 0;
+  if (shown > WINNING_ABOVE) return 2;
   return 1;
 }
 
-// True when your team won the play's fight (more enemy deaths than yours)
-// with OUTNUMBERED_BY or more fewer champions in it than the enemy team. A champion is in it when
-// they killed, helped or died. Riot counts anyone who did damage as a
-// helper, but an enemy who ran away untouched isn't counted at all.
-function wonOutnumbered(
-  play: Pick<Play, "kills">,
+// A play's kills (indexes into ReplayData.kills, in time order) cut into
+// fights wherever two are FIGHT_GAP_MS or more apart.
+function fights(kills: number[], replay: Pick<ReplayData, "kills">): number[][] {
+  const at = (i: number) => replay.kills[i].timestamp;
+  const out: number[][] = [];
+  for (const i of kills) {
+    const last = out[out.length - 1];
+    if (last && at(i) - at(last[last.length - 1]) < FIGHT_GAP_MS) last.push(i);
+    else out.push([i]);
+  }
+  return out;
+}
+
+// True when your team won the fight (more enemy deaths than yours), had at
+// least one champion in it, and had OUTNUMBERED_BY or more fewer than the
+// enemy team.
+function wonOutnumbered({ won, lost, ours, theirs }: FightSides): boolean {
+  return won > lost && ours.size > 0 && theirs.size - ours.size >= OUTNUMBERED_BY;
+}
+
+export type FightSides = {
+  // Enemy deaths and your team's deaths.
+  won: number;
+  lost: number;
+  // The champions in it on each side: whoever killed, helped or died. Riot
+  // counts anyone who did damage as a helper, but an enemy who ran away
+  // untouched isn't counted at all.
+  ours: Set<number>;
+  theirs: Set<number>;
+};
+
+// Who won some kills (indexes into ReplayData.kills) and who was in them,
+// from your team's side.
+export function fightSides(
+  kills: number[],
   replay: Pick<ReplayData, "kills" | "players" | "myTeamId">,
-): boolean {
+): FightSides {
   const teamOf = new Map(replay.players.map((p) => [p.participantId, p.teamId]));
-  const ours = (id: number) => teamOf.get(id) === replay.myTeamId;
-  const us = new Set<number>();
-  const them = new Set<number>();
-  let won = 0;
-  let lost = 0;
-  for (const i of play.kills) {
-    const k = replay.kills[i];
-    if (ours(k.victimId)) lost++;
-    else won++;
+  const isOurs = (id: number) => teamOf.get(id) === replay.myTeamId;
+  const sides: FightSides = { won: 0, lost: 0, ours: new Set(), theirs: new Set() };
+  for (const i of kills) {
+    const k: ReplayKill = replay.kills[i];
+    if (isOurs(k.victimId)) sides.lost++;
+    else sides.won++;
     // killerId is 0 when a tower or minions got the kill.
     const champions = [k.victimId, ...(k.killerId > 0 ? [k.killerId] : []), ...k.assists];
-    for (const id of champions) (ours(id) ? us : them).add(id);
+    for (const id of champions) (isOurs(id) ? sides.ours : sides.theirs).add(id);
   }
-  return won > lost && them.size - us.size >= OUTNUMBERED_BY;
+  return sides;
 }
 
 // 7.6 -> "+7.6%", -2 -> "−2.0%" (with a real minus sign), 0 -> "0.0%".
@@ -288,13 +329,9 @@ export function formatSwing(swing: number): string {
 // took Baron". `names` gives each participantId's champion.
 export function playTitle(play: Play, replay: ReplayData, names: Record<number, string>): string {
   const ours = (teamId: number) => teamId === replay.myTeamId;
-  const teamOf = new Map(replay.players.map((p) => [p.participantId, p.teamId]));
   const kills = play.kills.map((i) => replay.kills[i]);
   const objectives = play.objectives.map((i) => replay.objectives[i]);
-
-  // Kills by your team are the enemy team's deaths.
-  const won = kills.filter((k) => !ours(teamOf.get(k.victimId) ?? 0)).length;
-  const lost = kills.length - won;
+  const { won, lost } = fightSides(play.kills, replay);
   const fight =
     kills.length === 0
       ? null

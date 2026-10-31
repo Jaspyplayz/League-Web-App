@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Match } from "@/lib/riot/types";
+import { matchWinChance } from "@/lib/win-chance";
 import closeGame from "./fixtures/close.json";
 import comebackGame from "./fixtures/comeback.json";
 import remakeGame from "./fixtures/remake.json";
@@ -18,6 +19,7 @@ import stompGame from "./fixtures/stomp.json";
 import { formatClock } from "./format";
 import { analyzeMatch, isAnalyzable, type MatchAnalysis } from "./index";
 import type { Snapshot } from "./matchup";
+import { GRADES, playSwing, replayChances, type Grade, type Play } from "./plays";
 import type { TrimmedTimeline } from "./trim";
 
 // A saved game: Riot's match data and the timeline as the site stores it.
@@ -186,4 +188,46 @@ describe("anonymized", () => {
       expect(JSON.stringify(game)).not.toMatch(/[\w-]{78}/);
     });
   }
+});
+
+describe("play grades", () => {
+  // The replay's graded plays from one player's side, with the base win
+  // chance model (no rank). The thresholds in plays.ts were picked on these
+  // games (decision record 0022), so a change to them, to how plays are
+  // grouped, or to the model shows here.
+  function playsOf(game: Game, participantId: number): Play[] {
+    const analysis = analyze(game, participantId);
+    const me = game.match.info.participants.find((p) => p.participantId === participantId)!;
+    const winChance = matchWinChance(game.match, game.timeline, me.teamId, null);
+    if (!winChance) throw new Error("No win chance for this game");
+    return replayChances(game.timeline, analysis.replay, winChance.model, participantId)!.plays;
+  }
+
+  // How many of the plays they were in got each grade.
+  function gradeCounts(game: Game, participantId: number): Record<Grade, number> {
+    const mine = playsOf(game, participantId).filter((play) => play.mine);
+    return counts(...GRADES.map((grade) => mine.filter((play) => play.grade === grade).length));
+  }
+  const counts = (...n: number[]) =>
+    Object.fromEntries(GRADES.map((grade, i) => [grade, n[i]])) as Record<Grade, number>;
+
+  it("grades each jungler's plays, with no Brilliant in any of them", () => {
+    //                                                 Bri Gre Exc Goo Eve Ina Mis Blu
+    expect(gradeCounts(closeGame as Game, 2)).toEqual(counts(0, 1, 7, 4, 3, 0, 0, 2));
+    expect(gradeCounts(closeGame as Game, 7)).toEqual(counts(0, 2, 1, 4, 0, 4, 6, 1));
+    expect(gradeCounts(comebackGame as Game, 2)).toEqual(counts(0, 2, 5, 3, 1, 1, 2, 0));
+    expect(gradeCounts(comebackGame as Game, 7)).toEqual(counts(0, 0, 5, 5, 0, 4, 1, 2));
+    expect(gradeCounts(stompGame as Game, 2)).toEqual(counts(0, 0, 0, 0, 2, 4, 0, 0));
+    expect(gradeCounts(stompGame as Game, 7)).toEqual(counts(0, 0, 0, 5, 2, 0, 0, 0));
+  });
+
+  it("gives the comeback's Baron fight a Great from one side and a Blunder from the other", () => {
+    const at2510 = (participantId: number) => {
+      const plays = playsOf(comebackGame as Game, participantId);
+      const play = plays.find((p) => formatClock(p.from) === "25:10")!;
+      return { grade: play.grade, swing: playSwing(play) };
+    };
+    expect(at2510(2)).toEqual({ grade: "Great", swing: 37.1 });
+    expect(at2510(7)).toEqual({ grade: "Blunder", swing: -37.1 });
+  });
 });
