@@ -47,7 +47,7 @@ describe("ThisIsMeButton", () => {
     expect(html).not.toContain('type="submit"');
     expect(html).toContain("Couldn&#x27;t check whether this profile is yours");
     // The reason shows as the label too, since phones don't show a title.
-    expect(html).toContain(">Couldn&#x27;t check</button>");
+    expect(html).toContain(">Reload to check</button>");
     expect(html).not.toContain("hover:");
     // Readable in both themes: muted text, not faded with opacity.
     expect(html).toContain("text-muted");

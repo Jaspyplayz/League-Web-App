@@ -13,7 +13,7 @@ Status: draft (GitHub issue #167).
 
 ## Decision
 
-Option 2. `readMyPlayer` and `readQuestions` return `{ ok: false }` when the query throws, or when `DATABASE_URL` is set but the database can't be reached. Without `DATABASE_URL` they still return nothing saved, since the features are off. Callers never offer an action that writes on a failed read: the "This is me" button shows disabled with "Couldn't check", the account menu and the Ask tab say they couldn't load, and the Log tab shows no notes box and says the notes couldn't be loaded.
+Option 2. `readMyPlayer` and `readQuestions` return `{ ok: false }` when the query throws, or when `DATABASE_URL` is set but the database can't be reached. Without `DATABASE_URL` they still return nothing saved, since the features are off. Callers never offer an action that writes on a failed read: the "This is me" button shows disabled with "Reload to check", the account menu and the Ask tab say they couldn't load, and the Log tab shows no notes box and says the notes couldn't be loaded.
 
 `toggleMyPlayer` no longer reads at all. The button's form says what the click means (`intent=mark` or `intent=clear`), and "clear" deletes the mark only if it's still this player. A read in the action could fail or disagree with the page the player clicked on, and then a click meant to mark would clear.
 

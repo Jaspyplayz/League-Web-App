@@ -54,7 +54,7 @@ export async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props
         title="Couldn't check whether this profile is yours. Reload to try again."
         className={`${button} cursor-not-allowed border-line text-muted`}
       >
-        Couldn&apos;t check
+        Reload to check
       </button>
     );
   }
