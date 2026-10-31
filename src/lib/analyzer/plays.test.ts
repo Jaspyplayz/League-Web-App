@@ -209,6 +209,14 @@ describe("gradePlay", () => {
   // 20 13:00 1 kills Darius, 6,000 units  } one chase: 20 and 21 are too
   // 21 13:04 1 kills Kaisa  apart         } far apart, but 22 is near
   // 22 13:06 1 kills Syndra between them  } both, so it joins them
+  // 23 14:00 1 kills Darius                } a chase that doubles back: 25
+  // 24 14:03 1 kills Kaisa 3,500 east      } is far from 24 but near 23,
+  // 25 14:06 1 kills Syndra by 23          } so all three are one fight
+  // 26 15:00 1 kills Darius                } 8 seconds apart each: 28 is
+  // 27 15:08 1 kills Kaisa                 } 16 seconds after 26 but 8
+  // 28 15:16 1 kills Syndra                } after 27, so one fight
+  // 29-31 16:00 1 kills Darius, Kaisa and Syndra, each 3,423 from the last
+  // 32-34 17:00 1 kills Darius, Kaisa and Syndra, each 4,460 from the last
   // The rest is in the middle of the map.
   const timeline = game([
     kill("4:32", 7, VI, [6, 9], MID),
@@ -233,6 +241,18 @@ describe("gradePlay", () => {
     kill("13:00", 1, 6, [], WEST),
     kill("13:04", 1, 7, [], EAST),
     kill("13:06", 1, SYNDRA, [], MID),
+    kill("14:00", 1, 6, [], { x: 2000, y: 12000 }),
+    kill("14:03", 1, 7, [], { x: 5500, y: 12000 }),
+    kill("14:06", 1, SYNDRA, [], { x: 1500, y: 10000 }),
+    kill("15:00", 1, 6, [], MID),
+    kill("15:08", 1, 7, [], MID),
+    kill("15:16", 1, SYNDRA, [], MID),
+    kill("16:00", 1, 6, [], { x: 2000, y: 2000 }),
+    kill("16:01", 1, 7, [], { x: 5423, y: 2000 }),
+    kill("16:02", 1, SYNDRA, [], { x: 8846, y: 2000 }),
+    kill("17:00", 1, 6, [], { x: 2000, y: 5000 }),
+    kill("17:01", 1, 7, [], { x: 6460, y: 5000 }),
+    kill("17:02", 1, SYNDRA, [], { x: 10920, y: 5000 }),
   ]);
   const replay = replayData(timeline, players, BLUE);
   // A play that moved your team's chance from `before` to `after` (0 to 1).
@@ -334,6 +354,21 @@ describe("gradePlay", () => {
     expect(grade(0.5, 0.55, [20, 21, 22])).toBe("Brilliant");
     // Without the kill between them, they're two 1 against 1 fights.
     expect(grade(0.5, 0.55, [20, 21])).toBe("Excellent");
+  });
+
+  it("joins a kill near any of a fight's kills, not only its last", () => {
+    expect(grade(0.5, 0.55, [23, 24, 25])).toBe("Brilliant");
+  });
+
+  it("times the gap from a fight's last kill, not its first", () => {
+    expect(grade(0.5, 0.55, [26, 27, 28])).toBe("Brilliant");
+  });
+
+  it("keeps kills up to 3,423 apart together and splits them from 4,460", () => {
+    // The gap the golden games leave between kills in one fight and kills in
+    // two (see FIGHT_RANGE): a range outside it fails one of these.
+    expect(grade(0.5, 0.55, [29, 30, 31])).toBe("Brilliant");
+    expect(grade(0.5, 0.55, [32, 33, 34])).toBe("Excellent");
   });
 
   it("counts a kill with no position as a fight of its own", () => {

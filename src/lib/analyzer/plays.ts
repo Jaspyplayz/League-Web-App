@@ -290,8 +290,7 @@ function fights(kills: number[], replay: Pick<ReplayData, "kills">): number[][] 
       if (kill.timestamp - last.timestamp >= FIGHT_GAP_MS) return false;
       return f.some((j) => near(replay.kills[j].position, kill.position));
     };
-    // Indexes stay in time order, so each fight's last kill is its latest.
-    const joined = [...out.filter(joins).flat(), i].sort((a, b) => a - b);
+    const joined = [...out.filter(joins).flat(), i];
     out = [...out.filter((f) => !joins(f)), joined];
   }
   return out;
