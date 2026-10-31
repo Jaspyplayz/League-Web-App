@@ -6,7 +6,7 @@ name: Agent merge
 # PR's description says `**Ready to merge:** yes at <head sha>`. can-merge checks every gate
 # at the PR's head commit and merges only if all pass, so most runs end in a
 # refusal while another check is still going, and the last one to finish is
-# the one that merges.
+# the one that merges. After a merge it starts CI on main (JAS-123).
 #
 # A workflow_run workflow always runs as this file is on main, never a PR's
 # copy, and the job checks out main. The PR's code is never checked out or
@@ -50,7 +50,9 @@ jobs:
       # statuses. A public repo lets any token read them, but naming them
       # keeps this working if the repo goes private.
       checks: read
-      actions: read
+      # write also starts ci.yml on main after a merge, since GitHub runs no
+      # workflow for a push this token makes (JAS-123). It includes read.
+      actions: write
       statuses: read
     steps:
       # checkout uses the job's token for this one fetch of main, and

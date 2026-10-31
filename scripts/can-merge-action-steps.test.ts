@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   ATTEMPTS,
   branchToTry,
+  mainCiDispatchPath,
+  mergePull,
   OpenPulls,
   openPullsPath,
   outcomeOf,
@@ -11,6 +13,7 @@ import {
   readyToMerge,
   shouldRetry,
   WorkflowRunEvent,
+  type CanMergeRun,
   type OpenPull,
 } from "./can-merge-action-steps";
 import { REFUSED_EXIT_CODE } from "./can-merge-gates";
@@ -139,8 +142,83 @@ describe("pullsToMerge", () => {
   it("is the only way the script picks a PR, and it runs can-merge only on those", () => {
     const script = source("scripts/can-merge-action.ts");
     expect(script.match(/spawnSync\(/g)).toHaveLength(1);
+    expect(script.match(/mergePull\(/g)).toHaveLength(1);
     expect(script).toMatch(/const \{ ready, held \} = pullsToMerge\(pulls, target\.branch, repository\);/);
-    expect(script).toMatch(/for \(const number of ready\) \{\n\s+for \(let attempt = 1; attempt <= ATTEMPTS; attempt\+\+\) \{\n.*\n\s+const result = spawnSync\("npx", \["tsx", "scripts\/can-merge\.ts", String\(number\), "--merge"\]/);
+    expect(script).toMatch(/for \(const number of ready\) \{\n\s+const \{ failed: thisFailed \} = mergePull\(number, \{\n\s+runCanMerge: \(attempt\) => \{\n.*\n\s+const result = spawnSync\("npx", \["tsx", "scripts\/can-merge\.ts", String\(number\), "--merge"\]/);
+  });
+});
+
+// One PR's run through can-merge, with GitHub faked: each can-merge try
+// returns the next status in the list, and the PR counts as merged once a try
+// passes or `mergedAfterCrash` says a crash came after the merge.
+function fakeRun(statuses: (number | null)[], { mergedAfterCrash = false, dispatchFails = false } = {}) {
+  const calls: string[] = [];
+  const summary: string[] = [];
+  let tries = 0;
+  const result = mergePull(240, {
+    runCanMerge: (attempt): CanMergeRun => {
+      calls.push(`can-merge try ${attempt}`);
+      const status = statuses[tries++];
+      return { status, why: `exit ${status}` };
+    },
+    isMerged: () => mergedAfterCrash,
+    waitBeforeRetry: () => calls.push("wait"),
+    startMainCi: () => {
+      calls.push("start CI on main");
+      if (dispatchFails) throw new Error("HTTP 403: Resource not accessible by integration");
+    },
+    log: () => {},
+    summary: (line) => summary.push(line),
+  });
+  return { ...result, calls, summary };
+}
+
+// GitHub doesn't start workflows for a push this job's token makes, so the
+// merge would never run ci.yml on main (JAS-123). Starting it through
+// workflow_dispatch is the one way the token can.
+describe("mergePull starts CI on main after each merge", () => {
+  it("asks GitHub to start ci.yml on main", () => {
+    expect(mainCiDispatchPath(REPO)).toBe("repos/Jaspyplayz/League-Web-App/actions/workflows/ci.yml/dispatches");
+  });
+
+  it("starts it after can-merge merges the PR", () => {
+    const run = fakeRun([0]);
+    expect(run.calls).toEqual(["can-merge try 1", "start CI on main"]);
+    expect(run.failed).toBe(false);
+    expect(run.summary).toEqual(["#240: every gate passed and can-merge merged it.", "#240: started CI on main for the merge."]);
+  });
+
+  it("starts it after a crash that came after the merge, since main still changed", () => {
+    const run = fakeRun([1], { mergedAfterCrash: true });
+    expect(run.calls).toEqual(["can-merge try 1", "start CI on main"]);
+    expect(run.failed).toBe(true);
+    expect(run.summary[0]).toBe("#240: merged, but a step after the merge failed (exit 1). The log above says which.");
+  });
+
+  it("starts it after a retry that merges", () => {
+    expect(fakeRun([1, 0]).calls).toEqual(["can-merge try 1", "wait", "can-merge try 2", "start CI on main"]);
+  });
+
+  it("never starts it after a refusal", () => {
+    const run = fakeRun([REFUSED_EXIT_CODE]);
+    expect(run.calls).toEqual(["can-merge try 1"]);
+    expect(run.failed).toBe(false);
+  });
+
+  it("never starts it after crashes that didn't merge", () => {
+    const run = fakeRun([1, null]);
+    expect(run.calls).toEqual(["can-merge try 1", "wait", "can-merge try 2"]);
+    expect(run.failed).toBe(true);
+    expect(run.summary).toEqual(["#240: can-merge crashed (exit null) and wasn't merged. The log above says why."]);
+  });
+
+  it("fails the run when GitHub won't start it, and says the PR merged anyway", () => {
+    const run = fakeRun([0], { dispatchFails: true });
+    expect(run.failed).toBe(true);
+    expect(run.summary).toEqual([
+      "#240: every gate passed and can-merge merged it.",
+      "#240: merged, but starting CI on main failed (HTTP 403: Resource not accessible by integration), so main's CI hasn't run on it. Start it from the Actions tab: CI, Run workflow, on main.",
+    ]);
   });
 });
 
@@ -223,10 +301,33 @@ describe(".github/workflows/agent-merge.yml", () => {
       "pull-requests: write",
       "issues: write",
       "checks: read",
-      "actions: read",
+      "actions: write",
       "statuses: read",
     ]);
     expect(code).toContain("permissions: {}");
     expect(code.filter((line) => /permissions:/.test(line))).toHaveLength(2);
+  });
+});
+
+// The Agent merge job starts this through workflow_dispatch after each merge
+// (JAS-123). That trigger is the only change: its token still only reads, so
+// the write access stays on the Agent merge job alone.
+describe(".github/workflows/ci.yml", () => {
+  const code = source(".github/workflows/ci.yml")
+    .split("\n")
+    .filter((line) => line.trim() !== "" && !line.trim().startsWith("#"))
+    .map((line) => line.replace(/\s+#.*$/, ""));
+
+  it("can be started through the API, and still runs on pushes to main and on PRs", () => {
+    const on = code.indexOf("on:");
+    const end = code.findIndex((line, i) => i > on && !line.startsWith(" "));
+    expect(code.slice(on + 1, end).map((line) => line.trim())).toEqual(["push:", "branches: [main]", "pull_request:", "workflow_dispatch:"]);
+  });
+
+  it("asks only to read the repo", () => {
+    expect(code.filter((line) => /permissions:|: (read|write)$/.test(line)).map((line) => line.trim())).toEqual([
+      "permissions:",
+      "contents: read",
+    ]);
   });
 });

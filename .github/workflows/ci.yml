@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The Agent merge workflow starts this on main after each of its merges,
+  # since GitHub doesn't run it for a push that workflow's token makes
+  # (JAS-123). It also puts a "Run workflow" button on the Actions tab.
+  workflow_dispatch:
 
 # The token GitHub gives the job can only read the repo, like
 # dependency-review.yml's. Nothing here writes to GitHub, so a bad package
