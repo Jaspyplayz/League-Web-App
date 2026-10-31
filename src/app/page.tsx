@@ -1,3 +1,4 @@
+import { cacheLife } from "next/cache";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { HomeExampleLoading, HomeExamplePanel } from "@/components/home-example";
@@ -6,7 +7,7 @@ import { SearchForm } from "@/components/search-form";
 import { MAP_SIZE } from "@/lib/analyzer/map";
 import { RIFT_OUTLINE } from "@/lib/analyzer/rift";
 import { championName, getDataDragon } from "@/lib/ddragon";
-import { summarizeExample } from "@/lib/home-example";
+import { summarizeExample, type HomeExample } from "@/lib/home-example";
 import { readSavedGame } from "@/lib/match-store";
 import { SAMPLE_MATCH } from "@/lib/sample-match";
 
@@ -44,18 +45,30 @@ export default function Home() {
   );
 }
 
-// Read per visit, not at build time: the build has no database, and a
-// failed read baked into the page would stay until the next deploy.
+// Read when someone visits, not at build time: the build has no database,
+// and a failed read baked into the page would stay until the next deploy.
 async function Example() {
   await connection();
+  const example = await loadExample().catch(() => null);
+  return <HomeExamplePanel example={example} />;
+}
+
+// The sample game never changes, so one read serves every visit for an hour
+// instead of two database reads per visit. It throws rather than returning
+// null because Next.js doesn't keep a thrown result: after a failed read,
+// the next visit tries the database again.
+async function loadExample(): Promise<HomeExample> {
+  "use cache";
+  cacheLife("hours");
+
   const [game, dd] = await Promise.all([
     readSavedGame(SAMPLE_MATCH.matchId),
     getDataDragon().catch(() => null),
   ]);
-  const example = game
-    ? summarizeExample(game.match, game.timeline, SAMPLE_MATCH, (name) => championName(dd, name))
-    : null;
-  return <HomeExamplePanel example={example} />;
+  const example =
+    game && summarizeExample(game.match, game.timeline, SAMPLE_MATCH, (name) => championName(dd, name));
+  if (!example) throw new Error("The example game couldn't be read from the database.");
+  return example;
 }
 
 // The faint Rift-wall texture JAS-77 kept for home: this season's walls (the
