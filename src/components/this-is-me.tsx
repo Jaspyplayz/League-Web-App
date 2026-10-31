@@ -23,7 +23,8 @@ export function ThisIsMe(props: Props) {
   );
 }
 
-async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props) {
+// Exported for its tests; pages use ThisIsMe.
+export async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props) {
   if (!supabaseConfig()) return null;
 
   const user = await getCurrentUser();
@@ -41,10 +42,29 @@ async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props) {
     );
   }
 
-  const isMine = (await readMyPlayer(user.id))?.puuid === puuid;
+  const mine = await readMyPlayer(user.id);
+  if (!mine.ok) {
+    // We can't tell whether this profile is already yours, so offer nothing
+    // that could mark or clear it (#167). The label says why, since phones
+    // never show a title.
+    return (
+      <button
+        type="button"
+        disabled
+        title="Couldn't check whether this profile is yours. Reload to try again."
+        className={`${button} cursor-not-allowed border-line text-muted`}
+      >
+        Reload to check
+      </button>
+    );
+  }
+  const isMine = mine.player?.puuid === puuid;
+  // The form says what the click means, so the action never has to read
+  // again and guess (#167).
   return (
     <form action={toggleMyPlayer}>
       <input type="hidden" name="puuid" value={puuid} />
+      <input type="hidden" name="intent" value={isMine ? "clear" : "mark"} />
       <button
         type="submit"
         aria-pressed={isMine}

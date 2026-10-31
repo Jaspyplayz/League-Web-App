@@ -13,7 +13,7 @@ import {
   type AskGame,
   type UsedSoFar,
 } from "@/lib/ask-rules";
-import { database, readCache } from "@/lib/match-store";
+import { database } from "@/lib/match-store";
 import type { Region } from "@/lib/regions";
 import type { Account } from "@/lib/riot/types";
 
@@ -40,10 +40,16 @@ export type AskedQuestion = {
   askedAt: Date;
 };
 
-// One account's answered questions about one player, newest first.
-export async function readQuestions(userId: string, puuid: string): Promise<AskedQuestion[]> {
-  const rows = await readCache((db) =>
-    db
+// One account's answered questions about one player, newest first. A failed
+// read says so, so the Ask tab doesn't show an empty history as if nothing
+// was asked (#167).
+export type ReadQuestionsResult = { ok: true; questions: AskedQuestion[] } | { ok: false };
+
+export async function readQuestions(userId: string, puuid: string): Promise<ReadQuestionsResult> {
+  const db = database();
+  if (!db) return process.env.DATABASE_URL ? { ok: false } : { ok: true, questions: [] };
+  try {
+    const rows = await db
       .select({
         id: tables.askQuestions.id,
         question: tables.askQuestions.question,
@@ -60,9 +66,12 @@ export async function readQuestions(userId: string, puuid: string): Promise<Aske
         ),
       )
       .orderBy(desc(tables.askQuestions.createdAt))
-      .limit(HISTORY_LENGTH),
-  );
-  return (rows ?? []).map((r) => ({ ...r, answer: r.answer ?? "" }));
+      .limit(HISTORY_LENGTH);
+    return { ok: true, questions: rows.map((r) => ({ ...r, answer: r.answer ?? "" })) };
+  } catch (error) {
+    Sentry.captureException(error);
+    return { ok: false };
+  }
 }
 
 // Whether this account can ask now, and how many questions it has left today.

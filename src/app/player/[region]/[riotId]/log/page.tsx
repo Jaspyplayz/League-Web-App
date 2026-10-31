@@ -180,7 +180,10 @@ async function loadNotes(puuid: string, since: string): Promise<ReadDayNotesResu
   if (!supabaseConfig()) return null;
   const user = await getCurrentUser();
   if (!user) return null;
+  // A failed read shows no notes box, rather than one that might save notes
+  // on someone else's log, and says the notes couldn't be loaded (#167).
   const mine = await readMyPlayer(user.id);
-  if (mine?.puuid !== puuid) return null;
+  if (!mine.ok) return { ok: false };
+  if (mine.player?.puuid !== puuid) return null;
   return readDayNotes(user.id, since);
 }

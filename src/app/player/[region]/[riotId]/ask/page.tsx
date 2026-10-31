@@ -130,7 +130,8 @@ async function AskContent({
         region={region}
         riotId={riotId}
         playerPath={playerPath}
-        history={history}
+        history={history.ok ? history.questions : []}
+        historyFailed={!history.ok}
         left={allowed.ok ? allowed.left : 0}
       />
     </>

@@ -39,7 +39,10 @@ export async function AccountMenu() {
     );
   }
 
-  const me = await readMyPlayer(user.id);
+  // If the read fails, the menu shows the account without a My profile link
+  // and says so, rather than telling you nothing is marked (#167).
+  const mine = await readMyPlayer(user.id);
+  const me = mine.ok ? mine.player : null;
   const [rank, dd] = me
     ? await Promise.all([savedSoloRank(me.puuid), getDataDragon().catch(() => null)])
     : [null, null];
@@ -68,9 +71,13 @@ export async function AccountMenu() {
           <Link href={`/player/${me.region}/${toSlug(me)}`} className={menuItem}>
             My profile
           </Link>
-        ) : (
+        ) : mine.ok ? (
           <p className="px-4 py-2.5 text-[13px] text-faint">
             Press &quot;This is me&quot; on your profile to see your rank here.
+          </p>
+        ) : (
+          <p className="px-4 py-2.5 text-[13px] text-faint">
+            Couldn&apos;t load your profile. Reload to try again.
           </p>
         )}
         <div className="my-1.5 h-px bg-line" />
