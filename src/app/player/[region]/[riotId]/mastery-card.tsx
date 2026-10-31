@@ -67,7 +67,8 @@ function MasteryColumn({ mastery, dd }: { mastery: ChampionMastery; dd: DataDrag
 
 // Riot doesn't publish mastery crest images in its official assets, so this
 // is our own: a small shield in the site's colors with the level inside.
-// Level 10 and up gets the bright "ahead" blue, lower levels the steel frame.
+// Level 10 and up gets the bright "ahead" blue, lower levels the quiet grey.
+// (It used the frame colour, which is transparent since panels lost their outline.)
 function LevelCrest({ level }: { level: number }) {
   const high = level >= 10;
   return (
@@ -77,7 +78,7 @@ function LevelCrest({ level }: { level: number }) {
       height={30}
       role="img"
       aria-label={`Mastery level ${level}`}
-      className={high ? "text-ahead" : "text-frame"}
+      className={high ? "text-ahead" : "text-quiet"}
     >
       <path
         d="M14 1 L26 6 V16 C26 22 20.5 26.5 14 29 C7.5 26.5 2 22 2 16 V6 Z"
