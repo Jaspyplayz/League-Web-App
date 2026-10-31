@@ -121,13 +121,22 @@ With one snapshot left out, the estimate spans two minutes, while the replay's n
 
 A play is a run of kills, epic monsters, towers and inhibitors less than 20 seconds apart, so a fight at Baron and the tower right after it are one play. Its grade is your team's chance to win just after its last event minus just before its first, in points: from 52.0% to 59.6% is +7.6. Plays never overlap, so between them only gold and XP move the chance (farming, plates and passive gold), plus a buff running out or an inhibitor coming back.
 
-| Grade | Your team's chance moved by |
-|---|---|
-| Great | +4 points or more |
-| Good | +1 to +4 |
-| Even | less than 1 either way |
-| Inaccuracy | −1 to −4 |
-| Mistake | −4 or more |
+The grades borrow chess.com's game review scale, which ranks moves from Brilliant to Blunder ([decision record 0022](adr/0022-chess-style-grades.md)):
+
+| Grade | Your team's chance moved by | And |
+|---|---|---|
+| Brilliant | +4 points or more | Your team won the fight with at least 2 fewer champions in it than the enemy |
+| Great | +8 or more | It moved your team up a step: from losing to even, or even to winning |
+| Excellent | +4 or more | Any other gain this big |
+| Good | +1 to +4 | |
+| Even | less than 1 either way | |
+| Inaccuracy | −1 to −4 | |
+| Mistake | −4 or more | Any loss this big that isn't a Blunder |
+| Blunder | −8 or more | It moved your team down a step: from winning to even, or even to losing |
+
+Losing means a chance under 40%, winning over 60%, and even in between, 40% and 60% included. Great and Blunder mark the plays that changed who was ahead, not just by how much; the 8 points keep an early lone kill that tips the chance from 43% to 39% from reading as a Blunder. Brilliant is the outnumbered win: a champion is in the fight when they killed, helped or died in it, and Riot counts anyone who did damage to the victim as a helper. One fewer isn't enough, because the losing side of a big fight nearly always shows all five, so a 4 against 5 is usually a teammate who stayed out of it. Brilliant ranks first, so a fight that's both outnumbered and game-turning reads Brilliant.
+
+Chess.com's Best, Miss and Book are left out on purpose. Best needs the other options a player had, which a chess engine works out and Turnpoint can't: it only measures what a play did. Miss is a slip the enemy made that your team didn't punish, which is the absence of a play, and the win chance only grades plays that happened. Book is a standard opening move, and the opening habits a League game has (level 6 first, first scuttles, first back) aren't kills, epic monsters or buildings, so they aren't plays here.
 
 It grades what a play did to the game, not whether it was the right call: a fight you didn't join still moves your team's chance, and so does the enemy taking Dragon. It's called "Win Probability Added" in sports.
 
@@ -135,9 +144,9 @@ Things that shape the grades:
 
 - **A kill counts through its gold.** The model learned that a kill on its own is worth almost nothing, because the gold it pays is already in the gold lead (see [win-chance.md](win-chance.md#the-weights-it-learned)). So a kill's grade comes from the base reward arriving at the second of the kill. In an even game that's 2.8 points for a solo kill at 5:00 and 4.1 with a helper, falling to 2.0 and 3.0 by 20:00, because the model counts a gold lead for less as builds fill up. The extra gold of a shutdown arrives spread over the minute, so the play doesn't count it.
 - **Towers and Baron count mostly through their gold.** The model learned that a tower is worth the gold it pays, and Riot doesn't log tower gold, so it reaches the replay spread over the rest of the minute: a tower on its own reads Even. Baron's buff adds about a point at once, and its gold arrives the same way. Dragons, Elder and inhibitors count in full at the second they're taken.
-- **The same play is worth less once a game is decided.** In the game below, a fight won 6 for 3 with two towers added 0.2 points, because the team was already at 99%. That's how win probability works in any sport: the plays that decide a game happen while it's close.
+- **The same play is worth less once a game is decided.** In a 28-minute Qiyana game of Jasper's, a fight won 6 for 3 with two towers added 0.2 points, because the team was already at 99%. That's how win probability works in any sport: the plays that decide a game happen while it's close.
 
-On Jasper's 28-minute Qiyana game, a win, his 16 plays came out as 3 Great, 6 Good, 5 Even, 1 Inaccuracy and 1 Mistake. The Mistake was a fight lost 1 for 2 at 6:30 (−4.1), and the biggest Great a fight won 4 for 1 with Dragon at 14:56 (+8.6). After 20 minutes, with his team above 95%, every play read Even or Good.
+In the golden comeback game (`src/lib/analyzer/fixtures/comeback.json`), the 14 plays the blue jungler was in came out as 2 Great, 5 Excellent, 3 Good, 1 Even, 1 Inaccuracy and 2 Mistake. The first Great was a fight won 5 for 1 with Baron and two towers at 25:10, which took the team from 23.6% to 60.8% (+37.1). The red jungler was in the same fight, and from their side it's a Blunder: 76.4% to 39.2%. None of the golden games has a Brilliant, which is meant to be rare, as it is in chess.
 
 ## Limits
 
@@ -149,6 +158,7 @@ On Jasper's 28-minute Qiyana game, a win, his 16 plays came out as 3 Great, 6 Go
 - The walls champions walk around are learned from this season's games, so after a change to the map they're out of date until `npm run rift-map` runs on games from the new patch.
 - Plays are grouped by time only, so two things 15 seconds apart on opposite sides of the map make one play.
 - A play's grade uses the base kill gold, so shutdowns and first blood count for less than they paid, and kills on players who keep dying for more.
+- Brilliant counts the champions in a fight from its kills, so an enemy who was there but neither died nor got a kill or assist isn't counted, and a teammate who only stood nearby isn't either.
 
 ## Running the checks
 

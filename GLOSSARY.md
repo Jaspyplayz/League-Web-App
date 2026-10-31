@@ -121,7 +121,7 @@ How much a play moved your team's win chance, up or down.
 _Avoid_: Swing, impact, value
 
 **Grade**:
-The word a play earns from its win chance added: Great, Good, Even, Inaccuracy or Mistake.
+The word a play earns from its win chance added, on a chess-style scale: Brilliant, Great, Excellent, Good, Even, Inaccuracy, Mistake or Blunder.
 _Avoid_: Rating, score
 
 **60-second review**:
