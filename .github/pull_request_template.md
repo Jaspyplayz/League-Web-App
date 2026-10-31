@@ -41,8 +41,8 @@ player sees, such as docs, tests or scripts. Name the page, command or file,
 not "some players".
 
 ## Review
-The reviewer's first line, `Reviewer agent at <sha>: no blockers`, then its
-findings, each fixed (with the test that shows it) or rejected (with the
+The reviewer's first line, `Reviewer agent at <sha>: no blockers`, on a line
+of its own after a blank line, then its findings, each fixed (with the test that shows it) or rejected (with the
 evidence). A tiny PR under the line limit has no review, so write "none:
 tiny". A no-blockers verdict covers small commits after it, such as fixes for
 should-fixes or a postmortem entry (decision record 0017).

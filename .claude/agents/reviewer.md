@@ -64,10 +64,10 @@ Paperwork, such as a test count or how a line is worded, is a nit at most.
 Check in this order:
 1. Each acceptance criterion: met, not met, or untestable, with file:line evidence.
    Say whether the PR names a screenshot or a test for it, since `can-merge` checks
-   only that its box is ticked. Check the criteria as GitHub shows them:
-   `can-merge` skips fenced code blocks and HTML comments, but a ticked box in
-   a 4-space code block, or in a code block inside a list or quote, can still
-   fool it (decision record 0019).
+   only that its box is ticked. Check the criteria as GitHub shows them: a box or
+   a `## ` line inside an HTML comment or a code block can fool `can-merge`,
+   most of all in a 4-space code block or one inside a list or quote
+   (decision record 0019).
 2. Inputs that break it: remakes, games under 15 minutes, missing timeline frames,
    a player who left, ARAM or Arena, no lane opponent, an expired Riot key.
 3. Project rules that lint can't check: "server-only" on modules with secrets

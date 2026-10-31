@@ -33,3 +33,11 @@ A gate's tests build its inputs by hand, so they pass for the cases the builder 
 - **Root cause:** the builder treated matching GitHub's Markdown as reachable with a few rules, and wrote tests for the shapes those rules handled instead of for the ways a reader that disagrees with GitHub could be fooled.
 - **Rung:** design
 - **Fix:** [PR 223](https://github.com/Jaspyplayz/League-Web-App/pull/223): a second line that could be the same heading or field fails the gate, so a disagreement over which one GitHub shows can't pass. The test `refuses a fake Review section behind %s` holds each body, and 27 tests fail on 296118d's gate code.
+
+## 2026-10-31
+
+- **What happened:** the fail-closed JAS-58 fix let a section end at a `#` heading indented up to 3 spaces, so a shell comment such as "  # run it" in a list item's code block ended the Review or Acceptance criteria section, and a blockers verdict or unticked box after it was dropped. It should have kept looking for failing lines past where it thinks the section ends.
+- **Evidence:** the reviewer's re-review on [PR 223](https://github.com/Jaspyplayz/League-Web-App/pull/223), at e8adedb, blocker 1: main fails that body with "blockers in the newest verdict", e8adedb passed it with "no blockers, carried over 1 commit with 5 lines outside docs".
+- **Root cause:** the builder made failing signals count anywhere inside a section, but trusted the section's end, which is decided by the same reader that can disagree with GitHub.
+- **Rung:** check
+- **Fix:** [PR 223](https://github.com/Jaspyplayz/League-Web-App/pull/223): the gates also look for unticked boxes and verdict-like lines in the rest of the body, and the tests `counts an unticked box after a # comment in a code block on a %slist item` and `refuses blockers after a # comment in a list item's code block even when an older clean verdict would carry over` fail on e8adedb's gate code.

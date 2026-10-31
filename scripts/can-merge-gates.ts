@@ -286,6 +286,13 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
         const hidden = box(raw);
         return hidden && !/^x$/i.test(hidden[1]) ? [{ ticked: false, text: raw.trim() }] : [];
       });
+      // The section may end early where GitHub shows no heading, such as at
+      // a "# " comment in a list item's code block, so an unticked box later
+      // in the body still counts.
+      for (const raw of criteria.rest) {
+        const hidden = box(raw);
+        if (hidden && !/^x$/i.test(hidden[1])) boxes.push({ ticked: false, text: raw.trim() });
+      }
       if (boxes.length === 0) return fail("the Acceptance criteria section has no boxes");
       const open = boxes.filter(({ ticked }) => !ticked);
       if (open.length > 0) {
@@ -385,6 +392,11 @@ function readVerdicts(body: string): { verdicts: Verdict[] } | { why: string } {
       unread.add(raw.trim());
     }
   });
+  // The section may end early where GitHub shows no heading, so a verdict
+  // later in the body is never safe to skip either.
+  for (const raw of review.rest) {
+    if (LOOKS_LIKE_VERDICT.test(raw.replace(/[*_`]/g, ""))) unread.add(raw.trim());
+  }
   if (unread.size > 0) {
     const quoted = [...unread].map((line) => `"${line}"`).join(", ");
     return {
@@ -544,10 +556,12 @@ function headingText(line: string): string | undefined {
   return match ? (match[1] ?? "") : undefined;
 }
 
-type Section = { shown: string[]; raw: string[] } | { why: string; missing?: true };
+type Section = { shown: string[]; raw: string[]; rest: string[] } | { why: string; missing?: true };
 
 // The lines under "## Heading", as written and as shown, up to the next "#"
-// or "##" heading. Fails closed when anything else in the body could pass for
+// or "##" heading, and the raw lines after it. A "# " line GitHub shows as
+// code, such as a comment in a list item's code block, ends it too early, so
+// the gates still look for failing lines in the rest. Fails closed when anything else in the body could pass for
 // the same heading, such as one in a list item's code block, since GitHub
 // might show that one and hide this one (JAS-58).
 function section(body: string, heading: string): Section {
@@ -559,5 +573,5 @@ function section(body: string, heading: string): Section {
   if (start === -1) return { why: `no "## ${heading}" section`, missing: true };
   const end = shown.findIndex((line, i) => i > start && /^ {0,3}#{1,2}(?:[ \t]|$)/.test(line));
   const stop = end === -1 ? raw.length : end;
-  return { shown: shown.slice(start + 1, stop), raw: raw.slice(start + 1, stop) };
+  return { shown: shown.slice(start + 1, stop), raw: raw.slice(start + 1, stop), rest: raw.slice(stop) };
 }

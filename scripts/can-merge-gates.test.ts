@@ -729,6 +729,22 @@ describe("decide", () => {
       expect(failed(decide(pr({ body: body({ criteria }) }), main()))).toEqual(["Acceptance criteria ticked"]);
     });
 
+    // A "# " comment in a list item's code block looks like a heading to the
+    // gates, which don't follow a fence after "- ", so the section ends there.
+    // A failing line after it must still count (re-review at e8adedb).
+    it.each(["- ", "1. "])("counts an unticked box after a # comment in a code block on a %slist item", (marker) => {
+      const pad = " ".repeat(marker.length);
+      const criteria = ['- [x] A: test "a"', `${marker}\`\`\`bash`, `${pad}# how to try it`, `${pad}npx vitest`, `${pad}\`\`\``, "- [ ] B"];
+      expect(detail(decide(pr({ body: body({ criteria }) }), main()), "Acceptance criteria ticked")).toContain('1 of 2 unticked: "- [ ] B"');
+    });
+
+    it("refuses blockers after a # comment in a list item's code block even when an older clean verdict would carry over", () => {
+      const review = [`Reviewer agent at ${OLDER}: no blockers`, "", "- ```bash", "  # run it", "  npx vitest", "  ```", "", `Reviewer agent at ${HEAD}: 1 blockers`];
+      const older = (sha: string) =>
+        sha === OLDER ? { commits: 1, lines: changes({ "src/components/habit-card.tsx": 2 }), files: pr().files, created: [] } : undefined;
+      expect(failed(decide(pr({ body: body({ review }) }), main(), history({ since: older })))).toEqual(["Reviewer cleared the PR"]);
+    });
+
     it("doesn't read a Tier line inside a code block", () => {
       const text = withSummary("```\n**Tier:** tiny\n```", { tier: null });
       expect(detail(decide(pr({ body: text }), main()), "Tiny or normal tier")).toBe("no **Tier:** line");
