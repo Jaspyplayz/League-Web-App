@@ -18,8 +18,10 @@ import { REFUSED_EXIT_CODE } from "./can-merge-gates";
 const REPO = "Jaspyplayz/League-Web-App";
 const HEAD = "4d2a4fefeaef178f0565d274999c22b752383437";
 
+// A Windows checkout ends lines with \r\n, and the patterns below match \n,
+// so read every file the way CI on Linux sees it.
 function source(path: string): string {
-  return readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  return readFileSync(new URL(`../${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 }
 
 function event(branch: string | null, repo: string | null = REPO): WorkflowRunEvent {

@@ -31,7 +31,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | ----- | ---------- | ---- |
 | [A guard that also blocks the repair](agent-mistakes/guard-blocks-its-own-repair.md) | 1 | check |
 | [Re-review line written in the wrong shape](agent-mistakes/re-review-line-shape.md) | 1 | check |
-| [Text read as if it had Unix line endings](agent-mistakes/windows-line-endings.md) | 1 | check |
+| [Text read as if it had Unix line endings](agent-mistakes/windows-line-endings.md) | 2 | none yet |
 | [Jasper's own writing listed as his to-do](agent-mistakes/owner-writing-listed-as-todo.md) | 2 | design |
 | [Tier line names a second tier word](agent-mistakes/tier-line-names-two-tiers.md) | 5 | design |
 | [Description quotes a field line](agent-mistakes/description-quotes-a-field-line.md) | 1 | none yet |
