@@ -44,5 +44,8 @@ describe("ThisIsMeButton", () => {
     expect(html).not.toContain("<form");
     expect(html).not.toContain('type="submit"');
     expect(html).toContain("Couldn&#x27;t check whether this profile is yours");
+    // The reason shows as the label too, since phones don't show a title.
+    expect(html).toContain(">Couldn&#x27;t check</button>");
+    expect(html).not.toContain("hover:");
   });
 });

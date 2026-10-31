@@ -45,15 +45,16 @@ export async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props
   const mine = await readMyPlayer(user.id);
   if (!mine.ok) {
     // We can't tell whether this profile is already yours, so offer nothing
-    // that could mark or clear it (#167).
+    // that could mark or clear it (#167). The label says why, since phones
+    // never show a title.
     return (
       <button
         type="button"
         disabled
         title="Couldn't check whether this profile is yours. Reload to try again."
-        className={`${button} ${off} cursor-not-allowed opacity-60`}
+        className={`${button} cursor-not-allowed border-line-strong text-faint opacity-60`}
       >
-        This is me
+        Couldn&apos;t check
       </button>
     );
   }
