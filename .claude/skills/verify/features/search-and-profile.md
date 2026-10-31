@@ -11,7 +11,7 @@ A player types a Riot ID on the home page, picks a region and lands on that play
 
 ## How to get to it (user POV)
 
-- The home page form: the `Riot ID` field, the `Region` select and the `Analyze` button.
+- The home page form: the `Riot ID` field, the `Region` select and the `Search` button.
 - The search button in the site header, on every page.
 - A pasted link such as `/player/kr/Hide%20on%20bush-KR1`.
 - The `Profile sections` links under the player's name.
@@ -20,7 +20,7 @@ A player types a Riot ID on the home page, picks a region and lands on that play
 
 Preconditions: `npm run shot -- --check` exits 0, and its profile line says `ok`, not `riot-key`.
 
-- **Home page.** `npm run shot -- --pr <n> /` shows the heading "Find the minute" and the search form.
+- **Home page.** `npm run shot -- --pr <n> /` shows the "Turnpoint" logo heading, the search form and the example game.
 - **Profile.** `npm run shot -- --pr <n> "/player/kr/Hide%20on%20bush-KR1"` shows the region named `Player summary`, the `Ranked Solo/Duo` card and `Recent matches`. Searching lands on this URL, so shoot it directly.
 - **Sections.** Add `/champions`, `/insights`, `/log` or `/ask` to the profile path.
 - **Not found.** `npm run shot -- --pr <n> --expect not-found /this-page-does-not-exist` saves the 404 page. Without `--expect` it reports `not-found` and exits 1, and so does a player or match link with a typo, even though those pages answer 200.

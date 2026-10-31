@@ -74,13 +74,13 @@ async function openPlayerPage(page: Page) {
 
 test("scan the home page", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint");
   await scan(page, "Home");
 });
 
 test("scan the sample analysis, both tabs", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
     "Victory",
     FIRST_LOAD,
@@ -140,7 +140,7 @@ test("scan light mode", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await scan(page, "Home, light mode");
 
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
     "Victory",
     FIRST_LOAD,

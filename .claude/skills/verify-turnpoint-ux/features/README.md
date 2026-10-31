@@ -41,7 +41,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 ## Features
 
 - [Search form recovery](./search-recovery.md) covers a Riot ID without a tag: a clear inline message, the input kept, no page change. Journey `ux-search-recovery`.
-- [Home on a phone](./phone-home.md) covers the home page on a Pixel 7: no sideways scroll, a reachable Analyze button, the start cards. Journey `ux-phone-home`.
+- [Home on a phone](./phone-home.md) covers the home page on a Pixel 7: no sideways scroll, a reachable Search button, the example game. Journey `ux-phone-home`.
 - [60-second review path](./review-path.md) covers home → sample game → review → Watch in replay → back to Summary. Journey `ux-review-path`.
 - [Signed-out teasers](./signed-out-teasers.md) covers Ask, Game recap and Your notes for a signed-out visitor, and the Sign in round trip. Journey `ux-signed-out-teasers`.
 - [Insights peer card](./insights-peer-card.md) covers the You vs others card, switching rank, and a bad Riot ID in Compare with a player. Journey `ux-insights-peer-card`.

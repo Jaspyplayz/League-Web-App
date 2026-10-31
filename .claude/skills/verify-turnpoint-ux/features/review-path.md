@@ -4,14 +4,14 @@ From the home page a visitor can reach a game's 60-second review in one click an
 
 ## Sub-features
 
-- `path-entry` takes `See a sample analysis` on the home page to the sample game with `Summary` selected, calm.
+- `path-entry` takes `Open this game` on the home page to the sample game with `Summary` selected, calm.
 - `path-review` shows the first review moment in the `60-second review` region.
 - `path-replay` switches to `Deep dive` from `Watch in replay`, hides the Summary panel, and puts the `Replay` heading on screen.
 - `path-back` brings the `60-second review` back when `Summary` is chosen again.
 
 ## How to get to it (user POV)
 
-- Choose `See a sample analysis` in the `Look at a game` section of the home page.
+- Choose `Open this game` under the example game on the home page.
 - Choose a game in a profile's `Recent matches` list, then use the review on its Summary tab.
 
 ## Driving it with drive.ts
@@ -22,7 +22,7 @@ Preconditions:
 - Signed out, fresh context, reduced motion.
 
 - **Home.** Go to `/`. Calm.
-- **Choose the sample.** Click the link `See a sample analysis`. The URL contains `/match/KR_8416261221`, tab `Summary` has `aria-selected="true"`, and the page is calm.
+- **Choose the sample.** Click the link `Open this game` (exact name). The URL contains `/match/KR_8416261221`, tab `Summary` has `aria-selected="true"`, and the page is calm.
 - **Reach the review.** Scroll the region `60-second review` into view. Its first `listitem` is visible (first lines saved as `notes.firstMoment`).
 - **Watch in replay.** Click the first `Watch in replay` in the review. Tab `Deep dive` has `aria-selected="true"`, tabpanel `Summary` is hidden, and the heading `Replay` is inside the viewport.
 - **Back.** Click the tab `Summary`. The region `60-second review` is visible.

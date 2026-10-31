@@ -1,12 +1,12 @@
 # Home on a phone
 
-On a phone the home page fits the screen: no sideways scrolling, the Analyze button is fully on screen and big enough to tap, and the `Look at a game` start cards are reachable by scrolling.
+On a phone the home page fits the screen: no sideways scrolling, the Search button is fully on screen and big enough to tap, and the example game's `Open this game` is reachable by scrolling.
 
 ## Sub-features
 
 - `phone-fit` keeps `scrollWidth` within `clientWidth` (no sideways scroll).
-- `phone-tap` keeps `Analyze` inside the screen and at least 44 px tall.
-- `phone-cards` shows the `Look at a game` region with `See a sample analysis` after scrolling.
+- `phone-tap` keeps `Search` inside the screen and at least 44 px tall.
+- `phone-example` shows the example game's `Open this game` link after scrolling.
 
 ## How to get to it (user POV)
 
@@ -19,11 +19,11 @@ Preconditions:
 - doctor reports `home page ok`. No keys needed.
 - Playwright device `Pixel 7` (412×915 CSS px, touch), signed out.
 
-- **Open home.** Go to `/`. The level-1 heading contains `Find the minute` (case-insensitive) and the page is calm.
-- **Fit.** `document.documentElement.scrollWidth` ≤ `clientWidth` + 1 (saved as `notes.scrollWidth` and `notes.clientWidth`). The `Analyze` button's box lies inside the width and is ≥ 44 px tall.
-- **Cards.** Scroll the region `Look at a game` into view. Link `See a sample analysis` is visible.
+- **Open home.** Go to `/`. The level-1 heading is `Turnpoint` and the page is calm.
+- **Fit.** `document.documentElement.scrollWidth` ≤ `clientWidth` + 1 (saved as `notes.scrollWidth` and `notes.clientWidth`). The `Search` button's box lies inside the width and is ≥ 44 px tall.
+- **Example.** Scroll the link `Open this game` (exact name) into view. It is visible.
 - **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-phone-home`.
-- **Proof.** `01-open-home-on-a-phone.png` (top of the page) and `03-scroll-to-the-start-cards.png`.
+- **Proof.** `01-open-home-on-a-phone.png` (top of the page) and `03-scroll-to-the-example-game.png`.
 
 ## Gotchas
 
