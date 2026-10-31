@@ -745,6 +745,36 @@ describe("decide", () => {
       expect(failed(decide(pr({ body: body({ review }) }), main(), history({ since: older })))).toEqual(["Reviewer cleared the PR"]);
     });
 
+    // The real heading GitHub shows can be hidden from the gate by a code
+    // block that starts after "- " or a "<!--" in a paragraph. Treating that
+    // as no Review section let a tiny PR skip past blockers (re-review at
+    // f50720e).
+    it.each<[string, string]>([
+      ["a code block on a list item", "- ```bash\n  npm run dev\n  ```"],
+      ["a <!-- in a paragraph", "Docs use <!-- for hidden notes."],
+    ])("reads a blockers verdict on a tiny PR when the heading is hidden from the gate by %s", (_, summary) => {
+      const parts = { tier: "tiny. Copy.", criteria: [], review: [`Reviewer agent at ${HEAD}: 1 blockers`] };
+      for (const files of [["docs/habits.md"], ["src/components/habit-card.tsx"]]) {
+        const gate = reviewerGate(withSummary(summary, parts), files);
+        expect(gate?.pass).toBe(false);
+        expect(gate?.detail).toContain(`can't see the "## Review" heading`);
+      }
+    });
+
+    it("names the code block when a verdict after one can't be read", () => {
+      const review = [`Reviewer agent at ${HEAD}: no blockers (re-review since ${OLDER.slice(0, 7)})`, "", "- ```bash", "  npx vitest", "  ```", "", `Reviewer agent at ${OLDER}: 1 blockers`];
+      const gate = reviewerGate(body({ review }));
+      expect(gate?.pass).toBe(false);
+      expect(gate?.detail).toContain('the gate reads the lines from "```" on as code or a comment');
+    });
+
+    it("names the line that ended the section when a verdict after it can't be read", () => {
+      const review = [`Reviewer agent at ${HEAD}: no blockers`, "", "- ```bash", "  # run it", "  ```", "", `Reviewer agent at ${OLDER}: 1 blockers`];
+      const gate = reviewerGate(body({ review }));
+      expect(gate?.pass).toBe(false);
+      expect(gate?.detail).toContain('the gate\'s Review section ended at "# run it"');
+    });
+
     it("doesn't read a Tier line inside a code block", () => {
       const text = withSummary("```\n**Tier:** tiny\n```", { tier: null });
       expect(detail(decide(pr({ body: text }), main()), "Tiny or normal tier")).toBe("no **Tier:** line");

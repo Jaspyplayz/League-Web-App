@@ -41,3 +41,11 @@ A gate's tests build its inputs by hand, so they pass for the cases the builder 
 - **Root cause:** the builder made failing signals count anywhere inside a section, but trusted the section's end, which is decided by the same reader that can disagree with GitHub.
 - **Rung:** check
 - **Fix:** [PR 223](https://github.com/Jaspyplayz/League-Web-App/pull/223): the gates also look for unticked boxes and verdict-like lines in the rest of the body, and the tests `counts an unticked box after a # comment in a code block on a %slist item` and `refuses blockers after a # comment in a list item's code block even when an older clean verdict would carry over` fail on e8adedb's gate code.
+
+## 2026-10-31
+
+- **What happened:** the JAS-58 fix treated a Review section the reader couldn't see as no Review section, so a tiny PR whose Summary held a code block after "- " or a `<!--` in a paragraph skipped past "Reviewer agent at <head>: 1 blockers" under a heading GitHub shows. It should have failed: one line that looks like the heading but can't be read is not the same as none.
+- **Evidence:** the reviewer's re-review on [PR 223](https://github.com/Jaspyplayz/League-Web-App/pull/223), at f50720e, blocker 1: main fails that body with "blockers in the newest verdict", f50720e passed it with "a tiny PR that changes only docs skips the reviewer".
+- **Root cause:** the builder made the gates fail closed on what the reader saw, but kept the old "missing" answer for a heading it couldn't see, and every test of a hidden heading used a normal PR, where missing already fails.
+- **Rung:** check
+- **Fix:** [PR 223](https://github.com/Jaspyplayz/League-Web-App/pull/223): a heading that looks right in the raw body but isn't seen fails the gate, and the test `reads a blockers verdict on a tiny PR when the heading is hidden from the gate by %s` fails on f50720e's gate code.

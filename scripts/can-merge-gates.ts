@@ -376,9 +376,14 @@ function readVerdicts(body: string): { verdicts: Verdict[] } | { why: string } {
   if ("why" in review) return "missing" in review ? { verdicts: [] } : { why: review.why };
   const verdicts: Verdict[] = [];
   const unread = new Set<string>();
+  // Where the gate's reading of the section went wrong, if it did, so the
+  // message can name the cause and not just the verdict it couldn't read.
+  let hiddenFrom: string | undefined;
+  let cause: string | undefined;
   let afterVerdict = false;
   review.shown.forEach((line, i) => {
     const raw = review.raw[i];
+    if (line !== raw) hiddenFrom ??= raw.trim();
     // Right after the heading, a blank line or another verdict, nothing
     // earlier in a paragraph can hide this line.
     const paragraph = i === 0 || review.raw[i - 1].trim() === "" || afterVerdict;
@@ -390,17 +395,24 @@ function readVerdicts(body: string): { verdicts: Verdict[] } | { why: string } {
       verdicts.push({ sha: match[1].toLowerCase(), verdict, line: text });
     } else if (LOOKS_LIKE_VERDICT.test(raw.replace(/[*_`]/g, ""))) {
       unread.add(raw.trim());
+      if (hiddenFrom !== undefined && hiddenFrom !== raw.trim()) {
+        cause ??= `the gate reads the lines from "${hiddenFrom}" on as code or a comment`;
+      }
     }
   });
   // The section may end early where GitHub shows no heading, so a verdict
   // later in the body is never safe to skip either.
   for (const raw of review.rest) {
-    if (LOOKS_LIKE_VERDICT.test(raw.replace(/[*_`]/g, ""))) unread.add(raw.trim());
+    if (LOOKS_LIKE_VERDICT.test(raw.replace(/[*_`]/g, ""))) {
+      unread.add(raw.trim());
+      cause ??= `the gate's Review section ended at "${review.rest[0].trim()}", which it reads as a heading`;
+    }
   }
   if (unread.size > 0) {
     const quoted = [...unread].map((line) => `"${line}"`).join(", ");
+    const fix = cause ? ` (${cause}; start a code block's fence on a line of its own, not after "- " or "1. ")` : "";
     return {
-      why: `couldn't read ${quoted}: a verdict is a line of its own after a blank line, reading "Reviewer agent at <sha>: no blockers", with a re-review's "(re-review since <since>)" after the verdict. Quote other reviews without their "at <sha>:"`,
+      why: `couldn't read ${quoted}${fix}: a verdict is a line of its own after a blank line, reading "Reviewer agent at <sha>: no blockers", with a re-review's "(re-review since <since>)" after the verdict. Quote other reviews without their "at <sha>:"`,
     };
   }
   return { verdicts };
@@ -570,6 +582,14 @@ function section(body: string, heading: string): Section {
   const count = raw.filter((line) => lookalike.test(line)).length;
   if (count > 1) return { why: `the description has ${count} lines that look like a "## ${heading}" heading; keep only the real one` };
   const start = shown.findIndex((line, i) => line === raw[i] && headingText(line)?.toLowerCase() === heading.toLowerCase());
+  if (start === -1 && count === 1) {
+    // GitHub may well show it while the gate can't, such as after a code
+    // block that starts after "- ", so it isn't safe to treat as missing: a
+    // tiny PR would skip past blockers under it.
+    return {
+      why: `the gate can't see the "## ${heading}" heading: something above it, such as a code block that starts after "- " or a "<!--" in a paragraph, hides it. Start the fence on a line of its own, or put the "<!--" in backticks`,
+    };
+  }
   if (start === -1) return { why: `no "## ${heading}" section`, missing: true };
   const end = shown.findIndex((line, i) => i > start && /^ {0,3}#{1,2}(?:[ \t]|$)/.test(line));
   const stop = end === -1 ? raw.length : end;
