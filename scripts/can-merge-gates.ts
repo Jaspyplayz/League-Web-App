@@ -496,7 +496,7 @@ function readTier(body: string): Tier {
     const names = [...named].join(", ");
     return {
       ok: false,
-      why: `the tier on the **Tier:** line names more than one tier (${names}); end the tier with a colon, as in "normal: <why>", so the reason isn't read as part of it`,
+      why: `the tier on the **Tier:** line names more than one tier (${names}); name one, then a colon and the reason, as in "normal: <why>"`,
     };
   }
   return { ok: true, tier: first };

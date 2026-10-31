@@ -355,6 +355,7 @@ describe("decide", () => {
     ],
     ["a semicolon", "normal; not on the risky list", "normal"],
     ["an em dash", "normal — nothing on the risky list", "normal"],
+    ["an en dash", "normal – nothing on the risky list", "normal"],
     ["a spaced hyphen", "normal - nothing on the risky list", "normal"],
     ["a bracket", "tiny (docs only, nothing on the risky list)", "tiny"],
   ])("reads the tier before %s, though the reason says risky", (_, tier, expected) => {
@@ -372,7 +373,7 @@ describe("decide", () => {
     ["a reason after a comma", "normal, because nothing is on the risky list"],
   ])("still refuses %s for naming more than one tier, and says how to fix it", (_, tier) => {
     expect(detail(decide(pr({ body: body({ tier }) }), main()), "Tiny or normal tier")).toMatch(
-      /^the tier on the \*\*Tier:\*\* line names more than one tier \(.+\); end the tier with a colon/,
+      /^the tier on the \*\*Tier:\*\* line names more than one tier \(.+\); name one, then a colon and the reason/,
     );
   });
 
