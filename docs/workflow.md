@@ -15,6 +15,8 @@ Work lives in Linear ([linear.app/jaspy](https://linear.app/jaspy), team JAS, pr
 | In Review | The PR is open | The builder |
 | Done | The PR merged | Linear, from the ticket ID in the branch name |
 
+A `wayfinder` map and its decision tickets (any ticket with a `wayfinder:` label) use these statuses differently, since no PR builds them: assigned in Todo means a session claimed it, and Done means it was resolved, moved by that session ([Wayfinding operations](agents/issue-tracker.md#wayfinding-operations)).
+
 - **Claude Code is the only builder**, in a local session on Jasper's PC or a cloud session in the `League-Web-App` environment. One ticket has one builder: the one whose start comment came first.
 - **Up to 4 branches at once**, each touching different files. A file another open PR already changes waits for that PR, or the change goes into it.
 - **Branch:** `claude/jas-<n>-<short-name>`. Linear links a PR by its branch name, not its description, and `npm run can-merge` takes only branches that start with `claude/`. Tiny changes need no ticket.
@@ -78,6 +80,8 @@ Three of Matt Pocock's skills turn it into tickets before any builder starts. Cl
 3. **`/to-tickets JAS-<n>`**, given that ticket, splits it into slices, checks the split with Jasper, and saves each slice as a sub-ticket, joined by Linear's blocking links. Two of this repo's rules override the skill's: each slice fits one PR (the skill sizes them to one Claude session), and each sub-ticket has the [Feature or fix](../.github/ISSUE_TEMPLATE/feature.md) sections, so it counts as written up in Todo.
 
 Every ticket they make stays in Todo for Jasper to move to Ready ([triage roles](agents/triage-labels.md)). Each sub-ticket is then built like any other, but only after the tickets that block it are Done. The parent ticket stays in Todo until the last sub-ticket's PR merges; whoever merges that PR moves the parent to Done: the builder after `can-merge`, or Jasper when the PR is his to merge.
+
+When the plan itself is still unclear, too foggy to grill in one sitting, Jasper can type **`/wayfinder`** first. It keeps a map ticket of the open decisions in Linear and works through them one session at a time, ending in something `/to-spec` can write up. How its tickets sit in Linear is in [Wayfinding operations](agents/issue-tracker.md#wayfinding-operations).
 
 Outside a ticket: Jasper types `/improve-codebase-architecture` (Matt Pocock) to scan the code for modules worth deepening, then picks one to go through; what comes out becomes tickets. For slow code, `poteto-mode` has a playbook for one measured slowdown and one for improving a number step by step, and `benchmark-checklist` (pstack) checks a measurement before anyone acts on it.
 

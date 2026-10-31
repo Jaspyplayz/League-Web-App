@@ -1,6 +1,6 @@
 # Issue tracker: Linear
 
-Turnpoint's tickets live in Linear: workspace [linear.app/jaspy](https://linear.app/jaspy), team **JAS**, project **Turnpoint**. Not GitHub issues; GitHub issues opened before 2026-10-25 stay open until they're done. The full rules are in [docs/workflow.md](../workflow.md#tickets-and-builders); this page is what Matt Pocock's skills (`to-tickets`, `to-spec`, `triage`) need to know.
+Turnpoint's tickets live in Linear: workspace [linear.app/jaspy](https://linear.app/jaspy), team **JAS**, project **Turnpoint**. Not GitHub issues; GitHub issues opened before 2026-10-25 stay open until they're done. The full rules are in [docs/workflow.md](../workflow.md#tickets-and-builders); this page is what Matt Pocock's skills (`to-tickets`, `to-spec`, `triage`, `wayfinder`) need to know.
 
 `wayfinder` plans an effort too big for one session as a map of decision tickets; how it works here is in [Wayfinding operations](#wayfinding-operations).
 
@@ -26,14 +26,17 @@ Turnpoint's tickets live in Linear: workspace [linear.app/jaspy](https://linear.
 
 What Matt Pocock's `wayfinder` skill needs. Its tickets are decisions, not builds, so they never go through the build steps in [docs/workflow.md](../workflow.md).
 
-- **Labels**: `wayfinder:map` on the map, and one of `wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling` or `wayfinder:task` on each ticket. They are workspace labels in Linear. A map and its tickets carry no other labels, not even `Feature` or `Bug`.
-- **The map**: a ticket in team JAS, project Turnpoint, state Todo, labelled `wayfinder:map`. It stays open until its destination is reached.
+A ticket with a `wayfinder:` label is the exception to the status meanings in [docs/workflow.md](../workflow.md#tickets-and-builders) and [triage-labels.md](triage-labels.md): Todo means open, assigned means claimed, and Done means resolved, with no PR.
+
+- **Labels**: `wayfinder:map` on the map, and one of `wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling` or `wayfinder:task` on each ticket. They are workspace labels in Linear. A map and its tickets carry no other labels, not even `Feature` or `Bug`, and `triage` skips them.
+- **The map**: a ticket in team JAS, project Turnpoint, state Todo, labelled `wayfinder:map`. When no open tickets are left under it and the way to its destination is clear, the session that resolved the last one moves it to Done.
 - **Its tickets**: sub-tickets of the map (`save_issue` with `parentId` set to the map's ID), in state Todo, with a `## Question` section. Builders only take Ready tickets, so a decision ticket in Todo is never picked up as build work. Only Jasper moves tickets to Ready, and a wayfinder ticket never needs to be.
 - **Blocking**: Linear's own relation (`blockedBy`), set in a second pass once every ticket has an ID.
-- **Claiming**: assign the ticket to Jasper (`assignee: "me"`; the Linear connection is his account) before any work. An open, unassigned ticket is unclaimed.
-- **The frontier**: `list_issues` with `parentId` set to the map and `state: "Todo"`, then keep the unassigned ones whose blockers (`get_issue` with `includeRelations: true`) are all Done or Canceled.
-- **Resolving**: post the answer as a comment on the ticket, move it to Done, and add a line to the map's Decisions so far. Ruling a ticket out of scope moves it to Canceled with a line under the map's Out of scope.
-- **Research findings** go on a `research/<name>` branch that is pushed but never merged and has no PR; the ticket's resolution comment links the file on that branch.
+- **Claiming**: assign the ticket to Jasper (`assignee: "me"`; the Linear connection is his account) before any work. An open, unassigned ticket is unclaimed. A claimed ticket still in Todo is being worked on, not waiting for Jasper; if its session died, unassign it.
+- **The frontier**: `list_issues` with `parentId` set to the map and `state: "Todo"`, keeping the unassigned ones. For each, `get_issue` with `includeRelations: true` lists its blockers, but not their status, so look each blocker up with `get_issue` too. A ticket is on the frontier when every blocker is Done, Canceled or Duplicate.
+- **Resolving**: post the answer as a comment on the ticket, move it to Done, and add a line to the map's Decisions so far. That comment is the only one a decision ticket needs: the start, PR and session-end comments in the rules above are for build tickets.
+- **Retiring a ticket**: one a decision makes wrong, or one ruled out of scope, moves to Canceled with a comment saying why. An out-of-scope one also gets a line under the map's Out of scope.
+- **Research findings** go in a Linear document attached to the ticket (`save_document` with `issue` set to its ID), linked from the resolution comment. Not on a pushed branch: Vercel builds a preview for every branch pushed, and the Hobby plan's 100 deploys a day are shared with another project.
 - **Branch names**: a builder's `claude/jas-<n>-...` branch closes ticket `<n>` when it merges, so never put a map's or decision ticket's number in a build branch.
 
 ## Pull requests as a triage surface
