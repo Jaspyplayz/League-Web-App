@@ -344,23 +344,27 @@ type Verdict = { sha: string; verdict: string; line: string };
 const isClean = (verdict: string) => /^no blockers\b/i.test(verdict);
 
 function readVerdicts(body: string): { verdicts: Verdict[]; unread: string } {
+  // A verdict starts its own line, bold or in code at most. One after a
+  // bullet, a ">" or other words is a mention of a review, not the review's
+  // line (JAS-58).
   const lines = section(body, "Review").map((line) => line.replace(/[*_`]/g, "").trim());
   const verdicts = lines.flatMap((line) => {
-    const match = line.match(/Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
+    const match = line.match(/^Reviewer agent at ([0-9a-f]{7,40}):\s*(.*)/i);
     return match ? [{ sha: match[1].toLowerCase(), verdict: match[2].trim(), line: match[0].trim() }] : [];
   });
   // A line that names a commit but isn't a verdict, such as PR 209's
-  // "Reviewer agent at <sha> (re-review since <since>): no blockers", is
-  // skipped, so a failure names it instead of only the commits it did read.
+  // "Reviewer agent at <sha> (re-review since <since>): no blockers" or one
+  // after a bullet, is skipped, so a failure names it instead of only the
+  // commits it did read.
   // Only a line with a colon after the commit looks like a verdict; one that
   // just mentions a commit in passing isn't quoted.
   const misread = new Set(
-    lines.filter((line) => /Reviewer agent at [0-9a-f]{7,40}\b[^:]+:/i.test(line) && !/Reviewer agent at [0-9a-f]{7,40}:/i.test(line)),
+    lines.filter((line) => /Reviewer agent at [0-9a-f]{7,40}\b[^:]*:/i.test(line) && !/^Reviewer agent at [0-9a-f]{7,40}:/i.test(line)),
   );
   const unread =
     misread.size === 0
       ? ""
-      : `; couldn't read ${[...misread].map((line) => `"${line}"`).join(", ")}: a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`;
+      : `; couldn't read ${[...misread].map((line) => `"${line}"`).join(", ")}: a verdict starts its own line and reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`;
   return { verdicts, unread };
 }
 
@@ -434,21 +438,69 @@ function lines(text: string): string[] {
 // The text after "**Label:**" on the first line that starts with it.
 function field(body: string, label: string): string | undefined {
   const prefix = `**${label}:**`;
-  const line = lines(body).find((text) => text.trim().startsWith(prefix));
+  const line = shownLines(body).find((text) => text.trim().startsWith(prefix));
   return line?.trim().slice(prefix.length).trim();
 }
 
-// The lines under "## Heading", up to the next "## ".
+// A fence opens a code block: up to 3 spaces, then 3 or more backticks or
+// tildes. Only a fence of the same character, at least as long, with nothing
+// after it closes the block, and one that never closes runs to the end.
+const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+
+// The body's lines as GitHub shows them as text: a line inside a code block
+// is "", and so is the part of a line inside an HTML comment. A "## Review"
+// GitHub shows as code or hides can then never pass for the real section,
+// and a verdict or box in one never counts (JAS-58).
+function shownLines(body: string): string[] {
+  let fence: string | undefined;
+  let inComment = false;
+  return lines(body).map((line) => {
+    if (fence !== undefined) {
+      const close = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = undefined;
+      return "";
+    }
+    const open = inComment ? null : line.match(FENCE);
+    if (open) {
+      fence = open[1];
+      return "";
+    }
+    // `<!--` inside a code span is text, so look for comment marks with
+    // code spans blanked out, then cut the line itself at the same places.
+    const marks = line.replace(/(`+)(.+?)\1/g, (span) => " ".repeat(span.length));
+    let shown = "";
+    let at = 0;
+    while (at < line.length) {
+      if (inComment) {
+        const end = marks.indexOf("-->", at);
+        if (end === -1) return shown;
+        inComment = false;
+        at = end + 3;
+      } else {
+        const start = marks.indexOf("<!--", at);
+        if (start === -1) return shown + line.slice(at);
+        shown += line.slice(at, start);
+        inComment = true;
+        at = start + 4;
+      }
+    }
+    return shown;
+  });
+}
+
+// A "## " heading GitHub shows: up to 3 spaces before it, since 4 make a
+// code block, and optional closing #s after it.
+function headingText(line: string): string | undefined {
+  return line.match(/^ {0,3}##[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/)?.[1];
+}
+
+// The lines under "## Heading", up to the next "## " heading, with code
+// blocks and comments blanked out by shownLines.
 function section(body: string, heading: string): string[] {
-  const all = lines(body);
-  const start = all.findIndex((line) => line.trim().toLowerCase() === `## ${heading.toLowerCase()}`);
+  const all = shownLines(body);
+  const start = all.findIndex((line) => headingText(line)?.toLowerCase() === heading.toLowerCase());
   if (start === -1) return [];
   const rest = all.slice(start + 1);
-  // A "## " line inside a code block isn't a heading.
-  let inCode = false;
-  const end = rest.findIndex((line) => {
-    if (/^\s*(```|~~~)/.test(line)) inCode = !inCode;
-    return !inCode && line.startsWith("## ");
-  });
+  const end = rest.findIndex((line) => headingText(line) !== undefined);
   return end === -1 ? rest : rest.slice(0, end);
 }

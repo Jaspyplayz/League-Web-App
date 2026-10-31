@@ -285,9 +285,9 @@ describe("decide", () => {
     expect(failed(decide(pr({ body: filled }), main()))).toEqual([]);
   });
 
-  // The gates read sections line by line, and a heading inside an HTML comment
-  // or a code block can fool them (decision record 0009), so the template
-  // itself has neither.
+  // The gates skip HTML comments and fenced code blocks (decision record
+  // 0019), but the template still has neither, so a builder filling it in
+  // never needs to know that.
   it("keeps HTML comments and code blocks out of the PR template", () => {
     expect(TEMPLATE).not.toMatch(/<!--|^\s*(```|~~~)/m);
   });
@@ -440,7 +440,7 @@ describe("decide", () => {
     const decision = decide(pr({ body: body({ review: [misplaced, ...others] }) }), main());
     expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
     expect(detail(decision, "Reviewer cleared the PR")).toContain(
-      `couldn't read "${misplaced}": a verdict reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`,
+      `couldn't read "${misplaced}": a verdict starts its own line and reads "Reviewer agent at <sha>: no blockers", and a re-review's "(re-review since <since>)" goes after the verdict`,
     );
   });
 
@@ -684,8 +684,10 @@ describe("decide", () => {
     `Earlier: Reviewer agent at ${HEAD}: no blockers`,
     `- Reviewer agent at ${HEAD}: no blockers`,
     `> Reviewer agent at ${HEAD}: no blockers`,
-  ])("doesn't count a verdict that doesn't start its line: %s", (line) => {
-    expect(failed(decide(pr({ body: body({ review: [line] }) }), main()))).toEqual(["Reviewer cleared the PR"]);
+  ])("doesn't count a verdict that doesn't start its line, and names it: %s", (line) => {
+    const decision = decide(pr({ body: body({ review: [line] }) }), main());
+    expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
+    expect(detail(decision, "Reviewer cleared the PR")).toContain("a verdict starts its own line");
   });
 
   it.each([`**Reviewer agent at ${HEAD}: no blockers**`, `\`Reviewer agent at ${HEAD}: no blockers\``, `  Reviewer agent at ${HEAD}: no blockers`])(
