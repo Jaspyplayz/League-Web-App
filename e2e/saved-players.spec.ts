@@ -36,6 +36,7 @@ async function fakeAnswers(page: Page, answers: { status?: number; json?: unknow
   return seen;
 }
 
+// Home only: it has no header search, so this is the one box there.
 const riotId = (page: Page) => page.getByRole("textbox", { name: "Riot ID" });
 const recentTab = (page: Page) => page.getByRole("tab", { name: /^Recent/ });
 
@@ -116,7 +117,7 @@ test("a search error doesn't follow you to the player you pick", async ({ page }
   await openHomeWithSaved(page, [me]);
   await page.goto("/privacy");
   // The header's box by name: Riot doesn't know this player, so their page can
-  // turn into the not-found page, which has a Riot ID box of its own.
+  // turn into the player-not-found page, which has a Riot ID box of its own.
   const headerBox = page.getByRole("search", { name: "Search a player" }).getByRole("textbox", { name: "Riot ID" });
   await headerBox.fill("no tag here");
   await page.keyboard.press("Enter");
