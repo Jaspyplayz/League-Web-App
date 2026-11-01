@@ -42,6 +42,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A new way to start a check that the merge gates trust](agent-mistakes/new-trigger-feeds-the-gates.md) | 1 | check |
 | [A throwing read moved onto a page that didn't expect it](agent-mistakes/throwing-read-moved-to-a-busier-page.md) | 1 | check |
 | [Text on screen that promises more than the feature does](agent-mistakes/screen-text-promises-more-than-the-feature.md) | 1 | none yet |
+| [Opening a gate without keeping what it quietly guarded](agent-mistakes/opened-gate-dropped-its-guard.md) | 3 | check |
 | [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | none yet |
 
 ## Rules and what enforces them
@@ -58,7 +59,7 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
 | A PR that touches Jasper's list (migrations, anything that defines a check) is Jasper's to merge | `npm run can-merge`, gate "No files Jasper merges" (`jaspersFiles` in `scripts/risky-paths.ts`) |
 | A risky PR merges only after the interrogate panel ran on one of its commits | `npm run can-merge`, gate "Interrogate panel ran", and its tests in `scripts/can-merge-gates.test.ts` |
-| A one-way door is Jasper's to merge | `npm run can-merge`, gate "Two-way door" |
+| A one-way door is Jasper's to merge | `npm run can-merge`, gate "Two-way door", reads what the PR says. For a one-way door labelled two-way, nothing yet but the reviewer (`.claude/agents/reviewer.md`, check 8); JAS-69 would compare the line with the diff |
 | The Agent merge workflow merges only a PR whose builder wrote `**Ready to merge:** yes at <head sha>` | `readyToMerge` in `scripts/can-merge-action-steps.ts` and its tests |
 | CI started by hand runs only on main, so it can't stand in for a PR's own `check` | The first step of `.github/workflows/ci.yml`, pinned by test `fails at once when started by hand anywhere but main` in `scripts/can-merge-action-steps.test.ts` |
 | Every agent mistake entry has all five lines | `scripts/agent-mistakes.test.ts` |

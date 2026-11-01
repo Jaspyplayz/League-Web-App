@@ -172,6 +172,7 @@ describe("decide", () => {
         "No files Jasper merges",
         "Reviewer cleared the PR",
         "Interrogate panel ran",
+        "Acceptance criteria ticked",
       ]);
     },
   );
@@ -393,14 +394,14 @@ describe("decide", () => {
     const files = ["src/x.ts"];
     const big = decide(pr({ body: tiny, files }), main(), history({ lines: { "src/x.ts": TINY_LINES + 1 } }, files));
     expect(failed(big)).toEqual(["Reviewer cleared the PR"]);
-    const risky = decide(pr({ body: tiny, files: ["src/db/schema.ts"] }), main());
-    expect(failed(risky)).toEqual(["Reviewer cleared the PR", "Interrogate panel ran"]);
+    const risky = decide(pr({ body: tiny, files: ["src/lib/riot/client.ts"] }), main());
+    expect(failed(risky)).toEqual(["Reviewer cleared the PR", "Interrogate panel ran", "Acceptance criteria ticked"]);
   });
 
   it("refuses a migration even when the tier says tiny, and names it", () => {
     const tiny = body({ tier: "tiny. One column.", criteria: [] });
     const decision = decide(pr({ body: tiny, files: ["docs/database.md", "drizzle/0013_notes.sql"] }), main());
-    expect(failed(decision)).toEqual(["No files Jasper merges", "Interrogate panel ran"]);
+    expect(failed(decision)).toEqual(["No files Jasper merges", "Interrogate panel ran", "Acceptance criteria ticked"]);
     expect(detail(decision, "No files Jasper merges")).toBe("drizzle/0013_notes.sql (database migrations)");
   });
 
@@ -439,10 +440,31 @@ describe("decide", () => {
       ["a panel line in a code block", ["```", panel(HEAD), "```", "", `Reviewer agent at ${HEAD}: no blockers`]],
       ["a panel line in a comment", [`<!-- ${panel(HEAD)} -->`, "", `Reviewer agent at ${HEAD}: no blockers`]],
       ["a panel line after a bullet", [`- ${panel(HEAD)}`, "", `Reviewer agent at ${HEAD}: no blockers`]],
+      ["a panel line saying it couldn't run", [`Interrogate panel at ${HEAD}: could not run`, "", `Reviewer agent at ${HEAD}: no blockers`]],
     ])("refuses a risky tier with %s", (_, review) => {
       const decision = decide(pr({ body: risky(review), files: SIGN_IN }), main());
       expect(failed(decision)).toEqual(["Interrogate panel ran"]);
-      expect(detail(decision, "Interrogate panel ran")).toContain('no "Interrogate panel at <sha>:" line');
+      expect(detail(decision, "Interrogate panel ran")).toContain('no "Interrogate panel at <sha>: <n> to act on" line');
+    });
+
+    // A panel that ran before the PR touched a risky path never read it, so a
+    // docs-only first commit can't stand in for one.
+    it("refuses a panel on a commit from before the PR changed a risky path, and names it", () => {
+      const docsOnly = (sha: string) => (sha === OLDER ? { commits: 1, lines: {}, files: ["docs/sign-in.md"], created: [] } : undefined);
+      const decision = decide(
+        pr({ body: risky([panel(OLDER), "", `Reviewer agent at ${HEAD}: no blockers`]), files: SIGN_IN }),
+        main(),
+        history({ since: docsOnly }, SIGN_IN),
+      );
+      expect(failed(decision)).toEqual(["Interrogate panel ran"]);
+      expect(detail(decision, "Interrogate panel ran")).toContain("src/app/sign-in/page.tsx");
+    });
+
+    // Otherwise "tiny" would skip the criteria on a PR that changes sign-in.
+    it("asks a tiny PR that changes a risky path for its acceptance criteria", () => {
+      const review = [panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`];
+      const decision = decide(pr({ body: body({ tier: "tiny. One line.", criteria: [], review }), files: SIGN_IN }), main());
+      expect(failed(decision)).toEqual(["Acceptance criteria ticked"]);
     });
 
     // A normal tier that touches a risky path, like PR 245, needs it too.
@@ -466,18 +488,22 @@ describe("decide", () => {
     });
 
     it("doesn't ask for the panel on a normal PR with no risky paths", () => {
-      expect(detail(decide(pr(), main()), "Interrogate panel ran")).toBe("not needed: a normal PR with no risky paths");
+      expect(detail(decide(pr(), main()), "Interrogate panel ran")).toBe("not needed: no risky tier and no risky paths");
     });
 
     // Acceptance criterion 2: these stay Jasper's whatever the tier and verdicts.
     it.each([
       "drizzle/0013_notes.sql",
       "drizzle.config.ts",
+      "src/db/schema.ts",
       ".github/workflows/ci.yml",
       ".claude/skills/verify-turnpoint-ux/SKILL.md",
       ".claude/agents/reviewer.md",
       "eslint-rules/no-green-classes.mjs",
+      "eslint.config.js",
       "playwright.config.ts",
+      "e2e/preview-login.ts",
+      "src/app/themes.test.ts",
       "package.json",
       "scripts/can-merge-gates.ts",
       "scripts/risky-paths.ts",
@@ -540,12 +566,41 @@ describe("decide", () => {
       ["one-way", "one-way. It sends an email."],
       ["the template's placeholder", "one-way or two-way. Two-way means a revert undoes it completely."],
       ["neither", "maybe. Nothing stays, I think."],
+      ["two-way, then one-way in its reason", "two-way, except the emails it sends are one-way."],
+      ["two-way, then one-way after a full stop", "two-way. The rows it writes are one-way."],
+      ["a word that only starts with two-way", "two-way-ish. Most of it reverts."],
     ])("refuses a PR whose door is %s", (_, door) => {
       expect(failed(decide(pr({ body: body({ door }) }), main()))).toEqual(["Two-way door"]);
     });
 
-    it("lets a PR with no risky paths leave the Door line out", () => {
-      expect(detail(decide(pr({ body: body({ door: null }) }), main()), "Two-way door")).toBe("no **Door:** line, and no risky paths");
+    // These read as one-way on GitHub but aren't the exact "**Door:**" line, so
+    // the gate must not count them as no line at all.
+    it.each(["- **Door:** one-way", "**Door: one-way.**", "**Door**: one-way", "Door: one-way", "> `**Door:**` one-way"])(
+      "refuses a line that only looks like the Door line and says one-way: %s, at any tier",
+      (line) => {
+        for (const tier of ["tiny. Copy.", "normal. Copy."]) {
+          const text = body({ tier, door: null }).replace("## Merge Danger\n", `## Merge Danger\n${line}\n`);
+          expect(failed(decide(pr({ body: text }), main()))).toEqual(["Two-way door"]);
+        }
+      },
+    );
+
+    it("doesn't refuse a line that mentions a one-way door in passing", () => {
+      const text = body().replace("Adds a card to Insights.", "- The gate refuses a door marked `one-way`, and Door notes say why.");
+      expect(failed(decide(pr({ body: text }), main()))).toEqual([]);
+    });
+
+    it("lets a tiny PR with no risky paths leave the Door line out", () => {
+      const tiny = body({ tier: "tiny. Copy.", door: null });
+      expect(detail(decide(pr({ body: tiny }), main()), "Two-way door")).toBe("a tiny PR with no risky paths needs no **Door:** line");
+    });
+
+    // A normal PR can be a one-way door too, such as one that sends a message,
+    // so leaving the line out can't be how it merges.
+    it("refuses a normal PR with no Door line", () => {
+      const decision = decide(pr({ body: body({ door: null }) }), main());
+      expect(failed(decision)).toEqual(["Two-way door"]);
+      expect(detail(decision, "Two-way door")).toContain("no **Door:** line");
     });
 
     it("refuses a risky PR with no Door line", () => {

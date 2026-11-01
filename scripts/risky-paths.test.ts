@@ -2,7 +2,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
-import { CARVED_OUT, jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, RISKY_PATHS, riskyFiles } from "./risky-paths";
+import { FEATURE_NOTE, jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, riskyFiles } from "./risky-paths";
+
+const RISKY_PATHS = [...JASPERS_PATHS, ...PANEL_PATHS];
 
 // -z lists names unquoted, so a file named in other letters is still checked.
 const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
@@ -13,7 +15,7 @@ const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others",
 
 // The only risky patterns allowed to match no file in the repo (see the
 // "names only paths that exist" test below).
-const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/"];
+const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/", "vite.config", ".npmrc", ".mcp.json"];
 
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
@@ -63,7 +65,7 @@ describe("riskyFiles", () => {
         "package.json",
       ]),
     ).toEqual([
-      { path: "src/db/schema.ts", why: "the database schema and queries" },
+      { path: "src/db/schema.ts", why: "the tables migrations are generated from" },
       { path: "drizzle/0012_ask_budget.sql", why: "database migrations" },
       { path: "src/lib/riot/client.ts", why: "the Riot client and rate limiter" },
       { path: "src/app/api/mcp/route.ts", why: "API routes, including the MCP server" },
@@ -164,6 +166,7 @@ describe("riskyFiles", () => {
     const paths = [
       "drizzle/0014_notes.sql",
       "drizzle.config.ts",
+      "src/db/schema.ts",
       ".github/workflows/ci.yml",
       ".claude/settings.json",
       ".claude/hooks/check-before-commit.mjs",
@@ -179,8 +182,15 @@ describe("riskyFiles", () => {
       "vercel.json",
       "vitest.config.mts",
       "playwright.config.ts",
+      "e2e/fixtures.ts",
+      "e2e/preview-login.ts",
+      "e2e/preview-secret.spec.ts",
+      "src/app/themes.test.ts",
       "package.json",
       "package-lock.json",
+      ".npmrc",
+      ".nvmrc",
+      ".mcp.json",
       "scripts/can-merge-gates.ts",
       "scripts/risky-paths.ts",
       "src/lib/.claude/rules/x.md",
@@ -188,12 +198,21 @@ describe("riskyFiles", () => {
     expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
+  // Each tool loads another file name ahead of the one the repo has today, so
+  // an exact name would let a new file replace a check's config.
+  it.each(["eslint.config.js", "next.config.js", "vitest.config.ts", "vite.config.ts", "playwright.config.js", "tsconfig.base.json"])(
+    "keeps %s Jasper's, which could replace a check's config",
+    (path) => {
+      expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
+    },
+  );
+
   // These are risky, so they get the interrogate panel, but Claude merges them
   // once it clears them. e2e/ holds the smoke test's specs; what decides
   // whether and how they run (playwright.config.ts, .github/) stays Jasper's.
   it("lets Claude merge the product's risky paths after the panel", () => {
     const paths = [
-      "src/db/schema.ts",
+      "src/db/freshness.ts",
       "src/lib/match-note-store.ts",
       "src/app/sign-in/page.tsx",
       "src/lib/riot/client.ts",
@@ -202,7 +221,6 @@ describe("riskyFiles", () => {
       "src/lib/analyzer/score-model.json",
       "src/app/privacy/page.tsx",
       "src/app/globals.css",
-      "src/app/themes.test.ts",
       "e2e/smoke.spec.ts",
     ];
     expect(jaspersFiles(paths)).toEqual([]);
@@ -221,6 +239,8 @@ describe("riskyFiles", () => {
       ".claude/skills/verify-turnpoint-ux/scripts/drive.ts",
       ".claude/skills/verify-turnpoint-ux/features/drive.ts",
       ".claude/skills/verify-turnpoint-ux/features/.claude/rules/x.md",
+      ".claude/skills/verify-turnpoint-ux/features/deep/SKILL.md",
+      ".claude/skills/verify-turnpoint-ux/features/README.md",
       ".claude/skills/verify-turnpoint/features/ask-teaser.md",
       "src/.claude/skills/verify-turnpoint-ux/features/x.md",
     ];
@@ -235,32 +255,26 @@ describe("riskyFiles", () => {
     ]);
   });
 
-  // Jasper's list is checked first, so a pattern on both would be his anyway,
-  // but the reader of one list shouldn't have to know that.
-  it("puts no path on both lists", () => {
+  // A file on Jasper's list can sit in a panel folder, like src/db/schema.ts
+  // in src/db/, but a whole panel pattern inside his list would do nothing.
+  it("puts no panel pattern inside one of Jasper's", () => {
     const both = PANEL_PATHS.filter(({ pattern }) => JASPERS_PATHS.some((jaspers) => matchesPattern(jaspers.pattern, pattern)));
     expect(both).toEqual([]);
   });
 
-  it("lists every path once, Jasper's first", () => {
-    expect(RISKY_PATHS).toEqual([...JASPERS_PATHS, ...PANEL_PATHS]);
-  });
-
-  // A carve-out that matches no file, or sits outside Jasper's list, does nothing.
-  it("carves out only files that exist and would otherwise be Jasper's", () => {
-    for (const { pattern } of CARVED_OUT) {
-      const files = repoFiles.filter((file) => matchesPattern(pattern, file));
-      expect(files.length, pattern).toBeGreaterThan(0);
-      expect(files.every((file) => JASPERS_PATHS.some((jaspers) => matchesPattern(jaspers.pattern, file))), pattern).toBe(true);
-    }
+  // A carve-out that matches no file does nothing, so renaming the skill's
+  // folder would quietly send its notes back to Jasper.
+  it("carves out feature notes that exist", () => {
+    const notes = repoFiles.filter((file) => FEATURE_NOTE.test(file));
+    expect(notes.length).toBeGreaterThan(0);
+    expect(jaspersFiles(notes)).toEqual([]);
   });
 
   // A folder renamed without updating the list would quietly stop being risky.
-  // The Cursor patterns are the exception: .cursor/ was deleted when Cursor
-  // stopped being used (decision record 0012), so they match no file, but
-  // they stay so a Cursor settings or rules file added later still goes to
-  // Jasper.
-  it("names only paths that exist in the repo, except the kept Cursor patterns", () => {
+  // The exceptions name files that don't exist yet: .cursor/ was deleted when
+  // Cursor stopped being used (decision record 0012), and the others would
+  // change how a check or an agent runs if someone added them.
+  it("names only paths that exist in the repo, except the ones kept for files added later", () => {
     const missing = RISKY_PATHS.filter(
       ({ pattern }) => !KEPT_WITHOUT_FILES.includes(pattern) && !repoFiles.some((file) => matchesPattern(pattern, file)),
     );

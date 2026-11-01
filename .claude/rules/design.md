@@ -21,7 +21,7 @@ The look is the **Review board** ([0022](../../docs/adr/0022-the-review-board-lo
 
 **Spacing and motion.** 40px page sides, 68px header, 24 to 28px between columns, 14px between panels. Hover fades in 0.12s and out 0.32s, never during a theme switch or under reduced motion.
 
-**Process.** The ticket links its mockup before work starts; no link, ask Jasper. Before Done, the PR puts screenshots side by side with the mockup, in dark, light and at 390px wide (`npm run shot -- --phone`), naming each intended difference. Jasper merges the look's foundations, the files on `scripts/risky-paths.ts` (`globals.css`, `themes.test.ts`, these rules); a restyle that touches none of them stays normal tier.
+**Process.** The ticket links its mockup before work starts; no link, ask Jasper. Before Done, the PR puts screenshots side by side with the mockup, in dark, light and at 390px wide (`npm run shot -- --phone`), naming each intended difference. Jasper merges the look's checks and rules (`themes.test.ts`, these rules), which are on his list in `scripts/risky-paths.ts`. `globals.css` is on the panel list, so a change to it gets the interrogate panel, and Claude merges it after ([0025](../../docs/adr/0025-risky-prs-merge-after-the-panel.md)). A restyle that touches none of them stays normal tier.
 
 **Accessibility.** `e2e/accessibility.spec.ts` scans each Vercel preview and fails on any finding. Text is hardest to read on the blue and red tints, so check a new colour on them in both themes, over `page`, `panel` and `raised`, not only on white. Over the light page, `ahead` and `behind` pass on `/10`; on `/15` use `ahead-soft` or `ahead-bright`, on `/20` only `ahead-bright`, and keep red text off `/15` and `/20`. In dark, `/10` over `raised` fails for both.
 

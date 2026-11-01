@@ -121,6 +121,10 @@ type Tier = { ok: true; tier: "tiny" | "normal" | "risky" } | { ok: false; why: 
 type Context = { pr: PrSnapshot; main: MainState; history: ReviewHistory; tier: Tier };
 type Result = { pass: boolean; detail: string };
 
+// Ignores list and quote markers and indentation, to count every line that
+// could pass for a heading or field somewhere GitHub shows it differently.
+const CONTAINER = String.raw`^(?:\s|>|[-+*]\s|\d+[.)]\s)*`;
+
 // Agents follow docs/workflow.md, the skill setup in docs/agents/, any CLAUDE
 // or AGENTS file and anything in a dot folder as rules, so a change to one
 // always gets the reviewer, whatever the tier (JAS-12). Windows ignores case,
@@ -274,7 +278,7 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
   {
     name: "Acceptance criteria ticked",
     check: ({ pr, tier }) => {
-      if (tier.ok && tier.tier === "tiny") return pass("a tiny PR has no acceptance criteria");
+      if (skipsCriteriaAndDoor(pr, tier)) return pass("a tiny PR with no risky paths has no acceptance criteria");
       // A box in any list GitHub renders ("-", "*", "+", "1." or "1)"), nested
       // or inside a ">" quote. Only "[x]" counts as ticked, and a "[text](url)"
       // link isn't a box.
@@ -480,28 +484,34 @@ function carryOver(
   return pass(`${line}, carried over ${plural(commits, "commit")} with ${plural(counted, "line")} outside docs`);
 }
 
-// Why a PR needs the interrogate panel (and a Door line), or undefined when
-// it doesn't: a risky tier, or any risky path whatever the tier says, such
-// as PR 245's normal-tier sign-in page. A tier the gate can't read counts as
-// risky, so a typo can't skip the panel.
+// Why a PR needs the interrogate panel, or undefined when it doesn't: a risky
+// tier, or any risky path whatever the tier says, such as PR 245's normal-tier
+// sign-in page. A tier the gate can't read counts too, so a typo can't skip it.
 function needsPanel(pr: Pick<PrSnapshot, "files">, tier: Tier): string | undefined {
   const risky = riskyFiles(pr.files).map(({ path }) => path);
   if (risky.length > 0) return `a PR that changes ${risky.join(", ")}`;
-  if (!(tier.ok && tier.tier !== "risky")) return "a risky tier";
-  return undefined;
+  if (!tier.ok) return "a PR whose tier the gate can't read";
+  return tier.tier === "risky" ? "a risky tier" : undefined;
+}
+
+// Only a tiny PR that needs no panel skips these, so calling a change to
+// sign-in tiny doesn't skip them.
+function skipsCriteriaAndDoor(pr: Pick<PrSnapshot, "files">, tier: Tier): boolean {
+  return tier.ok && tier.tier === "tiny" && needsPanel(pr, tier) === undefined;
 }
 
 // The builder's record of the panel, as docs/workflow.md asks:
 // "Interrogate panel at <sha>: <n> to act on", on its own line. Only a line
 // GitHub shows counts, at the start of the line with at most bold or code
-// around it, so one in a comment, code block or bullet doesn't.
-const PANEL = /^ {0,3}(?:\*\*|__|`+)?Interrogate panel at ([0-9a-f]{7,40}):/i;
+// around it, so one in a comment, code block or bullet doesn't, and neither
+// does "Interrogate panel at <sha>: could not run".
+const PANEL = /^ {0,3}(?:\*\*|__|`+)?Interrogate panel at ([0-9a-f]{7,40}):\s*\d+ to act on\b/i;
 
 // The panel's "act on" findings aren't read: the reviewer gate already needs
 // a no-blockers verdict at the head, which covers the fixes for them.
 function panelResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Result {
   const reason = needsPanel(pr, tier);
-  if (reason === undefined) return pass(`not needed: a ${tier.ok ? tier.tier : ""} PR with no risky paths`);
+  if (reason === undefined) return pass("not needed: no risky tier and no risky paths");
   const review = section(pr.body, "Review");
   if ("why" in review) return fail(review.why);
   const shas = review.shown.flatMap((line, i) => {
@@ -510,7 +520,7 @@ function panelResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Resul
   });
   if (shas.length === 0) {
     return fail(
-      `no "Interrogate panel at <sha>:" line on its own in the Review section, which ${reason} needs ("no interrogate panel yet" doesn't count)`,
+      `no "Interrogate panel at <sha>: <n> to act on" line on its own in the Review section, which ${reason} needs ("no interrogate panel yet" doesn't count)`,
     );
   }
   // Every panel line must name the head or a commit the PR added, so one
@@ -520,28 +530,39 @@ function panelResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Resul
     const named = outside.map((sha) => sha.slice(0, 7)).join(", ");
     return fail(`the panel saw ${named}, which isn't the head commit or one this PR added`);
   }
+  // The panel only runs once, so later fixes to a risky file are the reviewer's
+  // to check. A risky file the PR hadn't touched yet was never read at all.
+  const filesAt = (sha: string) => (pr.headRefOid.startsWith(sha) ? pr.files : (history.since(sha)?.files ?? []));
+  const unread = riskyFiles(pr.files)
+    .map(({ path }) => path)
+    .filter((path) => !shas.some((sha) => filesAt(sha).includes(path)));
+  if (unread.length > 0) {
+    return fail(`the panel ran before this PR changed ${unread.join(", ")}, so it never read them. Run it again on a commit that has them`);
+  }
   return pass(`Interrogate panel at ${shas[0].slice(0, 7)}`);
 }
+
+// Any line that could pass for the Door line on GitHub, in a list or quote or
+// with its stars in another place, like "**Door**: one-way".
+const ONE_WAY_LINE = new RegExp(`${CONTAINER}[*_\`#\\s]*door[*_\`]*\\s*:[*_\`\\s]*one-way`, "i");
 
 // A one-way door, a change a revert can't fully undo, stays Jasper's to merge
 // (decision record 0008), and Jasper kept that when risky PRs started merging
 // on their own (JAS-128). The PR template's Merge Danger section asks for
-// "**Door:** one-way or two-way". Only a PR that needs the panel must have the
-// line; one that has it must say two-way and nothing else.
+// "**Door:** one-way or two-way". This fails closed, since refusing a two-way
+// PR costs Jasper one click and merging a one-way door can't be undone: the
+// line must start with two-way and never say one-way, even in its reason.
 function doorResult(pr: Pick<PrSnapshot, "body" | "files">, tier: Tier): Result {
+  const oneWay = lines(pr.body).find((line) => ONE_WAY_LINE.test(line));
+  if (oneWay !== undefined) return fail(`"${oneWay.trim()}" says one-way, so Jasper merges it`);
   const door = field(pr.body, "Door");
   if (!("value" in door)) {
-    const reason = needsPanel(pr, tier);
-    if (reason === undefined && door.why === "no **Door:** line") return pass("no **Door:** line, and no risky paths");
-    return fail(reason === undefined ? door.why : `${door.why}, which ${reason} needs: write "**Door:** two-way" if a revert undoes it`);
+    if ("missing" in door && skipsCriteriaAndDoor(pr, tier)) return pass("a tiny PR with no risky paths needs no **Door:** line");
+    return fail(`${door.why}: write "**Door:** two-way" if a revert undoes all of it, and leave a one-way door for Jasper`);
   }
-  // Read up to the first full stop or colon, like the tier, so the reason can
-  // say what a revert undoes.
-  const doorText = door.value.split(TIER_END)[0];
-  const named = new Set([...doorText.matchAll(/\b(one|two)-way\b/gi)].map((match) => match[1].toLowerCase()));
-  if (named.size === 1 && named.has("two") && /^\W*two-way\b/i.test(doorText)) return pass("two-way");
-  if (named.has("one")) return fail(`the **Door:** line says ${named.size > 1 ? "both one-way and two-way" : "one-way"}, so Jasper merges it`);
-  return fail(`the **Door:** line starts with "${doorText.trim()}", not two-way`);
+  if (/one-way/i.test(door.value)) return fail(`the **Door:** line says one-way, so Jasper merges it: "${door.value}"`);
+  if (/^\W*two-way(?![-\w])/i.test(door.value)) return pass("two-way");
+  return fail(`the **Door:** line starts with "${door.value}", not two-way`);
 }
 
 // The tier is the start of the line, up to its first colon, semicolon,
@@ -585,13 +606,9 @@ function lines(text: string): string[] {
   return text.split(/\r?\n/);
 }
 
-export type Field = { value: string } | { why: string };
+export type Field = { value: string } | { why: string; missing?: true };
 
-// Ignores list and quote markers and indentation, to count every line that
-// could pass for a heading or field somewhere GitHub shows it differently.
-const CONTAINER = String.raw`^(?:\s|>|[-+*]\s|\d+[.)]\s)*`;
-
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escape =(text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // The text after "**Label:**" on the one line that starts with it. A second
 // such line anywhere, even in a code block or comment, fails closed: the
@@ -604,7 +621,7 @@ export function field(body: string, label: string): Field {
   if (count > 1) return { why: `${count} lines start with ${prefix}; keep one` };
   const { raw, shown } = bodyLines(body);
   const index = shown.findIndex((text, i) => text === raw[i] && /^ {0,3}\S/.test(text) && text.trim().startsWith(prefix));
-  if (index === -1) return { why: `no ${prefix} line` };
+  if (index === -1) return { why: `no ${prefix} line`, missing: true };
   return { value: shown[index].trim().slice(prefix.length).trim() };
 }
 

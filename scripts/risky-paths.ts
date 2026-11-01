@@ -19,6 +19,9 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   // Only Jasper runs `npm run db:migrate`.
   { pattern: "drizzle/", why: "database migrations" },
   { pattern: "drizzle.config.ts", why: "where migrations run" },
+  // Migrations are generated from it, and nothing checks that one was, so a
+  // change here with no migration would break the live site's reads.
+  { pattern: "src/db/schema.ts", why: "the tables migrations are generated from" },
 
   // Anything that defines or runs a check, since loosening one is risky.
   { pattern: ".github/", why: "CI, the smoke test and the PR template" },
@@ -29,15 +32,26 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   { pattern: ".cursor/rules/", why: "Cursor isn't used any more, but a rule here could still give an AI tool instructions" },
   { pattern: ".claude/skills/", why: "skills the reviewer loads" },
   { pattern: ".claude/rules/", why: "rules the reviewer checks against" },
-  { pattern: "eslint.config.mjs", why: "lint" },
+  // The configs match without an extension, because each tool loads other file
+  // names first: an eslint.config.js would replace the .mjs.
+  { pattern: "eslint.config", why: "lint" },
   { pattern: "eslint-rules/", why: "lint" },
-  { pattern: "tsconfig.json", why: "the type check" },
-  { pattern: "next.config.ts", why: "the build, which can skip type errors" },
+  { pattern: "tsconfig", why: "the type check" },
+  { pattern: "next.config", why: "the build, which can skip type errors" },
   { pattern: "vercel.json", why: "Vercel's build settings" },
-  { pattern: "vitest.config.mts", why: "unit tests" },
-  { pattern: "playwright.config.ts", why: "which smoke tests run, and how" },
+  { pattern: "vitest.config", why: "unit tests" },
+  { pattern: "vite.config", why: "unit tests, since Vitest reads it too" },
+  { pattern: "src/app/themes.test.ts", why: "the check that every colour has a light value" },
+  { pattern: "playwright.config", why: "which smoke tests run, and how" },
+  // These hold the preview's bypass secret and check that it goes nowhere else.
+  { pattern: "e2e/fixtures.ts", why: "the check that the preview's secret stays on the preview" },
+  { pattern: "e2e/preview-login.ts", why: "the code that sends the preview's secret" },
+  { pattern: "e2e/preview-secret.spec.ts", why: "the check that the preview's secret stays on the preview" },
   { pattern: "package.json", why: "the commands CI runs, and dependencies" },
   { pattern: "package-lock.json", why: "dependencies" },
+  { pattern: ".npmrc", why: "how npm ci installs, in every workflow" },
+  { pattern: ".nvmrc", why: "the Node version CI uses" },
+  { pattern: ".mcp.json", why: "tools every agent here would load" },
 
   // The merge rules themselves.
   { pattern: ".claude/agent-merge.json", why: "the switch for agent merging" },
@@ -51,15 +65,14 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
 
 // Inside JASPERS_PATHS, but Claude merges these after the panel, like
 // PANEL_PATHS. Most redesign PRs update the verify skill's feature notes, so
-// Jasper chose to let them go (2026-11-01). Only Markdown notes: a script
-// there could be run by the skill.
-export const CARVED_OUT: readonly RiskyPath[] = [
-  { pattern: ".claude/skills/verify-turnpoint-ux/features/*.md", why: "the verify skill's feature notes, which agents follow" },
-];
+// Jasper chose to let them go (2026-11-01). Only Markdown notes directly in the
+// folder: a script could be run by the skill, a subfolder could hold a skill
+// of its own, and the README says what counts as a pass.
+export const FEATURE_NOTE = /^\.claude\/skills\/verify-turnpoint-ux\/features\/(?!readme\.md$)[^/]+\.md$/i;
 
 export const PANEL_PATHS: readonly RiskyPath[] = [
   // The risky row of docs/workflow.md's tier table.
-  { pattern: "src/db/", why: "the database schema and queries" },
+  { pattern: "src/db/", why: "the database client and queries" },
   { pattern: "src/lib/*-store.ts", why: "database reads and writes, including deletes" },
   { pattern: "src/lib/my-player.ts", why: "links a user to their player in the database" },
   { pattern: "src/lib/own-data.ts", why: "how a failed read of a player's own data is reported" },
@@ -91,18 +104,15 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
   { pattern: "src/app/privacy/", why: "Riot reviews it for production keys" },
   { pattern: "src/app/terms/", why: "Riot reviews it for production keys" },
 
-  // The smoke test's specs. They're tests like any other, which the reviewer
-  // and the panel read; what decides whether and how they run
-  // (playwright.config.ts, .github/) stays on Jasper's list.
+  // The smoke test's specs, which Jasper chose to let go. They're tests like
+  // any other, which the reviewer and the panel read; what decides whether and
+  // how they run (playwright.config.ts, .github/) stays on Jasper's list.
   { pattern: "e2e/", why: "the smoke test and accessibility scan" },
 
-  // The look's foundations (JAS-94): the palette and the test that guards it.
-  // Page restyles that only use the tokens stay off this list.
+  // The look's foundation (JAS-94). Page restyles that only use the tokens
+  // stay off this list.
   { pattern: "src/app/globals.css", why: "the palette in both themes, the corners and the fonts" },
-  { pattern: "src/app/themes.test.ts", why: "the check that every colour has a light value" },
 ];
-
-export const RISKY_PATHS: readonly RiskyPath[] = [...JASPERS_PATHS, ...PANEL_PATHS];
 
 // Windows ignores case, so src/DB/schema.ts would land on src/db/schema.ts.
 export function matchesPattern(pattern: string, path: string): boolean {
@@ -120,13 +130,11 @@ const NESTED_AGENT_CONFIG = /\/\.(claude|cursor)\//i;
 
 type Owner = { why: string; jaspers: boolean };
 
-// In this order, so a mistake lands on Jasper's side: a nested agent folder
-// is his even inside the carve-out (features/.claude/rules/x.md ends in .md
-// too), and Jasper's list wins over a panel pattern that also matches.
+// In this order, so a mistake lands on Jasper's side: his list wins over a
+// panel pattern that also matches, such as src/db/schema.ts inside src/db/.
 function owner(path: string): Owner | undefined {
   if (NESTED_AGENT_CONFIG.test(path)) return { why: "agent skills or rules below the repo root", jaspers: true };
-  const carved = CARVED_OUT.find(({ pattern }) => matchesPattern(pattern, path));
-  if (carved) return { why: carved.why, jaspers: false };
+  if (FEATURE_NOTE.test(path)) return { why: "the verify skill's feature notes, which agents follow", jaspers: false };
   const jaspers = JASPERS_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
   if (jaspers) return { why: jaspers.why, jaspers: true };
   const panel = PANEL_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
