@@ -2,8 +2,8 @@ import type { WeaknessId } from "@/lib/analyzer/trends";
 import type { Focus } from "@/lib/focus";
 
 // The profile's By day view (it was the Log tab): a player's games grouped
-// into days, newest first, so they can see how each day went (record, LP,
-// game score, focus goal) and keep a short private note on it. These are
+// into days, on a month calendar coloured by how each day went, with a panel
+// per day (record, LP, focus goal, games) and a short private note on it. These are
 // plain functions so they can be tested without a browser or a database; the
 // view is src/app/player/[region]/[riotId]/by-day.tsx and daily-log.tsx.
 //
@@ -22,19 +22,16 @@ export type LogGame = {
   win: boolean;
   // Ranked solo/duo, the queue the LP is for.
   ranked: boolean;
-  championName: string;
   // The champion's display name ("Lee Sin" for "LeeSin").
   championLabel: string;
+  // The champion's square portrait from Data Dragon, or null when Data
+  // Dragon couldn't be reached (the row then shows a plain square).
+  championIcon: string | null;
   kills: number;
   deaths: number;
   assists: number;
-  csPerMin: number;
-  visionPerMin: number;
   // The 0 to 100 game score, or null for ARAM, Arena and similar.
   score: number | null;
-  // Your gold minus your opponent's at 15 minutes, once the game's timeline
-  // has been fetched (Insights and the match page fetch them too).
-  goldAt15: number | null;
   // Whether the game showed each focus-goal weakness; null until the
   // timeline is in, or when the game has no role matchup.
   shows: Record<WeaknessId, boolean | null> | null;
@@ -90,7 +87,7 @@ export function recentDays(now: number, count: number): string[] {
 }
 
 // The games grouped by day, newest day first. Days with no games are left
-// out; the month strip shows those.
+// out; the calendar shows those.
 export function groupDays(games: LogGame[], ranks: LogRankPoint[]): LogDay[] {
   const byDay = new Map<string, LogGame[]>();
   for (const game of [...games].sort((a, b) => b.startedAt - a.startedAt)) {
@@ -112,6 +109,15 @@ export function groupDays(games: LogGame[], ranks: LogRankPoint[]): LogDay[] {
     });
 }
 
+// Only the days in the last LOG_DAYS days. The server fetches a day more,
+// because its "four weeks ago" can be a day off the viewer's; without this, a
+// game from that extra day would sit on a calendar month the arrows can't
+// reach, or be left off the calendar while its panel still showed.
+export function lastFourWeeks(days: LogDay[], now: number): LogDay[] {
+  const inRange = new Set(recentDays(now, LOG_DAYS));
+  return days.filter((d) => inRange.has(d.day));
+}
+
 // LP gained or lost in a day's solo/duo games. Riot only says what a
 // player's rank is right now, so this compares two saved copies of the rank:
 // the last one before the day's first ranked game and the first one after its
@@ -131,37 +137,6 @@ export function dayLp(games: LogGame[], ranks: LogRankPoint[]): number | null {
   return after.score - before.score;
 }
 
-// The day's averages for the Detailed cards. Null where no game has the
-// number (no scored games, or no timelines fetched yet).
-export type DayStats = {
-  champions: { label: string; games: number }[]; // most played first
-  score: number | null;
-  csPerMin: number;
-  deaths: number;
-  visionPerMin: number;
-  goldAt15: number | null;
-};
-
-export function dayStats(games: LogGame[]): DayStats {
-  const counts = new Map<string, number>();
-  for (const g of games) counts.set(g.championLabel, (counts.get(g.championLabel) ?? 0) + 1);
-  return {
-    champions: [...counts.entries()]
-      .map(([label, n]) => ({ label, games: n }))
-      .sort((a, b) => b.games - a.games),
-    score: average(games.map((g) => g.score)),
-    csPerMin: average(games.map((g) => g.csPerMin)) ?? 0,
-    deaths: average(games.map((g) => g.deaths)) ?? 0,
-    visionPerMin: average(games.map((g) => g.visionPerMin)) ?? 0,
-    goldAt15: average(games.map((g) => g.goldAt15)),
-  };
-}
-
-function average(values: (number | null)[]): number | null {
-  const known = values.filter((v): v is number => v !== null);
-  return known.length ? known.reduce((sum, v) => sum + v, 0) / known.length : null;
-}
-
 // How each of the day's games went against the focus goal, oldest first:
 // true = avoided the weakness, false = it showed, null = can't tell yet.
 // Only games after the goal was picked count, like the Insights panel.
@@ -175,29 +150,120 @@ export function focusResults(games: LogGame[], focus: Focus): (boolean | null)[]
     });
 }
 
-// One square in the month strip at the top of By day.
-export type StripDay = { day: string; games: number; wins: number; losses: number };
-
-// The last LOG_DAYS days, oldest first so the strip reads left to right.
-export function monthStrip(days: LogDay[], now: number): StripDay[] {
-  const byDay = new Map(days.map((d) => [d.day, d]));
-  return recentDays(now, LOG_DAYS)
-    .reverse()
-    .map((day) => {
-      const found = byDay.get(day);
-      return {
-        day,
-        games: found?.games.length ?? 0,
-        wins: found?.wins ?? 0,
-        losses: found?.losses ?? 0,
-      };
-    });
-}
-
 // "Today", "Yesterday" or "3 days ago", under the date on each card.
 export function daysAgo(day: string, now: number): string {
   const index = recentDays(now, LOG_DAYS + 7).indexOf(day);
   if (index === 0) return "Today";
   if (index === 1) return "Yesterday";
   return index > 1 ? `${index} days ago` : "";
+}
+
+// ---- The month calendar ----
+
+// How a day went, which picks its colour on the calendar: blue when most of
+// its games were won, red when most were lost, a neutral fill for a tie, and
+// the plain raised fill when no games were played.
+export type DayColour = "won" | "lost" | "even" | "none";
+
+export function dayColour(day: { wins: number; losses: number } | undefined): DayColour {
+  if (!day || day.wins + day.losses === 0) return "none";
+  if (day.wins > day.losses) return "won";
+  if (day.losses > day.wins) return "lost";
+  return "even";
+}
+
+// One day on the calendar. Days before the last LOG_DAYS days, and days still
+// to come, are `inRange: false`: By day has no games for them, so they get no
+// fill rather than looking like days with no games.
+export type CalendarDay = {
+  day: string; // "2026-10-16"
+  date: number; // 16
+  weekday: number; // 0 for Monday to 6 for Sunday
+  inRange: boolean;
+  today: boolean;
+  colour: DayColour;
+  wins: number;
+  losses: number;
+};
+
+// Every day of one month ("2026-10"), first to last. Weeks start on Monday,
+// so `weekday` of the first day says which column it starts in.
+export function monthGrid(month: string, days: LogDay[], now: number): CalendarDay[] {
+  const [y, m] = month.split("-").map(Number);
+  const byDay = new Map(days.map((d) => [d.day, d]));
+  const inRange = new Set(recentDays(now, LOG_DAYS));
+  const today = dayKey(now);
+  // Day 0 of the next month is the last day of this one.
+  const length = new Date(y, m, 0).getDate();
+  return Array.from({ length }, (_, i) => {
+    // Built at noon so no timezone or daylight saving change can move it.
+    const date = new Date(y, m - 1, i + 1, 12);
+    const day = dayKey(date.getTime());
+    const found = byDay.get(day);
+    return {
+      day,
+      date: i + 1,
+      // getDay() counts from Sunday; this counts from Monday.
+      weekday: (date.getDay() + 6) % 7,
+      inRange: inRange.has(day),
+      today: day === today,
+      colour: dayColour(found),
+      wins: found?.wins ?? 0,
+      losses: found?.losses ?? 0,
+    };
+  });
+}
+
+// "2026-10" for "2026-10-16".
+export function monthOf(day: string): string {
+  return day.slice(0, 7);
+}
+
+// The months the last LOG_DAYS days touch, oldest first: one or two, since
+// four weeks can't cover a whole month and the bits either side of it.
+export function monthsInRange(now: number): string[] {
+  return [...new Set(recentDays(now, LOG_DAYS).map(monthOf))].reverse();
+}
+
+// The month the calendar opens on: the newest game's, so a player who hasn't
+// played yet this month still sees their last days. This month when there
+// are no games at all.
+export function startMonth(days: LogDay[], now: number): string {
+  return monthOf(days[0]?.day ?? dayKey(now));
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+// "Sat 17 Oct" from "2026-10-17", the date on each day panel. Written out by
+// hand rather than with toLocaleDateString, so it reads the same in every
+// browser and language setting.
+export function formatDay(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const weekday = WEEKDAYS[new Date(y, m - 1, d, 12).getDay()];
+  return `${weekday} ${d} ${MONTHS[m - 1].slice(0, 3)}`;
+}
+
+// "October 2026" from "2026-10", the calendar's heading.
+export function formatMonth(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${y}`;
+}
+
+// "October" from "2026-10", for "No games in October".
+export function monthName(month: string): string {
+  return MONTHS[Number(month.slice(5, 7)) - 1];
 }
