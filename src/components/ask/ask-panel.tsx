@@ -4,11 +4,13 @@ import * as Sentry from "@sentry/nextjs";
 import { SignInLink } from "@/components/sign-in-link";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { mainButtonClass } from "@/components/ui/state-panel";
 import { askEnabled } from "@/lib/ask";
 import { checkAllowance, readQuestions } from "@/lib/ask-store";
 import { getCurrentUser } from "@/lib/auth";
 import { supabaseConfig } from "@/lib/supabase/config";
 import { AskBox } from "./ask-box";
+import { AskNote } from "./ask-note";
 
 // The Ask panel beside the replay on a match page's Replay tab: type a
 // question about this player's games ("why do I lose on Viego?") and Claude
@@ -23,6 +25,10 @@ import { AskBox } from "./ask-box";
 //
 // The Ask button is a Server Action, which gets the page's time limit, so
 // the match page sets maxDuration for it.
+//
+// Each of its states is drawn on JAS-93's states canvas: signed out, not set
+// up, Ask failing to load, the three limits (here) and waiting, a question
+// that couldn't be answered and past questions failing (in AskBox).
 export function AskPanel({
   region,
   riotId,
@@ -37,7 +43,7 @@ export function AskPanel({
   game: string; // this game in words with its ID, "Ahri game on Oct 18 (NA1_123)"
 }) {
   return (
-    <section aria-labelledby="ask-heading" className={`${panelClass} flex flex-col gap-4 p-6`}>
+    <section aria-labelledby="ask-heading" className={`${panelClass} flex flex-col gap-4 p-5 sm:p-6`}>
       <PanelHeading id="ask-heading">Ask about this game</PanelHeading>
       <AskContent
         region={region}
@@ -61,7 +67,7 @@ function AskIllustration() {
   return (
     <>
       <span className="text-note text-quiet">{ASK_ILLUSTRATION.label}</span>
-      <div className="flex flex-col gap-3 rounded-md bg-raised p-5">
+      <div className="flex flex-col gap-3 self-stretch rounded-md bg-raised p-5">
         <p className="font-semibold text-main">{ASK_ILLUSTRATION.question}</p>
         <p className="whitespace-pre-line text-body">{ASK_ILLUSTRATION.answer}</p>
       </div>
@@ -85,16 +91,19 @@ export async function AskContent({
 }) {
   // Without the API key, sign-in or the database, nobody can ask.
   if (!askEnabled() || !supabaseConfig() || !process.env.DATABASE_URL) {
-    return <p className="text-quiet">Ask isn&apos;t available right now.</p>;
+    return (
+      <AskNote title="Ask isn't available right now.">Try again later.</AskNote>
+    );
   }
   const user = await getCurrentUser();
   if (!user) {
     return (
-      <div className="flex flex-col gap-4">
-        <p className="text-quiet">
-          <SignInLink className="font-medium text-ahead-soft hover:underline" /> to ask questions
-          about this player&apos;s games, like &ldquo;What decided my {game}?&rdquo;
+      <div className="flex flex-col items-start gap-4">
+        <p className="text-body text-quiet">
+          Sign in to ask questions about this player&apos;s games, like &ldquo;What decided my{" "}
+          {game}?&rdquo;
         </p>
+        <SignInLink className={mainButtonClass} />
         <AskIllustration />
       </div>
     );
@@ -109,22 +118,27 @@ export async function AskContent({
     loaded = await Promise.all([readQuestions(user.id, puuid), checkAllowance(user.id)]);
   } catch (error) {
     Sentry.captureException(error);
-    return <p className="text-behind">Couldn&apos;t load Ask. Reload to try again.</p>;
+    return (
+      <AskNote title="Couldn't load Ask." problem>
+        Reload the page to try again. The rest of this game is still here.
+      </AskNote>
+    );
   }
   const [history, allowed] = loaded;
   return (
     <>
-      <p className="text-note text-quiet">
-        To ask about this game, keep its match ID in your question, as the first two examples do.
-      </p>
-      {!allowed.ok && <p className="text-behind">{allowed.message}</p>}
+      {allowed.ok && (
+        <p className="text-note text-quiet">
+          To ask about this game, keep its match ID in your question, as the first two examples do.
+        </p>
+      )}
       <AskBox
         region={region}
         riotId={riotId}
         playerPath={playerPath}
         history={history.ok ? history.questions : []}
         historyFailed={!history.ok}
-        left={allowed.ok ? allowed.left : 0}
+        allowance={allowed}
         examples={[
           `What decided my ${game}?`,
           `How did my early game go in my ${game}?`,

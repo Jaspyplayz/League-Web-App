@@ -1,6 +1,6 @@
 # Tempo timeline (beta)
 
-The tempo timeline shows, second by second, which jungler had the tempo: the time advantage that lets one jungler make the next play (invade, gank, start an objective) while the other has to farm, back or give way. When you played jungle, it's part of the [replay](replay.md) on the match page, marked **Beta**.
+The tempo timeline shows, second by second, which jungler had the tempo: the time advantage that lets one jungler make the next play (invade, gank, start an objective) while the other has to farm, back or give way. When you played jungle, it's part of the [replay](replay.md) on the match page, with its own **Beta** mark beside the Jungle tempo heading.
 
 It's an experiment. Riot doesn't record tempo, so the timeline estimates it from what Riot does record. This page explains how the estimate is made, and how well it held up in 1,923 real games.
 
