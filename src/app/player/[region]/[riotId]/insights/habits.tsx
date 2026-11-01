@@ -3,6 +3,7 @@ import { panelClass } from "@/components/ui/panel";
 import { formatClock, plural } from "@/lib/analyzer/format";
 import {
   habitLabel,
+  MIN_HABIT_GAMES,
   type HabitId,
   type HabitReport,
   type HabitResult,
@@ -43,22 +44,42 @@ function describe(id: HabitId, report: HabitReport, rankName: string | null) {
 // "Habits": a few early-game habits (src/lib/analyzer/habits.ts), how often
 // you had each, and how often games with and without it were won, by you and
 // by players of the rank picked in "You vs [rank]". These are patterns, not a
-// verdict on any game, and the note under the cards says so.
-export function HabitsSection({ report, tier }: { report: HabitReport; tier: Tier | null }) {
-  const role = positionName(report.position)?.toLowerCase() ?? "";
+// verdict on any game, and the note under them says so. Like Session blocks,
+// the numbers aren't coloured blue or red.
+export function HabitsSection({ report, tier }: { report: HabitReport | null; tier: Tier | null }) {
+  const role = report ? (positionName(report.position)?.toLowerCase() ?? "") : "";
+  // No habit had enough of your games to count, such as with a champion
+  // picked that you played in two roles. The heading stays and says why.
+  if (!report || report.habits.length === 0) {
+    return (
+      <section
+        aria-labelledby="habits-heading"
+        className={`${panelClass} flex flex-col gap-1.5 p-4 sm:px-5`}
+      >
+        <PanelHeading id="habits-heading">Habits</PanelHeading>
+        <p className="text-body text-quiet">
+          Each habit needs at least {MIN_HABIT_GAMES} of your games in your most-played role
+          {role && ` (${role})`}, and these games don&apos;t have that many yet. Try more games, or
+          all champions.
+        </p>
+      </section>
+    );
+  }
   const rankName = tier && report.rankGames > 0 ? tierName(tier) : null;
   return (
-    <section aria-labelledby="habits-heading" className="flex flex-col gap-3.5">
-      <PanelHeading id="habits-heading">Habits</PanelHeading>
-      <p className="text-[15px] text-muted">
-        Your {plural(report.games, `${role} game`)}
-        {rankName &&
-          `, next to ${report.rankGames.toLocaleString("en-US")} ${rankName} ${role} games`}
-        .
-      </p>
-      <ul className="grid gap-3 sm:grid-cols-2">
+    <section aria-labelledby="habits-heading" className={`${panelClass} flex flex-col gap-5 p-4 sm:px-5`}>
+      <div className="flex flex-col gap-1">
+        <PanelHeading id="habits-heading">Habits</PanelHeading>
+        <p className="text-body text-quiet">
+          Your {plural(report.games, `${role} game`)}
+          {rankName &&
+            `, next to ${report.rankGames.toLocaleString("en-US")} ${rankName} ${role} games`}
+          .
+        </p>
+      </div>
+      <ul className="grid gap-x-10 gap-y-6 md:grid-cols-2">
         {report.habits.map((habit) => (
-          <HabitCard
+          <Habit
             key={habit.id}
             habit={habit}
             rankName={rankName}
@@ -66,7 +87,7 @@ export function HabitsSection({ report, tier }: { report: HabitReport; tier: Tie
           />
         ))}
       </ul>
-      <p className="text-[13px] text-faint">
+      <p className="text-note text-quiet">
         These are patterns across games, not advice for any one of them. A habit that goes with
         winning doesn&apos;t always cause it: players who are already ahead hit 6 first more often,
         for one.
@@ -75,7 +96,7 @@ export function HabitsSection({ report, tier }: { report: HabitReport; tier: Tie
   );
 }
 
-function HabitCard({
+function Habit({
   habit,
   rankName,
   title,
@@ -95,31 +116,31 @@ function HabitCard({
   const difference =
     rank && rankName ? winDifference(rank, `${rankName} games`) : winDifference(you, "You");
   return (
-    <li className={`flex flex-col gap-3 px-5 py-4 ${panelClass}`}>
-      <div className="flex flex-col gap-1">
-        <h3 className="font-mono text-label uppercase tracking-[0.12em] text-faint">{title}</h3>
-        <p className="text-note text-muted">{detail}</p>
+    <li className="flex min-w-0 flex-col gap-2">
+      <div className="flex flex-col">
+        <h3 className="text-body font-semibold">{title}</h3>
+        <p className="text-note text-quiet">{detail}</p>
       </div>
-      <p className="text-sm">
+      <p className="text-sm tabular-nums">
         You: {you.with.games} of {plural(yourGames, "game")} ({share(you)}%)
         {showRankRate && (
-          <span className="text-muted">
+          <span className="text-quiet">
             {" "}
             · {rankName}: {share(rank)}%
           </span>
         )}
       </p>
-      <table className="w-full text-left">
+      <table className="w-full text-left tabular-nums">
         <thead>
-          <tr className="font-mono text-label uppercase tracking-[0.12em] text-faint">
-            <th scope="col" className="pb-1 font-normal">
-              <span className="sr-only">Games</span>
+          <tr className="text-note text-quiet">
+            <th scope="col" className="w-24 pb-1.5 font-medium">
+              Games
             </th>
-            <th scope="col" className="pb-1 font-normal">
+            <th scope="col" className="pb-1.5 font-medium">
               You
             </th>
             {rank && rankName && (
-              <th scope="col" className="pb-1 font-normal">
+              <th scope="col" className="pb-1.5 font-medium">
                 {rankName}
               </th>
             )}
@@ -127,8 +148,8 @@ function HabitCard({
         </thead>
         <tbody>
           {(["with", "without"] as const).map((side) => (
-            <tr key={side} className="border-t border-line">
-              <th scope="row" className="py-1.5 text-sm font-normal text-ink-soft">
+            <tr key={side} className="border-t border-divider">
+              <th scope="row" className="py-1.5 text-note font-normal text-quiet">
                 {side === "with" ? "With it" : "Without"}
               </th>
               <WinCell record={you[side]} />
@@ -137,25 +158,23 @@ function HabitCard({
           ))}
         </tbody>
       </table>
-      {difference && (
-        <p className="border-t border-line pt-2.5 text-note text-muted">{difference}</p>
-      )}
+      {difference && <p className="text-note text-quiet">{difference}</p>}
     </li>
   );
 }
 
 function WinCell({ record }: { record: WinRecord }) {
   return (
-    <td className="py-1.5">
+    <td className="py-1.5 text-sm">
       {record.games > 0 ? (
-        <span className="flex flex-col">
-          <span className="font-mono text-base font-medium">{winRate(record)}% won</span>
-          <span className="font-mono text-xs text-faint">
+        <>
+          <span className="font-semibold">{winRate(record)}% won</span>{" "}
+          <span className="text-quiet">
             {record.wins} of {plural(record.games, "game")}
           </span>
-        </span>
+        </>
       ) : (
-        <span className="text-sm text-faint">No games</span>
+        <span className="text-quiet">No games</span>
       )}
     </td>
   );

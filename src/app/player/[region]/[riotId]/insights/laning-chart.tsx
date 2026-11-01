@@ -32,10 +32,13 @@ export function LaningChart({
   const dense = withGold.length > DENSE_GAMES;
 
   return (
-    <section aria-labelledby="laning-heading" className="flex flex-col gap-3.5">
+    <section
+      aria-labelledby="laning-heading"
+      className={`${panelClass} flex flex-col gap-4 p-4 sm:px-5`}
+    >
       <PanelHeading id="laning-heading">Early game: gold at 10 minutes</PanelHeading>
-      <div className={`${panelClass} flex flex-col gap-5 p-[22px]`}>
-        <dl className="flex flex-wrap gap-x-10 gap-y-3">
+      <div className="flex flex-col gap-3">
+        <dl className="flex flex-wrap gap-x-8 gap-y-3">
           <Stat
             label="Ahead at 10"
             value={`${laning.aheadInGold} of ${laning.games} games`}
@@ -56,7 +59,7 @@ export function LaningChart({
         </dl>
 
         <ol
-          className={`flex h-56 items-stretch ${dense ? "gap-px" : "gap-1.5"}`}
+          className={`flex h-40 items-stretch ${dense ? "gap-px" : "gap-1.5"}`}
           aria-label="Gold difference at 10 minutes, per game"
         >
           {withGold.map((g) => {
@@ -68,7 +71,7 @@ export function LaningChart({
                 <Link
                   href={matchPath(g.matchId)}
                   title={`${label(g.championName)}, ${result}: ${formatSigned(diff)} gold at 10`}
-                  className="group flex flex-1 flex-col rounded-md hover:bg-line"
+                  className="group flex flex-1 flex-col rounded-sm transition-colors duration-320 ease-out hover:bg-select hover:duration-120 motion-reduce:transition-none"
                 >
                   <span className="sr-only">
                     {label(g.championName)}, {result}, {formatSigned(diff)} gold at 10 minutes
@@ -82,7 +85,7 @@ export function LaningChart({
                       />
                     )}
                   </span>
-                  <span className="h-px bg-faint" aria-hidden="true" />
+                  <span className="h-px bg-divider" aria-hidden="true" />
                   {/* Bottom half: deficits grow down from it. */}
                   <span className="flex flex-1 items-start justify-center" aria-hidden="true">
                     {diff < 0 && (
@@ -95,7 +98,7 @@ export function LaningChart({
                   {!dense && (
                     <span
                       aria-hidden="true"
-                      className={`pt-1.5 text-center font-mono text-[11px] ${g.win ? "text-ahead-soft" : "text-behind"}`}
+                      className={`pt-1 text-center text-xs font-semibold ${g.win ? "text-ahead" : "text-behind"}`}
                     >
                       {g.win ? "W" : "L"}
                     </span>
@@ -105,9 +108,9 @@ export function LaningChart({
             );
           })}
         </ol>
-        <div className="flex justify-between font-mono text-xs text-faint" aria-hidden="true">
-          <span>← Older</span>
-          <span>Newer →</span>
+        <div className="flex justify-between text-note text-quiet" aria-hidden="true">
+          <span>Older</span>
+          <span>Newer</span>
         </div>
       </div>
     </section>
@@ -118,8 +121,8 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "ah
   const color = tone === "ahead" ? "text-ahead" : tone === "behind" ? "text-behind" : "";
   return (
     <div>
-      <dt className="text-[13px] text-faint">{label}</dt>
-      <dd className={`font-mono text-xl ${color}`}>{value}</dd>
+      <dt className="text-note text-quiet">{label}</dt>
+      <dd className={`text-xl font-semibold tabular-nums ${color}`}>{value}</dd>
     </div>
   );
 }

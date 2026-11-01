@@ -12,6 +12,8 @@ import {
   type Focus,
   type FocusGame,
 } from "@/lib/focus";
+import { panelClass } from "@/components/ui/panel";
+import { PanelHeading } from "@/components/ui/panel-heading";
 
 // Focus goals: pick one recurring weakness and see every game after that
 // checked against it. The pick is kept in this browser's localStorage (see
@@ -60,13 +62,13 @@ export function useFocus(player: string): Focus | null {
 export function FocusButton({ player, id }: { player: string; id: WeaknessId }) {
   const focus = useFocus(player);
   if (focus?.id === id) {
-    return <span className="shrink-0 font-mono text-xs text-ahead-soft">Your focus</span>;
+    return <span className="shrink-0 text-note font-medium text-ahead">Your focus</span>;
   }
   return (
     <button
       type="button"
       onClick={() => save(player, { id, setAt: Date.now() })}
-      className="shrink-0 rounded-full border border-line-strong px-3 py-1.5 text-sm text-ink-soft transition-colors hover:border-ahead hover:text-ink"
+      className="inline-flex h-10 shrink-0 items-center rounded-md bg-raised px-3.5 text-sm font-medium text-main transition-colors duration-320 ease-out hover:bg-divider hover:duration-120 motion-reduce:transition-none"
     >
       Focus on this
     </button>
@@ -97,32 +99,27 @@ export function FocusPanel({
   return (
     <section
       aria-labelledby="focus-heading"
-      className="soft-round flex flex-col gap-3.5 border border-ahead/30 bg-ahead/[0.07] p-[22px]"
+      className={`${panelClass} flex flex-col gap-3 p-4 sm:px-5`}
     >
       <div className="flex items-center justify-between gap-4">
-        <h2
-          id="focus-heading"
-          className="font-mono text-xs font-medium uppercase tracking-[0.12em] text-ahead-soft"
-        >
-          Your focus
-        </h2>
+        <PanelHeading id="focus-heading">Your focus</PanelHeading>
         <button
           type="button"
           onClick={() => save(player, null)}
-          className="text-sm text-faint underline-offset-2 hover:text-ink hover:underline"
+          className="min-h-10 text-note text-quiet underline-offset-2 hover:text-main hover:underline"
         >
           Stop focusing
         </button>
       </div>
-      <p className="font-semibold">{FOCUS_GOALS[focus.id]}</p>
+      <p className="text-body font-semibold">{FOCUS_GOALS[focus.id]}</p>
 
       {counted === 0 ? (
-        <p className="text-[15px] text-ink-soft">
+        <p className="text-body text-quiet">
           Picked {setOn}. Games you play from now on show up here, each one checked against
           it.
         </p>
       ) : (
-        <p className="text-[15px] text-ink-soft">
+        <p className="text-body text-quiet">
           Since {setOn}, you managed it in {avoided} of {counted}{" "}
           {counted === 1 ? "game" : "games"}
           {streak > 1 && `, including the last ${streak} in a row`}.
@@ -142,7 +139,7 @@ export function FocusPanel({
                   : "didn't manage it";
             const color =
               r.avoided === null
-                ? "border border-line-strong"
+                ? "border border-quiet"
                 : r.avoided
                   ? "bg-ahead"
                   : "bg-behind";
@@ -152,7 +149,7 @@ export function FocusPanel({
                   href={`${playerPath}/match/${r.matchId}`}
                   title={`${shortDate(r.startedAt)}: ${what}`}
                   aria-label={`Game on ${shortDate(r.startedAt)}: ${what}`}
-                  className={`block h-5 w-5 rounded-[5px] hover:opacity-75 ${color}`}
+                  className={`block size-5 rounded-sm hover:opacity-75 ${color}`}
                 />
               </li>
             );
@@ -161,11 +158,11 @@ export function FocusPanel({
       )}
 
       {counted > 0 && !current.includes(focus.id) && (
-        <p className="text-[13px] text-faint">
+        <p className="text-note text-quiet">
           This isn&apos;t one of your recurring weaknesses in these games anymore.
         </p>
       )}
-      <p className="text-[13px] text-faint">
+      <p className="text-note text-quiet">
         Saved in this browser only. Games that end too early to tell, or where the rule
         doesn&apos;t apply, show as outlines and don&apos;t count.
       </p>
