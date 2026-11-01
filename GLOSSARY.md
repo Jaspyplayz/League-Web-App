@@ -88,6 +88,10 @@ _Avoid_: Diff, gap, difference
 The chart of your lead over your lane opponent across a game.
 _Avoid_: Difference curve, diff graph
 
+**Eval bar**:
+The thin bar beside the gold chart that shows your team's win chance at the selected play.
+_Avoid_: Win bar, meter
+
 **Phase**:
 The early, mid or late part of a game.
 _Avoid_: Stage, period
