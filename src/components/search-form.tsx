@@ -93,7 +93,8 @@ export function usePlayerSearch(errorId: string, startingRiotId = "") {
       query={query}
       onPick={() => {
         setWanted(false);
-        setQuery("");
+        // Next.js keeps this page's state, so Back shows the form as left here.
+        setQuery(startingRiotId);
         setErrorDismissed(true);
       }}
       // A row that leaves takes keyboard focus with it, so hand it back.

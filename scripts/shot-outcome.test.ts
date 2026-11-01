@@ -72,7 +72,7 @@ describe("classify", () => {
   // change them here too.
   it("looks for the words the site really shows", () => {
     expect(source("src/components/riot-error-notice.tsx")).toContain(RIOT_KEY_NOTICE);
-    expect(source("src/app/player/[region]/[riotId]/page.tsx")).toContain(NO_PLAYER);
+    expect(source("src/app/player/[region]/[riotId]/player-not-found.tsx")).toContain(NO_PLAYER);
     expect(source("src/app/global-error.tsx")).toContain(ERROR_TEXTS[0]);
   });
 });

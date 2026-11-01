@@ -5,15 +5,15 @@ import { ProfileTabs } from "@/components/profile-tabs";
 import { RememberSearchedPlayer } from "@/components/saved-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { MatchListSkeleton } from "@/components/match-list-skeleton";
-import { SearchForm } from "@/components/search-form";
 import { LoadingBlock, LoadingSection } from "@/components/ui/loading";
 import { loadProfile } from "@/lib/profile-store";
 import { readQueueFilter, type QueueFilter } from "@/lib/queue-filters";
-import { isRegion, REGIONS, type Region } from "@/lib/regions";
+import { isRegion, REGIONS } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
-import { fromSlug, toSlug, type RiotId } from "@/lib/riot-id";
+import { fromSlug, toSlug } from "@/lib/riot-id";
 import { ByDay } from "./by-day";
+import { PlayerNotFound } from "./player-not-found";
 import { ProfileHeader, RankCards } from "./profile-header";
 import { ProfileSkeleton, RankSkeleton } from "./profile-skeleton";
 import { MatchesControls, readMatchesView } from "./queue-tabs";
@@ -161,22 +161,6 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
 
 // Names the Riot ID and region that were searched, then offers the search
 // again (JAS-93).
-function PlayerNotFound({ region, id }: { region: Region; id: RiotId }) {
-  return (
-    <div className="flex max-w-[640px] flex-col gap-3.5">
-      <h1 className="text-2xl font-semibold sm:text-title">
-        No player called {id.gameName}#{id.tagLine} on {REGIONS[region].label}
-      </h1>
-      <p className="text-body text-quiet">
-        Check the spelling and the tag after the #, or try another region.
-      </p>
-      <div className="mt-2.5">
-        <SearchForm startWith={{ region, riotId: `${id.gameName}#${id.tagLine}` }} />
-      </div>
-    </div>
-  );
-}
-
 function PlayerName({ gameName, tagLine }: { gameName: string; tagLine: string }) {
   return (
     <h1 className="text-title font-semibold">
