@@ -148,6 +148,10 @@ describe("game review", () => {
     expect(html).toMatch(/aria-current="true".*Your team took Baron/);
   });
 
+  it("says which of your plays is open, since the rest can be scrolled out of view", () => {
+    expect(review({ selected: 1 })).toContain("2 of 3");
+  });
+
   it("opens only the selected play, with its chance and events", () => {
     const html = review({ selected: 0 });
     expect(html).toContain("5:00 Syndra killed Zoe");
@@ -183,14 +187,10 @@ describe("game review", () => {
     expect(html).toContain("so its plays have no grades");
     expect(html).not.toContain("Grades of your plays");
   });
-
-  it("isn't drawn with nothing to show", () => {
-    expect(review({ plays: null, scores: [], selected: -1 })).toBe("");
-  });
 });
 
 describe("the summary's columns", () => {
-  const columns = (plays: BoardPlay[]) =>
+  const columns = (plays: BoardPlay[] | null, scores = SCORES) =>
     renderToStaticMarkup(
       <ReviewLinksContext value={LINKS}>
         <SummaryColumns
@@ -201,12 +201,12 @@ describe("the summary's columns", () => {
               { minute: 25, diff: 1200 },
             ],
             markers: [],
-            chances: { perSecond: new Array(1501).fill(500), plays },
+            chances: plays && { perSecond: new Array(1501).fill(500), plays },
             swings: [],
             quiet: [],
             note: null,
           }}
-          review={{ scores: SCORES, notes: false }}
+          review={{ scores, notes: false }}
         >
           <p>Scoreboard</p>
         </SummaryColumns>
@@ -218,6 +218,14 @@ describe("the summary's columns", () => {
     expect(html).toContain("Your team&#x27;s chance to win: 95%");
     expect(html).toMatch(/aria-current="true".*Won a fight 4 for 1/);
     expect(html).toContain("20:00 Syndra killed Vi");
+  });
+
+  it("has one column rather than a blank one when there's no Game review to draw", () => {
+    const html = columns(null, []);
+    expect(html).not.toContain("game-review-heading");
+    expect(html).not.toContain("380px");
+    expect(html).toContain("Scoreboard");
+    expect(columns(null)).toContain("380px");
   });
 
   it("puts Game review under the board and above the rest, for phones", () => {

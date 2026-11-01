@@ -103,6 +103,11 @@ test("open the sample analysis", async ({ page }) => {
   // button opens the replay at that play.
   await page.getByRole("tab", { name: "Summary" }).click();
   const review = page.getByRole("region", { name: "Game review" });
+  await review.locator("ol button").first().click();
+  await expect(review.getByRole("button", { name: "First play" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: /chance to win after it/ }).first(),
+  ).toHaveAttribute("aria-pressed", "true");
   await review.getByRole("button", { name: "Last play" }).click();
   await expect(review.getByRole("button", { name: "Next play" })).toBeDisabled();
   await expect(
@@ -111,6 +116,12 @@ test("open the sample analysis", async ({ page }) => {
   await review.getByRole("button", { name: "Start review in the replay" }).click();
   await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true");
   await expect(replay).toBeVisible();
+  // The sample game's last play starts at 24:15, and the replay opens on its
+  // first whole second.
+  await expect(page.getByRole("slider", { name: "Game time" })).toHaveAttribute(
+    "aria-valuetext",
+    /^24:1[56]:/,
+  );
 });
 
 // The theme is applied by a script in <head>, so check it survives a reload:

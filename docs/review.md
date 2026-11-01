@@ -16,7 +16,7 @@ One play is opened at a time. It opens on the play that moved the game most, the
 2. **That moved the chance by a point or more**, either way. Smaller ones are graded Even and are mostly farming noise.
 3. **The three that moved it most**, shown in game order.
 
-A game can have fewer than three, and a game where you weren't in any such play says so. Games the [win chance](win-chance.md) model doesn't cover have no plays or grades, only Game review's scores.
+A game can have fewer than three, and a game where you weren't in any such play says so. Games the [win chance](win-chance.md) model doesn't cover have no plays or grades. Game review then shows only your scores, or isn't drawn if the game has none.
 
 A play's size is Win Probability Added: how much it changed your team's chance to win. That says what the play did to the game, not whether it was the right call. A fight that was the right call can still go wrong, and once a game is decided even a big fight barely moves the chance (see [replay.md](replay.md#how-the-plays-are-graded)).
 

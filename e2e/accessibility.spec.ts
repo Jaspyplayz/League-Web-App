@@ -106,6 +106,12 @@ test("scan the saved players box, in both themes", async ({ page }) => {
   await scanOpenBox("Saved players box, light mode");
 });
 
+async function selectLostPlay(page: Page) {
+  const review = page.getByRole("region", { name: "Game review" });
+  await review.locator("ol button", { hasText: "Mistake" }).first().click();
+  await expect(review.locator("ol button[aria-current]")).toContainText("Mistake");
+}
+
 test("scan the sample analysis, all three tabs", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Open this game", exact: true }).click();
@@ -114,6 +120,11 @@ test("scan the sample analysis, all three tabs", async ({ page }) => {
     FIRST_LOAD,
   );
   await scan(page, "Sample analysis, Summary tab");
+
+  // The sample game opens on a play you gained from. A lost one puts red text
+  // on the selected row's fill.
+  await selectLostPlay(page);
+  await scan(page, "Sample analysis, Summary tab, a lost play selected");
 
   // Replay has the Ask panel beside it, whichever state Ask is in on the
   // preview (usually not set up there, since previews have no sign-in).
@@ -181,4 +192,6 @@ test("scan light mode", async ({ page }) => {
     FIRST_LOAD,
   );
   await scan(page, "Sample analysis, light mode");
+  await selectLostPlay(page);
+  await scan(page, "Sample analysis, light mode, a lost play selected");
 });

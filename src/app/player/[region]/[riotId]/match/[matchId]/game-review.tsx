@@ -40,8 +40,6 @@ export function GameReview({ scores, plays, selected, onSelect, notes }: GameRev
   const links = useReviewLinks();
   const play = plays?.[selected] ?? null;
 
-  if (scores.length === 0 && !plays) return null;
-
   return (
     <section
       aria-labelledby="game-review-heading"
@@ -142,17 +140,18 @@ function PlayList({
   const list = useRef<HTMLOListElement>(null);
   const opened = useRef<HTMLLIElement>(null);
 
-  // Keep the opened play in view as you step, moving only this list. The
-  // browser's scrollIntoView would scroll the page too, and take the board
-  // off the screen.
+  // Keep the opened play in view as you step, with the row before it showing
+  // so it still reads as a list. This moves only the list: the browser's
+  // scrollIntoView would scroll the page too, and take the board off the screen.
   useEffect(() => {
     if (!list.current || !opened.current) return;
     const view = list.current.getBoundingClientRect();
     const row = opened.current.getBoundingClientRect();
-    if (row.top < view.top) list.current.scrollTop -= view.top - row.top;
+    const top = row.top - (opened.current.previousElementSibling?.clientHeight ?? 0);
+    if (top < view.top) list.current.scrollTop -= view.top - top;
     else if (row.bottom > view.bottom) {
-      // A play taller than the list shows from its top.
-      list.current.scrollTop += Math.min(row.bottom - view.bottom, row.top - view.top);
+      // A play taller than the list shows from the row before it.
+      list.current.scrollTop += Math.min(row.bottom - view.bottom, top - view.top);
     }
   }, [selected]);
 
@@ -166,7 +165,10 @@ function PlayList({
   return (
     <div className="flex min-h-48 flex-col gap-1.5">
       <div className="flex flex-wrap items-center justify-between gap-x-3">
-        <SubHeading>Your plays</SubHeading>
+        <div className="flex items-baseline gap-2">
+          <SubHeading>Your plays</SubHeading>
+          <span className="text-xs text-quiet tabular-nums">{`${selected + 1} of ${plays.length}`}</span>
+        </div>
         {hasMoments && (
           <p className="flex items-center gap-1.5 text-xs text-quiet">
             <MomentChip /> your 60-second review
@@ -182,15 +184,17 @@ function PlayList({
       {/* Relative so it also clips the rows' screen reader text, which would
           otherwise make the page taller. The focus outline is drawn inside the
           rows, since this list clips. */}
-      <ol ref={list} className="relative flex max-h-[340px] min-h-0 flex-col overflow-y-auto">
+      <ol ref={list} className="relative flex max-h-[480px] min-h-0 flex-col overflow-y-auto">
         {plays.map((play, i) => (
           <li key={play.at} ref={i === selected ? opened : undefined}>
             <button
               type="button"
               onClick={() => onSelect(i)}
               aria-current={i === selected ? "true" : undefined}
+              // Raised rather than select: the swing's red is too faint to read
+              // on select in the dark theme.
               className={`flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left focus-visible:-outline-offset-2 ${
-                i === selected ? "bg-select" : "hover:bg-select"
+                i === selected ? "bg-raised" : "hover:bg-raised"
               }`}
             >
               <GradeMark grade={play.grade} />
@@ -258,8 +262,9 @@ function PlayDetail({ play, notes }: { play: BoardPlay; notes: boolean }) {
         </div>
       )}
       <ul className="flex flex-col gap-0.5 text-note tabular-nums">
-        {play.lines.map((line) => (
-          <li key={line}>{line}</li>
+        {play.lines.map((line, i) => (
+          // Index, since two towers falling in the same second read the same.
+          <li key={i}>{line}</li>
         ))}
       </ul>
     </div>
