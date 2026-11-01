@@ -416,7 +416,8 @@ const journeys: Journey[] = [
     phone: true,
     run: async ({ page, step, note }) => {
       const review = page.getByRole("region", { name: "Game review" });
-      await step("open the sample game on a phone", async () => {
+      await step("open the sample game at 390px", async () => {
+        await page.setViewportSize({ width: 390, height: 844 });
         await page.goto(SAMPLE_MATCH_PATH, LOAD);
         await expect(review).toBeVisible(LOAD);
         await expectCalm(page);
