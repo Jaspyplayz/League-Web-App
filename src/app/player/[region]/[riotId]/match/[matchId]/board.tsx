@@ -148,9 +148,9 @@ export function Board({
 
       {/* Lines up under the chart, past the eval bar and its gap. */}
       <div className={`flex flex-col gap-1 ${chances ? "pl-10" : ""}`}>
-        {/* Close marks overlap until the two columns give the strip room. */}
+        {/* Close marks can overlap, even fully, so these reach every play. */}
         {play && chances && (
-          <div className="flex gap-2 pb-1 lg:hidden">
+          <div className="flex gap-2 pb-1">
             <button
               type="button"
               disabled={selected === 0}
@@ -296,8 +296,8 @@ export function ChanceStrip({
                 aria-label={`${play.clock} ${play.title}, ${play.grade}. Your team's chance to win after it: ${Math.round(play.after * 100)}%`}
                 title={`${play.clock} ${play.title}`}
                 // 24px wide, and 44px tall with the invisible ::before, so it's easy
-                // to hit on a phone. Close marks can still overlap there, which is
-                // why the board has previous and next buttons up to the two-column width.
+                // to hit on a phone. Close marks can still overlap, which is
+                // why the board has previous and next buttons.
                 className={`absolute grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full before:absolute before:-inset-y-2.5 before:inset-x-0 before:content-[''] ${
                   i === selected ? "z-10" : "hover:z-10"
                 }`}

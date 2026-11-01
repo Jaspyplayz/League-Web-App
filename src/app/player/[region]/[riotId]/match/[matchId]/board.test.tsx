@@ -128,7 +128,7 @@ describe("the board", () => {
     expect(html).toContain("Your team&#x27;s chance to win: 73%");
   });
 
-  describe("the step buttons for screens where close marks overlap", () => {
+  describe("the step buttons", () => {
     const disabled = (html: string, name: string) =>
       new RegExp(`<button[^>]*disabled=""[^>]*>${name}<`).test(html);
 
