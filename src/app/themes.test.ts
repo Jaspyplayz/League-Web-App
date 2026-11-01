@@ -154,7 +154,7 @@ describe("Review board tokens", () => {
   // Tailwind builds nothing for a colour that doesn't exist, and nothing else
   // fails: the text or fill just isn't drawn. So build each class the real way.
   const COLOUR_CLASS =
-    /^(?:[\w-]+:)*!?(?:bg|text|border(?:-[a-z]+)?|divide|ring|fill|stroke|outline|decoration|accent|caret|placeholder|from|via|to|shadow)-[a-z][\w-]*(?:\/\d+)?$/;
+    /^(?:[^\s:]+:)*!?(?:bg|text|border(?:-[a-z]+)?|divide|ring|fill|stroke|outline|decoration|accent|caret|placeholder|from|via|to|shadow)-[a-z][\w-]*(?:\/\d+)?$/;
 
   async function classesThatBuildNothing(classes: string[]): Promise<string[]> {
     const compiler = await compile(readFileSync("src/app/globals.css", "utf8"), {
@@ -173,10 +173,17 @@ describe("Review board tokens", () => {
   }
 
   it("spots a colour class that builds nothing", async () => {
-    expect(await classesThatBuildNothing(["bg-panel", "text-main", "bg-surface-2", "hover:bg-raisd"])).toEqual([
-      "bg-surface-2",
-      "hover:bg-raisd",
-    ]);
+    const classes = ["bg-panel", "[&_a]:text-main", "bg-surface-2", "hover:bg-raisd", "[&_a]:text-mian"];
+    expect(classes.filter((name) => COLOUR_CLASS.test(name))).toEqual(classes);
+    expect(await classesThatBuildNothing(classes)).toEqual(["bg-surface-2", "hover:bg-raisd", "[&_a]:text-mian"]);
+  });
+
+  // Tailwind builds a class for any name in a file it reads, so without these
+  // two lines the checks that name banned classes would put them in the CSS.
+  it("has Tailwind read only src and not its tests", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain('@import "tailwindcss" source("..");');
+    expect(css).toContain('@source not "../**/*.test.{ts,tsx}";');
   });
 
   it("builds CSS for every colour class in src", async () => {

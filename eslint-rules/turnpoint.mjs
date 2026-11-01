@@ -104,13 +104,13 @@ const noGreenClasses = {
   },
 };
 
-// Words for a person, not a class list: no piece looks like a class, and it
-// starts with a capital or runs to three words. "Card rounded p-4" has a class
-// in it, and "values rounded to whole blocks" doesn't.
+// Words for a person, not a class list: it starts with a capital and no piece
+// looks like a class. "Card rounded p-4" has a class in it. A lowercase string
+// can't be told from "flex rounded border", so it counts as classes, and a
+// sentence that fails can be reworded.
 export function isSentence(text) {
-  const words = text.trim().split(/\s+/);
-  const hasClass = words.some((word) => /-|\[|:./.test(word));
-  return !hasClass && (/^[A-Z]/.test(text) || words.length >= 3);
+  const hasClass = text.trim().split(/\s+/).some((word) => /-|\[|:./.test(word));
+  return /^[A-Z]/.test(text) && !hasClass;
 }
 
 // Calls check(node, text) for every string and template piece in a file, which

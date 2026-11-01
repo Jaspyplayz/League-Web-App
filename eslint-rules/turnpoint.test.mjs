@@ -188,13 +188,13 @@ describe("review-board-type", () => {
     ["a weight below 400", 'export const c = "font-light";'],
     ["a weight above 700", 'export const c = "font-black";'],
     ["a class after a capital word", 'export const c = "Card uppercase-ish uppercase";'],
+    ["a class list of plain words", 'export const c = "flex uppercase underline";'],
   ])("fails on %s", async (_, code) => {
     expect(await turnpointRules(code, "src/app/x.tsx")).toEqual(["turnpoint/review-board-type"]);
   });
 
   it.each([
     ["a prop read by that name", "export function A({ letterSpacing }) { return letterSpacing; }"],
-    ["a lowercase sentence", 'export const c = "must be uppercase to match";'],
     ["the weights the site uses", 'export const c = "font-normal font-medium font-semibold font-bold";'],
     ["a colour size from a variable", 'export const c = "text-[var(--x)]";'],
   ])("passes %s", async (_, code) => {
@@ -206,13 +206,13 @@ describe("review-board-type", () => {
     ["a colour mix", 'export const c = "bg-[color-mix(in_srgb,white,black)]";'],
     ["a colour function", 'export const c = "bg-[color(srgb_1_0_0)]";'],
     ["a short hex after a capital word", 'export const c = "Panel bg-[#abc]";'],
+    ["a short hex in a lowercase string", 'export const c = "game #123 failed today";'],
   ])("fails on %s", async (_, code) => {
     expect(await turnpointRules(code, "src/app/x.tsx")).toEqual(["turnpoint/tokens-only"]);
   });
 
   it.each([
     ["a link to a gradient with a long id", 'export const A = () => <rect fill="url(#abcdef)" />;'],
-    ["a number in a lowercase sentence", 'export const c = "game #123 failed today";'],
   ])("passes %s", async (_, code) => {
     expect(await turnpointRules(code, "src/app/x.tsx")).toEqual([]);
   });

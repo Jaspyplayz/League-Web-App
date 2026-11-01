@@ -119,6 +119,7 @@ describe("corners", () => {
     ["a radius in a style block", '<style>{".a { border-radius: 10px; }"}</style>'],
     ["a radius set by script", 'el.style.setProperty("border-radius", "20px");'],
     ["a class after a capital word", 'const box = "Card rounded p-4";'],
+    ["a class list of plain words", 'const box = "block rounded border";'],
     ["hud-cut", '<div className="hud-cut" />'],
     ["a beveled corner shape", '<div className="[corner-shape:bevel]" />'],
   ])("fails on %s", (_, source) => {
@@ -151,7 +152,6 @@ describe("corners", () => {
     ["a comment", "// rounded to whole blocks, not rounded-lg\nexport const a = 1;"],
     ["words on the page", "<p>Numbers are rounded, like rounded-lg corners.</p>"],
     ["a sentence in a string", 'throw new Error("The rounded gap must be positive");'],
-    ["a lowercase sentence in a string", 'const note = "values rounded to whole blocks";'],
     ["hud-cut in a comment", "// the old hud-cut class is gone\nexport const a = 1;"],
     ["a style key named in a comment", "// no borderRadius here\nexport const a = 1;"],
   ])("passes %s", (_, source) => {
