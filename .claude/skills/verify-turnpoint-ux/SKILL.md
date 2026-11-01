@@ -19,7 +19,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts          # http://127.
 
 Pick the target from the journey's `needs:`:
 
-- `needs: nothing` (`ux-search-recovery`, `ux-phone-home`): the local dev server works with no `.env.local`.
+- `needs: nothing` (`ux-search-recovery`, `ux-phone-home`, `ux-saved-players`, `ux-saved-players-phone`): the local dev server works with no `.env.local`.
 - `database`, `riot`, `supabase`: the local server needs `.env.local` (`RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`). Without it, use the live site (`--base https://league-web-app.vercel.app`, what `main` shows now) or a PR preview (`--pr <number>`, which needs `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment or `.env.local`; only Jasper can add it). A `--base` URL never gets the secret, so a preview passed that way shows `vercel-login`.
 
 Launch details (port rules, `npm ci`, the state file `.cache/verify-turnpoint-server/instance.json`, one server per checkout) are in `.claude/skills/verify-turnpoint/SKILL.md` → Launch. No migrations or seed step; never run `npm run db:migrate`.
@@ -51,6 +51,9 @@ npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --pr 155 ux-search-r
 |---|---|---|---|
 | `ux-search-recovery` | nothing | Desktop Chrome | [features/search-recovery.md](features/search-recovery.md) |
 | `ux-phone-home` | nothing | Pixel 7 | [features/phone-home.md](features/phone-home.md) |
+| `ux-saved-players` | nothing | Desktop Chrome | [features/saved-players.md](features/saved-players.md) |
+| `ux-saved-players-phone` | nothing | Pixel 7 at 390px | [features/saved-players.md](features/saved-players.md) |
+| `ux-saved-players-search` | riot | Desktop Chrome | [features/saved-players.md](features/saved-players.md) |
 | `ux-review-path` | database | Desktop Chrome | [features/review-path.md](features/review-path.md) |
 | `ux-signed-out-teasers` | database, supabase | Desktop Chrome | [features/signed-out-teasers.md](features/signed-out-teasers.md) |
 | `ux-insights-peer-card` | riot, database | Desktop Chrome | [features/insights-peer-card.md](features/insights-peer-card.md) |
