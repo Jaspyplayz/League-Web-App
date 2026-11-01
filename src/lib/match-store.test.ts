@@ -2,8 +2,9 @@ import * as Sentry from "@sentry/nextjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { match, participants } from "@/lib/analyzer/test-fixtures";
 import { tables } from "@/db";
-import { getMatch } from "@/lib/riot/api";
-import { loadMatches } from "./match-store";
+import { TRIM_VERSION } from "@/lib/analyzer/trim";
+import { getMatch, getTimeline } from "@/lib/riot/api";
+import { loadMatches, readSavedGame } from "./match-store";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
@@ -22,10 +23,15 @@ const insert = (table: unknown) => ({
     return { onConflictDoNothing: async () => {} };
   },
 });
+// The one saved game readSavedGame can find, set by its tests.
+const saved: { match?: { raw: unknown }; timeline?: { frames: unknown; events: unknown; trimVersion: number } } = {};
 vi.mock("@/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/db")>()),
   getDb: () => ({
-    query: { matches: { findMany: async () => [] } },
+    query: {
+      matches: { findMany: async () => [], findFirst: async () => saved.match },
+      matchTimelines: { findFirst: async () => saved.timeline },
+    },
     transaction: async (write: (tx: unknown) => Promise<void>) => write({ insert }),
   }),
 }));
@@ -41,6 +47,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   inserted.length = 0;
+  delete saved.match;
+  delete saved.timeline;
   vi.mocked(Sentry.captureException).mockClear();
 });
 
@@ -79,5 +87,37 @@ describe("loadMatches", () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
     expect(inserted.map((w) => w.table)).toEqual([tables.matches, tables.matchParticipants]);
     expect(inserted[1].rows).toHaveLength(10);
+  });
+});
+
+// Home's example game must never ask Riot: it has to show when the key has
+// expired, and a home visit shouldn't spend the rate limit (JAS-115).
+describe("readSavedGame", () => {
+  const game = match(participants());
+
+  it("reads the game and its timeline from the database alone", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://test");
+    saved.match = { raw: game };
+    saved.timeline = { frames: [], events: [], trimVersion: TRIM_VERSION };
+    expect(await readSavedGame("NA1_0")).toEqual({ match: game, timeline: { frames: [], events: [] } });
+    expect(getMatch).not.toHaveBeenCalled();
+    expect(getTimeline).not.toHaveBeenCalled();
+  });
+
+  it("gives nothing for a timeline trimmed by an older version, without asking Riot", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://test");
+    saved.match = { raw: game };
+    saved.timeline = { frames: [], events: [], trimVersion: TRIM_VERSION - 1 };
+    expect(await readSavedGame("NA1_0")).toBeNull();
+    expect(getTimeline).not.toHaveBeenCalled();
+  });
+
+  it("gives nothing when the game isn't saved or there's no database", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://test");
+    expect(await readSavedGame("NA1_0")).toBeNull();
+    vi.stubEnv("DATABASE_URL", "");
+    saved.match = { raw: game };
+    expect(await readSavedGame("NA1_0")).toBeNull();
+    expect(getMatch).not.toHaveBeenCalled();
   });
 });
