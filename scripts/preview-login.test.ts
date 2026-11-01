@@ -41,7 +41,7 @@ describe("recordLeaks", () => {
   it("waits for a read that's still running when the check starts", async () => {
     const { context, finish } = fakeContext();
     const leaked = recordLeaks(context, PREVIEW);
-    let answer = (_: Record<string, string>) => {};
+    let answer: (headers: Record<string, string>) => void = () => {};
     finish(fakeRequest(`${OTHER}/redirected`, () => new Promise((resolve) => (answer = resolve))));
 
     const check = leaked();

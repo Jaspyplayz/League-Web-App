@@ -1,4 +1,4 @@
-import type { BrowserContext } from "@playwright/test";
+import type { BrowserContext, Request } from "@playwright/test";
 
 // Vercel's preview protection lets a request through when it carries the
 // "Protection Bypass for Automation" secret. That secret opens every preview,
@@ -21,9 +21,14 @@ type Sent = { origin: string; secret: boolean };
 
 // Headers a route adds show up only once the request has gone out, so read
 // them when it finishes, not when it starts.
+//
+// The function this returns ends the recording, so call it once, at the end. A
+// request that finishes later can't change its answer, and the browser may be
+// closing by then: that read would reject with nothing waiting for it, and
+// Playwright fails the running test for any unhandled rejection (JAS-141).
 export function recordSent(context: BrowserContext): () => Promise<Sent[]> {
   const sent: Promise<Sent>[] = [];
-  context.on("requestfinished", (request) => {
+  const onFinished = (request: Request) => {
     const url = new URL(request.url());
     if (!url.protocol.startsWith("http")) return;
     sent.push(
@@ -31,8 +36,12 @@ export function recordSent(context: BrowserContext): () => Promise<Sent[]> {
         .allHeaders()
         .then((headers) => ({ origin: url.origin, secret: "x-vercel-protection-bypass" in headers })),
     );
-  });
-  return () => Promise.all(sent);
+  };
+  context.on("requestfinished", onFinished);
+  return () => {
+    context.off("requestfinished", onFinished);
+    return Promise.all(sent);
+  };
 }
 
 // Playwright also adds a route's headers to the redirects a request follows,
