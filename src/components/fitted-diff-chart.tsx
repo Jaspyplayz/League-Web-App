@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { DiffChart, type TurningPointMarker } from "./diff-chart";
-import type { DiffPoint } from "@/lib/diff-chart";
+import type { DiffPoint, MinuteDomain } from "@/lib/diff-chart";
 
 // Chart units per screen pixel. DiffChart's text is 22 units, so this draws
 // it at 11px, like home's prototype (JAS-92).
@@ -15,18 +15,25 @@ const GUESS = { width: 640, height: 150 };
 // The gold chart at a fixed height in pixels, at whatever width it's given.
 // DiffChart on its own grows taller as it gets wider; home wants it exactly
 // 150px (180px on phones, set by `className`) so "Open this game" stays on a
-// laptop's first screen. The box sets the size and this measures it.
+// laptop's first screen, and the match page's board wants its eval bar exactly
+// as tall as the chart. The box sets the size and this measures it.
 export function FittedDiffChart({
   className,
+  guess = GUESS,
   ...chart
 }: {
   className: string;
+  // Its size until the browser measures it, when the box isn't home's.
+  guess?: { width: number; height: number };
   points: DiffPoint[];
   markers: TurningPointMarker[];
   description: string;
+  domain?: MinuteDomain;
+  cursor?: number | null;
+  lineBySide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState(GUESS);
+  const [size, setSize] = useState(guess);
   useLayoutEffect(() => {
     const box = ref.current;
     if (!box) return;
