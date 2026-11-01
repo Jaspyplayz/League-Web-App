@@ -8,9 +8,11 @@ import { REGIONS } from "@/lib/regions";
 import { BenchmarkComparison } from "./benchmark-comparison";
 import type { Choice, ChosenPlayer } from "./chosen-player";
 import { panelClass } from "@/components/ui/panel";
+import { secondButtonClass } from "@/components/ui/state-panel";
 
-const fieldLabel = "font-mono text-[11px] uppercase tracking-[0.12em] text-faint";
-const note = `${panelClass} px-5 py-4 text-muted`;
+const fieldLabel = "text-note text-quiet";
+const input = "h-11 min-w-0 rounded-md bg-raised px-2.5 text-body text-main";
+const note = "text-body text-quiet";
 
 // "Compare with a player": type any Riot ID, such as a pro's solo queue
 // account, and see your games next to their last 20 ranked solo games.
@@ -34,7 +36,10 @@ export function CompareWithPlayer({
   dd: DataDragon | null;
 }) {
   return (
-    <section aria-labelledby="compare-player-heading" className="flex flex-col gap-3.5">
+    <section
+      aria-labelledby="compare-player-heading"
+      className={`${panelClass} flex flex-col gap-4 p-4 sm:px-5`}
+    >
       <PanelHeading id="compare-player-heading">
         {chosen?.status === "ok" ? `You vs ${chosen.name}` : "Compare with a player"}
       </PanelHeading>
@@ -54,12 +59,12 @@ function PlayerForm({
   keep: Record<string, string>;
 }) {
   return (
-    <Form action="" aria-label="Compare with a player" className="flex max-w-[600px] flex-col gap-2">
+    <Form action="" aria-label="Compare with a player" className="flex flex-col gap-2.5">
       {Object.entries(keep).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      <div className={`${panelClass} flex flex-wrap gap-2 p-2 focus-within:border-ahead`}>
-        <div className="flex min-w-0 flex-[1_1_260px] flex-col px-3 py-1.5 max-sm:basis-full">
+      <div className="flex flex-wrap items-end gap-2.5">
+        <div className="flex min-w-0 max-w-[360px] flex-[1_1_220px] flex-col gap-1 max-sm:max-w-none">
           <label htmlFor="vs" className={fieldLabel}>
             Their Riot ID
           </label>
@@ -70,10 +75,10 @@ function PlayerForm({
             defaultValue={choice?.input}
             placeholder="Hide on bush#KR1"
             autoComplete="off"
-            className="min-w-0 bg-transparent py-0.5 text-lg text-ink outline-none placeholder:text-placeholder focus-visible:outline-none"
+            className={`${input} placeholder:text-placeholder`}
           />
         </div>
-        <div className="flex flex-col border-line-strong px-3 py-1.5 max-sm:basis-full max-sm:border-t sm:border-l">
+        <div className="flex flex-col gap-1">
           <label htmlFor="vsRegion" className={fieldLabel}>
             Region
           </label>
@@ -81,7 +86,7 @@ function PlayerForm({
             id="vsRegion"
             name="vsRegion"
             defaultValue={choice?.region ?? "kr"}
-            className="bg-surface py-0.5 text-lg text-ink outline-none focus-visible:outline-none"
+            className={`${input} min-w-24`}
           >
             {Object.entries(REGIONS).map(([key, { label }]) => (
               <option key={key} value={key} title={label}>
@@ -90,20 +95,17 @@ function PlayerForm({
             ))}
           </select>
         </div>
-        <button
-          type="submit"
-          className="soft-round inline-flex min-h-[52px] flex-[0_0_auto] items-center justify-center bg-ahead px-6 font-semibold text-page transition-colors hover:bg-ahead-soft max-sm:w-full"
-        >
+        <button type="submit" className={secondButtonClass}>
           Compare
         </button>
       </div>
-      <p className="px-1 text-sm text-faint">
+      <p className="text-note text-quiet">
         Any player works, such as a pro&apos;s solo queue account. Their last 20 ranked solo games
         are used.
         {choice && (
           <>
             {" "}
-            <a href={clearHref} className="text-muted underline underline-offset-2">
+            <a href={clearHref} className="text-main underline underline-offset-2">
               Clear
             </a>
           </>

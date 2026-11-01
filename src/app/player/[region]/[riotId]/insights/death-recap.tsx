@@ -36,19 +36,23 @@ export async function DeathRecapSection({
     nameOf(ability, spellName, spells.get(champion) ?? null, dd);
   const name = (champion: string) => championName(dd, champion);
 
+  const enough = recap.championDeaths >= MIN_RECAP_DEATHS;
   return (
-    <section aria-labelledby="death-recap-heading" className="flex flex-col gap-3.5">
+    <section
+      aria-labelledby="death-recap-heading"
+      className={`${panelClass} flex flex-col gap-4 p-4 sm:px-5`}
+    >
       <PanelHeading id="death-recap-heading">What keeps killing you</PanelHeading>
-      {recap.championDeaths < MIN_RECAP_DEATHS ? (
-        <p className={`px-5 py-4 text-[15px] text-muted ${panelClass}`}>
+      {!enough ? (
+        <p className="text-body text-quiet">
           <FillingIn recap={recap} />
         </p>
       ) : (
-        <div className={`flex flex-col gap-5 p-5 ${panelClass}`}>
+        <>
           {recap.respect && (
-            <p className="text-[15px] text-ink-soft">
+            <p className="text-body">
               Respect {name(recap.respect.championName)}&apos;s{" "}
-              <strong className="font-semibold text-ink">
+              <strong className="font-semibold">
                 {abilityName(
                   recap.respect.championName,
                   recap.respect.ability,
@@ -59,61 +63,52 @@ export async function DeathRecapSection({
               {name(recap.respect.championName)} was in.
             </p>
           )}
-          <div className="grid gap-6 md:grid-cols-[3fr_2fr]">
-            <div className="flex min-w-0 flex-col gap-3">
-              <SubHeading>In the most of your {plural(recap.deaths, "death")}</SubHeading>
-              <ul className="flex flex-col gap-4">
-                {recap.threats.map((threat) => (
-                  <li key={threat.championName} className="flex gap-3">
-                    <ChampionIcon
-                      dd={dd}
-                      name={threat.championName}
-                      size={40}
-                      className="soft-round-sm"
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                      <p className="text-sm">
-                        <span className="font-semibold text-ink">{name(threat.championName)}</span>{" "}
-                        <span className="text-muted">
-                          in {threat.deaths} of {recap.deaths} · {Math.round(threat.share * 100)}%
-                          of the damage
-                        </span>
-                      </p>
-                      <ul className="flex flex-wrap gap-1.5">
-                        {threat.abilities.slice(0, 3).map((a) => (
-                          <li
-                            key={`${a.ability}:${a.spellName}`}
-                            className="rounded-lg border border-line px-2 py-0.5 text-xs text-ink-soft"
-                          >
-                            {abilityName(threat.championName, a.ability, a.spellName)}{" "}
-                            <span className="font-mono text-faint">
-                              {a.deaths}/{threat.deaths}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <DamageTypes
-              damage={recap.damage}
-              towerDeaths={recap.towerDeaths}
-              deaths={recap.deaths}
-            />
+          <div className="flex flex-col gap-2">
+            <SubHeading>In the most of your {plural(recap.deaths, "death")}</SubHeading>
+            <ul className="grid gap-x-6 gap-y-4 md:grid-cols-3">
+              {recap.threats.map((threat) => (
+                <li key={threat.championName} className="flex min-w-0 gap-3">
+                  <ChampionIcon dd={dd} name={threat.championName} size={32} className="rounded-md" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <p className="text-body">
+                      <span className="font-semibold">{name(threat.championName)}</span>{" "}
+                      <span className="text-note text-quiet">
+                        in {threat.deaths} of {recap.deaths} · {Math.round(threat.share * 100)}% of
+                        the damage
+                      </span>
+                    </p>
+                    <ul className="flex flex-col gap-0.5 text-note tabular-nums">
+                      {threat.abilities.slice(0, 3).map((a) => (
+                        <li
+                          key={`${a.ability}:${a.spellName}`}
+                          className="flex max-w-[340px] justify-between gap-3"
+                        >
+                          <span>{abilityName(threat.championName, a.ability, a.spellName)}</span>
+                          <span className="text-quiet">
+                            {a.deaths}/{threat.deaths}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
-      )}
-      {recap.championDeaths >= MIN_RECAP_DEATHS && (
-        <p className="text-[13px] text-faint">
-          From Riot&apos;s death recaps: the damage you took in the last seconds before each death.
-          Crowd control isn&apos;t in them. A champion was in a death when they did any damage in
-          it, not only when they got the kill. The numbers after each ability are the deaths it hit
-          you in, out of the deaths that champion was in.
-          {recap.undetailed > 0 &&
-            ` ${plural(recap.undetailed, "death")} from games saved before Turnpoint kept death recaps ${recap.undetailed === 1 ? "is" : "are"} left out.`}
-        </p>
+          <DamageTypes
+            damage={recap.damage}
+            towerDeaths={recap.towerDeaths}
+            deaths={recap.deaths}
+          />
+          <p className="text-note text-quiet">
+            From Riot&apos;s death recaps: the damage you took in the last seconds before each
+            death. Crowd control isn&apos;t in them. A champion was in a death when they did any
+            damage in it, not only when they got the kill. The numbers after each ability are the
+            deaths it hit you in, out of the deaths that champion was in.
+            {recap.undetailed > 0 &&
+              ` ${plural(recap.undetailed, "death")} from games saved before Turnpoint kept death recaps ${recap.undetailed === 1 ? "is" : "are"} left out.`}
+          </p>
+        </>
       )}
     </section>
   );
@@ -135,14 +130,17 @@ function FillingIn({ recap }: { recap: DeathRecap }) {
   );
 }
 
+// Each kind of damage gets a neutral shade, not blue or red: all of it is
+// damage you took, so none of it is you against the opponent.
 const DAMAGE_TYPES = [
-  { key: "physical", label: "Physical", counter: "armor" },
-  { key: "magic", label: "Magic", counter: "magic resist" },
-  { key: "true", label: "True", counter: null },
+  { key: "physical", label: "Physical", counter: "armor", fill: "bg-main" },
+  { key: "magic", label: "Magic", counter: "magic resist", fill: "bg-quiet" },
+  { key: "true", label: "True", counter: null, fill: "bg-divider" },
 ] as const;
 
 // Physical, magic and true damage as shares of all the champion damage that
-// killed you. When one kind is most of it, the matching resist does the most.
+// killed you, in one split bar. When one kind is most of it, the matching
+// resist does the most.
 function DamageTypes({
   damage,
   towerDeaths,
@@ -154,32 +152,40 @@ function DamageTypes({
 }) {
   const all = damage.physical + damage.magic + damage.true;
   const main = DAMAGE_TYPES.find((t) => all > 0 && damage[t.key] / all >= MOSTLY);
+  const parts = DAMAGE_TYPES.map((t) => ({
+    ...t,
+    percent: all > 0 ? Math.round((damage[t.key] / all) * 100) : 0,
+  }));
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <SubHeading>What the damage was</SubHeading>
-      <ul className="flex flex-col gap-2.5">
-        {DAMAGE_TYPES.map(({ key, label }) => {
-          const share = all > 0 ? damage[key] / all : 0;
-          return (
-            <li key={key} className="flex items-center gap-3 text-sm">
-              <span className="w-16 flex-none text-ink-soft">{label}</span>
-              <div className="h-2 flex-1 rounded-sm bg-line" aria-hidden="true">
-                <div className="h-2 rounded-sm bg-behind" style={{ width: `${share * 100}%` }} />
-              </div>
-              <span className="w-10 flex-none text-right font-mono text-faint">
-                {Math.round(share * 100)}%
-              </span>
-            </li>
-          );
-        })}
+      <div
+        role="img"
+        aria-label={parts.map((p) => `${p.label} ${p.percent}%`).join(", ")}
+        className="flex h-2.5 gap-0.5 overflow-hidden rounded-sm"
+      >
+        {parts.map(
+          (p) =>
+            p.percent > 0 && (
+              <span key={p.key} className={`h-full ${p.fill}`} style={{ width: `${p.percent}%` }} />
+            ),
+        )}
+      </div>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-note tabular-nums" aria-hidden="true">
+        {parts.map((p) => (
+          <li key={p.key} className="flex items-center gap-1.5">
+            <span className={`size-3 rounded-sm ${p.fill}`} />
+            {p.label} {p.percent}%
+          </li>
+        ))}
       </ul>
       {main?.counter && (
-        <p className="text-note text-muted">
+        <p className="text-note text-quiet">
           Mostly {main.label.toLowerCase()} damage, so {main.counter} covers the most of it.
         </p>
       )}
       {towerDeaths >= 2 && (
-        <p className="text-note text-muted">
+        <p className="text-note text-quiet">
           A tower was hitting you in {towerDeaths} of these {deaths} deaths.
         </p>
       )}

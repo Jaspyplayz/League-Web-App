@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ChartPlaceholders, InsightsSkeleton } from "@/components/loading-skeleton";
-import { panelClass } from "@/components/ui/panel";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
 import { compareWithBenchmarks, MIN_PLAYER_GAMES } from "@/lib/analyzer/compare";
@@ -35,12 +34,13 @@ import { AnalysisProgress } from "./analysis-progress";
 import { loadChosenPlayer, readChoice } from "./chosen-player";
 import { CompareWithPlayer } from "./compare-with-player";
 import { DeathRecapSection } from "./death-recap";
+import { MIN_GAMES, NotEnoughGames, TooFewOnChampion } from "./empty-states";
 import { FocusPanel } from "./focus";
 import { HabitsSection } from "./habits";
 import { InsightsFilterBar } from "./insights-filters";
 import { InsightsTabs } from "./insights-tabs";
 import { SessionBlocks } from "./session-blocks";
-import { TierComparison } from "./tier-comparison";
+import { NoRanks, TierComparison } from "./tier-comparison";
 import { LaningChart } from "./laning-chart";
 import { CsPhases, EarlyDeaths, LeadsAndDeficits } from "./trend-sections";
 import { Weaknesses } from "./weaknesses";
@@ -61,9 +61,6 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = { title: "Insights" };
 
-// Trends from one or two games would be noise, so the charts wait for a few.
-const MIN_GAMES = 3;
-
 export default function InsightsPage({
   params,
   searchParams,
@@ -72,7 +69,7 @@ export default function InsightsPage({
   searchParams: SearchParams;
 }) {
   return (
-    <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-7 px-6 pb-20 pt-7">
+    <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-3.5 px-4 pb-20 pt-7 sm:px-6">
       <Suspense fallback={<InsightsSkeleton />}>
         <Insights params={params} searchParams={searchParams} />
       </Suspense>
@@ -94,14 +91,18 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   const { puuid, gameName, tagLine } = account.value;
   const playerPath = `/player/${region}/${toSlug(account.value)}`;
 
+  const insightsPath = `${playerPath}/insights`;
+
+  // The name and the profile tabs, with more room under them than between
+  // the panels below.
   const header = (
-    <>
-      <h1 className="font-display text-[52px] font-bold leading-none tracking-[0.01em]">
+    <div className="mb-2.5 flex flex-col gap-6">
+      <h1 className="text-title font-semibold">
         {gameName}
-        <span className="font-semibold text-placeholder">#{tagLine}</span>
+        <span className="font-normal text-quiet">#{tagLine}</span>
       </h1>
       <ProfileTabs playerPath={playerPath} current="insights" />
-    </>
+    </div>
   );
 
   const query = await searchParams;
@@ -164,6 +165,21 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
     />
   );
 
+  // Null until `npm run benchmarks` has collected some games.
+  const tier = pickTier(query.tier, tiers.map((t) => t.tier));
+
+  // Every choice on the page, as URL parameters. Each form carries the others
+  // along in hidden inputs, so picking one doesn't reset the rest.
+  const current: Record<string, string> = {
+    games: String(filters.games),
+    ...(filters.champion && { champion: filters.champion }),
+    ...(typeof query.tier === "string" && tier && { tier: tier.toLowerCase() }),
+    ...(choice && { vs: choice.input, vsRegion: choice.region }),
+    ...(view !== "overview" && { view }),
+  };
+  const without = (...names: string[]) =>
+    Object.fromEntries(Object.entries(current).filter(([name]) => !names.includes(name)));
+
   if (allGames.length < MIN_GAMES) {
     return (
       <>
@@ -174,7 +190,12 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
             <ChartPlaceholders />
           </>
         ) : (
-          <NotEnoughGames window={filters.games} skipped={matches.length - trendMatches.length} />
+          <NotEnoughGames
+            window={filters.games}
+            skipped={matches.length - trendMatches.length}
+            insightsPath={insightsPath}
+            keep={without("games")}
+          />
         )}
       </>
     );
@@ -196,20 +217,6 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       games: 0,
     });
   }
-  // Null until `npm run benchmarks` has collected some games.
-  const tier = pickTier(query.tier, tiers.map((t) => t.tier));
-
-  // Every choice on the page, as URL parameters. Each form carries the others
-  // along in hidden inputs, so picking one doesn't reset the rest.
-  const current: Record<string, string> = {
-    games: String(filters.games),
-    ...(filters.champion && { champion: filters.champion }),
-    ...(typeof query.tier === "string" && tier && { tier: tier.toLowerCase() }),
-    ...(choice && { vs: choice.input, vsRegion: choice.region }),
-    ...(view !== "overview" && { view }),
-  };
-  const without = (...names: string[]) =>
-    Object.fromEntries(Object.entries(current).filter(([name]) => !names.includes(name)));
   const filterBar = (
     <InsightsFilterBar
       filters={filters}
@@ -222,9 +229,15 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
     return (
       <>
         {header}
-        {waiting > 0 && progress}
         {filterBar}
-        <TooFewOnChampion filters={filters} games={games.length} dd={dd} />
+        {waiting > 0 && progress}
+        <TooFewOnChampion
+          name={championName(dd, filters.champion ?? "")}
+          games={games.length}
+          window={filters.games}
+          insightsPath={insightsPath}
+          keep={without("games")}
+        />
       </>
     );
   }
@@ -261,9 +274,9 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
   return (
     <>
       {header}
-      {waiting > 0 && progress}
       {filterBar}
-      <InsightsTabs insightsPath={`${playerPath}/insights`} current={view} keep={without("view")} />
+      <InsightsTabs insightsPath={insightsPath} current={view} keep={without("view")} />
+      {waiting > 0 && progress}
       {/* Overview: your own games' trends. */}
       {view === "overview" && (
         <>
@@ -280,8 +293,9 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
             label={label}
             matchPath={(matchId) => `${playerPath}/match/${matchId}`}
           />
-          <LeadsAndDeficits conversion={trends.conversion} />
-          <div className="flex flex-wrap items-start gap-5">
+          {/* One row on wide screens, as in the profile mockup (JAS-87). */}
+          <div className="grid items-start gap-3.5 lg:grid-cols-[1.3fr_1fr_0.8fr]">
+            <LeadsAndDeficits conversion={trends.conversion} />
             <EarlyDeaths earlyDeaths={trends.earlyDeaths} games={games.length} />
             <CsPhases csPerMin={trends.csPerMin} />
           </div>
@@ -291,7 +305,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       {/* You vs others: your games next to a rank's, or one player's. */}
       {view === "others" && (
         <>
-          {tier && (
+          {tier ? (
             <TierComparison
               tier={tier}
               tiers={tiers}
@@ -300,11 +314,13 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
               keep={without("tier")}
               dd={dd}
             />
+          ) : (
+            <NoRanks />
           )}
           <CompareWithPlayer
             chosen={chosen}
             comparison={playerComparison}
-            clearHref={`${playerPath}/insights?${new URLSearchParams(without("vs", "vsRegion"))}`}
+            clearHref={`${insightsPath}?${new URLSearchParams(without("vs", "vsRegion"))}`}
             keep={without("vs", "vsRegion")}
             dd={dd}
           />
@@ -313,7 +329,7 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
       {/* Habits and sessions: what you tend to do, and when you play. */}
       {view === "habits" && (
         <>
-          {habits && <HabitsSection report={habits} tier={tier} />}
+          <HabitsSection report={habits} tier={tier} />
           <SessionBlocks report={sessions} champion={filters.champion} />
         </>
       )}
@@ -325,36 +341,6 @@ async function Insights({ params, searchParams }: { params: Params; searchParams
         dd={dd}
       />
     </>
-  );
-}
-
-function NotEnoughGames({ window, skipped }: { window: number; skipped: number }) {
-  return (
-    <p className={`${panelClass} px-5 py-4 text-muted`}>
-      Not enough games to spot trends yet. Insights need at least {MIN_GAMES} recent games on
-      Summoner&apos;s Rift that lasted 15 minutes or more
-      {skipped > 0 && ` (${skipped} of the last ${window} were ARAM, Arena, remakes or similar)`}.
-    </p>
-  );
-}
-
-function TooFewOnChampion({
-  filters,
-  games,
-  dd,
-}: {
-  filters: InsightsFilters;
-  games: number;
-  dd: DataDragon | null;
-}) {
-  const name = championName(dd, filters.champion ?? "");
-  return (
-    <p className={`${panelClass} px-5 py-4 text-muted`}>
-      {games === 0
-        ? `No ${name} games in your last ${filters.games}.`
-        : `Only ${games} ${name} ${games === 1 ? "game" : "games"} in your last ${filters.games}, and trends need at least ${MIN_GAMES}.`}{" "}
-      {filters.games < 100 && "Try a bigger window, or pick another champion."}
-    </p>
   );
 }
 
@@ -374,7 +360,7 @@ function Footnote({
   const skipped = matches.length - trendMatches.length;
   const which = filters.champion ? ` ${championName(dd, filters.champion)}` : "";
   return (
-    <p className="text-[13px] text-faint">
+    <p className="text-note text-quiet">
       Based on {games}
       {which} games out of your last {matches.length}, each compared with the enemy who played your
       role.

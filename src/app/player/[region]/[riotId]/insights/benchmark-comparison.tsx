@@ -11,7 +11,7 @@ import { formatSigned, plural } from "@/lib/analyzer/format";
 import { championClass, championName, type DataDragon } from "@/lib/ddragon";
 import { positionName } from "@/lib/match-summary";
 import { tierName, type Tier } from "@/lib/tiers";
-import { panelClass } from "@/components/ui/panel";
+import { SubHeading } from "@/components/ui/panel-heading";
 
 // Who your games are compared with: players of one rank on KR, EUW and NA
 // (see tier-comparison.tsx), or one player you picked (compare-with-player.tsx).
@@ -30,14 +30,14 @@ export function BenchmarkComparison({
 }) {
   const them = against.kind === "tier" ? tierName(against.tier) : against.name;
   return (
-    <div className="flex flex-col gap-3.5">
-      <p className="text-[15px] text-muted">
+    <div className="flex flex-col gap-3">
+      <p className="text-note text-quiet">
         {against.kind === "tier" ? (
           `Each of your games is compared with ${them} players on KR, EUW and NA, using one-tricks on your champion when there are enough of their games.`
         ) : (
           <>
             Each of your games is compared with{" "}
-            <Link href={against.href} className="text-ink underline underline-offset-2">
+            <Link href={against.href} className="text-main underline underline-offset-2">
               {against.name}
             </Link>
             &apos;s last ranked solo games on the same champion, then the same class, then the same
@@ -45,20 +45,21 @@ export function BenchmarkComparison({
           </>
         )}
       </p>
-      <div className={`overflow-x-auto ${panelClass}`}>
-        <table className="w-full text-left text-sm">
-          <thead className="font-mono text-xs uppercase tracking-[0.08em] text-faint">
+      {/* Scrolls sideways inside the panel on a narrow phone. */}
+      <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
+        <table className="w-full min-w-[480px] max-w-[880px] text-left text-sm tabular-nums">
+          <thead className="text-note text-quiet">
             <tr>
-              <th scope="col" className="px-3 py-3 sm:px-5 font-medium">
+              <th scope="col" className="py-2 pr-3 font-medium">
                 Per game
               </th>
-              <th scope="col" className="px-3 py-3 sm:px-5 text-right font-medium">
+              <th scope="col" className="px-3 py-2 text-right font-medium">
                 You
               </th>
-              <th scope="col" className="px-3 py-3 sm:px-5 text-right font-medium">
+              <th scope="col" className="px-3 py-2 text-right font-medium">
                 {them}
               </th>
-              <th scope="col" className="px-3 py-3 sm:px-5 text-right font-medium">
+              <th scope="col" className="py-2 pl-3 text-right font-medium">
                 Gap
               </th>
             </tr>
@@ -71,7 +72,7 @@ export function BenchmarkComparison({
         </table>
       </div>
       <ChampionList champions={comparison.champions} against={against} dd={dd} />
-      <p className="text-[13px] text-faint">
+      <p className="text-note text-quiet">
         {against.kind === "tier"
           ? `Leads are against each player's own lane opponent, so a ${them} player's lead is over another ${them} player.`
           : `${against.name}'s leads are against their own lane opponents, at their own rank.`}{" "}
@@ -83,24 +84,20 @@ export function BenchmarkComparison({
   );
 }
 
+// One stat: its name and game count, your number, theirs, and the gap in
+// words, which is the only coloured part: blue ahead, red behind.
 function StatRow({ stat }: { stat: StatComparison }) {
   const { label, format, gap } = statRowStyle(stat.key);
-  const better = gap.lowerIsBetter ? stat.you <= stat.them : stat.you >= stat.them;
-  const tone = gap.neutral ? "text-ink" : better ? "text-ahead" : "text-behind";
   return (
-    <tr className="border-t border-line">
-      <th scope="row" className="px-3 py-3 sm:px-5 font-normal text-ink-soft">
-        {label}
-        <span className="block font-mono text-xs text-faint sm:ml-2 sm:inline">
-          {plural(stat.games, "game")}
-        </span>
+    <tr className="border-t border-divider">
+      <th scope="row" className="py-2 pr-3 font-normal">
+        <span className="block font-medium">{label}</span>
+        <span className="block text-note text-quiet">{plural(stat.games, "game")}</span>
       </th>
-      <td className={`px-3 py-3 sm:px-5 text-right font-mono ${tone}`}>
-        {format(stat.you)}
-      </td>
-      <td className="px-3 py-3 sm:px-5 text-right font-mono text-ink-soft">{format(stat.them)}</td>
+      <td className="px-3 py-2 text-right">{format(stat.you)}</td>
+      <td className="px-3 py-2 text-right">{format(stat.them)}</td>
       {/* The gap in words, so nobody has to subtract in their head. */}
-      <td className="whitespace-nowrap px-3 py-3 sm:px-5 text-right">
+      <td className="whitespace-nowrap py-2 pl-3 text-right font-medium">
         <Gap you={stat.you} them={stat.them} {...gap} />
       </td>
     </tr>
@@ -119,36 +116,37 @@ function ChampionList({
   dd: DataDragon | null;
 }) {
   return (
-    <ul className={`flex flex-col divide-y divide-line ${panelClass}`}>
-      {champions.map((c) => {
-        const gold = c.stats.find((s) => s.key === "goldAt10");
-        return (
-          <li
-            key={`${c.position}-${c.championName}`}
-            className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3"
-          >
-            <ChampionIcon dd={dd} name={c.championName} size={32} className="soft-round-sm" />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm">
-                {championName(dd, c.championName)}
-                <span className="text-faint">
-                  {" "}
-                  · {positionName(c.position) ?? c.position} · {plural(c.games, "game")}
-                </span>
-              </span>
-              <span className="text-[13px] text-muted">{comparedWith(c, against, dd)}</span>
-            </div>
-            {gold && (
-              // Below the name on phones, on the right on wider screens.
-              <span className="basis-full pl-11 font-mono text-sm text-ink-soft sm:basis-auto sm:whitespace-nowrap sm:pl-0">
-                <span className="text-note text-faint">Gold at 10</span> {formatSigned(gold.you)} vs{" "}
-                {formatSigned(gold.them)} · <Gap you={gold.you} them={gold.them} />
-              </span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-1">
+      <SubHeading>Gold at 10 on each champion</SubHeading>
+      <ul className="grid gap-x-6 sm:grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
+        {champions.map((c) => {
+          const gold = c.stats.find((s) => s.key === "goldAt10");
+          return (
+            <li
+              key={`${c.position}-${c.championName}`}
+              className="flex gap-2.5 border-b border-divider py-2"
+            >
+              <ChampionIcon dd={dd} name={c.championName} size={32} className="rounded-md" />
+              <div className="flex min-w-0 flex-col">
+                <p className="text-sm">
+                  <span className="font-medium">{championName(dd, c.championName)}</span>{" "}
+                  <span className="text-note text-quiet">
+                    {positionName(c.position) ?? c.position} · {plural(c.games, "game")}
+                  </span>
+                </p>
+                <p className="text-note text-quiet">{comparedWith(c, against, dd)}</p>
+                {gold && (
+                  <p className="text-note tabular-nums">
+                    {formatSigned(gold.you)} vs {formatSigned(gold.them)} ·{" "}
+                    <Gap you={gold.you} them={gold.them} />
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
