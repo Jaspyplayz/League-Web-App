@@ -78,11 +78,29 @@ describe("MatchRow", () => {
     const html = render(game, score);
     expect(html).toContain('aria-label="Game score 78 out of 100"');
     expect(html).toMatch(/aria-hidden="true"[^>]*truncate[^>]*>MVP · Helped by strong KDA</);
-    expect(html).toContain('class="sr-only">Helped by strong KDA. Held back by little objective damage.<');
+    expect(html).toContain('class="sr-only">MVP. Helped by strong KDA. Held back by little objective damage.<');
   });
 
   it("names what held the score back when nothing helped", () => {
     expect(shortReason({ ...score, badge: null, strengths: [] })).toBe("Held back by little objective damage");
+  });
+
+  // Most bad games still have something that helped, so below 50 the line
+  // leads with what held the score back.
+  it("leads with what held a low score back", () => {
+    const low = { ...score, score: 14, badge: null, strengths: ["high vision"], weakness: "many deaths" };
+    expect(shortReason(low)).toBe("Held back by many deaths");
+  });
+
+  // Two side by side would run under the score box.
+  it("puts each highlight on its own line", () => {
+    const html = renderToStaticMarkup(
+      <ul>
+        <MatchRow match={game} dd={null} now={0} href="/x" badges={["Double kill", "First blood"]} />
+      </ul>,
+    );
+    expect(html).toMatch(/>Double kill<\/p>/);
+    expect(html).toMatch(/>First blood<\/p>/);
   });
 
   // Ranked games are scored, so a remake's missing score isn't the mode's fault.

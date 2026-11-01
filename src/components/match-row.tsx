@@ -120,7 +120,7 @@ export function MatchRow({
               <p aria-hidden="true" className="hidden min-w-0 truncate text-note leading-8 text-quiet @xl:block">
                 {shortReason(score)}
               </p>
-              <p className="sr-only">{scoreReason(score)}</p>
+              <p className="sr-only">{[score.badge, scoreReason(score)].filter(Boolean).join(". ")}</p>
             </>
           ) : (
             <p className="hidden min-w-0 truncate text-note leading-8 text-quiet @xl:block">
@@ -139,15 +139,14 @@ export function MatchRow({
   );
 }
 
-// The reason cut to one line: what helped the score most, or else what held
-// it back, after MVP or ACE when the player was the best on their team.
-// "MVP · Helped by strong KDA"
+// The reason cut to one line, after MVP or ACE when the player was the best
+// on their team: what helped most for a score of 50 or more, what held it
+// back most below 50, where most bad games still have something that helped.
+// "MVP · Helped by strong KDA", "Held back by many deaths"
 export function shortReason(score: PlayerScore): string {
-  const main = score.strengths[0]
-    ? `Helped by ${score.strengths[0]}`
-    : score.weakness
-      ? `Held back by ${score.weakness}`
-      : "";
+  const helped = score.strengths[0] && `Helped by ${score.strengths[0]}`;
+  const heldBack = score.weakness && `Held back by ${score.weakness}`;
+  const main = (score.score < 50 ? heldBack || helped : helped || heldBack) || "";
   return [score.badge, main].filter(Boolean).join(" · ");
 }
 

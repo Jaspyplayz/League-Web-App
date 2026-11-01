@@ -1,6 +1,6 @@
 # Game score
 
-Every player in a Summoner's Rift game gets a score from 0 to 100, plus **MVP** for the best player on the winning team and **ACE** for the best on the losing team. It's Turnpoint's own take on op.gg's OP Score. You'll find it on each match row, and yours is the overall rating on the match page's Summary tab. On wider screens each match row writes out beside the score what helped it and what held it back, with MVP or ACE first.
+Every player in a Summoner's Rift game gets a score from 0 to 100, plus **MVP** for the best player on the winning team and **ACE** for the best on the losing team. It's Turnpoint's own take on op.gg's OP Score. You'll find it on each match row, and yours is the overall rating on the match page's Summary tab. On wider screens each match row gives one line beside the score: MVP or ACE, then what helped it most, or what held it back most when it's under 50. Screen readers hear MVP or ACE and the whole reason.
 
 On the match page, it's also the **Overall** tile next to your early, mid and late game ratings, which are trained the same way on each phase of the game (see [phase-ratings.md](phase-ratings.md)).
 
