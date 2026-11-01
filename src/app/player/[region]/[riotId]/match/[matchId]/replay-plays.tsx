@@ -51,6 +51,21 @@ const DOT_SIZE: Record<Grade, string> = {
   Blunder: "size-3",
 };
 
+// The ring round the play's dot: blue when it raised your team's chance, red
+// when it lowered it, so the direction reads without telling eleven grade
+// colours apart, and the pale grades (Good, Excellent) still show on the
+// light theme's white panel. Even has none.
+const DOT_RING: Record<Grade, string> = {
+  Brilliant: "ring-1 ring-ahead",
+  Great: "ring-1 ring-ahead",
+  Excellent: "ring-1 ring-ahead",
+  Good: "ring-1 ring-ahead",
+  Even: "",
+  Inaccuracy: "ring-1 ring-behind",
+  Mistake: "ring-1 ring-behind",
+  Blunder: "ring-1 ring-behind",
+};
+
 // The play's icon in the list: blue for a gain, red for a loss.
 const GRADE_ICON: Record<Grade, string> = {
   Brilliant: "text-ahead-soft",
@@ -115,17 +130,18 @@ export function ChanceRow({ perSecond }: { perSecond: number[] }) {
   );
 }
 
-// A dot at each play, in its grade's colour: round for fights, square when
-// it took an objective.
+// A dot at each play, in its grade's colour and ringed by direction: round
+// for fights, square when it took an objective.
 export function PlayMarks({ plays, left }: { plays: Play[]; left: (ms: number) => string }) {
   return (
     <div aria-hidden="true" className="relative h-6">
       {plays.map((play) => (
         <span
           key={play.from}
+          data-grade={play.grade}
           className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${DOT_SIZE[play.grade]} ${
             GRADE_LOOKS[play.grade].dot
-          } ${play.objectives.length > 0 ? "" : "rounded-full"}`}
+          } ${DOT_RING[play.grade]} ${play.objectives.length > 0 ? "" : "rounded-full"}`}
           style={{ left: left(play.from) }}
         />
       ))}
@@ -292,7 +308,7 @@ export function ReplayPlays({
               : `Your ${yours === 1 ? "play" : `${yours} plays`}: ${listNames(counts)}.`}
           </p>
         </div>
-        <div role="group" aria-label="Which plays" className={SWITCH}>
+        <div role="group" aria-label="Which plays" className={`${SWITCH} bg-raised`}>
           {[false, true].map((mineOnly) => (
             <button
               key={String(mineOnly)}
@@ -348,8 +364,9 @@ export function ReplayPlays({
 }
 
 // A pressed-or-not switch, like "All | Yours" and the replay's speeds: the
-// pressed one in the text colour, as the Review board's buttons are.
-export const SWITCH = "inline-flex gap-1 rounded-md bg-raised p-1 text-note";
+// pressed one in the text colour, as the Review board's buttons are. Each
+// use adds its own fill, one step off what it sits on.
+export const SWITCH = "inline-flex gap-1 rounded-md p-1 text-note";
 export const SWITCH_BUTTON = "min-h-8 rounded-sm px-3 py-1";
 export const SWITCH_ON = "bg-main font-medium text-page";
 export const SWITCH_OFF = "text-quiet hover:text-main";

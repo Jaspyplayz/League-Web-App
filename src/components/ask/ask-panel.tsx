@@ -92,9 +92,7 @@ export async function AskContent({
   // Without the API key, sign-in or the database, nobody can ask.
   if (!askEnabled() || !supabaseConfig() || !process.env.DATABASE_URL) {
     return (
-      <AskNote title="Ask isn't available right now.">
-        This copy of Turnpoint doesn&apos;t have Claude, sign-in or its database set up.
-      </AskNote>
+      <AskNote title="Ask isn't available right now.">Try again later.</AskNote>
     );
   }
   const user = await getCurrentUser();
@@ -140,8 +138,7 @@ export async function AskContent({
         playerPath={playerPath}
         history={history.ok ? history.questions : []}
         historyFailed={!history.ok}
-        left={allowed.ok ? allowed.left : 0}
-        limit={allowed.ok ? undefined : allowed.message}
+        allowance={allowed}
         examples={[
           `What decided my ${game}?`,
           `How did my early game go in my ${game}?`,

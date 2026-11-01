@@ -1,14 +1,14 @@
-// The parts of the replay only junglers see (beta, with its own mark now
-// that the replay has none): a strip across the game,
-// blue while you were up tempo and red while the enemy jungler was, each
-// jungler's deaths and shop visits under it, and why the moment the replay
-// is on got its call. The call changes at the second someone died,
-// respawned, levelled up or shopped. How it's made is in
+// The parts of the replay only junglers see (beta, with a mark of its own):
+// a strip across the game, blue while you were up tempo and red while the
+// enemy jungler was, each jungler's deaths and shop visits under it, and why
+// the moment the replay is on got its call. The call changes at the second
+// someone died, respawned, levelled up or shopped. How it's made is in
 // src/lib/analyzer/tempo.ts and docs/tempo.md.
 //
 // replay.tsx owns the clock and lays these out. They draw whatever moment
 // it passes them.
 
+import { linkClass } from "@/components/ui/state-panel";
 import { formatClock } from "@/lib/analyzer/format";
 import { describeSpot } from "@/lib/analyzer/map";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
@@ -254,10 +254,7 @@ export function TempoReadout({
         {tempo.exactItemGold
           ? ""
           : " This game was saved before Turnpoint kept unspent gold, so item gold is estimated from when each jungler shopped."}{" "}
-        <a
-          href={docsHref}
-          className="text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main"
-        >
+        <a href={docsHref} className={linkClass}>
           How it&apos;s worked out, and how well it held up in real games
         </a>
         .

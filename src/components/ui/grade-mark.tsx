@@ -26,9 +26,9 @@ export type MarkGrade = (typeof MARK_GRADES)[number];
 // The symbol's colour on the circle. In dark every grade colour is light
 // enough for the page colour on top. In light most still are, so the symbol
 // takes the text colour; Great, Miss and Blunder are dark there, so it turns
-// white (the light panel). Each pair stays above 4:1 except Brilliant and Book
-// in light, which are still above the 3:1 a symbol needs: the grade's name is
-// always written beside the mark, so the symbol only repeats it.
+// white (the light panel). Every pair is above 4:1; the lowest are Brilliant
+// (about 4.2) and Book (about 4.4) in light. The grade's name is always
+// written beside the mark, so the symbol only repeats it.
 // Fill for the characters, stroke for the drawn ones, both written out so
 // Tailwind finds them.
 type Ink = { fill: string; stroke: string };
@@ -39,7 +39,8 @@ const INK_ON_DARK: Ink = {
 };
 
 type Look = {
-  // The symbol as text: what the mark shows, and what a test can compare.
+  // The symbol as text. Rubik draws the ! ? + = ones; the other four are
+  // drawn as lines in GradeSymbol below, and this names them.
   symbol: string;
   // Tailwind classes for the circle and for a plain dot of the same colour.
   circle: string;

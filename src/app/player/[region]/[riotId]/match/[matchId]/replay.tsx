@@ -17,6 +17,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { linkClass } from "@/components/ui/state-panel";
 import { formatClock, formatGap } from "@/lib/analyzer/format";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
 import { playStart, type ReplayChances } from "@/lib/analyzer/plays";
@@ -277,8 +278,8 @@ export function Replay({
         <div className="flex flex-wrap gap-x-[18px] gap-y-2">
           {chances && (
             <>
-              <LegendSwatch className="bg-ahead/40">Your team favored</LegendSwatch>
-              <LegendSwatch className="bg-behind/40">Enemy team favored</LegendSwatch>
+              <LegendSwatch className="bg-ahead-fill">Your team favored</LegendSwatch>
+              <LegendSwatch className="bg-behind-fill">Enemy team favored</LegendSwatch>
             </>
           )}
           <LegendSwatch className="bg-ahead">Kill by your team</LegendSwatch>
@@ -287,7 +288,7 @@ export function Replay({
         </div>
         <p>
           {chances
-            ? "Each dot under the win chance line is a play, in its grade's colour (the same as its mark in the list), bigger the more it moved your team's chance, and square when it took an objective. "
+            ? "Each dot under the win chance line is a play, in its grade's colour (the same as its mark in the list), ringed in blue when it raised your team's chance and red when it lowered it, bigger the more it moved it, and square when it took an objective. "
             : ""}
           Letters mark the epic monsters each team took (D dragon, E Elder, G grubs, H Herald, B
           Baron, A Atakhan), in blue for your team and red for the enemy&apos;s, and ticks mark the
@@ -297,7 +298,7 @@ export function Replay({
         <p>
           Riot logs kills, deaths, level-ups and items to the second, but positions, gold and CS
           only once a minute, so between those snapshots they&apos;re estimates.{" "}
-          <a href={docsHref} className={LINK}>
+          <a href={docsHref} className={linkClass}>
             How the replay is worked out
           </a>
           .
@@ -490,10 +491,6 @@ export function Replay({
     </section>
   );
 }
-
-// A link in the text colour, underlined, as on How it works: blue and red
-// only ever mean you and the opponent.
-const LINK = "text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main";
 
 // 0.6143 -> "61%".
 function percent(chance: number): string {

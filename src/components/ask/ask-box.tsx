@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState, useTransition, type FormEvent } from "react";
 import { askAction } from "@/app/account/actions";
 import { LoadingBlock, StatusLine } from "@/components/ui/loading";
-import { mainButtonClass } from "@/components/ui/state-panel";
-import { MAX_QUESTION_LENGTH } from "@/lib/ask-rules";
+import { linkClass, mainButtonClass } from "@/components/ui/state-panel";
+import { MAX_QUESTION_LENGTH, type Allowance } from "@/lib/ask-rules";
 import type { AskedQuestion } from "@/lib/ask-store";
 import { AskNote } from "./ask-note";
 
@@ -15,11 +15,10 @@ type Props = {
   playerPath: string;
   history: AskedQuestion[];
   historyFailed: boolean; // the past questions couldn't be read, so history is empty for now
-  left: number; // questions this account can still ask today, 0 once any limit is reached
-  // Why this account can't ask right now (the day's questions, the account's
-  // month or the site's month, from allowance() in src/lib/ask-rules.ts).
-  // Shown in place of the question box.
-  limit?: string;
+  // From allowance() in src/lib/ask-rules.ts: how many questions are left
+  // today, or why none are (the account's day, its month or the site's
+  // month), which shows in place of the question box.
+  allowance: Allowance;
   examples?: string[]; // buttons that fill in a question; the match page names its game in them
 };
 
@@ -40,8 +39,7 @@ export function AskBox({
   playerPath,
   history,
   historyFailed,
-  left,
-  limit,
+  allowance,
   examples = DEFAULT_EXAMPLES,
 }: Props) {
   const [text, setText] = useState("");
@@ -49,7 +47,7 @@ export function AskBox({
   // reads the games.
   const [asking, setAsking] = useState("");
   const [answers, setAnswers] = useState(history);
-  const [remaining, setRemaining] = useState(left);
+  const [remaining, setRemaining] = useState(allowance.ok ? allowance.left : 0);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -78,8 +76,8 @@ export function AskBox({
 
   return (
     <div className="flex flex-col gap-6">
-      {limit ? (
-        <AskNote title={limit} />
+      {!allowance.ok ? (
+        <AskNote title={allowance.message} />
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3">
           <label htmlFor="ask-question" className="text-sm text-quiet">
@@ -129,7 +127,7 @@ export function AskBox({
       {/* Where the past questions go, so it still shows under a new answer (#167). */}
       {historyFailed && (
         <AskNote title="Couldn't load your past questions." problem>
-          Reload to try again. You can still ask a new one.
+          Reload to try again.
         </AskNote>
       )}
       {answers.length > 0 && (
@@ -145,7 +143,7 @@ export function AskBox({
                     <Link
                       key={game.matchId}
                       href={`${playerPath}/match/${game.matchId}`}
-                      className="font-medium text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main"
+                      className={`font-medium ${linkClass}`}
                     >
                       {game.label}
                     </Link>
@@ -178,7 +176,8 @@ export function AskStatus({
     <>
       {/* Screen readers hear the waiting line, or why a question wasn't
           answered, from this line, which is always there so they notice it
-          change. The same words show on screen below. */}
+          change. The waiting line on screen below is hidden from them, so
+          it isn't read twice; the note stays, so it can be found again. */}
       <p role="status" className="sr-only">
         {error ?? (asking !== null ? WAITING : "")}
       </p>
@@ -191,7 +190,9 @@ export function AskStatus({
       {asking !== null && (
         <div className="flex flex-col gap-3 rounded-md bg-raised p-5">
           <p className="font-semibold text-main">{asking}</p>
-          <StatusLine label={WAITING} slow={false} />
+          <div aria-hidden="true">
+            <StatusLine label={WAITING} slow={false} />
+          </div>
           <div aria-hidden="true" className="flex flex-col gap-2 motion-safe:animate-pulse">
             <LoadingBlock className="h-3.5 w-full" />
             <LoadingBlock className="h-3.5 w-11/12" />

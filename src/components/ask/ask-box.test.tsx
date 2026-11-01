@@ -5,7 +5,12 @@ import { AskBox, AskStatus } from "./ask-box";
 
 vi.mock("@/app/account/actions", () => ({ askAction: vi.fn() }));
 
-const props = { region: "na", riotId: "Jaspy-CA1", playerPath: "/player/na/Jaspy-CA1", left: 5 };
+const props = {
+  region: "na",
+  riotId: "Jaspy-CA1",
+  playerPath: "/player/na/Jaspy-CA1",
+  allowance: { ok: true, left: 5 } as const,
+};
 const asked: AskedQuestion = { id: "q1", question: "Why do I lose?", answer: "You die early.", games: [], askedAt: new Date() };
 
 describe("AskBox", () => {
@@ -25,7 +30,12 @@ describe("AskBox", () => {
 
   it("shows a limit in place of the question box, with the past questions under it", () => {
     const html = renderToStaticMarkup(
-      <AskBox {...props} left={0} limit="You've asked 10 questions today. Try again tomorrow." history={[asked]} historyFailed={false} />,
+      <AskBox
+        {...props}
+        allowance={{ ok: false, message: "You've asked 10 questions today. Try again tomorrow." }}
+        history={[asked]}
+        historyFailed={false}
+      />,
     );
     expect(html).toContain("You&#x27;ve asked 10 questions today. Try again tomorrow.");
     expect(html).not.toContain("ask-question");
@@ -58,8 +68,10 @@ describe("AskStatus", () => {
     expect(html).not.toContain("text-behind");
   });
 
-  it("shows nothing but an empty status line otherwise", () => {
+  it("shows nothing otherwise, but keeps the status line for screen readers", () => {
     const html = renderToStaticMarkup(<AskStatus error={null} asking={null} />);
-    expect(html).toBe('<p role="status" class="sr-only"></p>');
+    expect(html).toContain('role="status"');
+    expect(html).not.toContain("Reading the games");
+    expect(html.replace(/<[^>]*>/g, "")).toBe("");
   });
 });

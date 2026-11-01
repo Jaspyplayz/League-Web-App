@@ -13,6 +13,11 @@ export const mainButtonClass =
 export const secondButtonClass =
   "inline-flex h-11 items-center justify-center rounded-md bg-raised px-5 text-body font-medium text-main hover:bg-divider";
 
+// A link inside a sentence: the text colour, underlined. Blue and red only
+// ever mean you and the opponent, so links aren't blue.
+export const linkClass =
+  "text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main";
+
 // Nothing to show: one sentence naming what's missing, an optional line
 // under it, and at most one way forward (a single link or button). No icon.
 export function EmptyPanel({
@@ -48,18 +53,25 @@ export function ProblemPanel({
 }) {
   return (
     <div role="alert" className={`${panelClass} flex gap-3 p-5`}>
-      <span
-        aria-hidden="true"
-        className="grid size-[22px] shrink-0 place-items-center rounded-full border-[1.5px] border-quiet text-note font-bold text-quiet"
-      >
-        !
-      </span>
+      <ProblemMark />
       <div className="flex min-w-0 flex-col items-start gap-1.5">
         <p className="text-body font-semibold">{title}</p>
         {children && <div className="flex flex-col gap-3 text-body text-quiet">{children}</div>}
         {actions && <div className="mt-2 flex flex-wrap gap-2.5">{actions}</div>}
       </div>
     </div>
+  );
+}
+
+// The "!" circle that marks a problem, here and in the Ask panel's notes.
+export function ProblemMark() {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-[22px] shrink-0 place-items-center rounded-full border-[1.5px] border-quiet text-note font-bold text-quiet"
+    >
+      !
+    </span>
   );
 }
 

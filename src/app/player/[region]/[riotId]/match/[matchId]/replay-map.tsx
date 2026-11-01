@@ -144,7 +144,7 @@ function Champion({
           <Picture src={person.iconUrl} alt="" size={26} className="size-full rounded-full" />
         ) : (
           <span className="text-xs font-semibold text-main">
-            {person.name.slice(0, 2)}
+            {person.name.slice(0, 2).toUpperCase()}
           </span>
         )}
       </span>
