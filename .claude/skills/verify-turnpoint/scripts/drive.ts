@@ -104,18 +104,22 @@ const journeys: Journey[] = [
   {
     name: "ask-teaser",
     feature: "ask-teaser.md",
-    needs: ["riot", "supabase"],
+    needs: ["database", "supabase"],
     run: async ({ page, step }) => {
       await step("open Ask signed out", async () => {
-        await page.goto(`${TEST_PLAYER.path}/ask`, LOAD);
+        await page.goto(SAMPLE_MATCH_PATH, LOAD);
         await assertAppPage(page);
-        await expect(page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Ask" })).toHaveAttribute("aria-current", "page", LOAD);
+        await page.getByRole("tab", { name: "Replay" }).click();
+        await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true", LOAD);
+        await expect(page.getByRole("heading", { name: "Ask about this game" })).toBeVisible(LOAD);
         if (await page.getByText("Ask isn't available right now.").isVisible())
           throw new Error('Ask shows "Ask isn\'t available right now." (no ANTHROPIC_API_KEY, Supabase or DATABASE_URL on this target)');
       });
       await step("teaser shows sign in and illustration", async () => {
-        const main = page.getByRole("main");
-        await expect(main.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", /\/sign-in\?next=%2Fplayer%2Fkr%2FHide%2520on%2520bush-KR1%2Fask/);
+        // The Game recap teaser on Summary has its own illustration and Sign
+        // in link, so look only inside the Ask panel.
+        const main = page.getByRole("region", { name: "Ask about this game" });
+        await expect(main.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", /\/sign-in\?next=%2Fplayer%2Fkr%2FHide%2520on%2520bush-KR1%2Fmatch%2FKR_8416261221/);
         await expect(main.getByText("Illustration · not a real game")).toBeVisible();
         await expect(main.getByText("What do my losses have in common?").first()).toBeVisible();
         await expect(main.getByRole("textbox")).toHaveCount(0);

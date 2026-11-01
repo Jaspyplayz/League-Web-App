@@ -26,14 +26,16 @@ export function ChampionRowGroup({
   const [shown, setShown] = useState(STEP);
 
   return (
-    <tbody className="border-t border-line">
+    <tbody className="border-t border-divider">
       <tr
         // The button has no onClick of its own: its click (including Enter
         // or Space on the keyboard) bubbles up to the row.
         onClick={() => setOpen((wasOpen) => !wasOpen)}
         // Lets the pinned champion cell match the row's background.
         data-open={open}
-        className={`group cursor-pointer transition-colors hover:bg-surface-hover ${open ? "bg-surface-hover" : ""}`}
+        // `raised`, not `select`, so the pinned champion cell (which has to be
+        // solid) can match it. Fades in 0.12s and out 0.32s, like every hover.
+        className={`group cursor-pointer transition-colors duration-320 ease-out hover:bg-raised hover:duration-120 motion-reduce:transition-none ${open ? "bg-raised" : ""}`}
       >
         {cells}
         <td className="px-1 text-right">
@@ -41,7 +43,7 @@ export function ChampionRowGroup({
             type="button"
             aria-expanded={open}
             aria-label={`${open ? "Hide" : "Show"} ${label}`}
-            className="soft-round-sm p-1 text-placeholder hover:text-ink"
+            className="rounded-sm p-1 text-quiet hover:text-main"
           >
             <Chevron open={open} />
           </button>
@@ -50,7 +52,7 @@ export function ChampionRowGroup({
       {open && opponents.slice(0, shown)}
       {open && opponents.length === 0 && (
         <tr>
-          <td colSpan={columns} className="bg-page px-4 py-3 text-note text-faint">
+          <td colSpan={columns} className="bg-page px-4 py-3 text-note text-quiet">
             No lane opponent in these games (modes like ARAM have no roles).
           </td>
         </tr>
@@ -62,7 +64,7 @@ export function ChampionRowGroup({
             <button
               type="button"
               onClick={() => setShown((n) => n + STEP)}
-              className="soft-round-sm sticky left-3 w-full max-w-[calc(100vw-4rem)] border border-ahead/50 bg-ahead/10 py-2 text-note font-medium text-ahead-soft transition-colors hover:bg-ahead/20 hover:text-ahead-bright"
+              className="sticky left-3 w-full max-w-[calc(100vw-4rem)] rounded-md bg-raised py-2 text-note font-medium text-main hover:bg-divider"
             >
               Show more ({opponents.length - shown} left)
             </button>

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState, useTransition, type FormEvent } from "react";
 import { askAction } from "@/app/account/actions";
-import { softPanelClass } from "@/components/ui/panel";
 import { MAX_QUESTION_LENGTH } from "@/lib/ask-rules";
 import type { AskedQuestion } from "@/lib/ask-store";
 
@@ -14,9 +13,10 @@ type Props = {
   history: AskedQuestion[];
   historyFailed: boolean; // the past questions couldn't be read, so history is empty for now
   left: number; // questions this account can still ask today, 0 once any limit is reached
+  examples?: string[]; // buttons that fill in a question; the match page names its game in them
 };
 
-const EXAMPLES = [
+const DEFAULT_EXAMPLES = [
   "What do my losses have in common?",
   "How do my early games go on my most played champion?",
   "When do I usually die, and how?",
@@ -24,7 +24,15 @@ const EXAMPLES = [
 
 // The question box and the answers under it. Runs in the browser to show
 // "Thinking…" while Claude reads the games, which can take up to a minute.
-export function AskBox({ region, riotId, playerPath, history, historyFailed, left }: Props) {
+export function AskBox({
+  region,
+  riotId,
+  playerPath,
+  history,
+  historyFailed,
+  left,
+  examples = DEFAULT_EXAMPLES,
+}: Props) {
   const [text, setText] = useState("");
   const [answers, setAnswers] = useState(history);
   const [remaining, setRemaining] = useState(left);
@@ -56,8 +64,8 @@ export function AskBox({ region, riotId, playerPath, history, historyFailed, lef
   return (
     <div className="flex flex-col gap-6">
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <label htmlFor="ask-question" className="text-sm text-muted">
-          Ask about this player&apos;s recent games. Only you see your questions.
+        <label htmlFor="ask-question" className="text-sm text-quiet">
+          Your question about this player&apos;s games. Only you see your questions.
         </label>
         <textarea
           id="ask-question"
@@ -66,15 +74,15 @@ export function AskBox({ region, riotId, playerPath, history, historyFailed, lef
           maxLength={MAX_QUESTION_LENGTH}
           rows={3}
           placeholder="e.g. Why do I lose games on Viego?"
-          className="soft-round w-full resize-y border border-line-strong bg-page px-4 py-3 text-ink placeholder:text-placeholder focus:border-ahead"
+          className="w-full resize-y rounded-md border border-divider bg-page px-4 py-3 text-main placeholder:text-placeholder focus:border-ahead"
         />
         <div className="flex flex-wrap gap-2">
-          {EXAMPLES.map((example) => (
+          {examples.map((example) => (
             <button
               key={example}
               type="button"
               onClick={() => setText(example)}
-              className="rounded-full border border-line px-3 py-1 text-sm text-muted hover:border-ahead hover:text-ink"
+              className="rounded-full border border-divider px-3 py-1 text-left text-sm text-quiet hover:border-ahead hover:text-main"
             >
               {example}
             </button>
@@ -84,7 +92,7 @@ export function AskBox({ region, riotId, playerPath, history, historyFailed, lef
           <button
             type="submit"
             disabled={isPending || text.trim() === "" || remaining <= 0}
-            className="soft-round min-h-[52px] bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-[52px] rounded-md bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? "Thinking…" : "Ask"}
           </button>
@@ -93,11 +101,11 @@ export function AskBox({ region, riotId, playerPath, history, historyFailed, lef
               <span className="text-behind">{error}</span>
             ) : (
               isPending && (
-                <span className="text-muted">Reading the games. This can take up to a minute.</span>
+                <span className="text-quiet">Reading the games. This can take up to a minute.</span>
               )
             )}
           </p>
-          <p className="ml-auto text-sm text-faint">
+          <p className="ml-auto text-sm text-quiet">
             {/* At 0 the limit may be the month's, not the day's; a reload says which. */}
             {remaining > 0
               ? `${remaining} ${remaining === 1 ? "question" : "questions"} left today`
@@ -113,12 +121,12 @@ export function AskBox({ region, riotId, playerPath, history, historyFailed, lef
       {answers.length > 0 && (
         <ol className="flex flex-col gap-4">
           {answers.map((item) => (
-            <li key={item.id} className={`${softPanelClass} flex flex-col gap-3 p-6`}>
-              <p className="font-semibold text-ink">{item.question}</p>
+            <li key={item.id} className="flex flex-col gap-3 rounded-md bg-raised p-5">
+              <p className="font-semibold text-main">{item.question}</p>
               <p className="whitespace-pre-line text-body">{item.answer}</p>
               {item.games.length > 0 && (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                  <span className="text-faint">Games read:</span>
+                  <span className="text-quiet">Games read:</span>
                   {item.games.map((game) => (
                     <Link
                       key={game.matchId}
@@ -134,7 +142,7 @@ export function AskBox({ region, riotId, playerPath, history, historyFailed, lef
           ))}
         </ol>
       )}
-      <p className="text-note text-faint">
+      <p className="text-note text-quiet">
         Answers are written by AI from the stats Turnpoint shows, and can be wrong.
       </p>
     </div>

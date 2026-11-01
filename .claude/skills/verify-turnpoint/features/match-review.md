@@ -31,4 +31,4 @@ Preconditions:
 
 - `Victory` also appears in other sections. Assert it on the summary and the tab state, not on a count.
 - The review only shows moments the analysis found. Other games can show fewer than 3; 0 or more than 3 is a failure.
-- The `Deep dive` tab content is in the page but hidden. Check `aria-selected` and visibility, not presence.
+- The `Replay` and `Stats` tabs' content is in the page but hidden. Check `aria-selected` and visibility, not presence.
