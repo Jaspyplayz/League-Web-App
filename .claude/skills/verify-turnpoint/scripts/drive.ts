@@ -69,14 +69,14 @@ const journeys: Journey[] = [
         await expect(page.getByText("Victory", { exact: false }).first()).toBeVisible();
       });
       await step("60-second review has moments", async () => {
-        const review = page.getByRole("region", { name: "60-second review" });
+        const review = page.getByRole("region", { name: "Game review" });
         await review.scrollIntoViewIfNeeded();
         await expect(review).toBeVisible();
-        const moments = await review.getByRole("listitem").count();
+        const moments = await review.getByRole("button", { name: "In your 60-second review" }).count();
         note("moments", moments);
         if (moments < 1 || moments > 3) throw new Error(`expected 1-3 moments, saw ${moments}`);
-        await expect(review.getByText("Think about").first()).toBeVisible();
-        await expect(review.getByRole("button", { name: "Watch in replay" }).first()).toBeVisible();
+        await expect(review.getByText("Think about")).toBeVisible();
+        await expect(review.getByRole("button", { name: "Watch in replay" })).toBeVisible();
       });
     },
   },

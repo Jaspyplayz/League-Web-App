@@ -9,6 +9,7 @@ import {
   assertAppPage,
   expect,
   main,
+  SAMPLE_MATCH_PATH,
   TEST_PLAYER,
   type Journey,
 } from "../../verify-turnpoint/scripts/runner";
@@ -293,15 +294,18 @@ const journeys: Journey[] = [
         await expect(page.getByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true", LOAD);
         await expectCalm(page);
       });
-      await step("reach the 60-second review", async () => {
-        const review = page.getByRole("region", { name: "60-second review" });
+      await step("reach the 60-second review in game review", async () => {
+        const review = page.getByRole("region", { name: "Game review" });
         await review.scrollIntoViewIfNeeded();
-        await expect(review.getByRole("listitem").first()).toBeVisible();
-        note("firstMoment", (await review.getByRole("listitem").first().innerText()).split("\n").slice(0, 3).join(" | "));
+        // It opens on the play that moved the game most, which is always a moment.
+        const opened = review.locator('[aria-current="true"]');
+        await expect(opened).toContainText("In your 60-second review");
+        await expect(review.getByText("Think about")).toBeVisible();
+        note("firstMoment", (await opened.innerText()).split("\n").slice(0, 4).join(" | "));
       });
-      await step("watch the first moment in the replay", async () => {
-        const review = page.getByRole("region", { name: "60-second review" });
-        await review.getByRole("button", { name: "Watch in replay" }).first().click();
+      await step("watch the moment in the replay", async () => {
+        const review = page.getByRole("region", { name: "Game review" });
+        await review.getByRole("button", { name: "Watch in replay" }).click();
         await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true");
         await expect(page.getByRole("tabpanel", { name: "Summary" })).toBeHidden();
         await expect(page.getByRole("heading", { name: "Replay", exact: true })).toBeVisible();
@@ -321,7 +325,130 @@ const journeys: Journey[] = [
       });
       await step("back to summary keeps the review", async () => {
         await page.getByRole("tab", { name: "Summary" }).click();
-        await expect(page.getByRole("region", { name: "60-second review" })).toBeVisible();
+        await expect(page.getByRole("region", { name: "Game review" })).toBeVisible();
+      });
+    },
+  },
+  {
+    name: "ux-game-review",
+    feature: "game-review.md",
+    needs: ["database"],
+    run: async ({ page, step, note }) => {
+      const review = page.getByRole("region", { name: "Game review" });
+      const opened = review.locator('[aria-current="true"]');
+      const replayClock = page.getByRole("slider", { name: "Game time" });
+      // The strip's mark at a clock time.
+      const mark = (clock: string) =>
+        page.getByRole("button", { name: new RegExp(`^${clock} .*chance to win after it`) });
+      // The opened play, its mark and the eval bar all agree. Returns the chance.
+      const expectBoardOn = async (clock: string) => {
+        await expect(opened).toContainText(clock);
+        await expect(mark(clock)).toHaveAttribute("aria-pressed", "true");
+        const chance = (await mark(clock).getAttribute("aria-label"))?.match(/\d+%$/)?.[0];
+        await expect(page.getByRole("img", { name: `chance to win: ${chance}` })).toBeVisible();
+        return chance;
+      };
+
+      await step("open the sample game on its biggest play", async () => {
+        await page.goto(SAMPLE_MATCH_PATH, LOAD);
+        await expect(review).toBeVisible(LOAD);
+        await expectCalm(page);
+        for (const tile of ["Overall", "Early", "Mid"]) {
+          await expect(review.getByText(tile, { exact: true })).toBeVisible();
+        }
+        const grades = review.getByRole("list", { name: "Grades of your plays" }).getByRole("listitem");
+        await expect(grades).toHaveCount(11);
+        await expect(grades.filter({ hasText: "Book" })).toContainText("–");
+        await expect(grades.filter({ hasText: "Blunder" })).toContainText("0");
+        note("opensOn", await expectBoardOn("20:54"));
+      });
+      await step("next play moves the eval bar and strip mark", async () => {
+        await review.getByRole("button", { name: "Next play" }).click();
+        note("afterNext", await expectBoardOn("22:10"));
+        await expect(review.getByText("Think about")).toBeVisible();
+      });
+      await step("previous play goes back", async () => {
+        await review.getByRole("button", { name: "Previous play" }).click();
+        await expectBoardOn("20:54");
+      });
+      await step("first play, where first and previous stop", async () => {
+        await review.getByRole("button", { name: "First play" }).click();
+        await expectBoardOn("3:22");
+        await expect(review.getByRole("button", { name: "First play" })).toBeDisabled();
+        await expect(review.getByRole("button", { name: "Previous play" })).toBeDisabled();
+      });
+      await step("last play, with the list scrolled to it", async () => {
+        await review.getByRole("button", { name: "Last play" }).click();
+        await expectBoardOn("24:15");
+        await expect(review.getByRole("button", { name: "Next play" })).toBeDisabled();
+        const inList = await opened.evaluate((row) => {
+          const list = row.closest("ol")!.getBoundingClientRect();
+          const box = row.getBoundingClientRect();
+          return box.top >= list.top - 1 && box.bottom <= list.bottom + 1;
+        });
+        if (!inList) throw new Error("the opened play is scrolled out of its list");
+      });
+      await step("a strip mark selects the play in game review", async () => {
+        await mark("5:54").click();
+        await expect(opened).toContainText("5:54");
+      });
+      await step("step to the play at 33:36 in another game", async () => {
+        await page.goto(TEST_PLAYER.path + "/match/KR_8419370694", LOAD);
+        await expect(review).toBeVisible(LOAD);
+        await review.getByRole("button", { name: "First play" }).click();
+        await expectBoardOn("8:11");
+        await review.getByRole("button", { name: "Last play" }).click();
+        await expectBoardOn("33:36");
+      });
+      await step("start review opens the replay at 33:37", async () => {
+        await review.getByRole("button", { name: "Start review in the replay" }).click();
+        await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true");
+        await expect(page.getByRole("tabpanel", { name: "Summary" })).toBeHidden();
+        await expect(replayClock).toHaveAttribute("aria-valuetext", /^33:37:/);
+        note("replayAt", await replayClock.getAttribute("aria-valuetext"));
+      });
+    },
+  },
+  {
+    name: "ux-game-review-phone",
+    feature: "game-review.md",
+    needs: ["database"],
+    phone: true,
+    run: async ({ page, step, note }) => {
+      const review = page.getByRole("region", { name: "Game review" });
+      await step("open the sample game on a phone", async () => {
+        await page.goto(SAMPLE_MATCH_PATH, LOAD);
+        await expect(review).toBeVisible(LOAD);
+        await expectCalm(page);
+      });
+      await step("game review sits under the board, with no sideways scroll", async () => {
+        const board = (await page.getByRole("region", { name: "Gold lead" }).boundingBox())!;
+        const box = (await review.boundingBox())!;
+        const scoreboard = (await page.getByRole("region", { name: "Scoreboard by lane" }).boundingBox())!;
+        if (box.y < board.y + board.height) throw new Error("Game review starts above the board's end");
+        if (scoreboard.y < box.y + box.height) throw new Error("the scoreboard isn't under Game review");
+        const { sw, cw } = await page.evaluate(() => ({
+          sw: document.documentElement.scrollWidth,
+          cw: document.documentElement.clientWidth,
+        }));
+        note("scrollWidth", sw);
+        if (sw > cw + 1) throw new Error(`page scrolls sideways: scrollWidth ${sw} > clientWidth ${cw}`);
+      });
+      await step("step buttons are big enough to tap and move the board", async () => {
+        const previous = review.getByRole("button", { name: "Previous play" });
+        await previous.scrollIntoViewIfNeeded();
+        const size = (await previous.boundingBox())!;
+        if (size.height < 44) throw new Error(`step button is ${size.height}px tall, under 44px`);
+        const bar = page.getByRole("img", { name: /chance to win: \d+%/ });
+        const before = await bar.getAttribute("aria-label");
+        await previous.click();
+        await expect(bar).not.toHaveAttribute("aria-label", before!);
+      });
+      await step("start review opens the replay", async () => {
+        await review.getByRole("button", { name: "Start review in the replay" }).click();
+        await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true");
+        // The play before the one it opens on, which starts at 18:44 and a bit.
+        await expect(page.getByRole("slider", { name: "Game time" })).toHaveAttribute("aria-valuetext", /^18:45:/);
       });
     },
   },
@@ -362,8 +489,9 @@ const journeys: Journey[] = [
         await expect(recap.getByRole("button", { name: /recap/i })).toHaveCount(0);
       });
       await step("add to notes signed out lands on the notes teaser", async () => {
-        const review = page.getByRole("region", { name: "60-second review" });
-        await review.getByRole("button", { name: "Add to notes" }).first().click();
+        // Game review opens on the biggest play, which is always a moment.
+        const review = page.getByRole("region", { name: "Game review" });
+        await review.getByRole("button", { name: "Add to notes" }).click();
         await page.waitForTimeout(500);
         await inViewport(page, "Your notes");
         await expect(panel(page, "Your notes").getByText("to keep private notes on this game")).toBeVisible();
