@@ -1,6 +1,6 @@
 name: Agent merge
 
-# Merges Claude Code's tiny and normal PRs without a Claude session (JAS-121,
+# Merges Claude Code's own PRs without a Claude session (JAS-121,
 # docs/adr/0024-a-github-action-runs-can-merge.md). Each time one of a PR's
 # workflows finishes, this runs `can-merge --merge` on it from main, once the
 # PR's description says `**Ready to merge:** yes at <head sha>`. can-merge checks every gate
