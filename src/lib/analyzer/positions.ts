@@ -104,7 +104,7 @@ export function positionPath(
   leaveOut?: number,
 ): PathPoint[] {
   const points = pathPoints(timeline, player, deaths, options, leaveOut);
-  const kept = options.reachable ? points.filter((p, i) => canReach(points, i)) : points;
+  const kept = options.reachable ? points.filter((_, i) => canReach(points, i)) : points;
   const { walls } = options;
   const length = (from: MapPosition, to: MapPosition) =>
     walls ? walkingRoute(walls, from, to).length : distance(from, to);
