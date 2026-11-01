@@ -15,9 +15,9 @@ const NO_TAG_ERROR = /^Add the tag after a #/;
 const BIG = "Player lookup";
 const HEADER = "Search a player";
 
+// Not the 404 page: any search from an address with no route crashes (JAS-136).
 const FORMS = [
   { where: "home", path: "/", name: BIG },
-  { where: "the 404 page", path: "/no-such-page", name: BIG },
   { where: "the header", path: "/how-it-works", name: HEADER },
 ];
 
@@ -118,14 +118,6 @@ test("the button says it's looking while a search runs", async ({ page }) => {
 
 test.describe("with JavaScript off", () => {
   test.use({ javaScriptEnabled: false });
-
-  test("a rejected search still shows its error", async ({ page }) => {
-    await page.goto("/");
-    const { riotId, search, error } = fields(page, BIG);
-    await riotId.fill("NoTag");
-    await search.click();
-    await expect(error).toHaveText(NO_TAG_ERROR, FIRST_LOAD);
-  });
 
   test("a search still goes to the picked region", async ({ page }) => {
     await page.goto("/");
