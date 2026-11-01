@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { SignInLink } from "@/components/sign-in-link";
 import { Panel } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { linkClass } from "@/components/ui/state-panel";
 import { getCurrentUser } from "@/lib/auth";
 import { recapsEnabled } from "@/lib/recap";
 import { readRecap } from "@/lib/recap-store";
@@ -35,7 +36,7 @@ function RecapIllustration() {
   const detail = RECAP_ILLUSTRATION.points.map((point) => `${point.time}\t${point.text}`).join("\n");
   return (
     <>
-      <span className="font-mono text-[13px] text-faint">{RECAP_ILLUSTRATION.label}</span>
+      <span className="text-note text-quiet">{RECAP_ILLUSTRATION.label}</span>
       <RecapText headline={RECAP_ILLUSTRATION.headline} detail={detail} fromThisPage={false} />
     </>
   );
@@ -69,8 +70,8 @@ async function RecapPanel({ region, matchId, puuid }: Props) {
         <RecapButton region={region} matchId={matchId} puuid={puuid} />
       ) : (
         <>
-          <p className="text-muted">
-            <SignInLink className="font-medium text-ahead-soft hover:underline" /> to get a short
+          <p className="text-quiet">
+            <SignInLink className={linkClass} /> to get a short
             written recap of this game.
           </p>
           <RecapIllustration />

@@ -6,7 +6,7 @@ export function SegmentBar({
   filled,
   segments,
   on = "bg-ahead",
-  off = "bg-line-strong",
+  off = "bg-divider",
   className = "h-2 gap-[3px]",
   label,
 }: {

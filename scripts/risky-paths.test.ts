@@ -186,6 +186,7 @@ describe("riskyFiles", () => {
       "e2e/preview-login.ts",
       "e2e/preview-secret.spec.ts",
       "src/app/themes.test.ts",
+      "src/app/corners.test.ts",
       "package.json",
       "package-lock.json",
       ".npmrc",

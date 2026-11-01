@@ -6,6 +6,7 @@ import { REPO_URL } from "@/components/site-header";
 import { TeamAnalysis } from "@/components/team-analysis";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { linkClass } from "@/components/ui/state-panel";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
 import type { PhaseRating } from "@/lib/analyzer/phase-score";
@@ -179,10 +180,7 @@ export function AnalysisSections({
     <>
       <p className="text-note text-quiet">
         Beta: the replay is rebuilt from Riot&apos;s timeline, so it can be a little off.{" "}
-        <a
-          href={`${REPO_URL}/blob/main/docs/replay.md`}
-          className="font-medium text-ahead-soft hover:underline"
-        >
+        <a href={`${REPO_URL}/blob/main/docs/replay.md`} className={linkClass}>
           How it&apos;s checked
         </a>
       </p>

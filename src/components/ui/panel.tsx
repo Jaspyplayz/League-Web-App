@@ -8,9 +8,6 @@ import type { ComponentProps } from "react";
 // they would lose that ring.
 export const panelClass = "rounded-md border border-transparent bg-panel";
 
-// Same card. Home and Ask already imported this name.
-export const softPanelClass = panelClass;
-
 // The card used for every box of content: charts, stats, match rows. Pass
 // extra classes to set padding and layout.
 export function Panel({ className = "", ...props }: ComponentProps<"div">) {

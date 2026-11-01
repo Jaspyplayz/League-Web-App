@@ -86,7 +86,7 @@ export function MatchTabs({
           // Expanding to the full page: the same match analysis page as before.
           <Link
             href={analysisHref}
-            className="mb-1.5 rounded-md border border-ahead/40 px-3 py-1 text-note font-semibold text-ahead-soft transition-colors hover:bg-ahead/10"
+            className="mb-1.5 rounded-md bg-raised px-3 py-1 text-note font-medium text-main hover:bg-divider"
           >
             Full analysis →
           </Link>

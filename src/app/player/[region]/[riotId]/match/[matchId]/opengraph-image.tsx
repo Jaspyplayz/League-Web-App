@@ -94,7 +94,7 @@ function Card({
   return (
     <Frame>
       <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-        {icon && <img src={icon} width={150} height={150} alt="" style={{ borderRadius: 20 }} />}
+        {icon && <img src={icon} width={150} height={150} alt="" style={{ borderRadius: 6 }} />}
         <div
           style={{
             display: "flex",
@@ -118,7 +118,7 @@ function Card({
               flexDirection: "column",
               alignItems: "center",
               padding: "16px 28px",
-              borderRadius: 20,
+              borderRadius: 6,
               border: `2px solid ${COLORS.divider}`,
               background: COLORS.panel,
             }}
@@ -213,6 +213,8 @@ function Frame({ children }: { children: React.ReactNode }) {
         padding: 64,
         background: COLORS.page,
         color: COLORS.main,
+        // next/og draws this without our stylesheet, so it can't use Rubik.
+        // eslint-disable-next-line turnpoint/review-board-type
         fontFamily: "sans-serif",
       }}
     >

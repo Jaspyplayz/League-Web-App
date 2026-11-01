@@ -7,7 +7,7 @@ description: Prove Turnpoint's UX journeys behave the way a player should experi
 
 UX journeys follow a player through a flow and assert how it behaves at every step: the right thing is selected and on screen, nothing shows an error alert, the way back is kept, signed-out visitors get a clear teaser instead of a broken form. Functional checks (lookup, match list, data present) are in `verify-turnpoint`; this skill reuses its launch, doctor, harness and cleanup and adds only its own journeys.
 
-The feature map is [features/README.md](features/README.md). Read it, then the feature file you are proving. The site is moving to the Review board look page by page (see `.claude/rules/design.md`). These journeys assert roles, names, focus, scroll and URLs, which should survive each restyle. Do not fail a journey on colors or corner radii.
+The feature map is [features/README.md](features/README.md). Read it, then the feature file you are proving. The site's look is the Review board (see `.claude/rules/design.md`). These journeys assert roles, names, focus, scroll and URLs, which should survive a restyle. Do not fail a journey on colors or corner radii.
 
 ## Launch
 
@@ -96,4 +96,4 @@ Stops only the server `launch.ts` recorded and its children, removes the state f
 | `runner.ts` | imported from `../../verify-turnpoint/scripts/runner` | browser and device, preview bypass, step recorder, evidence layout |
 | `cleanup.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts` | stops our dev server, keeps evidence |
 
-Keep the map honest as the app changes with `/maintain-verification-skill`. When a page moves to the Review board look, re-run every journey that visits it, look at the screenshots, and update feature files whose copy or layout changed.
+Keep the map honest as the app changes with `/maintain-verification-skill`. When a page's look changes, re-run every journey that visits it, look at the screenshots, and update feature files whose copy or layout changed.

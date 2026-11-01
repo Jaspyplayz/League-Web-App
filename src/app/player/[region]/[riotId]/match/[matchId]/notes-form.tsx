@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveMatchNoteAction } from "@/app/account/actions";
+import { mainButtonClass } from "@/components/ui/state-panel";
 import { MAX_NOTE_LENGTH, withNoteLine, type SaveNoteResult } from "@/lib/match-note";
 import { useReviewLinks } from "./review-links";
 
@@ -44,7 +45,7 @@ export function NotesForm({ region, matchId, savedText }: Props) {
 
   return (
     <form onSubmit={save} className="flex flex-col gap-3">
-      <label htmlFor="match-note" className="text-sm text-muted">
+      <label htmlFor="match-note" className="text-sm text-quiet">
         Only you can see these.
       </label>
       <textarea
@@ -54,13 +55,13 @@ export function NotesForm({ region, matchId, savedText }: Props) {
         maxLength={MAX_NOTE_LENGTH}
         rows={4}
         placeholder="What would you do differently? e.g. ward river before 3:15, back on the cannon wave"
-        className="soft-round w-full resize-y border border-line-strong bg-page px-4 py-3 text-ink placeholder:text-placeholder focus:border-ahead"
+        className="w-full resize-y rounded-md border border-divider bg-page px-4 py-3 text-main placeholder:text-placeholder focus:border-ahead"
       />
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={isPending || unchanged}
-          className="soft-round-sm min-h-10 bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
+          className={mainButtonClass}
         >
           {isPending ? "Saving…" : "Save note"}
         </button>
@@ -68,10 +69,10 @@ export function NotesForm({ region, matchId, savedText }: Props) {
           {result?.status === "failed" ? (
             <span className="text-behind">{result.message}</span>
           ) : (
-            result?.status === "saved" && unchanged && <span className="text-muted">Saved</span>
+            result?.status === "saved" && unchanged && <span className="text-quiet">Saved</span>
           )}
         </p>
-        <p className="ml-auto font-mono text-xs text-faint">
+        <p className="ml-auto text-xs text-quiet tabular-nums">
           {text.length} / {MAX_NOTE_LENGTH}
         </p>
       </div>

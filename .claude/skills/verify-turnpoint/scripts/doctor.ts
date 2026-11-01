@@ -71,7 +71,7 @@ async function run() {
       if (text.includes(RIOT_KEY_NOTICE)) return "riot-key";
       const err = ERROR_TEXTS.find((t) => text.includes(t));
       if (err) return `error (${err})`;
-      // innerText follows CSS text-transform (headings are uppercase), so compare case-insensitively.
+      // Compare case-insensitively, so a change of case doesn't fail the check.
       if (!text.toLowerCase().includes(want.toLowerCase())) return `missing "${want}" (status ${res?.status()})`;
       return "ok";
     } catch (e) {

@@ -110,7 +110,8 @@ docs/             Design and research docs, decision records in adr/, and the ag
 e2e/              Playwright smoke test and accessibility scan, run against each Vercel preview;
                   fixtures.ts gets past the preview login (shot uses preview-login.ts too)
 eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/, "server-only"
-                  on files that read secrets, no green classes), run by npm run lint, tested in npm test
+                  on files that read secrets, no green classes, the Review board's type and colour
+                  tokens), run by npm run lint, tested in npm test
 .github/          CI, smoke test, dependency review, reviewer and agent merge workflows, Dependabot, PR and issue templates
 .claude/          Claude Code settings, hooks/ (lint and typecheck before commits, installs when
                   a cloud session starts, pstack's startup instruction, and Matt Pocock's skills

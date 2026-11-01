@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { SignInLink } from "@/components/sign-in-link";
 import { Panel } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { linkClass } from "@/components/ui/state-panel";
 import { getCurrentUser } from "@/lib/auth";
 import { readMatchNote } from "@/lib/match-note-store";
 import type { Region } from "@/lib/regions";
@@ -30,8 +31,8 @@ async function Notes({ region, matchId }: Props) {
     <Panel className="flex flex-col gap-3 p-6">
       <PanelHeading id="notes-heading">Your notes</PanelHeading>
       {!note ? (
-        <p className="text-muted">
-          <SignInLink className="font-medium text-ahead-soft hover:underline" /> to keep private
+        <p className="text-quiet">
+          <SignInLink className={linkClass} /> to keep private
           notes on this game, like what you&apos;d do differently.
         </p>
       ) : note.ok ? (

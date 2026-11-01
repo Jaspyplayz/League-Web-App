@@ -43,7 +43,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A throwing read moved onto a page that didn't expect it](agent-mistakes/throwing-read-moved-to-a-busier-page.md) | 1 | check |
 | [Text on screen that promises more than the feature does](agent-mistakes/screen-text-promises-more-than-the-feature.md) | 1 | none yet |
 | [Opening a gate without keeping what it quietly guarded](agent-mistakes/opened-gate-dropped-its-guard.md) | 3 | check |
-| [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | none yet |
+| [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | check |
 | [An empty state that guards the wrong empty case](agent-mistakes/empty-state-guards-the-wrong-case.md) | 1 | check |
 | [A server answer read once and kept for the page's life](agent-mistakes/server-answer-read-once.md) | 1 | check |
 | [A control tested only as static markup](agent-mistakes/control-tested-only-as-static-markup.md) | 1 | check |
@@ -61,6 +61,9 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Riot API hosts appear only in `src/lib/riot/` | Lint rule `turnpoint/no-riot-api-host` |
 | Files that read secrets import `"server-only"` | Lint rule `turnpoint/server-only-env` |
 | No green in the UI | Lint rule `turnpoint/no-green-classes` |
+| Rubik only and sentence case, with no made-up text sizes | Lint rule `turnpoint/review-board-type` |
+| Colours come from the theme's tokens, with the old names gone | Lint rule `turnpoint/tokens-only`, and `src/app/themes.test.ts` for the stylesheet |
+| Every corner is `rounded-md`, `rounded-sm` or `rounded-full` | `src/app/corners.test.ts` |
 | Lint and typecheck pass before Claude commits | The commit hook, `.claude/hooks/check-before-commit.mjs` |
 | No PR merges before the reviewer clears it (its head, or an earlier commit with only small changes since) | GitHub's required `reviewer` check |
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |

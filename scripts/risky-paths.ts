@@ -43,6 +43,7 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   { pattern: "vitest.config", why: "unit tests" },
   { pattern: "vite.config", why: "unit tests, since Vitest reads it too" },
   { pattern: "src/app/themes.test.ts", why: "the check that every colour has a light value" },
+  { pattern: "src/app/corners.test.ts", why: "the check that keeps every corner to the three approved ones" },
   { pattern: "playwright.config", why: "which smoke tests run, and how" },
   // These hold the preview's bypass secret and check that it goes nowhere else.
   { pattern: "e2e/fixtures.ts", why: "the check that the preview's secret stays on the preview" },
