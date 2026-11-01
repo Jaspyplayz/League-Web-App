@@ -56,7 +56,9 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   (Summary, Replay and Stats tabs, with Ask beside the replay;
                   .../ask/ only sends the old Ask tab's address to the profile)
                   and .../insights/ the trends across the last 20 to 100 games,
-                  .../log/ the Log tab (one card per day, src/lib/daily-log.ts),
+                  by-day.tsx Matches' By day view (one card per day,
+                  src/lib/daily-log.ts), .../log/ only sends the old Log
+                  tab's address there,
                   .../champions/ the season's stats per champion and enemy
                   champion (src/lib/champion-stats.ts);
                   settings/ only sends the old Settings page home (the theme

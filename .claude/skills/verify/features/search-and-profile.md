@@ -22,7 +22,7 @@ Preconditions: `npm run shot -- --check` exits 0, and its profile line says `ok`
 
 - **Home page.** `npm run shot -- --pr <n> /` shows the "Turnpoint" logo heading, the search form and the example game.
 - **Profile.** `npm run shot -- --pr <n> "/player/kr/Hide%20on%20bush-KR1"` shows the region named `Player summary`, the `Ranked Solo/Duo` card and `Recent matches`. Searching lands on this URL, so shoot it directly.
-- **Sections.** Add `/champions`, `/insights` or `/log` to the profile path. Ask is on a game's Replay tab now ([match page](./match-page.md)).
+- **Sections.** Add `/champions` or `/insights` to the profile path, or `?view=day` for Matches' By day view (the old `/log` address redirects there). Ask is on a game's Replay tab now ([match page](./match-page.md)).
 - **Not found.** `npm run shot -- --pr <n> --expect not-found /this-page-does-not-exist` saves the 404 page. Without `--expect` it reports `not-found` and exits 1, and so does a player or match link with a typo, even though those pages answer 200.
 
 ## Gotchas

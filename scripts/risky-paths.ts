@@ -37,6 +37,7 @@ export const RISKY_PATHS: readonly RiskyPath[] = [
   { pattern: "src/lib/ask", why: "Ask spends Claude API money" },
   { pattern: "src/lib/recap", why: "AI recaps spend Claude API money" },
   { pattern: "src/app/player/[region]/[riotId]/ask/", why: "the old Ask address, now a redirect" },
+  { pattern: "src/app/player/[region]/[riotId]/log/", why: "the old Log address, now a redirect" },
   { pattern: "src/components/ask/", why: "Ask spends Claude API money" },
   { pattern: "src/lib/analyzer/score-model.json", why: "a trained model" },
   { pattern: "src/lib/analyzer/phase-score-model.json", why: "a trained model" },

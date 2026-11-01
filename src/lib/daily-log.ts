@@ -1,11 +1,11 @@
 import type { WeaknessId } from "@/lib/analyzer/trends";
 import type { Focus } from "@/lib/focus";
 
-// The Log tab: a player's games grouped into days, newest first, so they can
-// see how each day went (record, LP, game score, focus goal) and keep a short
-// private note on it. These are plain functions so they can be tested
-// without a browser or a database; the page is in
-// src/app/player/[region]/[riotId]/log/.
+// The profile's By day view (it was the Log tab): a player's games grouped
+// into days, newest first, so they can see how each day went (record, LP,
+// game score, focus goal) and keep a short private note on it. These are
+// plain functions so they can be tested without a browser or a database; the
+// view is src/app/player/[region]/[riotId]/by-day.tsx and daily-log.tsx.
 //
 // Days are in the viewer's own timezone, which only the browser knows. So the
 // server sends every game with its start time, and the browser does the
@@ -175,7 +175,7 @@ export function focusResults(games: LogGame[], focus: Focus): (boolean | null)[]
     });
 }
 
-// One square in the month strip at the top of the Log tab.
+// One square in the month strip at the top of By day.
 export type StripDay = { day: string; games: number; wins: number; losses: number };
 
 // The last LOG_DAYS days, oldest first so the strip reads left to right.
