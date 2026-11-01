@@ -104,8 +104,11 @@ const noGreenClasses = {
   },
 };
 
+// A class list never starts with a capital, so this string is words for a person.
+const SENTENCE = /^[A-Z]/;
+
 // Calls check(node, text) for every string and template piece in a file, which
-// is where class names live. Comments and words on the page aren't checked.
+// is where class names live. Comments and JSX text aren't checked.
 function everyString(check) {
   return {
     Literal(node) {
@@ -119,25 +122,32 @@ function everyString(check) {
 
 // The Review board's type (JAS-94): Rubik only, sentence case. Each entry names
 // its fix so the error says what to do. "(?<![\w-])" lets a variant such as
-// "hover:" come first but not a longer name ending the same way.
+// "hover:" come first but not a longer name ending the same way. Each also
+// covers Tailwind's other ways to write the same thing, such as [font-size:13px].
 const OLD_TYPE = [
-  { pattern: /(?<![\w-])uppercase(?![\w-])/, found: "uppercase", fix: "write the words in sentence case" },
+  {
+    pattern: /(?<![\w-])uppercase(?![\w-])/,
+    found: "uppercase",
+    fix: "write the words in sentence case",
+    // "Include an uppercase letter" is a word in a sentence, not the class.
+    isAlsoAWord: true,
+  },
   {
     // A negative value is fine: the page titles sit slightly tighter.
-    pattern: /(?<![\w-])tracking-(?:wide(?:r|st)?(?![\w-])|\[(?!-))/,
+    pattern: /(?<![\w-])tracking-(?:wide(?:r|st)?(?![\w-])|\[(?!-)|\()|\[letter-spacing:/,
     found: "wide letter spacing",
     fix: "remove it, since it was only for all-caps labels",
   },
   { pattern: /(?<![\w-])font-mono(?![\w-])/, found: "font-mono", fix: "use tabular-nums for numbers" },
   {
     // font-[600] is a weight, not a font.
-    pattern: /(?<![\w-])font-(?:display(?![\w-])|serif(?![\w-])|\[(?!\d))/,
+    pattern: /(?<![\w-])font-(?:display(?![\w-])|serif(?![\w-])|\[(?!\d)|\(family-name:)|\[font-family:/,
     found: "second font",
     fix: "remove it, since Rubik is the only font",
   },
   { pattern: /(?<![\w-])text-label(?![\w-])/, found: "text-label", fix: "use text-note" },
   {
-    pattern: /(?<![\w-])text-\[[\d.]/,
+    pattern: /(?<![\w-])text-(?:\[(?:length:|[\d.])|\(length:)|\[font-size:/,
     found: "made-up text size",
     fix: "use text-title, text-heading, text-subheading, text-body, text-note or a Tailwind size",
   },
@@ -153,15 +163,26 @@ const reviewBoardType = {
   },
   create(context) {
     return everyString((node, text) => {
-      for (const { pattern, found, fix } of OLD_TYPE) {
+      const isSentence = SENTENCE.test(text);
+      for (const { pattern, found, fix, isAlsoAWord } of OLD_TYPE) {
+        if (isAlsoAWord && isSentence) continue;
         if (pattern.test(text)) context.report({ node, messageId: "oldType", data: { found, fix } });
       }
     });
   },
 };
 
-// "(?<![&\w])" skips a Riot ID's tag ("Faker#123") and an HTML entity ("&#123;").
-const RAW_COLOUR = /(?<![&\w])#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\w-])|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
+// The lookbehind skips a Riot ID's tag ("Faker#123") and an HTML entity ("&#123;").
+// "_" is allowed on both sides, since it's how Tailwind writes a space inside
+// [box-shadow:0_0_#123456]. Three or four characters can also be a rank in a
+// sentence ("Rank #123") or a link to an SVG gradient ("url(#fade)").
+const LONG_HEX = /(?<![&a-z0-9])#(?:[0-9a-f]{8}|[0-9a-f]{6})(?![a-z0-9-])/i;
+const SHORT_HEX = /(?<![&a-z0-9]|url\()#[0-9a-f]{3,4}(?![a-z0-9-])/i;
+const COLOUR_FUNCTION = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
+
+function hasRawColour(text) {
+  return LONG_HEX.test(text) || COLOUR_FUNCTION.test(text) || (!SENTENCE.test(text) && SHORT_HEX.test(text));
+}
 
 // Tailwind builds no CSS for a colour that doesn't exist, so one of these
 // wouldn't fail anywhere: the text or fill would quietly stop being drawn.
@@ -170,14 +191,23 @@ const OLD_COLOURS = {
   "surface-hover": "select for a hover or selected row, raised for a fill inside a panel",
   line: "divider",
   "line-strong": "divider",
-  frame: "nothing, since panels have no outline",
+  frame: "no border, since panels have none",
   ink: "main",
   "ink-soft": "main",
   muted: "quiet",
   faint: "quiet",
 };
-const OLD_COLOUR =
-  /(?<![\w-])(?:(?:bg|text|border(?:-[trblxyse])?|divide|ring|fill|stroke|outline|decoration|accent|caret|shadow|from|via|to)-|--color-)(surface-hover|surface|line-strong|line|frame|ink-soft|ink|muted|faint)(?![\w-])/;
+// Tailwind's colour utilities. "border" can name a side or corner first.
+const COLOUR_UTILITY =
+  "bg|text|border(?:-[a-z]+)?|divide|ring|ring-offset|inset-ring|shadow|inset-shadow|drop-shadow|text-shadow|fill|stroke|outline|decoration|accent|caret|placeholder|from|via|to";
+const OLD_COLOUR = new RegExp(
+  `(?<![\\w-])(?:(?:${COLOUR_UTILITY})-|--color-)(${Object.keys(OLD_COLOURS).join("|")})(?![\\w-])`,
+);
+// Tailwind's own colours draw, but don't follow the theme switch. Green, emerald
+// and lime are left to no-green-classes, which says why.
+const PALETTE_COLOUR = new RegExp(
+  `(?<![\\w-])(?:${COLOUR_UTILITY})-(?:white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|[1-9]00|950))(?![\\w-])`,
+);
 
 const tokensOnly = {
   meta: {
@@ -191,7 +221,7 @@ const tokensOnly = {
   },
   create(context) {
     return everyString((node, text) => {
-      if (RAW_COLOUR.test(text)) context.report({ node, messageId: "rawColour" });
+      if (hasRawColour(text) || PALETTE_COLOUR.test(text)) context.report({ node, messageId: "rawColour" });
       const name = OLD_COLOUR.exec(text)?.[1];
       if (name) context.report({ node, messageId: "oldColour", data: { name, fix: OLD_COLOURS[name] } });
     });

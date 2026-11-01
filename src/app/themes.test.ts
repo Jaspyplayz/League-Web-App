@@ -111,16 +111,25 @@ describe("Review board tokens", () => {
     expect(actual).toEqual(SPEC);
   });
 
-  it("has no old colour name left in either theme", () => {
-    const OLD = ["surface", "surface-hover", "line", "line-strong", "frame", "ink", "ink-soft", "muted", "faint"];
-    const names = [...colourTokens(css, DARK).keys(), ...colourTokens(css, LIGHT).keys()];
-    expect(names.filter((name) => OLD.includes(name))).toEqual([]);
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // Lint doesn't read CSS, and a rule here reading an old name would quietly
+  // lose its colour, as the page's own body colour nearly did.
+  it("sets and reads no old colour name anywhere in the stylesheet", () => {
+    const old = /--color-(?:surface-hover|surface|line-strong|line|frame|ink-soft|ink|muted|faint)\b/g;
+    expect(withoutComments.match(old)).toBeNull();
   });
 
-  it("has no old size, font or corner left", () => {
-    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
-    for (const old of ["--text-label", "--font-display", "--font-mono", "--radius-soft", "@utility soft-round"]) {
+  it("has no old size, font or corner left, and no all-caps rule", () => {
+    for (const old of ["--text-label", "--font-display", "--font-mono", "--radius-soft", "@utility soft-round", "uppercase"]) {
       expect(withoutComments).not.toContain(old);
     }
+  });
+
+  // A font the layout loads is a download for every player, even if nothing
+  // shows it, and neither lint rule reads imports.
+  it("loads only Rubik", () => {
+    const layout = readFileSync("src/app/layout.tsx", "utf8");
+    expect(layout).toMatch(/import \{ Rubik \} from "next\/font\/google";/);
   });
 });

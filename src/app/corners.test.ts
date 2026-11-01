@@ -13,11 +13,13 @@ const BEVELED = [/hud-cut/, /corner-shape\s*:/, /border-radius:\s*[^;{]*\b0\b/];
 // The share image has no stylesheet to read classes from, so it sets its own.
 const SETS_ITS_OWN_RADIUS = /opengraph-image\.tsx$/;
 
-// Only the strings: a variable called `rounded` or a comment saying "rounded to
-// whole blocks" isn't a class. Nor is a sentence, which starts with a capital. Nor is a sentence, which starts with a capital.
-function stringsIn(path: string, source: string): string[] {
+// The parts of a file that can set a corner: its strings, and any style key
+// such as borderRadius. A variable called `rounded` or a comment saying "rounded
+// to whole blocks" isn't either.
+function cornerCode(path: string, source: string): { strings: string[]; radiusKeys: string[] } {
   const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest);
-  const found: string[] = [];
+  const strings: string[] = [];
+  const radiusKeys: string[] = [];
   const visit = (node: ts.Node) => {
     if (
       ts.isStringLiteralLike(node) ||
@@ -25,20 +27,29 @@ function stringsIn(path: string, source: string): string[] {
       ts.isTemplateMiddle(node) ||
       ts.isTemplateTail(node)
     ) {
-      if (!/^[A-Z]/.test(node.text)) found.push(node.text);
+      strings.push(node.text);
     }
+    if (ts.isIdentifier(node) && /^border\w*Radius$/.test(node.text)) radiusKeys.push(node.text);
     ts.forEachChild(node, visit);
   };
   visit(file);
-  return found;
+  return { strings, radiusKeys };
 }
 
 function badCornerClasses(text: string): string[] {
+  // "The rounded gap must be positive" uses the word, not the class.
+  const isSentence = /^[A-Z]/.test(text);
   return text
     .split(/\s+/)
-    // "hover:rounded-lg" and "!rounded-lg" are still rounded-lg.
-    .map((token) => (token.split(":").at(-1) ?? token).replace(/^!|!$/g, ""))
-    .filter((name) => /^(?:soft-round|rounded(?:$|-))/.test(name) && !ALLOWED.test(name));
+    .map((token) => token.replace(/[;,}]+$/, ""))
+    .filter((token) => {
+      // Tailwind's [border-radius:10px] writes a corner without its class names.
+      if (/\[[\w-]*radius:/.test(token)) return true;
+      // "hover:rounded-lg" and "!rounded-lg" are still rounded-lg.
+      const name = (token.split(":").at(-1) ?? token).replace(/^!|!$/g, "");
+      if (name === "rounded") return !isSentence;
+      return /^(?:soft-round|rounded-)/.test(name) && !ALLOWED.test(name);
+    });
 }
 
 // One line per problem, each naming the fix. Exported nowhere: the cases below
@@ -46,18 +57,20 @@ function badCornerClasses(text: string): string[] {
 function cornerProblems(path: string, source: string): string[] {
   const isCss = path.endsWith(".css");
   const withoutComments = isCss ? source.replace(/\/\*[\s\S]*?\*\//g, "") : source;
-  const classes = isCss ? badCornerClasses(withoutComments) : stringsIn(path, source).flatMap(badCornerClasses);
-  const problems = classes.map(
+  const { strings, radiusKeys } = isCss
+    ? { strings: [withoutComments], radiusKeys: [] }
+    : cornerCode(path, source);
+  const problems = strings.flatMap(badCornerClasses).map(
     (name) => `${path} uses ${name}: use rounded-md, rounded-sm or rounded-full (.claude/rules/design.md)`,
   );
   for (const pattern of BEVELED) {
     if (pattern.test(withoutComments)) problems.push(`${path} matches ${pattern}: no beveled corners`);
   }
-  if (isCss && /border-radius\s*:/.test(withoutComments)) {
-    problems.push(`${path} sets border-radius: use rounded-md, rounded-sm or rounded-full instead`);
+  if (isCss && /border(?:-[a-z]+)*-radius\s*:/.test(withoutComments)) {
+    problems.push(`${path} sets a border radius: use rounded-md, rounded-sm or rounded-full instead`);
   }
-  if (!isCss && !SETS_ITS_OWN_RADIUS.test(path) && /\bborderRadius\b/.test(source)) {
-    problems.push(`${path} sets borderRadius: use rounded-md, rounded-sm or rounded-full instead`);
+  if (radiusKeys.length > 0 && !SETS_ITS_OWN_RADIUS.test(path)) {
+    problems.push(`${path} sets ${radiusKeys[0]}: use rounded-md, rounded-sm or rounded-full instead`);
   }
   return problems;
 }
@@ -92,7 +105,12 @@ describe("corners", () => {
     ["a class in a template string", "const box = (x: string) => `rounded-lg ${x} p-4`;"],
     ["a class after a template's value", "const box = (x: string) => `${x} rounded p-4`;"],
     ["a size built from a value", "const box = (x: string) => `rounded-${x}`;"],
+    ["a class in a string that starts with a capital", 'const box = "Card rounded-lg";'],
+    ["an arbitrary radius", '<div className="[border-radius:10px]" />'],
+    ["an arbitrary radius behind a variant", '<div className="hover:[border-radius:8px]" />'],
+    ["an arbitrary corner radius", '<div className="[border-top-left-radius:10px]" />'],
     ["an inline radius", "<div style={{ borderRadius: 10 }} />"],
+    ["an inline corner radius", "<div style={{ borderTopLeftRadius: 10 }} />"],
     ["hud-cut", '<div className="hud-cut" />'],
     ["a beveled corner shape", '<div className="[corner-shape:bevel]" />'],
   ])("fails on %s", (_, source) => {
@@ -102,6 +120,7 @@ describe("corners", () => {
   it.each([
     ["@apply with a big corner", ".box { @apply rounded-lg; }"],
     ["a border-radius", ".box { border-radius: 10px; }"],
+    ["a border radius on one corner", ".box { border-top-left-radius: 10px; }"],
     ["a square corner", ".box { border-radius: 0; }"],
     ["a beveled corner", ".box { corner-shape: bevel; }"],
   ])("fails in a stylesheet on %s", (_, source) => {
@@ -124,9 +143,13 @@ describe("corners", () => {
     ["a comment", "// rounded to whole blocks, not rounded-lg\nexport const a = 1;"],
     ["words on the page", "<p>Numbers are rounded, like rounded-lg corners.</p>"],
     ["a sentence in a string", 'throw new Error("The rounded gap must be positive");'],
-    ["a sentence in a string", 'throw new Error("The rounded gap must be positive");'],
+    ["a style key named in a comment", "// no borderRadius here\nexport const a = 1;"],
   ])("passes %s", (_, source) => {
     expect(cornerProblems("src/app/x.tsx", source)).toEqual([]);
+  });
+
+  it("passes @apply with an allowed corner", () => {
+    expect(cornerProblems("src/app/x.css", ".box { @apply rounded-md; }")).toEqual([]);
   });
 
   it("lets only the share image set its own radius", () => {

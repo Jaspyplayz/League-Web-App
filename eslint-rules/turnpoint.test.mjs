@@ -125,9 +125,16 @@ describe("review-board-type", () => {
     "font-display",
     "font-serif",
     "font-['Barlow_Condensed']",
+    "font-(family-name:--x)",
+    "[font-family:monospace]",
+    "tracking-(--x)",
+    "[letter-spacing:0.1em]",
     "text-label",
     "text-[13px]",
     "text-[1.2rem]",
+    "text-[length:13px]",
+    "text-(length:--x)",
+    "[font-size:13px]",
   ])("fails on %s", async (name) => {
     const code = `export const c = "p-4 ${name} bg-panel";`;
     expect(await turnpointRules(code, "src/components/x.tsx")).toEqual(["turnpoint/review-board-type"]);
@@ -159,6 +166,10 @@ describe("review-board-type", () => {
     expect(await turnpointRules(`export const c = "${name}";`, "src/app/x.tsx")).toEqual([]);
   });
 
+  it("passes the word in a sentence", async () => {
+    expect(await turnpointRules('export const c = "Include an uppercase letter.";', "src/app/x.tsx")).toEqual([]);
+  });
+
   it("passes the words in a comment or on the page", async () => {
     const code = '// Not uppercase or font-mono.\nexport const A = () => <p>uppercase text-label</p>;';
     expect(await turnpointRules(code, "src/app/x.tsx")).toEqual([]);
@@ -176,6 +187,9 @@ describe("tokens-only", () => {
     "#21201d",
     "#21201dcc",
     "bg-[#21201d]",
+    "shadow-[0_0_0_1px_#123456]",
+    "bg-[linear-gradient(90deg,#fff_0%,#000_100%)]",
+    "Card #21201d",
     "rgb(255 255 255 / 7%)",
     "rgba(0, 0, 0, 0.5)",
     "hsl(10 20% 30%)",
@@ -183,6 +197,17 @@ describe("tokens-only", () => {
   ])("fails on the raw colour %s", async (colour) => {
     const code = `export const c = "${colour}";`;
     expect(await turnpointRules(code, "src/components/x.tsx")).toEqual(["turnpoint/tokens-only"]);
+  });
+
+  it.each([
+    "text-white",
+    "bg-black/50",
+    "bg-red-500",
+    "hover:text-gray-400",
+    "border-t-zinc-800",
+    "ring-offset-blue-500",
+  ])("fails on Tailwind's own colour %s", async (name) => {
+    expect(await turnpointRules(`export const c = "${name}";`, "src/app/x.tsx")).toEqual(["turnpoint/tokens-only"]);
   });
 
   it("fails on a colour in a JSX attribute and a style", async () => {
@@ -198,13 +223,20 @@ describe("tokens-only", () => {
     ["border-line", "divider"],
     ["divide-line", "divider"],
     ["border-t-line-strong", "divider"],
-    ["border-frame", "nothing"],
+    ["border-frame", "no border"],
     ["text-ink", "main"],
     ["group-hover:text-ink-soft", "main"],
     ["outline-ink/50", "main"],
     ["text-muted", "quiet"],
     ["placeholder:text-faint", "quiet"],
     ["var(--color-ink)", "main"],
+    ["ring-offset-surface", "panel"],
+    ["inset-ring-line", "divider"],
+    ["inset-shadow-ink", "main"],
+    ["drop-shadow-ink", "main"],
+    ["text-shadow-ink", "main"],
+    ["placeholder-muted", "quiet"],
+    ["border-bs-line", "divider"],
   ])("fails on the old colour %s and names its fix", async (name, fix) => {
     const messages = await turnpointMessages(`export const c = "${name}";`, "src/app/x.tsx");
     expect(messages.map((message) => message.ruleId)).toEqual(["turnpoint/tokens-only"]);
@@ -219,6 +251,11 @@ describe("tokens-only", () => {
     "&#123;",
     "text-line-through",
     "var(--color-main)",
+    "url(#fade)",
+    "Rank #123 in Europe",
+    "bg-transparent",
+    "text-current",
+    "bg-whitesmoke",
   ])("passes %s", async (text) => {
     expect(await turnpointRules(`export const c = "${text}";`, "src/app/x.tsx")).toEqual([]);
   });
