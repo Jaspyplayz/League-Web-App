@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { searchPlayer } from "@/app/actions";
 import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { parseRiotId } from "@/lib/riot-id";
@@ -39,21 +39,26 @@ export function usePlayerSearch(errorId: string, startingRiotId = "") {
     return () => document.removeEventListener("pointerdown", closeIfOutside);
   }, [wanted]);
 
-  // Runs in the browser just before the form is sent, so the profile page can
-  // tell this player came from a search and add them to Recent.
-  function rememberSearch(event: React.FormEvent<HTMLFormElement>) {
+  // Sends the form from here, because React resets a form it sends itself, and
+  // that puts the region picker back where it started after a rejected search
+  // (JAS-135). A browser without JavaScript never gets here and uses `action`.
+  // Noting the search lets the profile page tell this player came from one and
+  // add them to Recent.
+  function sendSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const form = new FormData(event.currentTarget);
     const region = String(form.get("region") ?? "");
     const riotId = parseRiotId(String(form.get("riotId") ?? ""));
     if (isRegion(region) && riotId) noteSearch({ region, ...riotId });
     setWanted(false);
     setErrorDismissed(false);
+    startTransition(() => action(form));
   }
 
   const formProps = {
     ref: formRef,
     action,
-    onSubmit: rememberSearch,
+    onSubmit: sendSearch,
     role: "search",
     onFocus: () => setWanted(true),
     onBlur: (event: React.FocusEvent<HTMLFormElement>) => {
