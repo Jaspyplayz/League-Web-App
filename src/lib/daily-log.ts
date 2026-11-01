@@ -22,7 +22,6 @@ export type LogGame = {
   win: boolean;
   // Ranked solo/duo, the queue the LP is for.
   ranked: boolean;
-  championName: string;
   // The champion's display name ("Lee Sin" for "LeeSin").
   championLabel: string;
   // The champion's square portrait from Data Dragon, or null when Data
@@ -31,13 +30,8 @@ export type LogGame = {
   kills: number;
   deaths: number;
   assists: number;
-  csPerMin: number;
-  visionPerMin: number;
   // The 0 to 100 game score, or null for ARAM, Arena and similar.
   score: number | null;
-  // Your gold minus your opponent's at 15 minutes, once the game's timeline
-  // has been fetched (Insights and the match page fetch them too).
-  goldAt15: number | null;
   // Whether the game showed each focus-goal weakness; null until the
   // timeline is in, or when the game has no role matchup.
   shows: Record<WeaknessId, boolean | null> | null;
@@ -113,6 +107,15 @@ export function groupDays(games: LogGame[], ranks: LogRankPoint[]): LogDay[] {
         lp: dayLp(dayGames, ranks),
       };
     });
+}
+
+// Only the days in the last LOG_DAYS days. The server fetches a day more,
+// because its "four weeks ago" can be a day off the viewer's; without this, a
+// game from that extra day would sit on a calendar month the arrows can't
+// reach, or be left off the calendar while its panel still showed.
+export function lastFourWeeks(days: LogDay[], now: number): LogDay[] {
+  const inRange = new Set(recentDays(now, LOG_DAYS));
+  return days.filter((d) => inRange.has(d.day));
 }
 
 // LP gained or lost in a day's solo/duo games. Riot only says what a

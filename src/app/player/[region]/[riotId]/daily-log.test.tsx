@@ -18,16 +18,12 @@ function game(startedAt: number, win: boolean, extra: Partial<LogGame> = {}): Lo
     startedAt,
     win,
     ranked: true,
-    championName: "Galio",
     championLabel: "Galio",
     championIcon: null,
     kills: 7,
     deaths: 4,
     assists: 6,
-    csPerMin: 7,
-    visionPerMin: 1,
     score: 51,
-    goldAt15: null,
     shows: null,
     recap: null,
     ...extra,
@@ -63,6 +59,47 @@ describe("By day", () => {
     expect(html).toMatch(/ring-main[^>]*><span aria-hidden="true">31<\/span><span class="sr-only">Sat 31 Oct, today: no games/);
   });
 
+  it("colours a lost day red, a tie grey and a day with no games the raised fill", () => {
+    const days = groupDays(
+      [
+        game(at(10, 20, 14), false),
+        game(at(10, 21, 14), true),
+        game(at(10, 21, 15), false),
+      ],
+      [],
+    );
+    const html = render(days);
+    expect(html).toMatch(/href="#day-2026-10-20"[^>]*bg-behind-fill/);
+    expect(html).toMatch(/href="#day-2026-10-21"[^>]*bg-divider/);
+    expect(html).toMatch(/bg-raised text-quiet"><span aria-hidden="true">22<\/span>/);
+  });
+
+  it("only moves between the months the last four weeks touch", () => {
+    // 31 October: the four weeks start on 4 October, so October is the only month.
+    const october = render();
+    expect(october).toMatch(/aria-label="Previous month"[^>]*disabled=""/);
+    expect(october).toMatch(/aria-label="Next month"[^>]*disabled=""/);
+    // 2 November: the four weeks reach back into October, and it opens there.
+    const html = renderToStaticMarkup(
+      <ByDayView days={OCTOBER} now={at(11, 2, 12)} notes={null} player="p" playerPath="/player/kr/x" />,
+    );
+    expect(html).toContain("October 2026");
+    expect(html).not.toMatch(/aria-label="Next month"[^>]*disabled=""/);
+  });
+
+  it("leaves out a game from the day before the four weeks", () => {
+    // The server fetches a day extra. A game 28 days back from 28 October
+    // (30 September) isn't in the four weeks, so the calendar opens on
+    // October rather than on a September it couldn't leave.
+    const days = groupDays([game(at(9, 30, 23), true)], []);
+    const html = renderToStaticMarkup(
+      <ByDayView days={days} now={at(10, 28, 22)} notes={null} player="p" playerPath="/player/kr/x" />,
+    );
+    expect(html).toContain("October 2026");
+    expect(html).toContain("No games in the last 4 weeks");
+    expect(html).not.toContain("Wed 30 Sep");
+  });
+
   it("lists the games as links to their match page", () => {
     const html = render();
     expect(html).toContain('href="/player/kr/x/match/KR_');
@@ -79,10 +116,19 @@ describe("By day", () => {
     expect(html).toContain("Stop forcing level 2 fights.");
   });
 
-  it("says when the notes couldn't be loaded, where they would go", () => {
-    const html = render(OCTOBER, { ok: false });
+  it("says when the notes couldn't be loaded, in each day where the box would go", () => {
+    const twoDays = groupDays([game(at(10, 17, 14), true), game(at(10, 20, 14), false)], []);
+    const html = render(twoDays, { ok: false });
+    // Once above the days, as an alert...
+    expect(html.match(/role="alert"/g)).toHaveLength(1);
     expect(html).toContain("Your notes couldn&#x27;t be loaded");
-    expect(html).not.toContain("Your note for this day");
+    // ...and inside every day panel, instead of its note box.
+    const panels = html.split("<article").slice(1);
+    expect(panels).toHaveLength(2);
+    for (const panel of panels) {
+      expect(panel).toContain("Your note for this day couldn&#x27;t be loaded.");
+      expect(panel).not.toContain("<textarea");
+    }
   });
 
   it("keeps the calendar with no games, and says what will fill it", () => {

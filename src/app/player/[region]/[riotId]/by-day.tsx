@@ -33,8 +33,8 @@ import { DailyLog } from "./daily-log";
 // New matches fetched from Riot per page view, like Insights. Matches are
 // saved forever, so each visit only fetches games it hasn't seen.
 const MATCHES_PER_VIEW = 10;
-// Timelines are only needed for gold at 15 and focus goals, which are extras,
-// so By day fetches a few per visit and the rest fill in over time (Insights
+// Timelines are only needed for the focus goal's dots, an extra, so By day
+// fetches a few per visit and the rest fill in over time (Insights
 // and the match page fetch them too).
 const TIMELINES_PER_VIEW = 3;
 // Riot's queue ID for ranked solo/duo, the queue the LP is for.
@@ -93,17 +93,13 @@ export async function ByDay({
         startedAt: summary.startedAt,
         win: summary.win,
         ranked: match.info.queueId === SOLO_QUEUE,
-        championName: summary.championName,
         championLabel: championName(dd, summary.championName),
         // Worked out here because the browser part can't be sent all of Data Dragon.
         championIcon: dd ? championIconUrl(dd, summary.championName) : null,
         kills: summary.kills,
         deaths: summary.deaths,
         assists: summary.assists,
-        csPerMin: summary.csPerMin,
-        visionPerMin: summary.durationS > 0 ? me.visionScore / (summary.durationS / 60) : 0,
         score: scoreGame(match).get(me.participantId)?.score ?? null,
-        goldAt15: trend?.goldAt15 ?? null,
         shows: trend ? checkWeaknesses(trend) : null,
         recap: recaps.get(summary.matchId) ?? null,
       },

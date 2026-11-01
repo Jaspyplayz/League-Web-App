@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { saveDayNoteAction } from "@/app/account/actions";
-import { hoverFade } from "@/components/header-style";
+import { hoverFade, iconButton } from "@/components/header-style";
 import { panelClass } from "@/components/ui/panel";
 import {
   EmptyPanel,
@@ -18,6 +18,7 @@ import {
   formatDay,
   formatMonth,
   groupDays,
+  lastFourWeeks,
   LOG_DAYS,
   monthGrid,
   monthName,
@@ -75,7 +76,7 @@ function noChanges() {
 // The calendar and the day panels for days already grouped in the viewer's
 // timezone. Exported for its tests, which pass a fixed "now".
 export function ByDayView({
-  days,
+  days: fetched,
   now,
   notes,
   player,
@@ -88,6 +89,7 @@ export function ByDayView({
   playerPath: string;
 }) {
   const focus = useFocus(player);
+  const days = lastFourWeeks(fetched, now);
   // The month the player moved to with the arrows; until then, the month of
   // the newest game.
   const [picked, setPicked] = useState<string | null>(null);
@@ -109,7 +111,8 @@ export function ByDayView({
         />
         <div className="flex min-w-0 flex-col gap-3.5">
           {notes?.ok === false && (
-            // Where the note boxes would go, so it's clear what's missing.
+            // Once, above the days; each day panel also says so where its
+            // note box would be.
             <ProblemPanel title="Your notes couldn't be loaded">
               Reload the page to try again.
             </ProblemPanel>
@@ -133,6 +136,7 @@ export function ByDayView({
                         now={now}
                         focus={focus}
                         note={notes?.ok ? (notes.byDay[day.day] ?? "") : null}
+                        notesFailed={notes?.ok === false}
                         playerPath={playerPath}
                       />
                     </li>
@@ -174,8 +178,8 @@ function DaysHeading({ days }: { days: LogDay[] }) {
 
 // ---- The calendar ----
 
-// Each day's fill. The 32% blue and red come from the gold chart's area
-// tokens (22% and 20% in the light theme), and the day number stays in the
+// Each day's fill. The blue and red (32% and 30%, or 22% and 20% in the
+// light theme) are the gold chart's area tokens, and the day number stays in the
 // text colour on them so it's easy to read. A tie gets the divider grey, so it
 // reads as a day played that went neither way.
 const DAY_FILL: Record<DayColour, string> = {
@@ -312,7 +316,7 @@ function MonthButton({
       aria-label={label}
       onClick={onClick ?? undefined}
       disabled={!onClick}
-      className={`inline-flex size-11 items-center justify-center rounded-md text-quiet disabled:opacity-40 disabled:hover:bg-transparent lg:size-10 ${hoverFade}`}
+      className={`${iconButton} disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-quiet`}
     >
       <svg
         width="18"
@@ -360,12 +364,16 @@ function DayPanel({
   now,
   focus,
   note,
+  notesFailed,
   playerPath,
 }: {
   day: LogDay;
   now: number;
   focus: Focus | null;
+  // The saved note ("" for none), or null when there's no note box: this
+  // isn't the player's own profile, or their notes couldn't be read.
   note: string | null;
+  notesFailed: boolean;
   playerPath: string;
 }) {
   const focused = focus ? focusResults(day.games, focus) : [];
@@ -409,7 +417,11 @@ function DayPanel({
 
       <GameList games={day.games} playerPath={playerPath} />
 
-      {note !== null && <DayNote day={day.day} savedText={note} />}
+      {notesFailed ? (
+        <p className="text-note text-quiet">Your note for this day couldn&apos;t be loaded.</p>
+      ) : (
+        note !== null && <DayNote day={day.day} savedText={note} />
+      )}
     </article>
   );
 }
