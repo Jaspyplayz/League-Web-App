@@ -104,16 +104,16 @@ test.describe("JAS-20 key surfaces", () => {
     await shot(page, "06-champions");
   });
 
-  test("player log", async ({ page }) => {
-    await page.goto(`${PLAYER}/log`);
-    await expect(page.getByRole("link", { name: "Log" })).toHaveAttribute(
+  test("player by day", async ({ page }) => {
+    await page.goto(`${PLAYER}?view=day`);
+    await expect(page.getByRole("link", { name: "By day" })).toHaveAttribute(
       "aria-current",
       "page",
       READY,
     );
     await expect(page.getByRole("heading", { name: "Days", exact: true })).toBeVisible();
     await rejectStandIns(page);
-    await shot(page, "08-player-log");
+    await shot(page, "08-player-by-day");
   });
 
   test("ask teaser", async ({ page }) => {

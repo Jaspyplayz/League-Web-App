@@ -33,8 +33,7 @@ import type { Region } from "@/lib/regions";
 import { getManyMatchIds } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
-import { loadMatchDetailsAction } from "./match-details-action";
-import { QueueTabs } from "./queue-tabs";
+import { MatchesControls } from "./queue-tabs";
 import { RecentSummary } from "./recent-summary";
 import { SeasonChampions } from "./season-champions";
 import { MasteryCard } from "./mastery-card";
@@ -43,8 +42,8 @@ import { MasteryCard } from "./mastery-card";
 // `queue` is the game-mode tab picked above the list. `gamesParam` is the
 // URL's ?games=, how many games to show after "Show 10 more games" (see
 // src/lib/more-games.ts); missing means the first 10. playerPath is this
-// player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with both teams' scoreboard
-// and a link to the match analysis under that path, loaded when it opens.
+// player's page, e.g. "/player/na/Name-TAG". Each row links to that game's
+// match page under that path.
 type Props = {
   region: Region;
   puuid: string;
@@ -144,7 +143,7 @@ export async function RecentMatches({
         <h2 id="matches-heading" className="scroll-mt-4 text-xl font-semibold">
           Recent matches
         </h2>
-        <QueueTabs playerPath={playerPath} current={queue} />
+        <MatchesControls playerPath={playerPath} queue={queue} view="list" />
         {/* Covers every game in the list, so it grows to "Last 20 games"
             when more are shown. */}
         {record.games > 0 && <RecentSummary record={record} roles={roleCounts(matches)} />}
@@ -170,15 +169,7 @@ export async function RecentMatches({
                   score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
                   teams={{ region, players: matchTeams(match, puuid) }}
                   badges={matchBadges(match, puuid)}
-                  // The panel is rendered when the row first opens, not sent
-                  // with the page (see src/components/expandable-row.tsx).
-                  loadDetails={loadMatchDetailsAction.bind(
-                    null,
-                    region,
-                    m.matchId,
-                    puuid,
-                    playerPath,
-                  )}
+                  href={`${playerPath}/match/${m.matchId}`}
                 />
               ),
             }))}
