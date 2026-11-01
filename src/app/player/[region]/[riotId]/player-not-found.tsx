@@ -2,6 +2,8 @@ import { SearchForm } from "@/components/search-form";
 import { REGIONS, type Region } from "@/lib/regions";
 import type { RiotId } from "@/lib/riot-id";
 
+// Names the Riot ID and region that were searched, then offers the search
+// again, filled in, so a typo is one edit away (JAS-93).
 export function PlayerNotFound({ region, id }: { region: Region; id: RiotId }) {
   const typed = `${id.gameName}#${id.tagLine}`;
   return (

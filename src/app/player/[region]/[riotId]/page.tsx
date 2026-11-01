@@ -159,8 +159,6 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
   );
 }
 
-// Names the Riot ID and region that were searched, then offers the search
-// again (JAS-93).
 function PlayerName({ gameName, tagLine }: { gameName: string; tagLine: string }) {
   return (
     <h1 className="text-title font-semibold">
