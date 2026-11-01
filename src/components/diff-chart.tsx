@@ -1,3 +1,4 @@
+import { useId } from "react";
 import {
   buildDiffChart,
   DEFAULT_BOX,
@@ -38,6 +39,10 @@ type Props = {
   height?: number;
   minuteLabels?: boolean;
   minuteLines?: boolean;
+  // A vertical line at this minute, for the board's selected play.
+  cursor?: number | null;
+  // Draw the line blue above zero and red below, instead of in the text colour.
+  lineBySide?: boolean;
 };
 
 const TONE_COLOR = { ahead: "var(--color-ahead)", behind: "var(--color-behind)" };
@@ -56,7 +61,12 @@ export function DiffChart({
   height: boxHeight = DEFAULT_BOX.height,
   minuteLabels = true,
   minuteLines = false,
+  cursor = null,
+  lineBySide = false,
 }: Props) {
+  // Clip paths need an id unique on the page; useId's has characters SVG's
+  // url() can't take.
+  const clipId = useId().replace(/[^a-zA-Z0-9]/g, "");
   const box = {
     ...DEFAULT_BOX,
     width: boxWidth,
@@ -101,8 +111,8 @@ export function DiffChart({
         ))}
       </g>
 
-      <path d={chart.aheadArea} fill="var(--color-ahead)" fillOpacity="0.35" />
-      <path d={chart.behindArea} fill="var(--color-behind)" fillOpacity="0.3" />
+      <path d={chart.aheadArea} fill="var(--color-ahead-fill)" />
+      <path d={chart.behindArea} fill="var(--color-behind-fill)" />
       <line
         x1={left}
         x2={width - right}
@@ -111,13 +121,50 @@ export function DiffChart({
         stroke="var(--color-quiet)"
         strokeWidth="1.5"
       />
-      <path
-        d={chart.line}
-        fill="none"
-        stroke="var(--color-main)"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
+      {lineBySide ? (
+        <>
+          <clipPath id={`${clipId}-above`}>
+            <rect x={0} y={0} width={width} height={chart.zeroY} />
+          </clipPath>
+          <clipPath id={`${clipId}-below`}>
+            <rect x={0} y={chart.zeroY} width={width} height={height - chart.zeroY} />
+          </clipPath>
+          <path
+            d={chart.line}
+            fill="none"
+            stroke="var(--color-ahead)"
+            strokeWidth="3"
+            strokeLinejoin="round"
+            clipPath={`url(#${clipId}-above)`}
+          />
+          <path
+            d={chart.line}
+            fill="none"
+            stroke="var(--color-behind)"
+            strokeWidth="3"
+            strokeLinejoin="round"
+            clipPath={`url(#${clipId}-below)`}
+          />
+        </>
+      ) : (
+        <path
+          d={chart.line}
+          fill="none"
+          stroke="var(--color-main)"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+      )}
+      {cursor !== null && (
+        <line
+          x1={Math.min(width - right, Math.max(left, chart.x(cursor)))}
+          x2={Math.min(width - right, Math.max(left, chart.x(cursor)))}
+          y1={top}
+          y2={height - bottom}
+          stroke="var(--color-main)"
+          strokeWidth="3"
+        />
+      )}
 
       <g fontSize="19" fontWeight="500" textAnchor="middle">
         {markers.map((m, i) => (

@@ -21,6 +21,7 @@ import { ratePhases } from "@/lib/phase-score";
 import { matchWinChance } from "@/lib/win-chance";
 import { AnalysisSections } from "./analysis-sections";
 import { MatchHeader } from "./match-header";
+import { NotInGame, TimelineProblem } from "./match-states";
 import { MatchNotes } from "./match-notes";
 import { MatchRecap } from "./match-recap";
 import { Scoreboard } from "./scoreboard";
@@ -44,12 +45,29 @@ export const maxDuration = 180;
 
 export default function MatchPage({ params }: { params: Params }) {
   return (
-    <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-7 px-6 pb-20 pt-7">
-      <Suspense fallback={<MatchSkeleton />}>
+    <main className="mx-auto flex w-full max-w-[1320px] flex-1 flex-col gap-6 px-4 pb-20 pt-6 sm:px-10">
+      <Suspense
+        fallback={
+          <MatchSkeleton
+            back={
+              <Suspense fallback={null}>
+                <LoadingBack params={params} />
+              </Suspense>
+            }
+          />
+        }
+      >
         <Analysis params={params} />
       </Suspense>
     </main>
   );
+}
+
+// The back link while the page loads: the player is in the URL, so it's known.
+async function LoadingBack({ params }: { params: Params }) {
+  const { region, riotId } = await params;
+  const id = fromSlug(riotId);
+  return isRegion(region) && id ? <BackLink region={region} id={id} /> : null;
 }
 
 async function Analysis({ params }: { params: Params }) {
@@ -83,16 +101,23 @@ async function Analysis({ params }: { params: Params }) {
     return (
       <>
         {back}
-        <p className="text-quiet">
-          {id.gameName}#{id.tagLine} isn&apos;t in this match.
-        </p>
+        <NotInGame
+          name={`${id.gameName}#${id.tagLine}`}
+          profileHref={`/player/${region}/${toSlug(id)}`}
+        />
       </>
     );
   }
 
   // eslint-disable-next-line react-hooks/purity -- a Server Component renders once per request, so reading the clock is fine
   const now = Date.now();
-  const header = <MatchHeader match={match} me={me} now={now} />;
+  // The back link sits close over the title, as one block.
+  const top = (
+    <div className="flex flex-col gap-1">
+      {back}
+      <MatchHeader match={match} me={me} dd={dd} now={now} />
+    </div>
+  );
   const scoreboard = (
     <Scoreboard
       region={region}
@@ -108,8 +133,7 @@ async function Analysis({ params }: { params: Params }) {
   if (skipped) {
     return (
       <>
-        {back}
-        {header}
+        {top}
         <p className={`${panelClass} px-5 py-4 text-quiet`}>
           {skipped} Here&apos;s the scoreboard.
         </p>
@@ -127,9 +151,8 @@ async function Analysis({ params }: { params: Params }) {
   if (!timeline.ok) {
     return (
       <>
-        {back}
-        {header}
-        <RiotErrorNotice error={timeline.error} />
+        {top}
+        <TimelineProblem error={timeline.error} />
         {scoreboard}
         {notes}
       </>
@@ -146,8 +169,7 @@ async function Analysis({ params }: { params: Params }) {
     : null;
   return (
     <>
-      {back}
-      {header}
+      {top}
       <AnalysisSections
         region={region}
         match={match}

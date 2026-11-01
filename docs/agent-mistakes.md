@@ -46,6 +46,9 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [An empty state that guards the wrong empty case](agent-mistakes/empty-state-guards-the-wrong-case.md) | 1 | check |
 | [A server answer read once and kept for the page's life](agent-mistakes/server-answer-read-once.md) | 1 | check |
 | [A control tested only as static markup](agent-mistakes/control-tested-only-as-static-markup.md) | 1 | check |
+| [A browser test's locator filters on what the click changes](agent-mistakes/browser-locator-filters-on-what-it-changes.md) | 1 | none yet |
+| [Coloured text on a tint nobody checked it against](agent-mistakes/coloured-text-on-a-new-tint.md) | 1 | none yet |
+| [Pairs players by their place in a list](agent-mistakes/pairs-players-by-list-position.md) | 1 | check |
 
 ## Rules and what enforces them
 

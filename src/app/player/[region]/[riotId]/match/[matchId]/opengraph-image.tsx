@@ -24,13 +24,13 @@ export const contentType = "image/png";
 // The image is drawn by Satori, which doesn't read our CSS, so these copy the
 // tokens in src/app/globals.css.
 const COLORS = {
-  page: "#0b0e13",
-  surface: "#12161d",
-  line: "#262c37",
-  ink: "#e8ecf2",
-  muted: "#a9b2bf",
-  ahead: "#5a8cff",
-  behind: "#f4615a",
+  page: "#21201d",
+  panel: "#2b2925",
+  divider: "#3e3b36",
+  main: "#f2efe9",
+  quiet: "#aaa498",
+  ahead: "#62a8ff",
+  behind: "#ff6d65",
 };
 
 type Params = Promise<{ region: string; riotId: string; matchId: string }>;
@@ -90,7 +90,7 @@ function Card({
   icon,
 }: MatchCard & { icon: string | null }) {
   const resultColor =
-    result === "Victory" ? COLORS.ahead : result === "Defeat" ? COLORS.behind : COLORS.muted;
+    result === "Victory" ? COLORS.ahead : result === "Defeat" ? COLORS.behind : COLORS.quiet;
   return (
     <Frame>
       <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
@@ -103,12 +103,12 @@ function Card({
             minWidth: 0,
           }}
         >
-          <div style={{ fontSize: 30, color: COLORS.muted }}>{riotId}</div>
+          <div style={{ fontSize: 30, color: COLORS.quiet }}>{riotId}</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 20 }}>
             <span style={{ fontSize: 72, fontWeight: 700, color: resultColor }}>{result}</span>
-            <span style={{ fontSize: 36, color: COLORS.ink }}>{champion}</span>
+            <span style={{ fontSize: 36, color: COLORS.main }}>{champion}</span>
           </div>
-          <div style={{ fontSize: 28, color: COLORS.muted }}>{[details, kda].join(" · ")}</div>
+          <div style={{ fontSize: 28, color: COLORS.quiet }}>{[details, kda].join(" · ")}</div>
         </div>
         {score && (
           <div
@@ -119,12 +119,12 @@ function Card({
               alignItems: "center",
               padding: "16px 28px",
               borderRadius: 20,
-              border: `2px solid ${COLORS.line}`,
-              background: COLORS.surface,
+              border: `2px solid ${COLORS.divider}`,
+              background: COLORS.panel,
             }}
           >
-            <span style={{ fontSize: 22, color: COLORS.muted }}>{score.badge ?? "Score"}</span>
-            <span style={{ fontSize: 64, fontWeight: 700, color: COLORS.ink }}>{score.value}</span>
+            <span style={{ fontSize: 22, color: COLORS.quiet }}>{score.badge ?? "Score"}</span>
+            <span style={{ fontSize: 64, fontWeight: 700, color: COLORS.main }}>{score.value}</span>
           </div>
         )}
       </div>
@@ -132,8 +132,8 @@ function Card({
       {chances.length > 1 && <WinChanceLine chances={chances} />}
 
       {swing && (
-        <div style={{ display: "flex", fontSize: 30, color: COLORS.ink, gap: 14 }}>
-          <span style={{ color: COLORS.muted }}>Biggest swing</span>
+        <div style={{ display: "flex", fontSize: 30, color: COLORS.main, gap: 14 }}>
+          <span style={{ color: COLORS.quiet }}>Biggest swing</span>
           <span>{swing.clock}</span>
           <span>{swing.title}</span>
           <span
@@ -164,7 +164,7 @@ function WinChanceLine({ chances }: { chances: number[] }) {
         y1={height / 2}
         x2={width}
         y2={height / 2}
-        stroke={COLORS.line}
+        stroke={COLORS.divider}
         strokeWidth={2}
         strokeDasharray="8 8"
       />
@@ -190,10 +190,10 @@ function Fallback() {
           marginTop: 80,
         }}
       >
-        <span style={{ fontSize: 80, fontWeight: 700, color: COLORS.ink }}>
+        <span style={{ fontSize: 80, fontWeight: 700, color: COLORS.main }}>
           Find the minute your game turned.
         </span>
-        <span style={{ fontSize: 34, color: COLORS.muted }}>
+        <span style={{ fontSize: 34, color: COLORS.quiet }}>
           Match analysis for League of Legends
         </span>
       </div>
@@ -212,7 +212,7 @@ function Frame({ children }: { children: React.ReactNode }) {
         justifyContent: "space-between",
         padding: 64,
         background: COLORS.page,
-        color: COLORS.ink,
+        color: COLORS.main,
         fontFamily: "sans-serif",
       }}
     >
@@ -220,12 +220,12 @@ function Frame({ children }: { children: React.ReactNode }) {
       <div
         style={{
           display: "flex",
-          fontSize: 24,
-          letterSpacing: 6,
-          color: COLORS.ahead,
+          fontSize: 28,
+          fontWeight: 600,
+          color: COLORS.main,
         }}
       >
-        TURNPOINT
+        Turnpoint
       </div>
     </div>
   );
