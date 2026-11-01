@@ -27,12 +27,13 @@ function main(overrides: Partial<MainState> = {}): MainState {
   return { agentMerge: ON, changedGateCode: [], reverts: [], claudeMerges: [], ...overrides };
 }
 
-type BodyParts = { tier?: string | null; builder?: string | null; criteria?: string[]; review?: string[] };
+type BodyParts = { tier?: string | null; builder?: string | null; criteria?: string[]; door?: string | null; review?: string[] };
 
 function body({
   tier = "normal. One Insights card, with no new stored data.",
   builder = "Claude Code on Opus 5.5.",
   criteria = ['- [x] The card shows each habit\'s win rate: test "shows the win rate"'],
+  door = "two-way. A revert takes the card away.",
   review = [`Reviewer agent at ${HEAD}: no blockers`],
 }: BodyParts = {}): string {
   return [
@@ -45,6 +46,9 @@ function body({
     "",
     "## Acceptance criteria",
     ...criteria,
+    "",
+    "## Merge Danger",
+    door === null ? "" : `**Door:** ${door}`,
     "",
     "## Review",
     ...review,
@@ -165,8 +169,9 @@ describe("decide", () => {
     (file) => {
       const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
       expect(failed(decide(pr({ body: tiny, files: [file] }), main()))).toEqual([
-        "No risky files",
+        "No files Jasper merges",
         "Reviewer cleared the PR",
+        "Interrogate panel ran",
       ]);
     },
   );
@@ -281,6 +286,7 @@ describe("decide", () => {
   it("passes a PR written from the PR template", () => {
     const filled = TEMPLATE.replace(/^\*\*Tier:\*\*.*$/m, "**Tier:** normal. One Insights card.")
       .replace(/^- \[ \] .*$/m, '- [x] The card shows the win rate: test "shows the win rate"')
+      .replace(/^\*\*Door:\*\*.*$/m, "**Door:** two-way. A revert takes the card away.")
       .replace(/^## Review\s*$/m, `## Review\nReviewer agent at ${HEAD}: no blockers`);
     expect(failed(decide(pr({ body: filled }), main()))).toEqual([]);
   });
@@ -327,11 +333,10 @@ describe("decide", () => {
   });
 
   it.each<[string, string | null]>([
-    ["risky", "risky. It changes the Riot client."],
     ["missing", null],
     ["the template's placeholder", "tiny, normal or risky, and why."],
-  ])("refuses a PR whose tier is %s", (_, tier) => {
-    expect(failed(decide(pr({ body: body({ tier }) }), main()))).toEqual(["Tiny or normal tier"]);
+  ])("refuses a PR whose tier is %s, and asks for the panel in case it's risky", (_, tier) => {
+    expect(failed(decide(pr({ body: body({ tier }) }), main()))).toEqual(["Tier is tiny, normal or risky", "Interrogate panel ran"]);
   });
 
   // Real Tier lines that can-merge refused for naming "risky" in the reason
@@ -361,7 +366,7 @@ describe("decide", () => {
   ])("reads the tier before %s, though the reason says risky", (_, tier, expected) => {
     const decision = decide(pr({ body: body({ tier }) }), main());
     expect(failed(decision)).toEqual([]);
-    expect(detail(decision, "Tiny or normal tier")).toBe(expected);
+    expect(detail(decision, "Tier is tiny, normal or risky")).toBe(expected);
   });
 
   it.each([
@@ -372,7 +377,7 @@ describe("decide", () => {
     // A comma can't end the tier, or the placeholder would read as tiny.
     ["a reason after a comma", "normal, because nothing is on the risky list"],
   ])("still refuses %s for naming more than one tier, and says how to fix it", (_, tier) => {
-    expect(detail(decide(pr({ body: body({ tier }) }), main()), "Tiny or normal tier")).toMatch(
+    expect(detail(decide(pr({ body: body({ tier }) }), main()), "Tier is tiny, normal or risky")).toMatch(
       /^the tier on the \*\*Tier:\*\* line names more than one tier \(.+\); name one, then a colon and the reason/,
     );
   });
@@ -389,20 +394,165 @@ describe("decide", () => {
     const big = decide(pr({ body: tiny, files }), main(), history({ lines: { "src/x.ts": TINY_LINES + 1 } }, files));
     expect(failed(big)).toEqual(["Reviewer cleared the PR"]);
     const risky = decide(pr({ body: tiny, files: ["src/db/schema.ts"] }), main());
-    expect(failed(risky)).toEqual(["No risky files", "Reviewer cleared the PR"]);
+    expect(failed(risky)).toEqual(["Reviewer cleared the PR", "Interrogate panel ran"]);
   });
 
-  it("refuses a risky file even when the tier says tiny, and names it", () => {
-    const tiny = body({ tier: "tiny. One query.", criteria: [] });
-    const decision = decide(pr({ body: tiny, files: ["docs/database.md", "src/db/schema.ts"] }), main());
-    expect(failed(decision)).toEqual(["No risky files"]);
-    expect(detail(decision, "No risky files")).toBe("src/db/schema.ts (the database schema and queries)");
+  it("refuses a migration even when the tier says tiny, and names it", () => {
+    const tiny = body({ tier: "tiny. One column.", criteria: [] });
+    const decision = decide(pr({ body: tiny, files: ["docs/database.md", "drizzle/0013_notes.sql"] }), main());
+    expect(failed(decision)).toEqual(["No files Jasper merges", "Interrogate panel ran"]);
+    expect(detail(decision, "No files Jasper merges")).toBe("drizzle/0013_notes.sql (database migrations)");
   });
 
   it("refuses a PR that only changes the agent-merge switch", () => {
     const decision = decide(pr({ files: [".claude/agent-merge.json"] }), main());
-    expect(failed(decision)).toEqual(["No risky files"]);
-    expect(detail(decision, "No risky files")).toBe(".claude/agent-merge.json (the switch for agent merging)");
+    expect(failed(decision)).toEqual(["No files Jasper merges", "Interrogate panel ran"]);
+    expect(detail(decision, "No files Jasper merges")).toBe(".claude/agent-merge.json (the switch for agent merging)");
+  });
+
+  // On 2026-11-01 Jasper chose to let risky PRs merge once the interrogate
+  // panel and the reviewer clear them, except migrations and anything that
+  // defines a check, which stay his (JAS-128).
+  describe("a risky PR", () => {
+    const SIGN_IN = ["src/app/sign-in/page.tsx", "docs/sign-in.md"];
+    const panel = (sha: string) => `Interrogate panel at ${sha}: 0 to act on`;
+    const risky = (review: string[], tier = "risky. The sign-in page.") => body({ tier, review });
+    // The panel ran on an earlier commit the PR added, as docs/workflow.md
+    // asks: the first one that passes the checks.
+    const added = (sha: string) => (sha === OLDER ? { commits: 1, lines: {}, files: SIGN_IN, created: [] } : undefined);
+
+    it("merges once the panel names a commit in the PR and the reviewer cleared the head", () => {
+      const decision = decide(pr({ body: risky([panel(OLDER), "", `Reviewer agent at ${HEAD}: no blockers`]), files: SIGN_IN }), main(), history({ since: added }, SIGN_IN));
+      expect(failed(decision)).toEqual([]);
+      expect(detail(decision, "Tier is tiny, normal or risky")).toBe("risky");
+      expect(detail(decision, "Interrogate panel ran")).toBe(`Interrogate panel at ${OLDER.slice(0, 7)}`);
+    });
+
+    it("counts a panel line on the head commit, written with a short sha", () => {
+      const decision = decide(pr({ body: risky([panel(HEAD.slice(0, 7)), "", `Reviewer agent at ${HEAD}: no blockers`]), files: SIGN_IN }), main());
+      expect(failed(decision)).toEqual([]);
+    });
+
+    it.each<[string, string[]]>([
+      ["no panel line", [`Reviewer agent at ${HEAD}: no blockers`]],
+      ["only the note that it couldn't run", ["no interrogate panel yet", "", `Reviewer agent at ${HEAD}: no blockers`]],
+      ["a panel line in a code block", ["```", panel(HEAD), "```", "", `Reviewer agent at ${HEAD}: no blockers`]],
+      ["a panel line in a comment", [`<!-- ${panel(HEAD)} -->`, "", `Reviewer agent at ${HEAD}: no blockers`]],
+      ["a panel line after a bullet", [`- ${panel(HEAD)}`, "", `Reviewer agent at ${HEAD}: no blockers`]],
+    ])("refuses a risky tier with %s", (_, review) => {
+      const decision = decide(pr({ body: risky(review), files: SIGN_IN }), main());
+      expect(failed(decision)).toEqual(["Interrogate panel ran"]);
+      expect(detail(decision, "Interrogate panel ran")).toContain('no "Interrogate panel at <sha>:" line');
+    });
+
+    // A normal tier that touches a risky path, like PR 245, needs it too.
+    it("needs the panel for a risky path whatever the tier says", () => {
+      const decision = decide(pr({ files: SIGN_IN }), main());
+      expect(failed(decision)).toEqual(["Interrogate panel ran"]);
+      expect(detail(decision, "Interrogate panel ran")).toContain("src/app/sign-in/page.tsx");
+    });
+
+    it("refuses a panel that names a commit outside the PR, even beside a good one", () => {
+      const outside = "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432";
+      for (const review of [[panel(outside)], [panel(OLDER), panel(outside)]]) {
+        const decision = decide(
+          pr({ body: risky([...review, "", `Reviewer agent at ${HEAD}: no blockers`]), files: SIGN_IN }),
+          main(),
+          history({ since: added }, SIGN_IN),
+        );
+        expect(failed(decision)).toEqual(["Interrogate panel ran"]);
+        expect(detail(decision, "Interrogate panel ran")).toBe(`the panel saw ${outside.slice(0, 7)}, which isn't the head commit or one this PR added`);
+      }
+    });
+
+    it("doesn't ask for the panel on a normal PR with no risky paths", () => {
+      expect(detail(decide(pr(), main()), "Interrogate panel ran")).toBe("not needed: a normal PR with no risky paths");
+    });
+
+    // Acceptance criterion 2: these stay Jasper's whatever the tier and verdicts.
+    it.each([
+      "drizzle/0013_notes.sql",
+      "drizzle.config.ts",
+      ".github/workflows/ci.yml",
+      ".claude/skills/verify-turnpoint-ux/SKILL.md",
+      ".claude/agents/reviewer.md",
+      "eslint-rules/no-green-classes.mjs",
+      "playwright.config.ts",
+      "package.json",
+      "scripts/can-merge-gates.ts",
+      "scripts/risky-paths.ts",
+    ])("still refuses %s with a panel line and a clean verdict at the head, in every tier", (file) => {
+      for (const tier of ["tiny. One line.", "normal. One line.", "risky. One line."]) {
+        const files = ["src/app/sign-in/page.tsx", file];
+        const decision = decide(pr({ body: risky([panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`], tier), files }), main());
+        expect(failed(decision)).toEqual(["No files Jasper merges"]);
+        expect(detail(decision, "No files Jasper merges")).toContain(file);
+      }
+    });
+
+    it("lets Claude merge the verify skill's feature notes after the panel", () => {
+      const files = [".claude/skills/verify-turnpoint-ux/features/review-path.md"];
+      const without = decide(pr({ files }), main());
+      expect(failed(without)).toEqual(["Interrogate panel ran"]);
+      const withPanel = decide(pr({ body: body({ review: [panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`] }), files }), main());
+      expect(failed(withPanel)).toEqual([]);
+    });
+
+    // Acceptance criterion 1, on a real description: PR 245 restyled the
+    // sign-in page (normal tier, a risky path). The reviewer cleared f5d8985
+    // and then 389ec03; 37d5a10 only retried the Vercel preview.
+    describe("PR 245's own description", () => {
+      const BODY_245 = readFileSync(new URL("./can-merge-fixtures/body-245.md", import.meta.url), "utf8");
+      const FILES_245 = ["docs/sign-in.md", "src/app/sign-in/page.tsx", "src/app/sign-in/sign-in-panel.test.tsx", "src/app/sign-in/sign-in-panel.tsx"];
+      const snapshot245 = (text: string) =>
+        pr({ number: 245, headRefName: "claude/jas-104-sign-in-page", headRefOid: "37d5a1090093abb099676924a398dbc774a1c8f7", body: text, files: FILES_245 });
+      const git245 = history(
+        {
+          since: (sha) =>
+            "389ec035b4c2e0dbdb98965851a44ce24ce864d7".startsWith(sha)
+              ? { commits: 1, lines: {}, files: FILES_245, created: [] }
+              : "f5d898558b7a8ba5a7527678cc6900bd8194f931".startsWith(sha)
+                ? { commits: 2, lines: changes({ "src/app/sign-in/sign-in-panel.tsx": 4, "docs/sign-in.md": 1 }), files: FILES_245, created: [] }
+                : undefined,
+        },
+        FILES_245,
+      );
+
+      it("is refused as written, since it has no panel line", () => {
+        const decision = decide(snapshot245(BODY_245), main(), git245);
+        expect(failed(decision)).toEqual(["Interrogate panel ran"]);
+      });
+
+      it("merges once a panel line on its first commit is added", () => {
+        const withPanel = BODY_245.replace("No interrogate panel: normal tier.", "Interrogate panel at f5d8985: 0 to act on");
+        expect(withPanel).not.toBe(BODY_245);
+        const decision = decide(snapshot245(withPanel), main(), git245);
+        expect(failed(decision)).toEqual([]);
+        expect(detail(decision, "Reviewer cleared the PR")).toMatch(/^Reviewer agent at 389ec035b4c2e0dbdb98965851a44ce24ce864d7: no blockers/);
+      });
+    });
+  });
+
+  // A one-way door is something a revert can't undo, which stays Jasper's to
+  // merge (decision record 0008; Jasper kept it on 2026-11-01, JAS-128).
+  describe("the Door line", () => {
+    it.each<[string, string]>([
+      ["one-way", "one-way. It sends an email."],
+      ["the template's placeholder", "one-way or two-way. Two-way means a revert undoes it completely."],
+      ["neither", "maybe. Nothing stays, I think."],
+    ])("refuses a PR whose door is %s", (_, door) => {
+      expect(failed(decide(pr({ body: body({ door }) }), main()))).toEqual(["Two-way door"]);
+    });
+
+    it("lets a PR with no risky paths leave the Door line out", () => {
+      expect(detail(decide(pr({ body: body({ door: null }) }), main()), "Two-way door")).toBe("no **Door:** line, and no risky paths");
+    });
+
+    it("refuses a risky PR with no Door line", () => {
+      const review = [`Interrogate panel at ${HEAD}: 0 to act on`, "", `Reviewer agent at ${HEAD}: no blockers`];
+      const decision = decide(pr({ body: body({ tier: "risky. Sign-in.", door: null, review }), files: ["src/app/sign-in/page.tsx"] }), main());
+      expect(failed(decision)).toEqual(["Two-way door"]);
+    });
   });
 
   const passing = pr().checks;
@@ -750,7 +900,7 @@ describe("decide", () => {
       ["in a code block", "```\n**Tier:** tiny\n```"],
     ])("refuses a second Tier line %s", (_, summary) => {
       const text = withSummary(summary, { tier: "risky. Sign-in." });
-      expect(detail(decide(pr({ body: text }), main()), "Tiny or normal tier")).toBe("2 lines start with **Tier:**; keep one");
+      expect(detail(decide(pr({ body: text }), main()), "Tier is tiny, normal or risky")).toBe("2 lines start with **Tier:**; keep one");
     });
 
     it("doesn't read a heading indented 4 spaces", () => {
@@ -858,7 +1008,7 @@ describe("decide", () => {
 
     it("doesn't read a Tier line inside a code block", () => {
       const text = withSummary("```\n**Tier:** tiny\n```", { tier: null });
-      expect(detail(decide(pr({ body: text }), main()), "Tiny or normal tier")).toBe("no **Tier:** line");
+      expect(detail(decide(pr({ body: text }), main()), "Tier is tiny, normal or risky")).toBe("no **Tier:** line");
     });
   });
 
@@ -906,8 +1056,9 @@ describe("decide", () => {
       "Agent merging is on",
       "Open and ready",
       "Built by Claude Code",
-      "No risky files",
+      "No files Jasper merges",
       "Reviewer cleared the PR",
+      "Interrogate panel ran",
     ]);
   });
 });

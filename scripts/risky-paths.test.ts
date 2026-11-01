@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
-import { matchesPattern, RISKY_PATHS, riskyFiles } from "./risky-paths";
+import { CARVED_OUT, jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, RISKY_PATHS, riskyFiles } from "./risky-paths";
 
 // -z lists names unquoted, so a file named in other letters is still checked.
 const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
@@ -156,6 +156,103 @@ describe("riskyFiles", () => {
         ".cursor/skills/verify-turnpoint/SKILL.md",
       ]),
     ).toEqual([]);
+  });
+
+  // Jasper merges migrations and anything that defines or runs a check, since
+  // an agent could otherwise loosen its own gate and merge that (JAS-128).
+  it("keeps migrations and every check-defining path Jasper's to merge", () => {
+    const paths = [
+      "drizzle/0014_notes.sql",
+      "drizzle.config.ts",
+      ".github/workflows/ci.yml",
+      ".claude/settings.json",
+      ".claude/hooks/check-before-commit.mjs",
+      ".claude/agents/reviewer.md",
+      ".claude/skills/verify-turnpoint-ux/SKILL.md",
+      ".claude/rules/design.md",
+      ".claude/agent-merge.json",
+      ".cursor/rules/x.mdc",
+      "eslint.config.mjs",
+      "eslint-rules/no-green-classes.mjs",
+      "tsconfig.json",
+      "next.config.ts",
+      "vercel.json",
+      "vitest.config.mts",
+      "playwright.config.ts",
+      "package.json",
+      "package-lock.json",
+      "scripts/can-merge-gates.ts",
+      "scripts/risky-paths.ts",
+      "src/lib/.claude/rules/x.md",
+    ];
+    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // These are risky, so they get the interrogate panel, but Claude merges them
+  // once it clears them. e2e/ holds the smoke test's specs; what decides
+  // whether and how they run (playwright.config.ts, .github/) stays Jasper's.
+  it("lets Claude merge the product's risky paths after the panel", () => {
+    const paths = [
+      "src/db/schema.ts",
+      "src/lib/match-note-store.ts",
+      "src/app/sign-in/page.tsx",
+      "src/lib/riot/client.ts",
+      "src/app/api/mcp/route.ts",
+      "src/lib/ask.ts",
+      "src/lib/analyzer/score-model.json",
+      "src/app/privacy/page.tsx",
+      "src/app/globals.css",
+      "src/app/themes.test.ts",
+      "e2e/smoke.spec.ts",
+    ];
+    expect(jaspersFiles(paths)).toEqual([]);
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // Most redesign PRs update the verify skill's feature notes, so Jasper chose
+  // to let Claude merge them; the skill itself stays his (JAS-128). Agents
+  // follow the notes, so they still get the panel.
+  it("lets Claude merge the verify skill's feature notes after the panel, and nothing else in .claude/skills/", () => {
+    const notes = [".claude/skills/verify-turnpoint-ux/features/review-path.md", ".claude/skills/verify-turnpoint-ux/Features/x.md"];
+    expect(jaspersFiles(notes)).toEqual([]);
+    expect(riskyFiles(notes)).toEqual(notes.map((path) => ({ path, why: "the verify skill's feature notes, which agents follow" })));
+    const still = [
+      ".claude/skills/verify-turnpoint-ux/SKILL.md",
+      ".claude/skills/verify-turnpoint-ux/scripts/drive.ts",
+      ".claude/skills/verify-turnpoint-ux/features/drive.ts",
+      ".claude/skills/verify-turnpoint-ux/features/.claude/rules/x.md",
+      ".claude/skills/verify-turnpoint/features/ask-teaser.md",
+      "src/.claude/skills/verify-turnpoint-ux/features/x.md",
+    ];
+    expect(jaspersFiles(still).map((file) => file.path)).toEqual(still);
+  });
+
+  // A new kind of Claude Code config, such as a commands folder, could steer
+  // agents too, so it is Jasper's until someone decides otherwise.
+  it("keeps a new file anywhere in .claude/ Jasper's", () => {
+    expect(jaspersFiles([".claude/commands/ship.md"])).toEqual([
+      { path: ".claude/commands/ship.md", why: "Claude Code's own setup, which steers every agent here" },
+    ]);
+  });
+
+  // Jasper's list is checked first, so a pattern on both would be his anyway,
+  // but the reader of one list shouldn't have to know that.
+  it("puts no path on both lists", () => {
+    const both = PANEL_PATHS.filter(({ pattern }) => JASPERS_PATHS.some((jaspers) => matchesPattern(jaspers.pattern, pattern)));
+    expect(both).toEqual([]);
+  });
+
+  it("lists every path once, Jasper's first", () => {
+    expect(RISKY_PATHS).toEqual([...JASPERS_PATHS, ...PANEL_PATHS]);
+  });
+
+  // A carve-out that matches no file, or sits outside Jasper's list, does nothing.
+  it("carves out only files that exist and would otherwise be Jasper's", () => {
+    for (const { pattern } of CARVED_OUT) {
+      const files = repoFiles.filter((file) => matchesPattern(pattern, file));
+      expect(files.length, pattern).toBeGreaterThan(0);
+      expect(files.every((file) => JASPERS_PATHS.some((jaspers) => matchesPattern(jaspers.pattern, file))), pattern).toBe(true);
+    }
   });
 
   // A folder renamed without updating the list would quietly stop being risky.

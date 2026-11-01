@@ -4,7 +4,7 @@
 // the PR and main through `gh api` and git, and passes them in.
 
 import { z } from "zod";
-import { riskyFiles } from "./risky-paths";
+import { jaspersFiles, riskyFiles } from "./risky-paths";
 
 export const SWITCH_FILE = ".claude/agent-merge.json";
 export const MERGED_BY_CLAUDE = "merged-by-claude";
@@ -117,7 +117,7 @@ export type ReviewHistory = {
 export type Gate = { name: string; pass: boolean; detail: string };
 export type Decision = { ok: boolean; gates: Gate[] };
 
-type Tier = { ok: true; tier: "tiny" | "normal" } | { ok: false; why: string };
+type Tier = { ok: true; tier: "tiny" | "normal" | "risky" } | { ok: false; why: string };
 type Context = { pr: PrSnapshot; main: MainState; history: ReviewHistory; tier: Tier };
 type Result = { pass: boolean; detail: string };
 
@@ -235,17 +235,20 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
     },
   },
   {
-    name: "Tiny or normal tier",
+    name: "Tier is tiny, normal or risky",
     check: ({ tier }) => (tier.ok ? pass(tier.tier) : fail(tier.why)),
   },
   {
-    name: "No risky files",
+    // Migrations and anything that defines a check, whatever the tier and
+    // the reviews say (JAS-128).
+    name: "No files Jasper merges",
     check: ({ pr }) => {
-      const risky = riskyFiles(pr.files);
-      if (risky.length === 0) return pass(`none of the ${pr.files.length} changed paths is in scripts/risky-paths.ts`);
-      return fail(risky.map(({ path, why }) => `${path} (${why})`).join(", "));
+      const jaspers = jaspersFiles(pr.files);
+      if (jaspers.length === 0) return pass(`none of the ${pr.files.length} changed paths is on Jasper's list in scripts/risky-paths.ts`);
+      return fail(jaspers.map(({ path, why }) => `${path} (${why})`).join(", "));
     },
   },
+  { name: "Two-way door", check: ({ pr, tier }) => doorResult(pr, tier) },
   {
     name: "Checks pass at the head commit",
     check: ({ pr }) => {
@@ -267,6 +270,7 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
     },
   },
   { name: REVIEWER_GATE, check: ({ pr, history, tier }) => reviewerResult(pr, history, tier) },
+  { name: "Interrogate panel ran", check: ({ pr, history, tier }) => panelResult(pr, history, tier) },
   {
     name: "Acceptance criteria ticked",
     check: ({ pr, tier }) => {
@@ -476,6 +480,70 @@ function carryOver(
   return pass(`${line}, carried over ${plural(commits, "commit")} with ${plural(counted, "line")} outside docs`);
 }
 
+// Why a PR needs the interrogate panel (and a Door line), or undefined when
+// it doesn't: a risky tier, or any risky path whatever the tier says, such
+// as PR 245's normal-tier sign-in page. A tier the gate can't read counts as
+// risky, so a typo can't skip the panel.
+function needsPanel(pr: Pick<PrSnapshot, "files">, tier: Tier): string | undefined {
+  const risky = riskyFiles(pr.files).map(({ path }) => path);
+  if (risky.length > 0) return `a PR that changes ${risky.join(", ")}`;
+  if (!(tier.ok && tier.tier !== "risky")) return "a risky tier";
+  return undefined;
+}
+
+// The builder's record of the panel, as docs/workflow.md asks:
+// "Interrogate panel at <sha>: <n> to act on", on its own line. Only a line
+// GitHub shows counts, at the start of the line with at most bold or code
+// around it, so one in a comment, code block or bullet doesn't.
+const PANEL = /^ {0,3}(?:\*\*|__|`+)?Interrogate panel at ([0-9a-f]{7,40}):/i;
+
+// The panel's "act on" findings aren't read: the reviewer gate already needs
+// a no-blockers verdict at the head, which covers the fixes for them.
+function panelResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Result {
+  const reason = needsPanel(pr, tier);
+  if (reason === undefined) return pass(`not needed: a ${tier.ok ? tier.tier : ""} PR with no risky paths`);
+  const review = section(pr.body, "Review");
+  if ("why" in review) return fail(review.why);
+  const shas = review.shown.flatMap((line, i) => {
+    const match = line === review.raw[i] ? line.match(PANEL) : null;
+    return match ? [match[1].toLowerCase()] : [];
+  });
+  if (shas.length === 0) {
+    return fail(
+      `no "Interrogate panel at <sha>:" line on its own in the Review section, which ${reason} needs ("no interrogate panel yet" doesn't count)`,
+    );
+  }
+  // Every panel line must name the head or a commit the PR added, so one
+  // copied from another PR fails rather than sitting beside a real one.
+  const outside = shas.filter((sha) => !pr.headRefOid.startsWith(sha) && history.since(sha) === undefined);
+  if (outside.length > 0) {
+    const named = outside.map((sha) => sha.slice(0, 7)).join(", ");
+    return fail(`the panel saw ${named}, which isn't the head commit or one this PR added`);
+  }
+  return pass(`Interrogate panel at ${shas[0].slice(0, 7)}`);
+}
+
+// A one-way door, a change a revert can't fully undo, stays Jasper's to merge
+// (decision record 0008), and Jasper kept that when risky PRs started merging
+// on their own (JAS-128). The PR template's Merge Danger section asks for
+// "**Door:** one-way or two-way". Only a PR that needs the panel must have the
+// line; one that has it must say two-way and nothing else.
+function doorResult(pr: Pick<PrSnapshot, "body" | "files">, tier: Tier): Result {
+  const door = field(pr.body, "Door");
+  if (!("value" in door)) {
+    const reason = needsPanel(pr, tier);
+    if (reason === undefined && door.why === "no **Door:** line") return pass("no **Door:** line, and no risky paths");
+    return fail(reason === undefined ? door.why : `${door.why}, which ${reason} needs: write "**Door:** two-way" if a revert undoes it`);
+  }
+  // Read up to the first full stop or colon, like the tier, so the reason can
+  // say what a revert undoes.
+  const doorText = door.value.split(TIER_END)[0];
+  const named = new Set([...doorText.matchAll(/\b(one|two)-way\b/gi)].map((match) => match[1].toLowerCase()));
+  if (named.size === 1 && named.has("two") && /^\W*two-way\b/i.test(doorText)) return pass("two-way");
+  if (named.has("one")) return fail(`the **Door:** line says ${named.size > 1 ? "both one-way and two-way" : "one-way"}, so Jasper merges it`);
+  return fail(`the **Door:** line starts with "${doorText.trim()}", not two-way`);
+}
+
 // The tier is the start of the line, up to its first colon, semicolon,
 // bracket, dash or full stop, as in "normal: <reason>" or "normal. <reason>".
 // Only that part is read, so a reason that says "not on the risky list" or
@@ -493,9 +561,8 @@ function readTier(body: string): Tier {
   const tierText = tier.value.split(TIER_END)[0];
   const first = tierText.match(/^\W*(\w+)/)?.[1].toLowerCase();
   const named = new Set([...tierText.matchAll(/\b(tiny|normal|risky)\b/gi)].map((match) => match[1].toLowerCase()));
-  if (first === "risky") return { ok: false, why: "risky tier, so Jasper merges it" };
-  if (first !== "tiny" && first !== "normal") {
-    return { ok: false, why: `the **Tier:** line starts with "${first ?? ""}", not tiny or normal` };
+  if (first !== "tiny" && first !== "normal" && first !== "risky") {
+    return { ok: false, why: `the **Tier:** line starts with "${first ?? ""}", not tiny, normal or risky` };
   }
   if (named.size > 1) {
     const names = [...named].join(", ");
