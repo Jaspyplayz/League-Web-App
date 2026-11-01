@@ -1,6 +1,6 @@
 import { SubHeading } from "@/components/ui/panel-heading";
 import { listNames, plural } from "@/lib/analyzer/format";
-import { LANES, type LaneTone } from "@/lib/analyzer/jungle-replay";
+import { LANES, type Lane, type LaneTone } from "@/lib/analyzer/jungle-replay";
 import { PATHING_FROM_MINUTE, PATHING_TO_MINUTE, type Pathing } from "@/lib/analyzer/pathing";
 import { LegendSwatch } from "./legend-swatch";
 
@@ -20,7 +20,7 @@ export function PathingGrid({ pathing }: { pathing: Pathing }) {
           "relative" keeps the screen-reader-only labels inside the scrolling
           box; otherwise they'd stretch the whole page sideways. */}
       <div className="relative overflow-x-auto">
-        <table className="w-full min-w-[560px] border-separate border-spacing-1 font-mono text-[13px]">
+        <table className="w-full min-w-[560px] border-separate border-spacing-1 text-note tabular-nums">
           <caption className="sr-only">
             Lane leads and your position, {PATHING_FROM_MINUTE}:00 to {PATHING_TO_MINUTE}:00
           </caption>
@@ -30,7 +30,7 @@ export function PathingGrid({ pathing }: { pathing: Pathing }) {
                 <span className="sr-only">Lane</span>
               </th>
               {minutes.map((m) => (
-                <th key={m.minute} scope="col" className="font-normal text-faint">
+                <th key={m.minute} scope="col" className="font-normal text-quiet">
                   {m.minute}:00
                 </th>
               ))}
@@ -39,11 +39,8 @@ export function PathingGrid({ pathing }: { pathing: Pathing }) {
           <tbody>
             {LANES.map((lane) => (
               <tr key={lane}>
-                <th
-                  scope="row"
-                  className="pr-2 text-left text-[11px] font-normal uppercase tracking-[0.1em] text-faint"
-                >
-                  {lane}
+                <th scope="row" className="pr-2 text-left font-normal text-quiet">
+                  {LANE_LABEL[lane]}
                 </th>
                 {minutes.map((m) => {
                   const tone = m.lanes[lane];
@@ -51,7 +48,9 @@ export function PathingGrid({ pathing }: { pathing: Pathing }) {
                   return (
                     <td key={m.minute} className={`h-9 rounded-md ${CELL_COLOR[tone]}`}>
                       <span className="flex items-center justify-center">
-                        {here && <span className="size-3 rounded-full bg-ink" aria-hidden="true" />}
+                        {here && (
+                          <span className="size-3 rounded-full bg-main" aria-hidden="true" />
+                        )}
                         <span className="sr-only">
                           {tone}
                           {here ? ", you were here" : ""}
@@ -66,12 +65,12 @@ export function PathingGrid({ pathing }: { pathing: Pathing }) {
         </table>
       </div>
 
-      <div className="flex flex-wrap gap-x-[18px] gap-y-2 text-[13px] text-muted">
+      <div className="flex flex-wrap gap-x-[18px] gap-y-2 text-note text-quiet">
         <LegendSwatch className="bg-ahead">Lane ahead</LegendSwatch>
         <LegendSwatch className="bg-behind">Lane behind</LegendSwatch>
-        <LegendSwatch className="bg-line-strong">Even</LegendSwatch>
+        <LegendSwatch className="bg-divider">Even</LegendSwatch>
         <span className="flex items-center gap-2">
-          <span className="size-3 rounded-full bg-ink" aria-hidden="true" />
+          <span className="size-3 rounded-full bg-main" aria-hidden="true" />
           You were near this lane
         </span>
       </div>
@@ -79,15 +78,22 @@ export function PathingGrid({ pathing }: { pathing: Pathing }) {
   );
 }
 
+// Each lane's name in sentence case, for the grid's rows and the gank lists.
+export const LANE_LABEL: Record<Lane, string> = {
+  top: "Top",
+  mid: "Mid",
+  bot: "Bot",
+};
+
 // What the grid shows, behind "How to read this".
 export const PATHING_HELP =
   "The grid shows which lane you were playing near each minute, against how each lane was " +
   "doing (gold + XP). Jungle and river count toward the lane on the same side of the map.";
 
 const CELL_COLOR: Record<LaneTone, string> = {
-  ahead: "bg-ahead/35",
-  behind: "bg-behind/35",
-  even: "bg-line-strong",
+  ahead: "bg-ahead-fill",
+  behind: "bg-behind-fill",
+  even: "bg-divider",
 };
 
 // "From 3:00 to 14:00 you spent 7 minutes near lanes that were ahead,
