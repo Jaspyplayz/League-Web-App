@@ -8,8 +8,10 @@ import { describe, expect, it } from "vitest";
 // words and fails here first if no text in src/ says them any more.
 //
 // Its limits: it can tell that some text says the words, not that the page the
-// test opens does. The loading skeleton also says "Replay", so renaming only
-// that tab stays green. Names held in a variable or a regex aren't read.
+// test opens does. The replay's own heading also says "Replay", so renaming
+// only that tab stays green. Names held in a variable or a regex aren't read,
+// and a built-from-data name is checked by its code, not its data: renaming the
+// "Pinned" tab stays green.
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = `${dir}/${name}`;
@@ -36,7 +38,7 @@ const BUILT_FROM_DATA: Record<string, { file: string; code: string }> = {
 // A quoted name in getByRole(..., { name: "..." }), the first argument of
 // getByText, getByLabel and the like, or the words an assertion or filter
 // expects. A regex name matches many wordings, so it's no use to look up here.
-const QUOTED = String.raw`(["'${"`"}])((?:(?!\1)[^\\]|\\.)*)\1`;
+const QUOTED = /(["'`])((?:(?!\1)[^\\]|\\.)*)\1/.source;
 const LOOKUPS = [
   new RegExp(String.raw`getByRole\(\s*["']\w+["']\s*,\s*\{[^}]*?\bname:\s*${QUOTED}`, "g"),
   new RegExp(String.raw`getBy(?:Text|Label|Placeholder|Title|AltText)\(\s*${QUOTED}`, "g"),
@@ -70,10 +72,11 @@ function pageWords(fileName: string, code: string): string[] {
   return words;
 }
 
-// Test data and the MCP server's answers aren't on a page.
+// Test data and the MCP server's answers aren't on a page. The loading skeleton
+// is, but only for a moment, and it repeats the match tabs' names.
 function srcText(): string {
   return files("src")
-    .filter((path) => /\.tsx?$/.test(path) && !/\.test\.|test-fixtures|\/lib\/mcp\//.test(path))
+    .filter((path) => /\.tsx?$/.test(path) && !/\.test\.|test-fixtures|loading-skeleton|\/lib\/mcp\/|\/app\/api\/mcp\//.test(path))
     .flatMap((path) => pageWords(path, readFileSync(path, "utf8")))
     .join("\n");
 }
@@ -87,6 +90,7 @@ describe("pageWords", () => {
     ["a block comment", "const a = /* Deep dive */ 1;"],
     ["a JSX comment", "const a = <p>{/* Deep dive */}</p>;"],
     ["an import", 'import a from "Deep dive";'],
+    ["an export's path", 'export { a } from "Deep dive";'],
     ["a name in the code", "const DeepDive = 1; const Deep_dive = 2;"],
   ])("doesn't count %s", (_, code) => {
     expect(says(code)).toBe(false);
@@ -95,12 +99,18 @@ describe("pageWords", () => {
   it.each([
     ["a string", 'const a = "Deep dive";'],
     ["a template's text", "const a = `${b} Deep dive ${c}`;"],
+    ["a template's first words", "const a = `Deep dive ${c}`;"],
     ["JSX text across lines", "const a = <p>\n  Deep\n  dive\n</p>;"],
     ["a label", 'const a = <p aria-label="Deep dive" />;'],
     ["a string after one holding a comment's start", 'const a = "/*"; const b = "Deep dive";'],
   ])("counts %s", (_, code) => {
     expect(says(code)).toBe(true);
   });
+});
+
+it("reads JSX's apostrophes and quotes as the page shows them", () => {
+  const code = "const a = <p>couldn&apos;t &#39;x&#39; &quot;y&quot;</p>;";
+  expect(pageWords("page.tsx", code)).toEqual(["couldn't 'x' \"y\""]);
 });
 
 describe("words the browser tests look for", () => {
@@ -112,6 +122,8 @@ describe("words the browser tests look for", () => {
     expect(texts).toContain("Recent matches");
     expect(texts).toContain("No one on Pinned matches.");
     expect(texts).toContain("We couldn't find that page");
+    expect(texts).toContain("Example game");
+    expect(texts).toContain("#");
   });
 
   it("are still in the text of src/", () => {
