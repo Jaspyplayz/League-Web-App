@@ -131,11 +131,12 @@ function FillingIn({ recap }: { recap: DeathRecap }) {
 }
 
 // Each kind of damage gets a neutral shade, not blue or red: all of it is
-// damage you took, so none of it is you against the opponent.
+// damage you took, so none of it is you against the opponent. Each shade is
+// at least 3:1 against the panel in both themes, so the smallest part shows.
 const DAMAGE_TYPES = [
   { key: "physical", label: "Physical", counter: "armor", fill: "bg-main" },
   { key: "magic", label: "Magic", counter: "magic resist", fill: "bg-quiet" },
-  { key: "true", label: "True", counter: null, fill: "bg-divider" },
+  { key: "true", label: "True", counter: null, fill: "bg-placeholder" },
 ] as const;
 
 // Physical, magic and true damage as shares of all the champion damage that

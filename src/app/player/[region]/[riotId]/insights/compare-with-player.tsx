@@ -11,7 +11,7 @@ import { panelClass } from "@/components/ui/panel";
 import { secondButtonClass } from "@/components/ui/state-panel";
 
 const fieldLabel = "text-note text-quiet";
-const input = "h-11 min-w-0 rounded-md bg-raised px-2.5 text-body text-main";
+const input = "h-11 min-w-0 rounded-md bg-raised px-2.5 text-body text-main sm:h-10";
 const note = "text-body text-quiet";
 
 // "Compare with a player": type any Riot ID, such as a pro's solo queue
@@ -95,7 +95,7 @@ function PlayerForm({
             ))}
           </select>
         </div>
-        <button type="submit" className={secondButtonClass}>
+        <button type="submit" className={`${secondButtonClass} sm:h-10`}>
           Compare
         </button>
       </div>

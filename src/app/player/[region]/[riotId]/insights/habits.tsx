@@ -3,6 +3,7 @@ import { panelClass } from "@/components/ui/panel";
 import { formatClock, plural } from "@/lib/analyzer/format";
 import {
   habitLabel,
+  MIN_HABIT_GAMES,
   type HabitId,
   type HabitReport,
   type HabitResult,
@@ -46,18 +47,24 @@ function describe(id: HabitId, report: HabitReport, rankName: string | null) {
 // verdict on any game, and the note under them says so. Like Session blocks,
 // the numbers aren't coloured blue or red.
 export function HabitsSection({ report, tier }: { report: HabitReport | null; tier: Tier | null }) {
-  if (!report) {
+  const role = report ? (positionName(report.position)?.toLowerCase() ?? "") : "";
+  // No habit had enough of your games to count, such as with a champion
+  // picked that you played in two roles. The heading stays and says why.
+  if (!report || report.habits.length === 0) {
     return (
-      <section aria-labelledby="habits-heading" className={`${panelClass} flex flex-col gap-1.5 p-4 sm:px-5`}>
+      <section
+        aria-labelledby="habits-heading"
+        className={`${panelClass} flex flex-col gap-1.5 p-4 sm:px-5`}
+      >
         <PanelHeading id="habits-heading">Habits</PanelHeading>
         <p className="text-body text-quiet">
-          None of these games has the early-game details habits are counted from yet, so there&apos;s
-          nothing to show. They fill in as games are analyzed.
+          Each habit needs at least {MIN_HABIT_GAMES} of your games in your most-played role
+          {role && ` (${role})`}, and these games don&apos;t have that many yet. Try more games, or
+          all champions.
         </p>
       </section>
     );
   }
-  const role = positionName(report.position)?.toLowerCase() ?? "";
   const rankName = tier && report.rankGames > 0 ? tierName(tier) : null;
   return (
     <section aria-labelledby="habits-heading" className={`${panelClass} flex flex-col gap-5 p-4 sm:px-5`}>

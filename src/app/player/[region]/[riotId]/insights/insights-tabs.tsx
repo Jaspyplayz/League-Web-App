@@ -34,7 +34,7 @@ export function InsightsTabs({
             // Stay where you are on the page instead of jumping to the top.
             scroll={false}
             aria-current={active ? "page" : undefined}
-            className={`flex min-h-9 items-center justify-center rounded-sm px-1.5 text-center text-sm leading-tight transition-colors duration-320 ease-out hover:duration-120 motion-reduce:transition-none sm:px-3.5 ${
+            className={`flex min-h-10 items-center justify-center rounded-sm px-1.5 text-center text-sm leading-tight transition-colors duration-320 ease-out hover:duration-120 motion-reduce:transition-none sm:px-3.5 ${
               active ? "bg-raised font-medium text-main" : "text-quiet hover:bg-select hover:text-main"
             }`}
           >

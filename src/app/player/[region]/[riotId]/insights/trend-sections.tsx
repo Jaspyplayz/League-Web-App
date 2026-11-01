@@ -66,7 +66,7 @@ function WinRate({
         share={record.games > 0 ? record.wins / record.games : 0}
         fill={tone === "ahead" ? "bg-ahead" : "bg-behind"}
       />
-      <span className="w-28 flex-none">
+      <span className="w-32 flex-none whitespace-nowrap">
         {record.games > 0 ? (
           <>
             <span className="font-semibold">{winRate(record)}% won</span>{" "}

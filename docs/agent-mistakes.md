@@ -43,6 +43,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A throwing read moved onto a page that didn't expect it](agent-mistakes/throwing-read-moved-to-a-busier-page.md) | 1 | check |
 | [Text on screen that promises more than the feature does](agent-mistakes/screen-text-promises-more-than-the-feature.md) | 1 | none yet |
 | [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | none yet |
+| [An empty state that guards the wrong empty case](agent-mistakes/empty-state-guards-the-wrong-case.md) | 1 | check |
 
 ## Rules and what enforces them
 

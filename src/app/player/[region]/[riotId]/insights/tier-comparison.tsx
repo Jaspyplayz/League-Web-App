@@ -49,7 +49,7 @@ export function TierComparison({
               id="tier"
               name="tier"
               defaultValue={tier.toLowerCase()}
-              className="h-11 min-w-0 rounded-md bg-raised px-2.5 text-body text-main"
+              className="h-11 min-w-0 rounded-md bg-raised px-2.5 text-body text-main sm:h-10"
             >
               {tiers.map((t) => (
                 <option key={t.tier} value={t.tier.toLowerCase()}>
@@ -58,7 +58,7 @@ export function TierComparison({
               ))}
             </select>
           </div>
-          <button type="submit" className={secondButtonClass}>
+          <button type="submit" className={`${secondButtonClass} sm:h-10`}>
             Compare
           </button>
         </Form>

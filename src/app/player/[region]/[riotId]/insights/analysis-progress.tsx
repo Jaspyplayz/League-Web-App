@@ -108,7 +108,7 @@ export function AnalysisProgress({
         }
       >
         <p>
-          {shown.analyzed} of {shown.total} are analyzed. The insights below use those games.
+          {shown.analyzed} of {shown.total} are analyzed so far. This is usually brief.
         </p>
       </ProblemPanel>
     );
