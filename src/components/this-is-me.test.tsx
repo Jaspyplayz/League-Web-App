@@ -49,8 +49,8 @@ describe("ThisIsMeButton", () => {
     // The reason shows as the label too, since phones don't show a title.
     expect(html).toContain(">Reload to check</button>");
     expect(html).not.toContain("hover:");
-    // Readable in both themes: muted text, not faded with opacity.
-    expect(html).toContain("text-muted");
+    // Readable in both themes: quiet text, not faded with opacity.
+    expect(html).toContain("text-quiet");
     expect(html).not.toContain("opacity-");
   });
 });

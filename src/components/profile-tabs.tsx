@@ -20,7 +20,10 @@ export function ProfileTabs({
   ] as const;
 
   return (
-    <nav aria-label="Profile sections" className="grid grid-cols-3 rounded-md bg-panel">
+    // The open tab's fill is `select`: over the panel it's the mockup's
+    // #3a3834 in dark. Its text colour and weight mark it too, since no fill
+    // this close to the panel stands out on its own.
+    <nav aria-label="Profile sections" className="grid grid-cols-3 gap-1 rounded-md bg-panel p-1">
       {tabs.map((tab) => {
         const active = tab.key === current;
         return (

@@ -5,7 +5,7 @@ description: Drive Turnpoint in a real browser and save screenshots as proof, on
 
 # Verify Turnpoint
 
-`npm run shot` ([scripts/shot.ts](../../../scripts/shot.ts)) opens pages in Chromium the way a player would and saves full-page screenshots to `.cache/verify/` (git-ignored). It won't save a page that isn't the app working: Vercel's login (`vercel-login`), the Riot key notice (`riot-key`), the 404 page or "No player found" (`not-found`), or an error page or alert (`error`), such as Riot's "Too many lookups right now". It prints what the page showed instead and exits with code 1. Exit code 0 means every page loaded.
+`npm run shot` ([scripts/shot.ts](../../../scripts/shot.ts)) opens pages in Chromium the way a player would and saves full-page screenshots to `.cache/verify/` (git-ignored). It won't save a page that isn't the app working: Vercel's login (`vercel-login`), the Riot key notice (`riot-key`), the 404 page or "No player called …" (`not-found`), or an error page or alert (`error`), such as Riot's "Too many lookups right now". It prints what the page showed instead and exits with code 1. Exit code 0 means every page loaded.
 
 In Git Bash, start every command with `MSYS_NO_PATHCONV=1`, or Git Bash turns `/settings` into `C:/Program Files/Git/settings`. PowerShell and cloud machines don't need it.
 

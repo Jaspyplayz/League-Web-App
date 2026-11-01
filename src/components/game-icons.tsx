@@ -24,7 +24,7 @@ export function ChampionIcon({
   dd,
   name,
   size,
-  className = "soft-round-sm",
+  className = "rounded-sm",
 }: {
   dd: DataDragon | null;
   name: string; // championName from match data
@@ -34,8 +34,8 @@ export function ChampionIcon({
   if (!dd) {
     return (
       <Placeholder size={size} className={className}>
-        <span className="font-display font-bold text-ink-soft" style={{ fontSize: size * 0.4 }}>
-          {name.slice(0, 2).toUpperCase()}
+        <span className="font-semibold text-quiet" style={{ fontSize: size * 0.32 }}>
+          {name.slice(0, 2)}
         </span>
       </Placeholder>
     );
@@ -49,7 +49,7 @@ export function ItemIcon({
   dd,
   itemId,
   size,
-  className = "rounded-lg",
+  className = "rounded-sm",
 }: {
   dd: DataDragon | null;
   itemId: number; // 0 = empty slot
@@ -71,36 +71,11 @@ export function ItemIcon({
   );
 }
 
-// A player's seven item slots as two rows, like the in-game scoreboard:
-// slots 1–3 and the trinket (round) on top, slots 4–6 below.
-export function ItemSlots({
-  dd,
-  items,
-  size = 26,
-}: {
-  dd: DataDragon | null;
-  items: number[]; // 7 ids, the last one is the trinket
-  size?: number;
-}) {
-  const [a, b, c, d, e, f, trinket] = items;
-  return (
-    <div aria-label="Items" role="group" className="grid shrink-0 grid-cols-4 gap-[3px]">
-      <ItemIcon dd={dd} itemId={a} size={size} />
-      <ItemIcon dd={dd} itemId={b} size={size} />
-      <ItemIcon dd={dd} itemId={c} size={size} />
-      <ItemIcon dd={dd} itemId={trinket} size={size} className="rounded-full" />
-      <ItemIcon dd={dd} itemId={d} size={size} />
-      <ItemIcon dd={dd} itemId={e} size={size} />
-      <ItemIcon dd={dd} itemId={f} size={size} />
-    </div>
-  );
-}
-
 export function SummonerSpellIcon({
   dd,
   spellId,
   size,
-  className = "rounded-lg",
+  className = "rounded-sm",
 }: {
   dd: DataDragon | null;
   spellId: number; // summoner1Id or summoner2Id from match data
@@ -146,14 +121,15 @@ export function RuneIcon({
   );
 }
 
-// The player's profile picture with their level in a pill along the bottom
-// edge. Without Data Dragon it shows the first letter of their name instead.
+// The player's profile picture with their level on a small tag over the
+// bottom edge. Without Data Dragon it shows the first letter of their name
+// instead. 6px corners, like every portrait in the Review board look.
 export function ProfileIcon({
   dd,
   iconId,
   level,
   name,
-  size = 96,
+  size = 88,
 }: {
   dd: DataDragon | null;
   iconId: number | null; // null when the summoner lookup failed
@@ -161,26 +137,20 @@ export function ProfileIcon({
   name: string;
   size?: number;
 }) {
-  // The small 4px corner, as the design rules give portraits.
-  const frame = "soft-round-sm border-2 border-frame";
   return (
-    // Spans rather than divs, so the icon can sit inside a button (the
-    // header's account menu).
+    // Spans rather than divs, so the icon could sit inside a button.
     <span className="relative block w-fit shrink-0">
       {dd && iconId !== null ? (
-        <GameImage src={profileIconUrl(dd, iconId)} alt="" size={size} className={frame} />
+        <GameImage src={profileIconUrl(dd, iconId)} alt="" size={size} className="rounded-md" />
       ) : (
-        <Placeholder size={size} className={frame}>
-          <span
-            className="font-display font-bold text-ahead-soft"
-            style={{ fontSize: size * 0.45 }}
-          >
+        <Placeholder size={size} className="rounded-md">
+          <span className="font-semibold text-quiet" style={{ fontSize: size * 0.4 }}>
             {name.charAt(0).toUpperCase()}
           </span>
         </Placeholder>
       )}
       {level !== null && (
-        <span className="soft-round-sm absolute -bottom-2.5 left-1/2 -translate-x-1/2 border border-frame bg-page px-2.5 font-mono text-xs text-ink-soft">
+        <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 rounded-sm bg-page px-1.5 text-xs leading-[18px] font-medium tabular-nums text-main">
           {level}
         </span>
       )}
@@ -209,7 +179,7 @@ function GameImage({
       width={size}
       height={size}
       unoptimized
-      className={`shrink-0 bg-line ${className}`}
+      className={`shrink-0 bg-raised ${className}`}
     />
   );
 }
@@ -226,7 +196,7 @@ function Placeholder({
   return (
     <span
       style={{ width: size, height: size }}
-      className={`flex shrink-0 items-center justify-center bg-line ${className}`}
+      className={`flex shrink-0 items-center justify-center bg-raised ${className}`}
     >
       {children}
     </span>

@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { MatchListSkeleton } from "@/components/match-list-skeleton";
 import { LoadingBlock, LoadingStatus } from "@/components/ui/loading";
 import { Panel } from "@/components/ui/panel";
 
@@ -14,31 +13,6 @@ function Frame({ label, children }: { label: string; children: ReactNode }) {
 
 function Bar({ className }: { className: string }) {
   return <div aria-hidden="true" className={`rounded-sm bg-divider ${className}`} />;
-}
-
-export function ProfileSkeleton() {
-  return (
-    <Frame label="Looking up player">
-      <Bar className="h-12 w-64" />
-      <Bar className="h-9 w-full max-w-md" />
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        <div className="flex flex-col gap-4 lg:w-80 lg:shrink-0">
-          <Panel aria-hidden="true" className="flex h-28 flex-col gap-3 p-4">
-            <Bar className="h-3 w-16" />
-            <Bar className="h-6 w-32" />
-          </Panel>
-          <Panel aria-hidden="true" className="flex h-28 flex-col gap-3 p-4">
-            <Bar className="h-3 w-16" />
-            <Bar className="h-6 w-32" />
-          </Panel>
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <Bar className="h-6 w-40" />
-          <MatchListSkeleton quiet />
-        </div>
-      </div>
-    </Frame>
-  );
 }
 
 // The match page while it's analyzed: layout A in grey (JAS-93), with what's

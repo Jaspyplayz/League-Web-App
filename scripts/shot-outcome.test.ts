@@ -54,7 +54,7 @@ describe("classify", () => {
   });
 
   it("reports a Riot ID that doesn't exist", () => {
-    const text = "No player found\nThere's no Foo#BAR in Korea.";
+    const text = "No player called Foo#BAR on Korea\nCheck the spelling and the tag after the #, or try another region.";
     expect(classify(load({ text })).outcome).toBe("not-found");
   });
 
