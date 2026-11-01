@@ -25,8 +25,8 @@ export function usePlayerSearch(errorId: string) {
   const saved = useSavedPlayersBox(wanted);
   const boxOpen = wanted && !pending && saved.hasAny;
   // One or the other, since they'd sit in the same spot. The error comes back
-  // when the box closes.
-  const error = boxOpen || errorDismissed ? null : state.error;
+  // when the box closes. While a new search runs, it's the last search's error.
+  const error = boxOpen || errorDismissed || pending ? null : state.error;
 
   // A click outside closes the box. Blur can't catch it: a tap outside on an
   // iPhone leaves the input focused.

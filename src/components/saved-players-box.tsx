@@ -101,11 +101,15 @@ export function SavedPlayersBox({
   const matches = (p: SavedPlayer) => `${p.gameName}#${p.tagLine}`.toLowerCase().includes(typed);
   // A name that's only on the other tab shows there, so the box never says
   // no player matches about someone it has.
-  const tab = typed && !chosen.players.some(matches) && other.players.some(matches) ? other : chosen;
-  // A keyboard press loses its focus along with the row, so hand it back. Not a
-  // tap (detail above 0): focusing the search would open a phone's keyboard.
+  // Clicking a tab beats that until the typing changes.
+  const [clickedWhileTyping, setClickedWhileTyping] = useState<string | null>(null);
+  const fallsThrough = typed && typed !== clickedWhileTyping && !chosen.players.some(matches) && other.players.some(matches);
+  const tab = fallsThrough ? other : chosen;
+  // A button holding focus loses it along with its row, and Escape stops working,
+  // so hand it back. Not after a tap, which never focuses the button: focusing
+  // the search then would open a phone's keyboard.
   const rowGone = (event: React.MouseEvent) => {
-    if (event.detail === 0) onRowGone();
+    if (event.currentTarget === document.activeElement) onRowGone();
   };
   const rows = tab.players.filter(matches);
 
@@ -128,7 +132,10 @@ export function SavedPlayersBox({
             type="button"
             role="tab"
             aria-selected={tab.id === t.id}
-            onClick={() => setChosenId(t.id)}
+            onClick={() => {
+              setChosenId(t.id);
+              setClickedWhileTyping(typed);
+            }}
             className={`-mb-px h-11 border-b-2 text-sm lg:h-10 ${insetRing} ${
               tab.id === t.id ? "border-main font-semibold text-main" : `border-transparent font-medium text-quiet ${hoverFade}`
             }`}

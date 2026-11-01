@@ -124,6 +124,64 @@ test("a search error doesn't follow you to the player you pick", async ({ page }
   await page.getByRole("link", { name: /Turnpoint Tester/ }).click();
   await expect(page).toHaveURL(/\/player\/na\//, FIRST_LOAD);
   await expect(error).toBeHidden();
+
+  // A new search doesn't bring it back while it runs, for a screen reader to read out.
+  await page.evaluate(() => {
+    new MutationObserver(() => {
+      if (document.body.innerText.includes("Add the tag after a #")) sessionStorage.setItem("sawOldError", "yes");
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+  await riotId(page).fill("Other Name#NA1");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/Other%20Name-NA1/, FIRST_LOAD);
+  expect(await page.evaluate(() => sessionStorage.getItem("sawOldError"))).toBeNull();
+});
+
+test("clicking a tab while typing opens it, even when the name is on the other one", async ({ page }) => {
+  await fakeAnswers(page, [{ json: { ranks: {}, you: null } }]);
+  await openHomeWithSaved(page, [faker], [me]);
+  await riotId(page).fill("hide");
+  const recent = recentTab(page);
+  const pinned = page.getByRole("tab", { name: /^Pinned/ });
+  await expect(recent).toHaveAttribute("aria-selected", "true");
+
+  await pinned.click();
+  await expect(pinned).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("No saved player matches.")).toBeVisible();
+
+  // The next change to the typing finds the name again.
+  await riotId(page).fill("hid");
+  await expect(recent).toHaveAttribute("aria-selected", "true");
+});
+
+test("Escape still closes the box after clicking a focused row's ×", async ({ page }) => {
+  await fakeAnswers(page, [{ json: { ranks: {}, you: null } }]);
+  await openHomeWithSaved(page, [faker, me]);
+  await riotId(page).click();
+
+  const remove = page.getByRole("button", { name: "Remove Hide on bush#KR1 from recent players" });
+  await remove.focus();
+  await remove.click();
+  await expect(remove).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(recentTab(page)).toBeHidden();
+});
+
+test.describe("on a touch screen", () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  // Focusing the search here would open a phone's keyboard over the list.
+  test("tapping × doesn't focus the search", async ({ page }) => {
+    await fakeAnswers(page, [{ json: { ranks: {}, you: null } }]);
+    await openHomeWithSaved(page, [faker, me]);
+    await riotId(page).click();
+    await riotId(page).evaluate((input: HTMLElement) => input.blur());
+
+    const remove = page.getByRole("button", { name: "Remove Hide on bush#KR1 from recent players" });
+    await remove.tap();
+    await expect(remove).toBeHidden();
+    await expect(riotId(page)).not.toBeFocused();
+  });
 });
 
 test("hands focus back when a row leaves under the keyboard", async ({ page }) => {
