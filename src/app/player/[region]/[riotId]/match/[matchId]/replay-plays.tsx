@@ -25,8 +25,8 @@ import type { ReplayData } from "@/lib/analyzer/replay";
 import { stretchAt, type TempoTimeline } from "@/lib/analyzer/tempo";
 import type { ReplayRequest } from "./review-links";
 
-// The old grade pill, which only the Summary's 60-second review still uses.
-// JAS-107 moves the review to the grade mark and deletes this.
+// The old grade pill, which nothing draws now. It's kept so replay.test.tsx can
+// check the plays list doesn't go back to it.
 export const GRADE_CHIP: Record<Grade, string> = {
   Brilliant: "border-ahead-bright bg-ahead-bright text-page",
   Great: "border-ahead bg-ahead text-page",
@@ -262,7 +262,7 @@ export function ReplayPlays({
   t: number;
   // Moves the replay's clock to a moment (ms).
   onPick: (ms: number) => void;
-  // The latest "Watch in replay" from the 60-second review. If its play is
+  // The latest "Watch in replay" from Game review. If its play is
   // hidden by "Yours", the list goes back to all plays so it shows.
   request: ReplayRequest | null;
 }) {

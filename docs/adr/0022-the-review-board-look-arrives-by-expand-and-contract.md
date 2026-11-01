@@ -1,6 +1,6 @@
 # 0022: The Review board look arrives by expand and contract
 
-Status: draft (JAS-97, the expand step of JAS-96). Jasper accepts it by merging the PR.
+Status: draft (JAS-97, the expand step of JAS-96). Jasper accepts it by merging the PR. Amended by [0025](0025-risky-prs-merge-after-the-panel.md), which leaves `globals.css` to the panel.
 
 ## Context
 

@@ -2,18 +2,67 @@
 // it opens on, what the eval bar shows and where things sit on the win-chance
 // strip. Kept free of React so it can be unit tested, like diff-chart.ts.
 
+import { formatClock } from "@/lib/analyzer/format";
+import {
+  playLines,
+  playStart,
+  playSwing,
+  playTitle,
+  type Grade,
+  type ReplayChances,
+} from "@/lib/analyzer/plays";
+import type { ReplayData } from "@/lib/analyzer/replay";
+import { reviewMoments, type Moment } from "@/lib/analyzer/review";
+import type { TempoTimeline } from "@/lib/analyzer/tempo";
 import { SWING_THRESHOLD } from "@/lib/analyzer/turning-points";
-import type { Grade } from "@/lib/analyzer/plays";
 
-// A play you were in, ready for the board.
+// A play you were in, ready for the board and Game review.
 export type BoardPlay = {
+  at: number; // ms, where the replay jumps to: the play's first whole second
   minute: number; // when it started
   clock: string; // the same, as "12:31"
   grade: Grade;
   title: string; // "Won a fight 3 for 1"
-  after: number; // your team's chance to win just after it, 0 to 1
+  lines: string[]; // what happened, one line per kill or objective
+  before: number; // your team's chance to win just before it, 0 to 1
+  after: number; // and just after it
   swing: number; // how far it moved that chance, in points: 7.6 or -3.2
+  // Set when it's one of the 60-second review's moments.
+  moment: Pick<Moment, "question" | "tempo" | "noteLine"> | null;
 };
+
+// The plays you were in, in game order. `names` gives each participantId's
+// champion. The 60-second review picks its moments from these same plays, so a
+// moment is found by the second it starts on: plays are at least 20 seconds
+// apart, so two never share one.
+export function boardPlays(
+  chances: ReplayChances,
+  replay: ReplayData,
+  meId: number,
+  names: Record<number, string>,
+  tempo: TempoTimeline | null,
+): BoardPlay[] {
+  const moments = new Map(
+    reviewMoments(chances, replay, meId, names, tempo).map((m) => [m.at, m]),
+  );
+  return chances.plays
+    .filter((play) => play.mine)
+    .map((play) => {
+      const at = playStart(play);
+      return {
+        at,
+        minute: play.from / 60_000,
+        clock: formatClock(play.from),
+        grade: play.grade,
+        title: playTitle(play, replay, names),
+        lines: playLines(play, replay, names),
+        before: play.before,
+        after: play.after,
+        swing: playSwing(play),
+        moment: moments.get(at) ?? null,
+      };
+    });
+}
 
 // The strip's line has no need for every second, and a 40-minute game has 2,400.
 const STRIP_POINTS = 400;

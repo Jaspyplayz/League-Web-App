@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { evalChance, markSpot, quietLines, startingPlay, stripLeft, stripLine } from "./board";
+import type { Play } from "./analyzer/plays";
+import type { ReplayData } from "./analyzer/replay";
+import {
+  boardPlays,
+  evalChance,
+  markSpot,
+  quietLines,
+  startingPlay,
+  stripLeft,
+  stripLine,
+} from "./board";
 
 describe("the play the board opens on", () => {
   it("is the one that moved the chance most, whichever way", () => {
@@ -82,5 +92,70 @@ describe("the lines for a quiet game", () => {
     expect(
       quietLines({ hasOpponent: false, turningPoints: 0, hasWinChance: false, swings: 0 }),
     ).toEqual([]);
+  });
+});
+
+describe("your plays for the board and Game review", () => {
+  const replay = {
+    myTeamId: 100,
+    kills: [
+      { timestamp: 60_500, killerId: 1, victimId: 6, assists: [] },
+      { timestamp: 120_000, killerId: 6, victimId: 2, assists: [] },
+      { timestamp: 180_000, killerId: 7, victimId: 1, assists: [] },
+    ],
+    objectives: [],
+    players: [
+      { participantId: 1, teamId: 100 },
+      { participantId: 2, teamId: 100 },
+      { participantId: 6, teamId: 200 },
+      { participantId: 7, teamId: 200 },
+    ],
+  } as unknown as ReplayData;
+  const play = (from: number, kill: number, swing: number, mine = true): Play => ({
+    from,
+    to: from,
+    kills: [kill],
+    objectives: [],
+    before: 0.5,
+    after: 0.5 + swing / 100,
+    mine,
+    grade: swing >= 0 ? "Good" : "Mistake",
+  });
+  const names = { 1: "Syndra", 2: "Vi", 6: "Zoe", 7: "Ahri" };
+  const plays = boardPlays(
+    {
+      perSecond: [],
+      plays: [play(60_500, 0, 5), play(120_000, 1, 2, false), play(180_000, 2, 0.5)],
+    },
+    replay,
+    1,
+    names,
+    null,
+  );
+
+  it("keeps only the plays you were in, in game order", () => {
+    expect(plays.map((p) => p.clock)).toEqual(["1:00", "3:00"]);
+  });
+
+  it("jumps the replay to a play's first whole second", () => {
+    expect(plays[0].at).toBe(61_000);
+    expect(plays[0].minute).toBeCloseTo(60_500 / 60_000);
+  });
+
+  it("carries the chance before and after and what happened", () => {
+    expect(plays[0]).toMatchObject({
+      before: 0.5,
+      after: 0.55,
+      swing: 5,
+      title: "Syndra killed Zoe",
+      lines: ["1:00 Syndra killed Zoe"],
+    });
+  });
+
+  it("attaches the 60-second review's question only to its moments", () => {
+    expect(plays[0].moment?.question).toBe("What set this up, and could you make it happen again?");
+    expect(plays[0].moment?.noteLine).toBe("1:00 Syndra killed Zoe: ");
+    // Under a point, so the review leaves it out.
+    expect(plays[1].moment).toBeNull();
   });
 });

@@ -98,6 +98,33 @@ test("open the sample analysis", async ({ page }) => {
   await expect(replay).toBeHidden();
   await page.getByRole("tab", { name: "Replay" }).click();
   await expect(replay).toBeVisible();
+
+  // Game review's step buttons select the play on the board too, and its main
+  // button opens the replay at that play.
+  await page.getByRole("tab", { name: "Summary" }).click();
+  const review = page.getByRole("region", { name: "Game review" });
+  // The first play is already selected from the strip above, so this is the
+  // second: picking a row has to move the selection for these to pass. The
+  // ">" leaves out the opened play's own buttons, such as Watch in replay.
+  await review.locator("ol > li > button").nth(1).click();
+  await expect(review.getByRole("button", { name: "First play" })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: /chance to win after it/ }).nth(1),
+  ).toHaveAttribute("aria-pressed", "true");
+  await review.getByRole("button", { name: "Last play" }).click();
+  await expect(review.getByRole("button", { name: "Next play" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: /chance to win after it/ }).last(),
+  ).toHaveAttribute("aria-pressed", "true");
+  await review.getByRole("button", { name: "Start review in the replay" }).click();
+  await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true");
+  await expect(replay).toBeVisible();
+  // The sample game's last play starts at 24:15, and the replay opens on its
+  // first whole second.
+  await expect(page.getByRole("slider", { name: "Game time" })).toHaveAttribute(
+    "aria-valuetext",
+    /^24:1[56]:/,
+  );
 });
 
 // The theme is applied by a script in <head>, so check it survives a reload:
