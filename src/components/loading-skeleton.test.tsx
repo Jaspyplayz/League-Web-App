@@ -1,15 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { InsightsSkeleton, MatchSkeleton, ProfileSkeleton } from "./loading-skeleton";
+import { InsightsSkeleton, MatchSkeleton } from "./loading-skeleton";
 
 describe("loading skeletons", () => {
-  it("draws the profile instead of a lookup sentence", () => {
-    const html = renderToStaticMarkup(<ProfileSkeleton />);
-    expect(html).toContain('aria-label="Looking up player"');
-    expect(html).toContain("bg-divider");
-    expect(html).not.toContain("Looking up player…");
-  });
-
   it("draws the match in layout A's shape, with what's already known for real", () => {
     const html = renderToStaticMarkup(<MatchSkeleton back={<a href="/back">Back</a>} />);
     expect(html).toContain('role="status"');

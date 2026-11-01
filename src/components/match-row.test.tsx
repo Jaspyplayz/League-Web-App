@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { PlayerScore } from "@/lib/analyzer/score";
 import type { MatchSummary } from "@/lib/match-summary";
-import { MatchRow } from "./match-row";
+import { MatchRow, shortReason } from "./match-row";
 
 const game: MatchSummary = {
   matchId: "KR_1",
@@ -74,14 +74,22 @@ describe("MatchRow", () => {
 
   // The row's link covers it, which hides hover titles, so the reason is
   // written out beside the score.
-  it("writes the score's reason in words", () => {
+  it("writes the score's reason in one line, and in full for screen readers", () => {
     const html = render(game, score);
     expect(html).toContain('aria-label="Game score 78 out of 100"');
-    expect(html).toContain("MVP. Helped by strong KDA. Held back by little objective damage.");
+    expect(html).toMatch(/aria-hidden="true"[^>]*truncate[^>]*>MVP · Helped by strong KDA</);
+    expect(html).toContain('class="sr-only">Helped by strong KDA. Held back by little objective damage.<');
   });
 
-  it("says when a game has no score", () => {
-    expect(render()).toContain("No game score in this mode.");
+  it("names what held the score back when nothing helped", () => {
+    expect(shortReason({ ...score, badge: null, strengths: [] })).toBe("Held back by little objective damage");
+  });
+
+  // Ranked games are scored, so a remake's missing score isn't the mode's fault.
+  it("says why a game has no score without blaming the mode", () => {
+    expect(render({ ...game, remake: true })).toContain("No score for a remake");
+    expect(render()).toContain("No game score for this game");
+    expect(render({ ...game, remake: true })).not.toContain("this mode");
   });
 
   // JAS-87's row has no spells or items; the match page shows them.

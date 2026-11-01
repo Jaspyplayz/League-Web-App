@@ -53,7 +53,7 @@ export function MatchRow({
     // `relative`, so the link's cover below spreads over the whole row.
     <li id={id} className="group relative scroll-mt-4 rounded-md bg-panel">
       <div
-        className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 rounded-md p-3 @xl:grid-cols-[76px_124px_112px_minmax(0,1fr)_16px] @xl:px-3.5 @3xl:grid-cols-[76px_124px_112px_minmax(0,1fr)_176px_16px] ${tint}`}
+        className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 rounded-md p-3 @xl:grid-cols-[76px_140px_112px_minmax(0,1fr)_16px] @xl:px-3.5 @3xl:grid-cols-[76px_140px_112px_minmax(0,1fr)_176px_16px] ${tint}`}
       >
         {/* Every part sits on the first line except the result, which drops
             to a second line on phones and leads the row on wider lists. */}
@@ -95,9 +95,12 @@ export function MatchRow({
           <p className="hidden text-note text-quiet @xl:block">
             {m.cs} CS · {m.csPerMin.toFixed(1)}/min
           </p>
-          {badges.length > 0 && (
-            <p className="hidden text-note text-quiet @xl:block">{badges.join(" · ")}</p>
-          )}
+          {/* One line each, since two side by side would run under the score. */}
+          {badges.map((badge) => (
+            <p key={badge} className="hidden text-note text-quiet @xl:block">
+              {badge}
+            </p>
+          ))}
         </div>
 
         <div className="row-start-1 flex min-w-0 items-start gap-2.5">
@@ -110,9 +113,22 @@ export function MatchRow({
           >
             {score ? score.score : "–"}
           </span>
-          <p className="hidden text-note text-quiet @xl:block">
-            {score ? reasonWithBadge(score) : "No game score in this mode."}
-          </p>
+          {score ? (
+            <>
+              {/* One line, as drawn: the main thing that helped or held the
+                  score back. Screen readers hear the whole reason instead. */}
+              <p aria-hidden="true" className="hidden min-w-0 truncate text-note leading-8 text-quiet @xl:block">
+                {shortReason(score)}
+              </p>
+              <p className="sr-only">{scoreReason(score)}</p>
+            </>
+          ) : (
+            <p className="hidden min-w-0 truncate text-note leading-8 text-quiet @xl:block">
+              {/* A remake, a game under 10 minutes or a mode without lanes
+                  (isScorable in src/lib/analyzer/score.ts) gets no score. */}
+              {m.remake ? "No score for a remake" : "No game score for this game"}
+            </p>
+          )}
         </div>
 
         {teams && <Teams region={teams.region} players={teams.players} />}
@@ -123,10 +139,16 @@ export function MatchRow({
   );
 }
 
-// MVP or ACE leads the reason when the player was the best on their team.
-function reasonWithBadge(score: PlayerScore): string {
-  const reason = scoreReason(score);
-  return score.badge ? `${score.badge}. ${reason}` : reason;
+// The reason cut to one line: what helped the score most, or else what held
+// it back, after MVP or ACE when the player was the best on their team.
+// "MVP · Helped by strong KDA"
+export function shortReason(score: PlayerScore): string {
+  const main = score.strengths[0]
+    ? `Helped by ${score.strengths[0]}`
+    : score.weakness
+      ? `Held back by ${score.weakness}`
+      : "";
+  return [score.badge, main].filter(Boolean).join(" · ");
 }
 
 // Points right, to say the row opens a page. Hidden on phones, as drawn.
