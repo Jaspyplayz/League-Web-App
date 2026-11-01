@@ -1,12 +1,14 @@
 import "server-only";
 
 import { playerBuilds } from "@/lib/analyzer/build";
+import type { TrimmedEvent } from "@/lib/analyzer/trim";
 import { getDataDragon, itemIconUrl, itemName, type DataDragon } from "@/lib/ddragon";
 import { loadMatch, loadTimeline } from "@/lib/match-store";
 import type { Region } from "@/lib/regions";
 import { settle, type RiotErrorKind } from "@/lib/riot/client";
 
-// What the match panel's Build tab shows, ready to draw in the browser. Item
+// What the Build tab (in a profile's match row, and on the match page's
+// Stats tab) shows, ready to draw in the browser. Item
 // names and image URLs are filled in here on the server, so the browser
 // doesn't need all of Data Dragon to show a few icons.
 
@@ -33,9 +35,18 @@ export async function loadBuilds(region: Region, matchId: string): Promise<Build
     getDataDragon().catch(() => null),
   ]);
   if (!timeline.ok) return { status: "failed", kind: timeline.error.kind };
+  return { status: "ok", builds: buildViews(timeline.value.events, dd) };
+}
 
+// Every player's build from a timeline already loaded, keyed by
+// participantId. The match page's Stats tab calls this directly, since it
+// loads the timeline anyway.
+export function buildViews(
+  events: TrimmedEvent[],
+  dd: DataDragon | null,
+): Record<number, BuildView> {
   const builds: Record<number, BuildView> = {};
-  for (const [id, build] of Object.entries(playerBuilds(timeline.value.events))) {
+  for (const [id, build] of Object.entries(playerBuilds(events))) {
     builds[Number(id)] = {
       items: build.items.map(({ minute, itemIds }) => ({
         minute,
@@ -44,7 +55,7 @@ export async function loadBuilds(region: Region, matchId: string): Promise<Build
       skills: build.skills,
     };
   }
-  return { status: "ok", builds };
+  return builds;
 }
 
 function buildItem(dd: DataDragon | null, id: number): BuildItem {

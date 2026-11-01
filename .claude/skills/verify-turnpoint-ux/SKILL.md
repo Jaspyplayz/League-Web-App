@@ -52,7 +52,7 @@ npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --pr 155 ux-search-r
 | `ux-search-recovery` | nothing | Desktop Chrome | [features/search-recovery.md](features/search-recovery.md) |
 | `ux-phone-home` | nothing | Pixel 7 | [features/phone-home.md](features/phone-home.md) |
 | `ux-review-path` | database | Desktop Chrome | [features/review-path.md](features/review-path.md) |
-| `ux-signed-out-teasers` | riot, supabase | Desktop Chrome | [features/signed-out-teasers.md](features/signed-out-teasers.md) |
+| `ux-signed-out-teasers` | database, supabase | Desktop Chrome | [features/signed-out-teasers.md](features/signed-out-teasers.md) |
 | `ux-insights-peer-card` | riot, database | Desktop Chrome | [features/insights-peer-card.md](features/insights-peer-card.md) |
 
 "Calm" (the `expectCalm` helper in `scripts/drive.ts`) means: no `role=alert` element with text on the page, and the page is the app (not the Riot-key notice, an error page, or the Vercel login). Next.js's route announcer (`<next-route-announcer>`) is also `role=alert` and reads the new page title after every client-side navigation; it is skipped. Browser contexts use `reducedMotion: "reduce"`, so smooth scrolls land at once.
