@@ -98,6 +98,19 @@ test("open the sample analysis", async ({ page }) => {
   await expect(replay).toBeHidden();
   await page.getByRole("tab", { name: "Replay" }).click();
   await expect(replay).toBeVisible();
+
+  // Game review's step buttons select the play on the board too, and its main
+  // button opens the replay at that play.
+  await page.getByRole("tab", { name: "Summary" }).click();
+  const review = page.getByRole("region", { name: "Game review" });
+  await review.getByRole("button", { name: "Last play" }).click();
+  await expect(review.getByRole("button", { name: "Next play" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: /chance to win after it/ }).last(),
+  ).toHaveAttribute("aria-pressed", "true");
+  await review.getByRole("button", { name: "Start review in the replay" }).click();
+  await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true");
+  await expect(replay).toBeVisible();
 });
 
 // The theme is applied by a script in <head>, so check it survives a reload:

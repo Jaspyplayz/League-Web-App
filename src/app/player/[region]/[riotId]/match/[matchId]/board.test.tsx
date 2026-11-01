@@ -4,10 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { BoardPlay } from "@/lib/board";
 import { Board, ChanceStrip, EvalBar } from "./board";
 
+const REST = { at: 0, lines: [], before: 0.5, moment: null };
 const PLAYS: BoardPlay[] = [
-  { minute: 5, clock: "5:00", grade: "Good", title: "Won a fight 2 for 1", after: 0.55, swing: 3 },
-  { minute: 12, clock: "12:00", grade: "Great", title: "Your team took Baron", after: 0.8, swing: 9 },
-  { minute: 20, clock: "20:00", grade: "Blunder", title: "Lost a fight 1 for 4", after: 0.3, swing: -12 },
+  { ...REST, minute: 5, clock: "5:00", grade: "Good", title: "Won a fight 2 for 1", after: 0.55, swing: 3 },
+  { ...REST, minute: 12, clock: "12:00", grade: "Great", title: "Your team took Baron", after: 0.8, swing: 9 },
+  { ...REST, minute: 20, clock: "20:00", grade: "Blunder", title: "Lost a fight 1 for 4", after: 0.3, swing: -12 },
 ];
 const PER_SECOND = new Array(1501).fill(500); // a 25-minute game
 const GOLD = [
@@ -28,6 +29,8 @@ function board(overrides: Partial<Parameters<typeof Board>[0]> = {}) {
       swings={[]}
       quiet={[]}
       note={<p>Where the chance comes from</p>}
+      selected={2}
+      onSelect={vi.fn()}
       {...overrides}
     />,
   );
@@ -94,7 +97,7 @@ describe("the eval bar", () => {
 });
 
 describe("the board", () => {
-  it("opens on the play that moved the game most, with the eval bar on it", () => {
+  it("puts the eval bar and the line under the strip on the selected play", () => {
     const html = board();
     expect(html).toContain("Your team&#x27;s chance to win: 30%");
     expect(html).toContain("Lost a fight 1 for 4");
@@ -124,32 +127,12 @@ describe("the board", () => {
   });
 
   it("falls back to the end of the game when you were in no plays", () => {
-    const html = board({ chances: { perSecond: [500, 730], plays: [] } });
+    const html = board({ chances: { perSecond: [500, 730], plays: [] }, selected: -1 });
     expect(html).toContain("Your team&#x27;s chance to win: 73%");
   });
 
-  describe("the step buttons", () => {
-    const disabled = (html: string, name: string) =>
-      new RegExp(`<button[^>]*disabled=""[^>]*>${name}<`).test(html);
-
-    it("can't go past the last play, where the board opens here", () => {
-      const html = board();
-      expect(disabled(html, "Previous play")).toBe(false);
-      expect(disabled(html, "Next play")).toBe(true);
-    });
-
-    it("can't go before the first play", () => {
-      const html = board({
-        chances: { perSecond: PER_SECOND, plays: [PLAYS[2], PLAYS[0]] },
-      });
-      expect(disabled(html, "Previous play")).toBe(true);
-      expect(disabled(html, "Next play")).toBe(false);
-    });
-
-    it("aren't there with no plays to step through", () => {
-      const html = board({ chances: { perSecond: PER_SECOND, plays: [] } });
-      expect(html).not.toContain("Previous play");
-    });
+  it("has no line about a play when none is selected", () => {
+    expect(board({ selected: -1 })).not.toContain("Blunder −12.0%");
   });
 
   it("says so under the strip when the game had no big moments", () => {

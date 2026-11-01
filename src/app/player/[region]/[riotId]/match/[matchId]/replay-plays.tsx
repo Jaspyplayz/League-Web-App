@@ -262,7 +262,7 @@ export function ReplayPlays({
   t: number;
   // Moves the replay's clock to a moment (ms).
   onPick: (ms: number) => void;
-  // The latest "Watch in replay" from the 60-second review. If its play is
+  // The latest "Watch in replay" from Game review. If its play is
   // hidden by "Yours", the list goes back to all plays so it shows.
   request: ReplayRequest | null;
 }) {

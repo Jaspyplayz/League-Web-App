@@ -128,9 +128,13 @@ _Avoid_: Swing, impact, value
 The word a play earns from its win chance added, on a chess-style scale: Brilliant, Great, Excellent, Good, Even, Inaccuracy, Mistake or Blunder.
 _Avoid_: Rating, score
 
+**Game review**:
+The match page's column that scores the game's phases, counts each grade and steps through every play you were in.
+_Avoid_: Review (on its own), analysis
+
 **60-second review**:
-The short list of plays you were in that moved your team's win chance the most, each with a question to think over.
-_Avoid_: Summary, highlights reel
+The short list of plays you were in that moved your team's win chance the most, each with a question to think over. Its moments are marked inside the Game review.
+_Avoid_: Summary, highlights reel, Game review
 
 **Moment**:
 One item in the 60-second review.
