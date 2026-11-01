@@ -1,31 +1,16 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { Barlow_Condensed, IBM_Plex_Mono, Rubik } from "next/font/google";
+import { Rubik } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeWatcher } from "@/components/theme-watcher";
 import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
-// Each font exposes a CSS variable that globals.css maps to font-display,
-// font-sans and font-mono.
-const barlowCondensed = Barlow_Condensed({
-  variable: "--font-barlow-condensed",
-  weight: ["600", "700"],
-  subsets: ["latin"],
-});
-
-// Rubik is the body font (JAS-97). It's a variable font, so one file covers
-// every weight the site uses (400 to 700). Barlow Condensed and IBM Plex Mono stay for
-// the headings and labels that still use them, until their pages move over.
+// The site's only font. It's a variable font, so one file covers every weight
+// the site uses (400 to 700). font-sans in globals.css reads its CSS variable.
 const rubik = Rubik({
   variable: "--font-rubik",
-  subsets: ["latin"],
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  weight: ["400", "500"],
   subsets: ["latin"],
 });
 
@@ -49,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       data-theme="dark"
       suppressHydrationWarning
-      className={`${barlowCondensed.variable} ${rubik.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${rubik.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

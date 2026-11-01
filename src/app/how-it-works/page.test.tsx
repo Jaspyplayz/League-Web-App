@@ -54,8 +54,7 @@ describe("How it works", () => {
 });
 
 // The Review board look: new token names only, sentence case, no condensed
-// or mono type. The shared Panel still carries the old names until the
-// contract ticket, so this reads the page's own files, not the HTML.
+// or mono type.
 describe("the page's own files", () => {
   const folder = join(process.cwd(), "src/app/how-it-works");
   const files = readdirSync(folder).filter((f) => /\.tsx?$/.test(f) && !f.includes(".test."));

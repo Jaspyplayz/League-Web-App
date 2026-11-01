@@ -10,11 +10,6 @@ import { describe, expect, it } from "vitest";
 // replay's map matches Riot's picture of it.
 const SAME_IN_BOTH_THEMES = new Set(["rift-ground", "rift-wall"]);
 
-// A token whose value is just another colour token, like
-// `--color-surface: var(--color-panel)`, follows that token into either theme,
-// so it needs no light value of its own.
-const ALIAS = /^var\(--color-([\w-]+)\)$/;
-
 // The colour tokens set inside the first block that starts with `opener`,
 // as name (without --color-) to value.
 function colourTokens(css: string, opener: string): Map<string, string> {
@@ -40,7 +35,7 @@ function missingLightValues(css: string): string[] {
   const dark = colourTokens(css, DARK);
   const light = colourTokens(css, LIGHT);
   return [...dark]
-    .filter(([name, value]) => !ALIAS.test(value) && !SAME_IN_BOTH_THEMES.has(name) && !light.has(name))
+    .filter(([name]) => !SAME_IN_BOTH_THEMES.has(name) && !light.has(name))
     .map(([name]) => `--color-${name} has a dark value and no light one: add it to the data-theme="light" block in src/app/globals.css`);
 }
 
@@ -52,7 +47,7 @@ describe("both themes", () => {
   });
 
   it("catches a colour with a dark value and no light one", () => {
-    const sample = `${DARK}\n  --color-page: #000;\n  --color-new: #123456;\n  --color-rift-wall: #000a13;\n  --color-alias: var(--color-page);\n}\n${LIGHT}\n  --color-page: #fff;\n}\n`;
+    const sample = `${DARK}\n  --color-page: #000;\n  --color-new: #123456;\n  --color-rift-wall: #000a13;\n}\n${LIGHT}\n  --color-page: #fff;\n}\n`;
     expect(missingLightValues(sample)).toEqual([
       '--color-new has a dark value and no light one: add it to the data-theme="light" block in src/app/globals.css',
     ]);
@@ -64,24 +59,17 @@ describe("both themes", () => {
     expect(extra).toEqual([]);
   });
 
-  it("keeps each alias following its token in both themes", () => {
-    const dark = colourTokens(css, DARK);
-    const light = colourTokens(css, LIGHT);
-    const problems: string[] = [];
-    for (const [name, value] of dark) {
-      const target = ALIAS.exec(value)?.[1];
-      if (!target) continue;
-      if (!dark.has(target)) problems.push(`--color-${name} points at --color-${target}, which doesn't exist`);
-      // A light value here would stop the alias following its token.
-      if (light.has(name)) problems.push(`--color-${name} is an alias, so the light theme shouldn't set it`);
-    }
-    expect(problems).toEqual([]);
+  // JAS-94 left no aliases: a second name for a colour is how the old names
+  // lasted through the move.
+  it("keeps one name for each colour, with no token pointing at another", () => {
+    const aliases = [...colourTokens(css, DARK), ...colourTokens(css, LIGHT)]
+      .filter(([, value]) => /^var\(--color-/.test(value))
+      .map(([name]) => name);
+    expect(aliases).toEqual([]);
   });
 });
 
-// The Review board tokens (JAS-94) and where each old name points while pages
-// move to the new names (JAS-96's table). The contract ticket deletes the old
-// names and this part of the test with them.
+// The Review board tokens (JAS-94), and the old names and sizes JAS-98 removed.
 describe("Review board tokens", () => {
   // Every approved value as [dark, light]: JAS-94's table (with light ahead,
   // light behind and dark behind nudged to pass 4.5:1, which Jasper approved on
@@ -116,17 +104,6 @@ describe("Review board tokens", () => {
     "grade-blunder": ["#ff5f57", "#cb2c2c"],
   };
 
-  const OLD_TO_NEW: Record<string, string> = {
-    surface: "panel",
-    "surface-hover": "raised",
-    line: "divider",
-    "line-strong": "divider",
-    ink: "main",
-    "ink-soft": "main",
-    muted: "quiet",
-    faint: "quiet",
-  };
-
   it("sets every approved value in both themes", () => {
     const dark = colourTokens(css, DARK);
     const light = colourTokens(css, LIGHT);
@@ -134,14 +111,16 @@ describe("Review board tokens", () => {
     expect(actual).toEqual(SPEC);
   });
 
-  it("points each old name at its new token", () => {
-    const dark = colourTokens(css, DARK);
-    const pointsAt = Object.fromEntries(Object.keys(OLD_TO_NEW).map((old) => [old, ALIAS.exec(dark.get(old) ?? "")?.[1]]));
-    expect(pointsAt).toEqual(OLD_TO_NEW);
+  it("has no old colour name left in either theme", () => {
+    const OLD = ["surface", "surface-hover", "line", "line-strong", "frame", "ink", "ink-soft", "muted", "faint"];
+    const names = [...colourTokens(css, DARK).keys(), ...colourTokens(css, LIGHT).keys()];
+    expect(names.filter((name) => OLD.includes(name))).toEqual([]);
   });
 
-  it("hides the panel outline, since Review board panels have no border", () => {
-    expect(colourTokens(css, DARK).get("frame")).toBe("transparent");
-    expect(colourTokens(css, LIGHT).get("frame")).toBe("transparent");
+  it("has no old size, font or corner left", () => {
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const old of ["--text-label", "--font-display", "--font-mono", "--radius-soft", "@utility soft-round"]) {
+      expect(withoutComments).not.toContain(old);
+    }
   });
 });

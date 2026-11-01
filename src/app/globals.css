@@ -1,9 +1,15 @@
-@import "tailwindcss";
+/*
+ * Only src/ and not its tests. Tailwind builds a class for any name it finds in
+ * a file it reads, so the checks that name banned classes, and the docs, would
+ * otherwise put them in the site's CSS.
+ */
+@import "tailwindcss" source("..");
+@source not "../**/*.test.{ts,tsx}";
 
 /*
  * Turnpoint design tokens, from the approved mockups.
- * Every name below becomes a Tailwind utility: --color-surface gives
- * bg-surface, text-surface, border-surface and so on.
+ * Every name below becomes a Tailwind utility: --color-panel gives
+ * bg-panel, text-panel, border-panel and so on.
  *
  * Meaning of the two accents, used everywhere data is shown:
  *   ahead  (blue)  = you, your team, ahead, win
@@ -16,9 +22,8 @@
  * row gets an outline so you can find it either way.
  *
  * "static" makes Tailwind write out every variable here, even one no class
- * uses yet. Without it the new tokens that pages haven't moved to (select,
- * the fills, the grades) would be left out of the dark theme, and anything
- * reading them with var() would get nothing.
+ * uses yet. Without it that token would be left out of the dark theme, and
+ * anything reading it with var() would get nothing.
  */
 @theme static {
   /*
@@ -66,31 +71,12 @@
   --color-grade-blunder: #ff5f57;
 
   /*
-   * The old names, each pointed at its new token so every page takes the
-   * new look before it is moved to the new names (JAS-96's expand step).
-   * An alias follows its token into the light theme by itself. The contract
-   * ticket deletes these once no page uses them.
-   */
-  --color-surface: var(--color-panel);
-  --color-surface-hover: var(--color-raised);
-  --color-line: var(--color-divider);
-  --color-line-strong: var(--color-divider);
-  --color-ink: var(--color-main);
-  --color-ink-soft: var(--color-main);
-  --color-muted: var(--color-quiet);
-  --color-faint: var(--color-quiet);
-  /* Panels have no outline now, so the old frame draws nothing. */
-  --color-frame: transparent;
-
-  /*
    * Text sizes beyond Tailwind's defaults, so the site sticks to a few:
-   * text-label (11px, the small uppercase mono labels), text-note (13px,
-   * captions and footnotes) and text-body (15px, sentences on a page).
-   * The Review board's headings: text-title (28px, a page's title),
+   * text-note (13px, captions and footnotes) and text-body (15px, sentences
+   * on a page). The Review board's headings: text-title (28px, a page's title),
    * text-heading (19px, a section) and text-subheading (17px, a panel), so
-   * no page needs a made-up size like text-[28px].
+   * no page needs a made-up size.
    */
-  --text-label: 11px;
   --text-note: 13px;
   --text-body: 15px;
   --text-title: 28px;
@@ -102,18 +88,7 @@
   --text-heading--line-height: 1.375;
   --text-subheading--line-height: 1.375;
 
-  --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
   --font-sans: var(--font-rubik), system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
-
-  /*
-   * Corners. The Review board uses 6px, and 4px for small pieces. The Soft
-   * Rounded names stay, pointed at the new sizes, until each page moves to
-   * Tailwind's rounded-md and rounded-sm (JAS-94). A full pill (rounded-full)
-   * is only for a control that is already a pill.
-   */
-  --radius-soft: 6px;
-  --radius-soft-sm: 4px;
 }
 
 /*
@@ -162,21 +137,6 @@
   --color-grade-mistake: #e0731f;
   --color-grade-miss: #c93a74;
   --color-grade-blunder: #cb2c2c;
-
-  --color-frame: transparent;
-}
-
-/*
- * Soft Rounded chrome, kept by name until the contract ticket. Both point at
- * the radius tokens above, so the whole site took the 6px corners from one
- * number each.
- */
-@utility soft-round {
-  border-radius: var(--radius-soft);
-}
-
-@utility soft-round-sm {
-  border-radius: var(--radius-soft-sm);
 }
 
 /*
@@ -192,7 +152,7 @@
 
 body {
   background: var(--color-page);
-  color: var(--color-ink);
+  color: var(--color-main);
 }
 
 /*
