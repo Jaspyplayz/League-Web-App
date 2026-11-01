@@ -4,12 +4,12 @@ import type { Perks } from "@/lib/riot/types";
 
 // One player's runes, drawn like the in-game rune page: each tree with every
 // row of choices, the picked runes lit and the rest faded, then the three
-// stat shards. Used by the match panel's Runes tab.
+// stat shards. Used by Build and runes on the match page's Stats tab.
 export function RunePage({ dd, perks }: { dd: DataDragon | null; perks: Perks | undefined }) {
   const primary = perks?.styles.find((s) => s.description === "primaryStyle");
   const secondary = perks?.styles.find((s) => s.description === "subStyle");
   if (!perks || !primary || !secondary) {
-    return <p className="text-[13px] text-faint">No runes in this game mode.</p>;
+    return <p className="text-note text-quiet">No runes in this game mode.</p>;
   }
 
   const shards = [perks.statPerks.offense, perks.statPerks.flex, perks.statPerks.defense];
@@ -24,8 +24,8 @@ export function RunePage({ dd, perks }: { dd: DataDragon | null; perks: Perks | 
         skipKeystones
       />
       <div className="flex flex-col gap-2">
-        <h4 className="font-mono text-[10px] tracking-[0.1em] text-faint uppercase">Shards</h4>
-        <ul className="flex flex-col gap-1.5 text-[13px] text-ink-soft">
+        <h4 className="text-note font-semibold">Shards</h4>
+        <ul className="flex flex-col gap-1.5 text-note text-quiet">
           {shards.map((id, i) => (
             // The same shard can be picked twice, so key by position.
             <li key={i}>{statShardName(id)}</li>
@@ -53,7 +53,7 @@ function Tree({
 
   return (
     <div className="flex flex-col gap-2.5">
-      <h4 className="flex items-center gap-2 text-[13px] font-semibold">
+      <h4 className="flex items-center gap-2 text-note font-semibold">
         <RuneIcon dd={dd} runeId={styleId} size={20} />
         {style?.name ?? "Runes"}
       </h4>
@@ -61,7 +61,9 @@ function Tree({
         <div key={i} className="flex items-center gap-2">
           {row.map((runeId) => {
             const isPicked = picked.includes(runeId);
-            // Keystones are the big runes at the top of the main tree.
+            // Keystones are the big runes at the top of the main tree. The
+            // picked ones get a ring in the text colour, not blue, since this
+            // can be anyone's page and blue only means you.
             const size = !skipKeystones && i === 0 ? 34 : 26;
             return (
               <RuneIcon
@@ -69,7 +71,7 @@ function Tree({
                 dd={dd}
                 runeId={runeId}
                 size={size}
-                className={isPicked ? "ring-2 ring-ahead-soft" : "opacity-30 grayscale"}
+                className={isPicked ? "ring-2 ring-main" : "opacity-30 grayscale"}
               />
             );
           })}

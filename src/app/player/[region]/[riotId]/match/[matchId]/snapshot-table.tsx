@@ -24,7 +24,7 @@ export function SnapshotTable({
 }) {
   if (snapshots.length === 0) return null;
   const minutes = snapshots.map((s) => s.minute).join(" and ");
-  const divider = "border-l border-line";
+  const divider = "border-l border-divider";
 
   return (
     <section
@@ -37,11 +37,11 @@ export function SnapshotTable({
       {/* On phones the table keeps a readable size and scrolls sideways.
           "relative" keeps the screen-reader-only caption inside the box. */}
       <div className="relative overflow-x-auto">
-        <table className="w-full min-w-[560px] whitespace-nowrap text-left text-sm">
+        <table className="w-full min-w-[560px] whitespace-nowrap text-left text-sm tabular-nums">
           <caption className="sr-only">
             Your stats and {opponentName}&apos;s at {minutes} minutes, with the gap
           </caption>
-          <thead className="text-note text-faint">
+          <thead className="text-note text-quiet">
             <tr>
               <td />
               {snapshots.map((s) => (
@@ -49,13 +49,13 @@ export function SnapshotTable({
                   key={s.minute}
                   scope="colgroup"
                   colSpan={3}
-                  className={`px-3 pb-1 font-mono text-label font-medium uppercase tracking-[0.12em] text-muted ${divider}`}
+                  className={`px-3 pb-1 font-medium text-main ${divider}`}
                 >
                   At {s.minute} minutes
                 </th>
               ))}
             </tr>
-            <tr className="border-b border-line">
+            <tr className="border-b border-divider">
               <th scope="col" className="py-1.5 font-normal">
                 Stat
               </th>
@@ -76,20 +76,20 @@ export function SnapshotTable({
               ])}
             </tr>
           </thead>
-          <tbody className="divide-y divide-line">
+          <tbody className="divide-y divide-divider">
             {(Object.keys(ROW_LABELS) as Metric[]).map((metric) => (
               <tr key={metric}>
-                <th scope="row" className="py-2.5 pr-3 font-normal text-ink-soft">
+                <th scope="row" className="py-2.5 pr-3 font-normal">
                   {ROW_LABELS[metric]}
                 </th>
                 {snapshots.map((s) => {
                   const you = Math.round(s.you[metric]);
                   const them = Math.round(s.opponent[metric]);
                   return [
-                    <td key={`you-${s.minute}`} className={`px-3 py-2.5 font-mono ${divider}`}>
+                    <td key={`you-${s.minute}`} className={`px-3 py-2.5 ${divider}`}>
                       {you.toLocaleString("en-US")}
                     </td>,
-                    <td key={`them-${s.minute}`} className="px-3 py-2.5 font-mono text-muted">
+                    <td key={`them-${s.minute}`} className="px-3 py-2.5 text-quiet">
                       {them.toLocaleString("en-US")}
                     </td>,
                     <td key={`gap-${s.minute}`} className="px-3 py-2.5">

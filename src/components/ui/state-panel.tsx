@@ -42,17 +42,23 @@ export function EmptyPanel({
 // happened (title), what to do (children) and gives a way out (actions).
 // Everything is in the text colours: blue and red only ever mean you and the
 // opponent, and the old amber box made a small hiccup look like an alarm.
+//
+// `nested` is for a problem inside another panel, such as Build and runes on
+// the match page: it drops its own fill and padding, which would only push
+// the "!" in from the panel's heading.
 export function ProblemPanel({
   title,
   children,
   actions,
+  nested = false,
 }: {
   title: string;
   children?: ReactNode;
   actions?: ReactNode;
+  nested?: boolean;
 }) {
   return (
-    <div role="alert" className={`${panelClass} flex gap-3 p-5`}>
+    <div role="alert" className={`flex gap-3 ${nested ? "" : `${panelClass} p-5`}`}>
       <ProblemMark />
       <div className="flex min-w-0 flex-col items-start gap-1.5">
         <p className="text-body font-semibold">{title}</p>
