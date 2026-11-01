@@ -406,6 +406,64 @@ const journeys: Journey[] = [
       });
     },
   },
+  {
+    name: "ux-profile-games",
+    feature: "profile-games.md",
+    needs: ["riot", "database"],
+    run: async ({ page, step, note }) => {
+      const tabs = () => page.getByRole("navigation", { name: "Profile sections" });
+      const views = () => page.getByRole("navigation", { name: "Matches view" });
+      await step("open the profile", async () => {
+        await page.goto(TEST_PLAYER.path, LOAD);
+        await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible(LOAD);
+        await expectCalm(page);
+        await expect(tabs().getByRole("link")).toHaveText(["Matches", "Champions", "Insights"]);
+        await expect(tabs().getByRole("link", { name: "Matches" })).toHaveAttribute("aria-current", "page");
+        await expect(views().getByRole("link", { name: "List" })).toHaveAttribute("aria-current", "page");
+      });
+      await step("switch to by day", async () => {
+        await views().getByRole("link", { name: "By day" }).click();
+        await expect(page).toHaveURL(/\?view=day$/, LOAD);
+        await expect(views().getByRole("link", { name: "By day" })).toHaveAttribute("aria-current", "page");
+        // Days, or the empty panel when the player has no games in four weeks.
+        const days = page.getByRole("heading", { name: "Days", exact: true });
+        const empty = page.getByText(/^No games in the last/);
+        await expect(days.or(empty)).toBeVisible(LOAD);
+        note("byDay", (await days.isVisible()) ? "days" : "empty");
+        await expect(tabs().getByRole("link", { name: "Matches" })).toHaveAttribute("aria-current", "page");
+        await expectCalm(page);
+      });
+      await step("back to the list", async () => {
+        await views().getByRole("link", { name: "List" }).click();
+        await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible(LOAD);
+        expect(new URL(page.url()).search).toBe("");
+      });
+      await step("click a game row and land on its match page", async () => {
+        const row = page.getByRole("link", { name: /^Open this .+ game/ }).first();
+        note("row", (await row.getAttribute("aria-label")) ?? "");
+        // Click the row's items, not the link's own text, to prove a click
+        // anywhere on the row opens the game. A mouse click at that spot,
+        // because the row link's cover sits over the items on purpose.
+        const group = page.getByRole("group", { name: "Items" }).first();
+        // A mouse click only lands on screen, so bring the items into view first.
+        await group.scrollIntoViewIfNeeded();
+        const items = await group.boundingBox();
+        if (!items) throw new Error("the first row has no items");
+        await page.mouse.click(items.x + items.width / 2, items.y + items.height / 2);
+        await expect(page).toHaveURL(/\/match\/KR_/, LOAD);
+        await expect(page.getByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true", LOAD);
+        await expectCalm(page);
+      });
+      await step("old log address lands on by day", async () => {
+        await page.goto(`${TEST_PLAYER.path}/log`, LOAD);
+        // goto follows the redirect, so the page's address is where it landed.
+        expect(new URL(page.url()).pathname).toBe(TEST_PLAYER.path);
+        expect(new URL(page.url()).search).toBe("?view=day");
+        await expect(views().getByRole("link", { name: "By day" })).toHaveAttribute("aria-current", "page", LOAD);
+        await expectCalm(page);
+      });
+    },
+  },
 ];
 
 main(journeys, "Usage: npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey...|all>\nJourneys:");

@@ -19,11 +19,11 @@ import {
 } from "@/lib/daily-log";
 import { FOCUS_GOALS, type Focus } from "@/lib/focus";
 import { MAX_NOTE_LENGTH, type ReadDayNotesResult, type SaveNoteResult } from "@/lib/match-note";
-import { useFocus } from "../insights/focus";
+import { useFocus } from "./insights/focus";
 
-// The Log tab's content. It runs in the browser because days depend on the
-// viewer's timezone, and because the Short / Detailed choice and the focus
-// goal are saved in this browser (localStorage).
+// The By day view's content, under Matches. It runs in the browser because
+// days depend on the viewer's timezone, and because the Short / Detailed
+// choice and the focus goal are saved in this browser (localStorage).
 
 type Props = {
   games: LogGame[];
@@ -51,10 +51,10 @@ export function DailyLog({ games, ranks, notes, player, playerPath }: Props) {
   const now = useMemo(() => Date.now(), []);
   const days = useMemo(() => groupDays(games, ranks), [games, ranks]);
 
-  if (!inBrowser) return <p className="text-muted">Loading your days…</p>;
+  if (!inBrowser) return <p className="text-quiet">Loading your days…</p>;
   if (days.length === 0) {
     return (
-      <p className={`${panelClass} px-5 py-4 text-muted`}>
+      <p className={`${panelClass} px-5 py-4 text-quiet`}>
         No games in the last {LOG_DAYS / 7} weeks. Days you play show up here, one card each.
       </p>
     );
@@ -64,7 +64,7 @@ export function DailyLog({ games, ranks, notes, player, playerPath }: Props) {
     <>
       <MonthSummary days={days} now={now} focus={focus} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-label font-medium uppercase tracking-[0.12em] text-faint">Days</h2>
+        <h2 className="text-note font-medium text-quiet">Days</h2>
         <ViewSwitch view={view} />
       </div>
       {notes?.ok === false && (
@@ -86,7 +86,7 @@ export function DailyLog({ games, ranks, notes, player, playerPath }: Props) {
           </li>
         ))}
       </ol>
-      <p className="text-note text-faint">
+      <p className="text-note text-quiet">
         Wins, losses and game scores come from your Riot match history. LP comes from the rank
         Turnpoint saves each time this profile updates, so a day with no update in between
         says &ldquo;LP not recorded&rdquo;. Remakes are left out.
@@ -114,14 +114,14 @@ function MonthSummary({ days, now, focus }: { days: LogDay[]; now: number; focus
     <section className={`${panelClass} flex flex-col gap-3 p-5`} aria-labelledby="log-month">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div>
-          <p className="text-label font-medium uppercase tracking-[0.12em] text-faint">
+          <p className="text-note font-medium text-quiet">
             Last {LOG_DAYS / 7} weeks
           </p>
-          <h2 id="log-month" className="font-display text-[26px] font-semibold leading-tight">
+          <h2 id="log-month" className="text-heading font-semibold leading-tight">
             {days.length} {days.length === 1 ? "day" : "days"} played
           </h2>
         </div>
-        <p className="text-note text-muted tabular-nums">
+        <p className="text-note text-quiet tabular-nums">
           {wins + losses} games · {wins}W {losses}L
           {lp.length > 0 && (
             <>
@@ -142,17 +142,17 @@ function MonthSummary({ days, now, focus }: { days: LogDay[]; now: number; focus
             key={d.day}
             title={stripLabel(d)}
             aria-label={stripLabel(d)}
-            className={`aspect-square rounded-[3px] ${stripColor(d)} ${
-              d === strip.at(-1) ? "outline outline-1 outline-offset-1 outline-ink" : ""
+            className={`aspect-square rounded-sm ${stripColor(d)} ${
+              d === strip.at(-1) ? "outline outline-1 outline-offset-1 outline-main" : ""
             }`}
           />
         ))}
       </ol>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-faint">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-quiet">
         <Legend className="bg-ahead">Won most games</Legend>
         <Legend className="bg-behind">Lost most games</Legend>
-        <Legend className="bg-faint">Even</Legend>
-        <Legend className="bg-line">No games</Legend>
+        <Legend className="bg-quiet">Even</Legend>
+        <Legend className="bg-divider">No games</Legend>
         <li>Brighter = 4 or more games</li>
       </ul>
     </section>
@@ -162,18 +162,18 @@ function MonthSummary({ days, now, focus }: { days: LogDay[]; now: number; focus
 function Legend({ className, children }: { className: string; children: React.ReactNode }) {
   return (
     <li className="flex items-center gap-1.5">
-      <span className={`inline-block h-2.5 w-2.5 rounded-[2px] ${className}`} />
+      <span className={`inline-block h-2.5 w-2.5 rounded-sm ${className}`} />
       {children}
     </li>
   );
 }
 
 function stripColor({ games, wins, losses }: StripDay): string {
-  if (games === 0) return "bg-line";
+  if (games === 0) return "bg-divider";
   const busy = games >= 4;
   if (wins > losses) return busy ? "bg-ahead" : "bg-ahead/60";
   if (losses > wins) return busy ? "bg-behind" : "bg-behind/60";
-  return "bg-faint";
+  return "bg-quiet";
 }
 
 function stripLabel({ day, games, wins, losses }: StripDay): string {
@@ -192,7 +192,7 @@ function formatDay(day: string): string {
 }
 
 function LpText({ lp }: { lp: number }) {
-  if (lp === 0) return <span className="text-muted">LP even</span>;
+  if (lp === 0) return <span className="text-quiet">LP even</span>;
   return lp > 0 ? (
     <span className="text-ahead">{lp} LP gained</span>
   ) : (
@@ -240,7 +240,7 @@ function ViewSwitch({ view }: { view: View }) {
     <div
       role="group"
       aria-label="Card size"
-      className="soft-round-sm inline-flex overflow-hidden border border-line-strong text-note"
+      className="inline-flex overflow-hidden rounded-md border border-divider text-note"
     >
       {(["short", "detailed"] as const).map((option) => (
         <button
@@ -249,7 +249,7 @@ function ViewSwitch({ view }: { view: View }) {
           aria-pressed={view === option}
           onClick={() => saveView(option)}
           className={`px-3.5 py-1.5 capitalize ${
-            view === option ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
+            view === option ? "bg-select text-main" : "text-quiet hover:text-main"
           }`}
         >
           {option}
@@ -280,16 +280,16 @@ function DayCard({
   return (
     <article className={`${panelClass} flex flex-col gap-3 p-4 sm:flex-row sm:gap-5`}>
       <div className="shrink-0 sm:w-28">
-        <h3 className="font-display text-[22px] font-semibold leading-tight">
+        <h3 className="text-heading font-semibold leading-tight">
           {formatDay(day.day)}
         </h3>
-        <p className="text-xs text-faint">{daysAgo(day.day, now)}</p>
+        <p className="text-xs text-quiet">{daysAgo(day.day, now)}</p>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-        <p className="flex flex-wrap gap-x-4 gap-y-1 text-ink-soft tabular-nums">
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-main tabular-nums">
           <span>
-            <b className="font-semibold text-ink">
+            <b className="font-semibold text-main">
               {day.wins}W {day.losses}L
             </b>{" "}
             · {day.games.length} {day.games.length === 1 ? "game" : "games"}
@@ -297,7 +297,7 @@ function DayCard({
           {day.lp !== null ? (
             <LpText lp={day.lp} />
           ) : (
-            day.ranked > 0 && <span className="text-faint">LP not recorded</span>
+            day.ranked > 0 && <span className="text-quiet">LP not recorded</span>
           )}
           {stats.score !== null && <span>Score {Math.round(stats.score)} avg</span>}
         </p>
@@ -307,23 +307,23 @@ function DayCard({
         )}
 
         {detailed && (
-          <p className="flex flex-wrap gap-x-4 gap-y-1 text-note text-muted tabular-nums">
+          <p className="flex flex-wrap gap-x-4 gap-y-1 text-note text-quiet tabular-nums">
             <span>
               Champions{" "}
-              <b className="font-medium text-ink">
+              <b className="font-medium text-main">
                 {stats.champions
                   .map((c) => (c.games > 1 ? `${c.label} ×${c.games}` : c.label))
                   .join(", ")}
               </b>
             </span>
             <span>
-              CS/min <b className="font-medium text-ink">{stats.csPerMin.toFixed(1)}</b>
+              CS/min <b className="font-medium text-main">{stats.csPerMin.toFixed(1)}</b>
             </span>
             <span>
-              Deaths <b className="font-medium text-ink">{stats.deaths.toFixed(1)}</b> avg
+              Deaths <b className="font-medium text-main">{stats.deaths.toFixed(1)}</b> avg
             </span>
             <span>
-              Vision/min <b className="font-medium text-ink">{stats.visionPerMin.toFixed(1)}</b>
+              Vision/min <b className="font-medium text-main">{stats.visionPerMin.toFixed(1)}</b>
             </span>
             {stats.goldAt15 !== null && (
               <span>
@@ -344,14 +344,14 @@ function DayCard({
 function FocusLine({ goal, results }: { goal: string; results: (boolean | null)[] }) {
   const counted = results.filter((r) => r !== null);
   return (
-    <p className="flex flex-wrap items-center gap-2 text-note text-muted">
+    <p className="flex flex-wrap items-center gap-2 text-note text-quiet">
       <span>Focus: {goal}</span>
       <span className="inline-flex gap-1" aria-hidden>
         {results.map((r, i) => (
           <span
             key={i}
             className={`inline-block h-2 w-2 rounded-full ${
-              r === null ? "border border-line-strong" : r ? "bg-ahead" : "bg-behind"
+              r === null ? "border border-divider" : r ? "bg-ahead" : "bg-behind"
             }`}
           />
         ))}
@@ -382,20 +382,20 @@ function GameList({
     null,
   );
   const rows = (
-    <ul className="flex flex-col divide-y divide-line">
+    <ul className="flex flex-col divide-y divide-divider">
       {games.map((g) => (
         <li key={g.matchId} className="flex flex-col py-1.5">
-          <div className="flex items-center gap-3 text-note text-ink-soft tabular-nums">
+          <div className="flex items-center gap-3 text-note text-main tabular-nums">
             <span
-              className={`h-2 w-2 shrink-0 rounded-[2px] ${g.win ? "bg-ahead" : "bg-behind"}`}
+              className={`h-2 w-2 shrink-0 rounded-sm ${g.win ? "bg-ahead" : "bg-behind"}`}
               aria-label={g.win ? "Win" : "Loss"}
             />
             <span className="min-w-0 flex-1 truncate">{g.championLabel}</span>
-            <span className="font-mono text-xs">
+            <span className="text-xs tabular-nums">
               {g.kills}/{g.deaths}/{g.assists}
             </span>
             {g.score !== null && (
-              <span className="hidden whitespace-nowrap font-mono text-xs text-muted sm:inline">
+              <span className="hidden whitespace-nowrap text-xs tabular-nums text-quiet sm:inline">
                 Score {g.score}
                 {g === best && games.length > 1 && <span className="text-ahead"> · best</span>}
               </span>
@@ -407,7 +407,7 @@ function GameList({
               Analyze
             </Link>
           </div>
-          {g.recap && <p className="pl-5 pt-0.5 text-note text-muted">{g.recap}</p>}
+          {g.recap && <p className="pl-5 pt-0.5 text-note text-quiet">{g.recap}</p>}
         </li>
       ))}
     </ul>
@@ -416,7 +416,7 @@ function GameList({
   if (open) return rows;
   return (
     <details className="group">
-      <summary className="cursor-pointer text-note text-faint hover:text-ink">
+      <summary className="cursor-pointer text-note text-quiet hover:text-main">
         <span className="group-open:hidden">Show games</span>
         <span className="hidden group-open:inline">Hide games</span>
       </summary>
@@ -437,11 +437,11 @@ function DayNote({ day, savedText }: { day: string; savedText: string }) {
 
   if (!editing) {
     return (
-      <div className="soft-round-sm flex items-start justify-between gap-3 border border-line bg-page px-3 py-2 text-note">
+      <div className="rounded-md flex items-start justify-between gap-3 border border-divider bg-page px-3 py-2 text-note">
         {saved ? (
-          <p className="min-w-0 whitespace-pre-line text-ink">{saved}</p>
+          <p className="min-w-0 whitespace-pre-line text-main">{saved}</p>
         ) : (
-          <p className="text-faint">No note for this day.</p>
+          <p className="text-quiet">No note for this day.</p>
         )}
         <button
           type="button"
@@ -477,7 +477,7 @@ function DayNote({ day, savedText }: { day: string; savedText: string }) {
 
   return (
     <form onSubmit={save} className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-xs text-faint">
+      <label htmlFor={id} className="text-xs text-quiet">
         Only you can see this.
       </label>
       <textarea
@@ -487,13 +487,13 @@ function DayNote({ day, savedText }: { day: string; savedText: string }) {
         maxLength={MAX_NOTE_LENGTH}
         rows={2}
         placeholder="How did today go? e.g. practiced full clears on Viego, stopped after two losses"
-        className="soft-round w-full resize-y border border-line-strong bg-page px-3 py-2 text-note text-ink placeholder:text-placeholder focus:border-ahead"
+        className="rounded-md w-full resize-y border border-divider bg-page px-3 py-2 text-note text-main placeholder:text-placeholder focus:border-ahead"
       />
       <div className="flex flex-wrap items-center gap-3 text-note">
         <button
           type="submit"
           disabled={isPending}
-          className="soft-round-sm bg-ahead px-4 py-1.5 font-semibold text-page hover:bg-ahead-soft disabled:opacity-60"
+          className="rounded-md bg-ahead px-4 py-1.5 font-semibold text-page hover:bg-ahead-soft disabled:opacity-60"
         >
           {isPending ? "Saving…" : "Save"}
         </button>
@@ -503,7 +503,7 @@ function DayNote({ day, savedText }: { day: string; savedText: string }) {
             setText(saved);
             setEditing(false);
           }}
-          className="text-muted hover:text-ink"
+          className="text-quiet hover:text-main"
         >
           Cancel
         </button>

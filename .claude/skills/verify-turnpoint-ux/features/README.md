@@ -46,3 +46,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [60-second review path](./review-path.md) covers home → sample game → review → Watch in replay → back to Summary. Journey `ux-review-path`.
 - [Signed-out teasers](./signed-out-teasers.md) covers Ask, Game recap and Your notes for a signed-out visitor, and the Sign in round trip. Journey `ux-signed-out-teasers`.
 - [Insights peer card](./insights-peer-card.md) covers the You vs others card, switching rank, and a bad Riot ID in Compare with a player. Journey `ux-insights-peer-card`.
+- [Profile games](./profile-games.md) covers the profile's three tabs, the List / By day switch, a game row opening its match page, and the old Log address. Journey `ux-profile-games`.

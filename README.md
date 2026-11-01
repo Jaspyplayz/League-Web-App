@@ -34,10 +34,8 @@
 
 ### Every game at a glance
 
-- **Expandable match rows** with Overview, Team analysis, Build and Runes tabs, without leaving the profile.
+- **Match rows** that each open the game's own match page, where Team analysis, Build and Runes sit on the Stats tab.
 - **Game score:** a trained 0 to 100 rating for all ten players, with **MVP** for the best winner and **ACE** for the best loser.
-
-![A match row expanded on the profile, with the game score and badges for every player](docs/screenshots/match-panel.png)
 
 ![Team analysis: every champion in the game compared with their opponent](docs/screenshots/team-analysis.png)
 
@@ -45,7 +43,7 @@
 
 - Rank emblems, a **30-day LP graph**, a win-rate ring and a summary of recent games.
 - **Champions tab:** season stats per champion and against each enemy champion.
-- **Log tab:** one card per day you played, with notes.
+- **By day:** a view of the Matches tab with one card per day you played, and your notes on each day.
 - Shareable URLs like `/player/kr/Faker-KR1`.
 
 ![Player profile with rank, LP graph, win rate and recent matches](docs/screenshots/profile.png)
@@ -154,7 +152,7 @@ flowchart LR
 src/
   app/                          Next.js routes (App Router)
     page.tsx                    Home page with the search form
-    player/[region]/[riotId]/   Player profile, with Insights, Champions and Log tabs
+    player/[region]/[riotId]/   Player profile, with Matches (List or By day), Champions and Insights tabs
       match/[matchId]/          Match analysis page (Summary, Replay and Stats tabs, Ask beside the replay)
     api/mcp/                    The MCP server
     how-it-works/               How the analyzer and models work, for players

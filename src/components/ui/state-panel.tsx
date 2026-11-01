@@ -13,6 +13,11 @@ export const mainButtonClass =
 export const secondButtonClass =
   "inline-flex h-11 items-center justify-center rounded-md bg-raised px-5 text-body font-medium text-main hover:bg-divider";
 
+// A link inside a sentence: the text colour, underlined. Blue and red only
+// ever mean you and the opponent, so links aren't blue.
+export const linkClass =
+  "text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main";
+
 // Nothing to show: one sentence naming what's missing, an optional line
 // under it, and at most one way forward (a single link or button). No icon.
 export function EmptyPanel({
@@ -37,29 +42,42 @@ export function EmptyPanel({
 // happened (title), what to do (children) and gives a way out (actions).
 // Everything is in the text colours: blue and red only ever mean you and the
 // opponent, and the old amber box made a small hiccup look like an alarm.
+//
+// `nested` is for a problem inside another panel, such as Build and runes on
+// the match page: it drops its own fill and padding, which would only push
+// the "!" in from the panel's heading.
 export function ProblemPanel({
   title,
   children,
   actions,
+  nested = false,
 }: {
   title: string;
   children?: ReactNode;
   actions?: ReactNode;
+  nested?: boolean;
 }) {
   return (
-    <div role="alert" className={`${panelClass} flex gap-3 p-5`}>
-      <span
-        aria-hidden="true"
-        className="grid size-[22px] shrink-0 place-items-center rounded-full border-[1.5px] border-quiet text-note font-bold text-quiet"
-      >
-        !
-      </span>
+    <div role="alert" className={`flex gap-3 ${nested ? "" : `${panelClass} p-5`}`}>
+      <ProblemMark />
       <div className="flex min-w-0 flex-col items-start gap-1.5">
         <p className="text-body font-semibold">{title}</p>
         {children && <div className="flex flex-col gap-3 text-body text-quiet">{children}</div>}
         {actions && <div className="mt-2 flex flex-wrap gap-2.5">{actions}</div>}
       </div>
     </div>
+  );
+}
+
+// The "!" circle that marks a problem, here and in the Ask panel's notes.
+export function ProblemMark() {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-[22px] shrink-0 place-items-center rounded-full border-[1.5px] border-quiet text-note font-bold text-quiet"
+    >
+      !
+    </span>
   );
 }
 

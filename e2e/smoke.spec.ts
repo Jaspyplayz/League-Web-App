@@ -42,10 +42,27 @@ test("search a player and see their profile", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Ranked Solo/Duo" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible();
 
-  // A match row's panel is rendered by a Server Action when the row first
-  // opens, not sent with the page, so open one and wait for its tabs.
-  await page.getByRole("button", { name: /^Show details for this/ }).first().click();
-  await expect(page.getByRole("tab", { name: "Overview" }).first()).toBeVisible(FIRST_LOAD);
+  // Matches switches to By day and back.
+  const views = page.getByRole("navigation", { name: "Matches view" });
+  await views.getByRole("link", { name: "By day" }).click();
+  await expect(views.getByRole("link", { name: "By day" })).toHaveAttribute("aria-current", "page");
+  // Days, or the empty panel if the player hasn't played in four weeks.
+  const days = page.getByRole("heading", { name: "Days", exact: true });
+  await expect(days.or(page.getByText(/^No games in the last/))).toBeVisible(FIRST_LOAD);
+  await views.getByRole("link", { name: "List" }).click();
+  await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible(FIRST_LOAD);
+
+  // Each game row is one link to that game's match page.
+  await page.getByRole("link", { name: /^Open this .+ game/ }).first().click();
+  await expect(page).toHaveURL(/\/match\/KR_/);
+  await expect(page.getByRole("tab", { name: "Summary" })).toBeVisible(FIRST_LOAD);
+});
+
+// The Log was a profile tab; it's now the By day view of Matches. Reaching
+// the new address is enough, so this passes even with an expired Riot key.
+test("send the old Log address to By day", async ({ page }) => {
+  await page.goto("/player/kr/Hide%20on%20bush-KR1/log");
+  await expect(page).toHaveURL(/\/player\/kr\/Hide%20on%20bush-KR1\?view=day$/);
 });
 
 // The sample game is served from the database, so unlike the search above it

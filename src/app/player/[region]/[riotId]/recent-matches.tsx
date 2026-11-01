@@ -33,8 +33,7 @@ import type { Region } from "@/lib/regions";
 import { getManyMatchIds } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
-import { loadMatchDetailsAction } from "./match-details-action";
-import { QueueTabs } from "./queue-tabs";
+import { MatchesControls } from "./queue-tabs";
 import { RecentSummary } from "./recent-summary";
 import { SeasonChampions } from "./season-champions";
 import { MasteryCard } from "./mastery-card";
@@ -43,8 +42,8 @@ import { MasteryCard } from "./mastery-card";
 // `queue` is the game-mode tab picked above the list. `gamesParam` is the
 // URL's ?games=, how many games to show after "Show 10 more games" (see
 // src/lib/more-games.ts); missing means the first 10. playerPath is this
-// player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with both teams' scoreboard
-// and a link to the match analysis under that path, loaded when it opens.
+// player's page, e.g. "/player/na/Name-TAG". Each row links to that game's
+// match page under that path.
 type Props = {
   region: Region;
   puuid: string;
@@ -141,10 +140,10 @@ export async function RecentMatches({
       </aside>
 
       <section aria-labelledby="matches-heading" className="flex min-w-0 flex-1 flex-col gap-3">
-        <h2 id="matches-heading" className="scroll-mt-4 text-xl font-semibold">
+        <h2 id="matches-heading" className="scroll-mt-4 text-heading font-semibold">
           Recent matches
         </h2>
-        <QueueTabs playerPath={playerPath} current={queue} />
+        <MatchesControls playerPath={playerPath} queue={queue} view="list" />
         {/* Covers every game in the list, so it grows to "Last 20 games"
             when more are shown. */}
         {record.games > 0 && <RecentSummary record={record} roles={roleCounts(matches)} />}
@@ -153,7 +152,7 @@ export async function RecentMatches({
           result.error ? (
             <RiotErrorNotice error={result.error} region={region} />
           ) : (
-            <p className="text-muted">{emptyMessage(queue)}</p>
+            <p className="text-quiet">{emptyMessage(queue)}</p>
           )
         ) : (
           <FilterableMatchList
@@ -170,28 +169,20 @@ export async function RecentMatches({
                   score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
                   teams={{ region, players: matchTeams(match, puuid) }}
                   badges={matchBadges(match, puuid)}
-                  // The panel is rendered when the row first opens, not sent
-                  // with the page (see src/components/expandable-row.tsx).
-                  loadDetails={loadMatchDetailsAction.bind(
-                    null,
-                    region,
-                    m.matchId,
-                    puuid,
-                    playerPath,
-                  )}
+                  href={`${playerPath}/match/${m.matchId}`}
                 />
               ),
             }))}
           />
         )}
         {end === "waiting" && matches.length > 0 && (
-          <p className="self-center text-sm text-faint">
+          <p className="self-center text-sm text-quiet">
             {waiting} more {waiting === 1 ? "game hasn't" : "games haven't"} loaded from Riot yet.{" "}
             {/* A plain link, not next/link: a Link to this same URL reuses
                 the page it already has instead of asking the server again. */}
             <a
               href={matchListHref(playerPath, queue, count, `game-${games.length + 1}`)}
-              className="text-ink underline hover:text-ahead"
+              className="text-main underline hover:text-ahead"
             >
               Refresh
             </a>{" "}
@@ -199,23 +190,23 @@ export async function RecentMatches({
           </p>
         )}
         {result.error && matches.length > 0 && (
-          <p className="self-center text-sm text-faint">
+          <p className="self-center text-sm text-quiet">
             Some games couldn&rsquo;t be loaded from Riot just now.
           </p>
         )}
         {end === "two-months" && (
-          <p className="self-center text-sm text-faint">
+          <p className="self-center text-sm text-quiet">
             That&rsquo;s every game from the last {HISTORY_DAYS / 30} months.
           </p>
         )}
         {end === "max" && (
-          <p className="self-center text-sm text-faint">The list stops at {MAX_GAMES} games.</p>
+          <p className="self-center text-sm text-quiet">The list stops at {MAX_GAMES} games.</p>
         )}
         {end === "more" && (
           <Link
             // Lands on the first new game, where the list left off.
             href={matchListHref(playerPath, queue, count + GAMES_STEP, `game-${games.length + 1}`)}
-            className="soft-round-sm self-center border border-line-strong bg-surface px-5 py-2 text-sm font-semibold text-ink transition-colors hover:border-ahead"
+            className="self-center rounded-md bg-panel px-5 py-2 text-sm font-semibold text-main transition-colors hover:bg-raised"
           >
             Show 10 more games
           </Link>
