@@ -1,10 +1,10 @@
 # Match page
 
-One game, minute by minute, against the enemy in the same role. The Summary tab has the result, the biggest swings and the 60-second review. The Replay tab has the replay with the Ask panel beside it. The Stats tab has the lane comparison at 10 and 15 minutes, team gold and deaths, early jungle, Team analysis, and each player's build and runes.
+One game, minute by minute, against the enemy in the same role. The Summary tab has the result, the board (gold chart, eval bar, win-chance strip with a grade mark on each of your plays), the scoreboard by lane, the biggest swings and the 60-second review. The Replay tab has the replay with the Ask panel beside it. The Stats tab has the lane comparison at 10 and 15 minutes, team gold and deaths, early jungle, Team analysis, and each player's build and runes.
 
 ## Sub-features
 
-- `summary` shows the result banner, kills and the biggest swings.
+- `summary` shows the result line, the board, the scoreboard by lane and the biggest swings. Clicking a grade mark moves the eval bar to that play's chance.
 - `deep-dive` shows the replay with its plays, the scoreboard, "You vs <champion> at 10 and 15 minutes", team gold and deaths.
 - `sample` is the stored sample game, which loads without the Riot key.
 

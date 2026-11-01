@@ -60,6 +60,16 @@ test("open the sample analysis", async ({ page }) => {
     FIRST_LOAD,
   );
   await expect(page.getByText("Biggest swings")).toBeVisible();
+  // A grade mark on the strip is a button: clicking one selects its play, and
+  // the eval bar moves to that play's chance.
+  const mark = page
+    .getByRole("button", { name: /chance to win after it/ })
+    .and(page.locator('[aria-pressed="false"]'))
+    .first();
+  const chance = (await mark.getAttribute("aria-label"))?.match(/\d+%$/)?.[0];
+  await mark.click();
+  await expect(mark).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("img", { name: `chance to win: ${chance}` })).toBeVisible();
   // The replay lives on the Replay tab, hidden until it's opened.
   const replay = page.getByRole("heading", { name: "Replay", exact: true });
   await expect(replay).toBeHidden();

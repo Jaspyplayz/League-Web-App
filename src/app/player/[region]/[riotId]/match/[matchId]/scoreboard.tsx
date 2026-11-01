@@ -11,10 +11,12 @@ import type { Participant } from "@/lib/riot/types";
 import { participantRiotId, toSlug } from "@/lib/riot-id";
 
 // Both teams' end-of-game numbers: your team first, both in role order, so
-// you and your opponent are on the same row of each table. Like the match
-// panel, the winning team is blue and the losing team red, and you and
-// your opponent are outlined. Each player's name links to their own profile,
-// so you can look up anyone you played with or against.
+// you and your opponent are on the same row of each table. The winning team is
+// blue and the losing team red, and you and your opponent are outlined. Each
+// player's name links to their own profile, so you can look up anyone you
+// played with or against. The page shows it when there's no board, for a game
+// that isn't analyzed or has no timeline; it copes with any team sizes, where
+// the board's LaneBoard needs 5v5.
 export function Scoreboard({
   region,
   dd,
@@ -43,20 +45,20 @@ export function Scoreboard({
         return (
           <Panel key={teamId} className="overflow-x-auto">
             <table className="w-full min-w-[820px] table-fixed border-collapse text-sm">
-              <caption className="px-5 pb-2.5 pt-4 text-left text-sm text-muted">
+              <caption className="px-5 pb-2.5 pt-4 text-left text-sm text-quiet">
                 <span
-                  className={`font-display text-xl font-bold uppercase tracking-[0.04em] ${won ? "text-ahead" : "text-behind"}`}
+                  className={`text-subheading font-semibold ${won ? "text-ahead" : "text-behind"}`}
                 >
                   {teamId === myTeamId ? "Your team" : "Enemy team"} · {won ? "Victory" : "Defeat"}
                 </span>
-                <span className="ml-3.5 font-mono text-note">
+                <span className="ml-3.5 text-note tabular-nums">
                   {teamId === 100 ? "Blue side" : "Red side"} · {kills} kills ·{" "}
                   {formatThousands(gold)} gold
                 </span>
               </caption>
               {/* Fixed column widths, so the two teams' tables line up. */}
               <thead>
-                <tr className="text-left font-mono text-[11px] uppercase tracking-[0.1em] text-faint">
+                <tr className="text-left text-note text-quiet">
                   <th scope="col" className="px-5 py-2 font-medium">
                     Player
                   </th>
@@ -125,19 +127,19 @@ function Row({
 
   const who = (
     <>
-      <ChampionIcon dd={dd} name={p.championName} size={36} className="soft-round-sm" />
+      <ChampionIcon dd={dd} name={p.championName} size={36} className="rounded-md" />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold">{championName(dd, p.championName)}</span>
           {tag && (
             <span
-              className={`rounded-full border px-2 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft ${tag === "You" ? "border-ink-soft" : "border-dashed border-faint"}`}
+              className={`rounded-full border px-2 text-xs ${tag === "You" ? "border-main" : "border-dashed border-quiet"}`}
             >
               {tag}
             </span>
           )}
         </div>
-        <div className="text-[13px] text-faint wrap-anywhere underline-offset-2 group-hover:text-ink group-hover:underline">
+        <div className="text-note text-quiet wrap-anywhere underline-offset-2 group-hover:text-main group-hover:underline">
           {name}
         </div>
       </div>
@@ -148,7 +150,7 @@ function Row({
     // Outlines instead of a tint, so they don't clash with the team colors:
     // solid for you, dashed for your opponent.
     <tr
-      className={`border-t border-line ${tag === "You" ? "outline -outline-offset-1 outline-ink" : tag === "Opponent" ? "outline outline-dashed -outline-offset-1 outline-faint" : ""}`}
+      className={`border-t border-divider ${tag === "You" ? "outline -outline-offset-1 outline-main" : tag === "Opponent" ? "outline outline-dashed -outline-offset-1 outline-quiet" : ""}`}
     >
       <th scope="row" className="px-5 py-2.5 text-left font-normal">
         {riotId ? (
@@ -156,7 +158,7 @@ function Row({
           // easy target; the name underlines on hover to show it's clickable.
           <Link
             href={`/player/${region}/${toSlug(riotId)}`}
-            className="soft-round-sm group flex items-center gap-3"
+            className="group flex items-center gap-3 rounded-md"
           >
             {who}
           </Link>
@@ -164,11 +166,11 @@ function Row({
           <div className="flex items-center gap-3">{who}</div>
         )}
       </th>
-      <td className="px-3 py-2.5 font-mono">
+      <td className="px-3 py-2.5 tabular-nums">
         {p.kills} / {p.deaths} / {p.assists}
       </td>
-      <td className="px-3 py-2.5 font-mono">{p.totalMinionsKilled + p.neutralMinionsKilled}</td>
-      <td className="px-3 py-2.5 font-mono">{formatThousands(p.goldEarned)}</td>
+      <td className="px-3 py-2.5 tabular-nums">{p.totalMinionsKilled + p.neutralMinionsKilled}</td>
+      <td className="px-3 py-2.5 tabular-nums">{formatThousands(p.goldEarned)}</td>
       <td className="px-3 py-2.5">
         <div className="flex">
           <StatBar
@@ -189,7 +191,7 @@ function Row({
               dd={dd}
               itemId={id}
               size={24}
-              className={slot === 6 ? "ml-1 rounded-full" : "rounded-[5px]"}
+              className={slot === 6 ? "ml-1 rounded-full" : "rounded-sm"}
             />
           ))}
         </div>
