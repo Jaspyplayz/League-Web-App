@@ -4,8 +4,9 @@
 // gold lead chart with an eval bar beside it, and under it your team's chance
 // to win with a grade mark on each play you were in. Click a mark and the eval
 // bar and the chart's cursor move to that play, like stepping through a chess
-// game's moves. It's a Client Component for that and for the switches; the data
-// all arrives with the page, so nothing reloads.
+// game's moves, and Game review beside it follows (summary-columns.tsx holds
+// the selection). It's a Client Component for that and for the switches; the
+// data all arrives with the page, so nothing reloads.
 
 import { useState, type ReactNode } from "react";
 import type { TurningPointMarker } from "@/components/diff-chart";
@@ -19,7 +20,6 @@ import { METRICS, type Metric } from "@/lib/analyzer/matchup";
 import {
   evalChance,
   markSpot,
-  startingPlay,
   stripLeft,
   stripLine,
   type BoardPlay,
@@ -40,15 +40,7 @@ const VIEW_NAMES: Record<View, string> = { lane: "Vs your opponent", team: "Team
 // size, so a laptop's chart doesn't move when the page wakes up.
 const CHART_GUESS = { width: 780, height: 300 };
 
-export function Board({
-  lead,
-  teamGold,
-  markers,
-  chances,
-  swings,
-  quiet,
-  note,
-}: {
+export type BoardProps = {
   // You minus your opponent for each stat. Null with nobody else in your role.
   lead: { series: Record<Metric, DiffPoint[]>; opponentName: string } | null;
   // Your team's gold minus the enemy team's.
@@ -65,10 +57,24 @@ export function Board({
   quiet: string[];
   // Where the win chance comes from.
   note: ReactNode;
-}) {
+  // Which of the plays is selected, -1 with none.
+  selected: number;
+  onSelect: (index: number) => void;
+};
+
+export function Board({
+  lead,
+  teamGold,
+  markers,
+  chances,
+  swings,
+  quiet,
+  note,
+  selected,
+  onSelect,
+}: BoardProps) {
   const [view, setView] = useState<View>(lead ? "lane" : "team");
   const [metric, setMetric] = useState<Metric>("gold");
-  const [selected, setSelected] = useState(() => startingPlay(chances?.plays ?? []));
 
   const onLane = view === "lane" && lead !== null;
   const shownMetric = onLane ? metric : "gold";
@@ -141,34 +147,13 @@ export function Board({
           perSecond={chances.perSecond}
           plays={chances.plays}
           selected={selected}
-          onSelect={setSelected}
+          onSelect={onSelect}
           swings={swings}
         />
       )}
 
       {/* Lines up under the chart, past the eval bar and its gap. */}
       <div className={`flex flex-col gap-1 ${chances ? "pl-10" : ""}`}>
-        {/* Close marks can overlap, even fully, so these reach every play. */}
-        {play && chances && (
-          <div className="flex gap-2 pb-1">
-            <button
-              type="button"
-              disabled={selected === 0}
-              onClick={() => setSelected(selected - 1)}
-              className={STEP_CLASS}
-            >
-              Previous play
-            </button>
-            <button
-              type="button"
-              disabled={selected === chances.plays.length - 1}
-              onClick={() => setSelected(selected + 1)}
-              className={STEP_CLASS}
-            >
-              Next play
-            </button>
-          </div>
-        )}
         {play && (
           <p aria-live="polite" className="flex flex-wrap items-center gap-x-2 text-note">
             <GradeMark grade={play.grade} size={18} />
@@ -189,9 +174,6 @@ export function Board({
     </section>
   );
 }
-
-const STEP_CLASS =
-  "min-h-11 flex-1 rounded-md bg-raised px-3 text-note font-medium hover:bg-select disabled:text-quiet disabled:hover:bg-raised";
 
 // The thin chess-style bar: your team's chance to win, blue from the bottom and
 // red above, with the number on top.
@@ -296,8 +278,8 @@ export function ChanceStrip({
                 aria-label={`${play.clock} ${play.title}, ${play.grade}. Your team's chance to win after it: ${Math.round(play.after * 100)}%`}
                 title={`${play.clock} ${play.title}`}
                 // 24px wide, and 44px tall with the invisible ::before, so it's easy
-                // to hit on a phone. Close marks can still overlap, which is
-                // why the board has previous and next buttons.
+                // to hit on a phone. Close marks can still overlap, even fully;
+                // Game review's list and step buttons reach every play.
                 className={`absolute grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full before:absolute before:-inset-y-2.5 before:inset-x-0 before:content-[''] ${
                   i === selected ? "z-10" : "hover:z-10"
                 }`}

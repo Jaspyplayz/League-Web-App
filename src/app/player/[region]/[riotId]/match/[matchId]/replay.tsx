@@ -116,7 +116,7 @@ export function Replay({
     return () => clearInterval(timer);
   }, [playing, speed, end]);
 
-  // "Watch in replay" in the 60-second review moves the clock to its moment.
+  // "Watch in replay" in Game review moves the clock to its moment.
   // Checked while drawing against the last request seen, React's way to
   // react to a changed prop or context without an effect.
   const replayRequest = useReviewLinks()?.replayRequest ?? null;

@@ -14,7 +14,7 @@ Features that need an account show a signed-out visitor a clear, calm teaser ins
 
 - Open any game, choose its `Replay` tab, then `Sign in` in the Ask panel beside the replay.
 - Open any game and scroll its Summary to `Game recap`.
-- Choose `Add to notes` on a moment in a game's `60-second review`.
+- Choose `Add to notes` on a moment in a game's `Game review`.
 
 ## Driving it with drive.ts
 
@@ -27,7 +27,7 @@ Preconditions:
 - **Ask teaser.** Go to the sample game and click the tab `Replay`. Calm; the region `Ask about this game` contains `to ask questions about this player` and `Illustration · not a real game`, and 0 `textbox`es.
 - **Sign in round trip.** Click `Sign in` inside that region. The URL matches `/sign-in?next=%2Fplayer%2Fkr%2FHide%2520on%2520bush-KR1%2Fmatch%2FKR_8416261221`; level-1 heading `Sign in`; buttons `Continue with Google` and `Continue with Discord` are visible.
 - **Recap teaser.** Go to the sample game. The panel headed `Game recap` shows `to get a short written recap of this game.` and `Illustration · not a real game`, with no button named like `recap`.
-- **Notes teaser.** Click the first `Add to notes` in `60-second review`. The heading `Your notes` is on screen, its panel shows `to keep private notes on this game`, and `#match-note` does not exist.
+- **Notes teaser.** Click `Add to notes` in `Game review`, which opens on a moment. The heading `Your notes` is on screen, its panel shows `to keep private notes on this game`, and `#match-note` does not exist.
 - **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-signed-out-teasers`.
 - **Proof.** Steps `01`–`05` screenshots and ARIA snapshots.
 

@@ -48,29 +48,16 @@ export function MatchSkeleton({ back }: { back?: ReactNode }) {
       </div>
       <div
         aria-hidden="true"
-        className="grid items-start gap-6 motion-safe:animate-pulse lg:grid-cols-[minmax(0,1fr)_380px]"
+        className="grid items-start gap-x-6 gap-y-3.5 motion-safe:animate-pulse lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[auto_1fr]"
       >
-        <div className="flex min-w-0 flex-col gap-3.5">
-          <Panel className="flex flex-col gap-3 p-3 sm:p-4">
-            <div className="flex gap-3">
-              <LoadingBlock className="h-[220px] w-2.5 rounded-sm sm:h-[300px]" />
-              <LoadingBlock className="h-[220px] min-w-0 flex-1 sm:h-[300px]" />
-            </div>
-            <LoadingBlock className="h-[84px]" />
-          </Panel>
-          <Panel className="flex flex-col px-3.5 py-2">
-            {Array.from({ length: 5 }, (_, i) => (
-              <div key={i} className="flex h-12 items-center gap-3">
-                <LoadingBlock className="size-7 shrink-0" />
-                <LoadingBlock className="h-3 w-16 sm:w-28" />
-                <LoadingBlock className="mx-auto h-3 w-14 sm:w-20" />
-                <LoadingBlock className="h-3 w-16 sm:w-28" />
-                <LoadingBlock className="size-7 shrink-0" />
-              </div>
-            ))}
-          </Panel>
-        </div>
-        <Panel className="flex flex-col gap-3 p-4">
+        <Panel className="flex min-w-0 flex-col gap-3 p-3 sm:p-4 lg:col-start-1">
+          <div className="flex gap-3">
+            <LoadingBlock className="h-[220px] w-2.5 rounded-sm sm:h-[300px]" />
+            <LoadingBlock className="h-[220px] min-w-0 flex-1 sm:h-[300px]" />
+          </div>
+          <LoadingBlock className="h-[84px]" />
+        </Panel>
+        <Panel className="flex flex-col gap-3 p-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <div className="grid grid-cols-2 gap-2">
             {Array.from({ length: 4 }, (_, i) => (
               <LoadingBlock key={i} className="h-16" />
@@ -79,6 +66,17 @@ export function MatchSkeleton({ back }: { back?: ReactNode }) {
           <LoadingBlock className="h-[90px]" />
           {Array.from({ length: 3 }, (_, i) => (
             <LoadingBlock key={i} className="h-8" />
+          ))}
+        </Panel>
+        <Panel className="flex min-w-0 flex-col px-3.5 py-2 lg:col-start-1">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="flex h-12 items-center gap-3">
+              <LoadingBlock className="size-7 shrink-0" />
+              <LoadingBlock className="h-3 w-16 sm:w-28" />
+              <LoadingBlock className="mx-auto h-3 w-14 sm:w-20" />
+              <LoadingBlock className="h-3 w-16 sm:w-28" />
+              <LoadingBlock className="size-7 shrink-0" />
+            </div>
           ))}
         </Panel>
       </div>

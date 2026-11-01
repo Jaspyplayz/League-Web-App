@@ -2,10 +2,11 @@
 
 import { createContext, useContext } from "react";
 
-// How the 60-second review reaches the rest of the match page: "Watch in
-// replay" moves the replay (on the Replay tab) to a moment, and "Add to
-// notes" puts a line in your notes box. The tabs hold this (analysis-tabs.tsx)
-// since they decide which tab shows, and the replay and notes box read it.
+// How Game review reaches the rest of the match page: "Watch in replay" and
+// "Start review in the replay" move the replay (on the Replay tab) to a play,
+// and "Add to notes" puts a line in your notes box. The tabs hold this
+// (analysis-tabs.tsx) since they decide which tab shows, and the replay and
+// notes box read it.
 //
 // Each request is a new object, so pressing the same button twice still
 // counts as a new request.

@@ -34,7 +34,7 @@ export function PhaseRatings({
           <Tile
             key={p.phase}
             label={p.label}
-            span={`${p.fromMinute} to ${p.phase === "late" ? "end" : p.toMinute} min`}
+            span={phaseSpan(p)}
             score={p.score}
             why={whyLine(p)}
           />
@@ -47,6 +47,11 @@ export function PhaseRatings({
       </p>
     </section>
   );
+}
+
+// When a phase ran: "14 to 25 min", or "25 to end min" for the late game.
+export function phaseSpan(p: Pick<PhaseRating, "phase" | "fromMinute" | "toMinute">): string {
+  return `${p.fromMinute} to ${p.phase === "late" ? "end" : p.toMinute} min`;
 }
 
 // The stat that moved the rating most: what helped it most when it's 50 or

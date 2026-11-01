@@ -1,6 +1,6 @@
 # Match page
 
-One game, minute by minute, against the enemy in the same role. The Summary tab has the result, the board (gold chart, eval bar, win-chance strip with a grade mark on each of your plays), the scoreboard by lane, the biggest swings and the 60-second review. The Replay tab has the replay with the Ask panel beside it. The Stats tab has the lane comparison at 10 and 15 minutes, team gold and deaths, early jungle, Team analysis, and each player's build and runes.
+One game, minute by minute, against the enemy in the same role. The Summary tab has the result, the board (gold chart, eval bar, win-chance strip with a grade mark on each of your plays), Game review (score tiles, grade counts and your plays to step through, with the 60-second review's moments marked), the scoreboard by lane and the biggest swings. The Replay tab has the replay with the Ask panel beside it. The Stats tab has the lane comparison at 10 and 15 minutes, team gold and deaths, early jungle, Team analysis, and each player's build and runes.
 
 ## Sub-features
 
