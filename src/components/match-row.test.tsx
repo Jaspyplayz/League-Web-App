@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import type { PlayerScore } from "@/lib/analyzer/score";
 import type { MatchSummary } from "@/lib/match-summary";
 import { MatchRow } from "./match-row";
 
@@ -23,11 +24,20 @@ const game: MatchSummary = {
   spells: [4, 14],
 };
 
-function render() {
+const score: PlayerScore = {
+  participantId: 1,
+  score: 78,
+  badge: "MVP",
+  strengths: ["strong KDA"],
+  weakness: "little objective damage",
+};
+
+function render(match: MatchSummary = game, gameScore?: PlayerScore) {
   return renderToStaticMarkup(
     <ul>
       <MatchRow
-        match={game}
+        match={match}
+        score={gameScore}
         dd={null}
         now={2 * 60 * 60 * 1000}
         href="/player/kr/Faker-KR1/match/KR_1"
@@ -46,7 +56,37 @@ function render() {
 describe("MatchRow", () => {
   it("opens the game's match page", () => {
     const link = render().match(/<a [^>]*href="\/player\/kr\/Faker-KR1\/match\/KR_1"[^>]*>/)?.[0];
-    expect(link).toContain('aria-label="Open this Ahri game (Victory, 2h ago)"');
+    expect(link).toContain('aria-label="Open this Ahri game (Win, 2h ago)"');
+  });
+
+  it("says Win or Loss, as the mockup does", () => {
+    expect(render()).toContain(">Win</span>");
+    expect(render({ ...game, win: false })).toContain(">Loss</span>");
+  });
+
+  // Blue at 10% for a win and red for a loss, 7% in light, with no outline.
+  it("tints the row by its result", () => {
+    expect(render()).toContain("bg-ahead/10 light:bg-ahead/7");
+    expect(render({ ...game, win: false })).toContain("bg-behind/10 light:bg-behind/7");
+    expect(render({ ...game, remake: true })).not.toMatch(/bg-(ahead|behind)\//);
+    expect(render()).not.toContain("border-ahead");
+  });
+
+  // The row's link covers it, which hides hover titles, so the reason is
+  // written out beside the score.
+  it("writes the score's reason in words", () => {
+    const html = render(game, score);
+    expect(html).toContain('aria-label="Game score 78 out of 100"');
+    expect(html).toContain("MVP. Helped by strong KDA. Held back by little objective damage.");
+  });
+
+  it("says when a game has no score", () => {
+    expect(render()).toContain("No game score in this mode.");
+  });
+
+  // JAS-87's row has no spells or items; the match page shows them.
+  it("leaves the items to the match page", () => {
+    expect(render()).not.toContain('aria-label="Items"');
   });
 
   // The inline expand (Overview, Team analysis, Build, Runes) is gone.

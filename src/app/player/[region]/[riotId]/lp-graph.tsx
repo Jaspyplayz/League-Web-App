@@ -34,7 +34,7 @@ export function LpGraph({ points }: { points: GraphPoint[] }) {
   const last = points.at(-1)!;
   return (
     <figure className="flex flex-col gap-1">
-      <figcaption className="flex justify-between text-xs text-faint">
+      <figcaption className="flex justify-between text-note text-quiet">
         <span>Last {GRAPH_DAYS} days</span>
         {points.length === 1 && <span>Fills in as you play</span>}
       </figcaption>
@@ -51,7 +51,7 @@ export function LpGraph({ points }: { points: GraphPoint[] }) {
               x2={WIDTH - PAD.right}
               y1={y(s)}
               y2={y(s)}
-              stroke="var(--color-line-strong)"
+              stroke="var(--color-divider)"
               strokeDasharray="2 3"
             />
             <text
@@ -59,7 +59,8 @@ export function LpGraph({ points }: { points: GraphPoint[] }) {
               y={y(s)}
               textAnchor="end"
               dominantBaseline="central"
-              className="fill-faint font-mono text-[9px]"
+              className="fill-quiet tabular-nums"
+              fontSize={10}
             >
               {scoreLabel(s)}
             </text>
@@ -71,14 +72,15 @@ export function LpGraph({ points }: { points: GraphPoint[] }) {
             <title>{p.label}</title>
           </circle>
         ))}
-        <text x={PAD.left} y={HEIGHT - 4} className="fill-faint font-mono text-[9px]">
+        <text x={PAD.left} y={HEIGHT - 4} fontSize={10} className="fill-quiet">
           {GRAPH_DAYS}d ago
         </text>
         <text
           x={WIDTH - PAD.right}
           y={HEIGHT - 4}
           textAnchor="end"
-          className="fill-faint font-mono text-[9px]"
+          fontSize={10}
+          className="fill-quiet"
         >
           Today
         </text>

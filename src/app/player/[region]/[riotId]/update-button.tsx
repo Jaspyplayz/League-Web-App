@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { mainButtonClass } from "@/components/ui/state-panel";
 import type { UpdateResult } from "@/lib/profile-store";
 import { updateProfileAction } from "./actions";
 
 type Props = {
   region: string;
   puuid: string;
-  // "Updated 5m ago", worked out on the server when the page was rendered.
-  updatedLabel: string;
   // Seconds left on the cooldown when the page was rendered; 0 if none.
   secondsUntilReady: number;
 };
@@ -17,7 +16,8 @@ type Props = {
 // snapshot, then the page re-renders with it. Runs in the browser because it
 // reacts to clicks. The page gives it a `key` that changes with each new
 // snapshot, so React starts it fresh (with a new cooldown) after an update.
-export function UpdateButton({ region, puuid, updatedLabel, secondsUntilReady }: Props) {
+// "Updated 6h ago" sits in the line above the buttons (profile-header.tsx).
+export function UpdateButton({ region, puuid, secondsUntilReady }: Props) {
   const [coolingDown, setCoolingDown] = useState(secondsUntilReady > 0);
   const [message, setMessage] = useState<string | null>(null);
   // isPending is true while the update runs, including the page re-render.
@@ -44,23 +44,45 @@ export function UpdateButton({ region, puuid, updatedLabel, secondsUntilReady }:
   }
 
   return (
-    <div className="flex flex-col items-start gap-1.5 sm:items-end">
+    // `contents` lets the button and its message join the row of buttons
+    // around them, and `order-last` puts the message at the end of that row,
+    // beside the buttons rather than between Update and This is me.
+    <div className="contents">
       <button
         type="button"
         onClick={update}
         disabled={isPending || coolingDown}
         title={coolingDown ? "You can update again a couple of minutes after the last update" : undefined}
-        className="soft-round-sm min-h-10 bg-ahead px-5 font-mono text-xs font-semibold tracking-[0.12em] text-page uppercase transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
+        className={`${mainButtonClass} gap-2 sm:h-10`}
       >
+        <RefreshIcon />
         {isPending ? "Updating…" : "Update"}
       </button>
-      <p className="font-mono text-xs text-faint">Updated {updatedLabel}</p>
       {message && (
-        <p role="status" className="max-w-64 text-sm text-behind sm:text-right">
+        // Neutral text: a failed update is a hiccup, and red means the opponent.
+        <p role="status" className="order-last max-w-80 text-note text-quiet">
           {message}
         </p>
       )}
     </div>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+    </svg>
   );
 }
 

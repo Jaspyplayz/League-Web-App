@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChampionIcon } from "@/components/game-icons";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import type { ChampionStats } from "@/lib/match-summary";
@@ -11,10 +12,10 @@ import { panelClass } from "@/components/ui/panel";
 // How many champions the box lists.
 const SHOWN = 7;
 
-// The "Season 2026" box in the profile's sidebar: the season's most played
-// champions, with each one's games, win rate, KDA and CS per minute, for the
-// game mode picked in the match list's tabs. Loads in its
-// own Suspense boundary, so the match list doesn't wait for it.
+// The "Season 2026" panel in the profile's side column: the season's most
+// played champions, with each one's games, CS per minute, win rate and KDA,
+// for the game mode picked above the games, and a link to the Champions tab.
+// Loads in its own Suspense boundary, so the match list doesn't wait for it.
 export async function SeasonChampions({
   region,
   puuid,
@@ -23,6 +24,7 @@ export async function SeasonChampions({
   loadMore,
   dd,
   recent,
+  championsHref,
 }: {
   region: Region;
   puuid: string;
@@ -34,6 +36,7 @@ export async function SeasonChampions({
   // The listed games' champions, shown instead when there's no database to
   // remember a season's worth of games.
   recent: ChampionStats[];
+  championsHref: string; // the Champions tab, e.g. "/player/na/Name-TAG/champions"
 }) {
   const stats = await loadSeasonStats(
     region,
@@ -45,62 +48,79 @@ export async function SeasonChampions({
   if (!stats) {
     return (
       <ChampionBox title="Champions" dd={dd} champions={recent}>
-        <p className="text-xs text-faint">From the games listed.</p>
+        <p className="text-note text-quiet">From the games listed.</p>
       </ChampionBox>
     );
   }
 
   const title = queue.id === "all" ? SEASON.label : `${SEASON.label} · ${queue.label}`;
   return (
-    <ChampionBox title={title} dd={dd} champions={stats.champions}>
-      {stats.loaded < stats.total ? (
-        <p className="text-xs text-faint">
+    <ChampionBox
+      title={title}
+      dd={dd}
+      champions={stats.champions}
+      link={
+        <Link href={championsHref} className={allGamesLinkClass}>
+          All {stats.total} games
+        </Link>
+      }
+    >
+      {stats.loaded < stats.total && (
+        <p className="text-note text-quiet">
           {stats.loaded} of {stats.total} season games loaded so far. More load each time{" "}
           {loadMore ? "the profile is opened" : "the profile's first page is opened"}, and once a
           day for players marked This is me.
         </p>
-      ) : (
-        <p className="text-xs text-faint">All {stats.total} games this season.</p>
       )}
     </ChampionBox>
   );
 }
 
+// A quiet underlined link in the panel's heading row, as drawn.
+const allGamesLinkClass =
+  "text-note text-quiet underline underline-offset-[3px] transition-colors duration-320 hover:text-main hover:duration-120 motion-reduce:transition-none";
+
 function ChampionBox({
   title,
   dd,
   champions,
+  link,
   children,
 }: {
   title: string;
   dd: DataDragon | null;
+  link?: React.ReactNode; // beside the heading
+
   // csPerMin is missing for the recent-games fallback, which doesn't count
   // it, and for a champion played only in Arena, which has no minions.
   champions: { championName: string; games: number; wins: number; kda: number; csPerMin?: number }[];
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
-    <section className={`${panelClass} flex flex-col gap-3 p-4`}>
-      <h2 className="font-mono text-xs tracking-widest text-faint uppercase">{title}</h2>
+    <section aria-labelledby="season-heading" className={`${panelClass} flex flex-col gap-3 px-[18px] py-4`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 id="season-heading" className="text-subheading font-semibold">
+          {title}
+        </h2>
+        {link}
+      </div>
       {champions.length === 0 ? (
-        <p className="text-sm text-faint">No games in this mode yet.</p>
+        <p className="text-body text-quiet">No games in this mode yet.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {champions.slice(0, SHOWN).map((c) => (
-            <li key={c.championName} className="flex items-center gap-3 text-sm">
-              <ChampionIcon dd={dd} name={c.championName} size={36} className="soft-round-sm" />
+            <li key={c.championName} className="flex items-center gap-2.5 py-1.5">
+              <ChampionIcon dd={dd} name={c.championName} size={32} className="rounded-md" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{championName(dd, c.championName)}</p>
-                <p className="font-mono text-xs text-faint">
+                <p className="text-note text-quiet tabular-nums">
                   {c.games} games
                   {c.csPerMin !== undefined && ` · ${c.csPerMin.toFixed(1)} CS/min`}
                 </p>
               </div>
-              <div className="text-right font-mono text-xs">
-                <p className={c.wins / c.games >= 0.5 ? "text-ahead" : "text-behind"}>
-                  {Math.round((c.wins / c.games) * 100)}%
-                </p>
-                <p className="text-faint">{c.kda.toFixed(1)} KDA</p>
+              <div className="text-right tabular-nums">
+                <p className="font-semibold">{Math.round((c.wins / c.games) * 100)}%</p>
+                <p className="text-note text-quiet">{c.kda.toFixed(1)} KDA</p>
               </div>
             </li>
           ))}

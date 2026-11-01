@@ -45,10 +45,10 @@ const journeys: Journey[] = [
       });
       await step("match list has rows", async () => {
         const list = page.getByRole("region", { name: "Recent matches" });
-        await expect(list.getByText(/^(Victory|Defeat|Remake)$/i).first()).toBeVisible(LOAD);
-        const rows = await list.getByText(/^(Victory|Defeat|Remake)$/i).count();
+        await expect(list.getByText(/^(Win|Loss|Remake)$/).first()).toBeVisible(LOAD);
+        const rows = await list.getByText(/^(Win|Loss|Remake)$/).count();
         note("resultLabels", rows);
-        if (rows < 1) throw new Error("no match rows: the list shows no Victory/Defeat rows");
+        if (rows < 1) throw new Error("no match rows: the list shows no Win/Loss rows");
       });
       await step("switch queue to Ranked Solo/Duo", async () => {
         await page.getByRole("region", { name: "Recent matches" }).getByRole("link", { name: "Ranked Solo/Duo", exact: true }).click();

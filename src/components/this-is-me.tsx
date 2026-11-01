@@ -8,9 +8,12 @@ import { supabaseConfig } from "@/lib/supabase/config";
 
 type Props = { region: string; puuid: string; gameName: string; tagLine: string };
 
-const button = "soft-round-sm inline-flex h-9 items-center gap-1.5 border px-3 text-sm transition-colors";
-const off = "border-line-strong text-faint hover:border-ahead hover:text-ink";
-const on = "border-ahead bg-ahead/15 text-ahead-soft";
+// A raised button beside Update, 44px tall on phones and 40px on wider
+// screens. Once pressed it turns blue, since blue means you.
+const button = "inline-flex h-11 items-center gap-1.5 rounded-md px-4 text-body font-medium sm:h-10";
+const off =
+  "bg-raised text-main transition-colors duration-320 hover:bg-divider hover:duration-120 motion-reduce:transition-none";
+const on = "bg-ahead/10 text-ahead";
 
 // The "This is me" button next to a player's name. Marking a profile as yours
 // adds a My profile link to the header. It depends on who's signed in, which
@@ -52,7 +55,7 @@ export async function ThisIsMeButton({ region, puuid, gameName, tagLine }: Props
         type="button"
         disabled
         title="Couldn't check whether this profile is yours. Reload to try again."
-        className={`${button} cursor-not-allowed border-line text-muted`}
+        className={`${button} cursor-not-allowed bg-raised text-quiet`}
       >
         Reload to check
       </button>

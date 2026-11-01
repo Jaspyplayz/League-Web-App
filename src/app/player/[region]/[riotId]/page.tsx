@@ -1,23 +1,29 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { RememberSearchedPlayer } from "@/components/saved-players";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
-import { ProfileSkeleton } from "@/components/loading-skeleton";
 import { MatchListSkeleton } from "@/components/match-list-skeleton";
+import { SearchForm } from "@/components/search-form";
 import { LoadingBlock, LoadingSection } from "@/components/ui/loading";
 import { loadProfile } from "@/lib/profile-store";
-import { readQueueFilter } from "@/lib/queue-filters";
+import { readQueueFilter, type QueueFilter } from "@/lib/queue-filters";
 import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { getAccount } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import { fromSlug, toSlug, type RiotId } from "@/lib/riot-id";
 import { ByDay } from "./by-day";
 import { ProfileHeader, RankCards } from "./profile-header";
+import { ProfileSkeleton, RankSkeleton } from "./profile-skeleton";
 import { MatchesControls, readMatchesView } from "./queue-tabs";
-import { RecentMatches } from "./recent-matches";
+import {
+  GAMES_COLUMN,
+  MatchesHeading,
+  RecentMatches,
+  SIDE_BOTTOM,
+  SidePanelSkeleton,
+} from "./recent-matches";
 
 type Params = Promise<{ region: string; riotId: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -30,14 +36,31 @@ export default function PlayerPage({
   searchParams: SearchParams;
 }) {
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-12">
-      <Link href="/" className="text-sm text-quiet hover:underline">
-        ← New search
-      </Link>
-      <Suspense fallback={<ProfileSkeleton />}>
+    // The same width as the Champions and Insights tabs, so the top and the
+    // tabs stay put when switching between them.
+    <main className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-6 px-4 pb-20 pt-7 sm:px-6">
+      <Suspense
+        fallback={
+          // The address already names the player, so the loading line can
+          // too, a moment after the plain one.
+          <Suspense fallback={<ProfileSkeleton label="Looking up the player" />}>
+            <LookingUp params={params} />
+          </Suspense>
+        }
+      >
         <Player params={params} searchParams={searchParams} />
       </Suspense>
     </main>
+  );
+}
+
+// "Looking up Faker#KR1 on Korea", from the address.
+async function LookingUp({ params }: { params: Params }) {
+  const { region, riotId } = await params;
+  const id = fromSlug(riotId);
+  if (!isRegion(region) || !id) return <ProfileSkeleton label="Looking up the player" />;
+  return (
+    <ProfileSkeleton label={`Looking up ${id.gameName}#${id.tagLine} on ${REGIONS[region].label}`} />
   );
 }
 
@@ -96,17 +119,34 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
               </Suspense>
             </>
           ) : (
-            <Suspense fallback={<MatchListSkeleton />}>
-              <RecentMatches
-                region={region}
-                puuid={puuid}
-                profile={profile.value}
-                queue={queue}
-                gamesParam={search.games}
-                playerPath={playerPath}
-                ranks={<RankCards puuid={puuid} profile={profile.value} />}
-              />
-            </Suspense>
+            // The Matches grid (JAS-87): a 320px left column with the ranks
+            // on top and Season 2026 and Champion mastery under them, and the
+            // games on the right. On phones: ranks, games, then the rest.
+            <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[320px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-6 lg:gap-y-3.5">
+              {/* Outside the games' Suspense, so the ranks show while the
+                  games load. */}
+              <div className="flex flex-col gap-3.5 lg:col-start-1 lg:row-start-1">
+                <Suspense
+                  fallback={
+                    <div className="motion-safe:animate-pulse">
+                      <RankSkeleton />
+                    </div>
+                  }
+                >
+                  <RankCards puuid={puuid} profile={profile.value} />
+                </Suspense>
+              </div>
+              <Suspense fallback={<GamesSkeleton playerPath={playerPath} queue={queue} />}>
+                <RecentMatches
+                  region={region}
+                  puuid={puuid}
+                  profile={profile.value}
+                  queue={queue}
+                  gamesParam={search.games}
+                  playerPath={playerPath}
+                />
+              </Suspense>
+            </div>
           )}
         </>
       ) : (
@@ -119,14 +159,20 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
   );
 }
 
+// Names the Riot ID and region that were searched, then offers the search
+// again (JAS-93).
 function PlayerNotFound({ region, id }: { region: Region; id: RiotId }) {
   return (
-    <div className="flex flex-col gap-2">
-      <h1 className="text-title font-semibold">No player found</h1>
-      <p className="text-quiet">
-        There&apos;s no {id.gameName}#{id.tagLine} in {REGIONS[region].label}. Check the spelling
-        and the tag after the #, or try another region.
+    <div className="flex max-w-[640px] flex-col gap-3.5">
+      <h1 className="text-2xl font-semibold sm:text-title">
+        No player called {id.gameName}#{id.tagLine} on {REGIONS[region].label}
+      </h1>
+      <p className="text-body text-quiet">
+        Check the spelling and the tag after the #, or try another region.
       </p>
+      <div className="mt-2.5">
+        <SearchForm />
+      </div>
     </div>
   );
 }
@@ -134,9 +180,25 @@ function PlayerNotFound({ region, id }: { region: Region; id: RiotId }) {
 function PlayerName({ gameName, tagLine }: { gameName: string; tagLine: string }) {
   return (
     <h1 className="text-title font-semibold">
-      {gameName}
-      <span className="text-quiet">#{tagLine}</span>
+      {gameName} <span className="font-normal text-quiet">#{tagLine}</span>
     </h1>
+  );
+}
+
+// The games column while the games load. The heading and the queue choices
+// are already known, so they show for real above the grey rows.
+function GamesSkeleton({ playerPath, queue }: { playerPath: string; queue: QueueFilter }) {
+  return (
+    <>
+      <section aria-labelledby="matches-heading" className={GAMES_COLUMN}>
+        <MatchesHeading />
+        <MatchesControls playerPath={playerPath} queue={queue} view="list" />
+        <MatchListSkeleton />
+      </section>
+      <div className={SIDE_BOTTOM}>
+        <SidePanelSkeleton label="Loading season champions" />
+      </div>
+    </>
   );
 }
 
