@@ -221,6 +221,7 @@ function PlayList({
 // Marks a play as one of the 60-second review's moments.
 function MomentChip() {
   return (
+    // Select rather than raised, which would vanish on the selected row.
     <span className="shrink-0 rounded-sm bg-select px-1 text-xs tabular-nums text-main">
       <span aria-hidden="true">60s</span>
       <span className="sr-only">In your 60-second review</span>

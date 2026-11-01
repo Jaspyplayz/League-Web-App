@@ -108,8 +108,8 @@ test("scan the saved players box, in both themes", async ({ page }) => {
 
 async function selectLostPlay(page: Page) {
   const review = page.getByRole("region", { name: "Game review" });
-  await review.locator("ol button", { hasText: "−" }).first().click();
-  await expect(review.locator("ol button[aria-current]")).toContainText("−");
+  await review.locator("ol > li > button", { hasText: "−" }).first().click();
+  await expect(review.locator("ol > li > button[aria-current]")).toContainText("−");
 }
 
 test("scan the sample analysis, all three tabs", async ({ page }) => {

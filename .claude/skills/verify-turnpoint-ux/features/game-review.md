@@ -7,6 +7,7 @@ A game's Summary has a chess-style review in its right column: your scores, how 
 - `review-scores` shows the `Overall`, `Early` and `Mid` tiles (`Late` too in a longer game), and all eleven grades in `Grades of your plays`, with a dash for the three the analyzer can't award.
 - `review-opens` opens on the play that moved the game most, on the board and in the list.
 - `review-steps` moves the selection with `First play`, `Previous play`, `Next play` and `Last play`, each marked disabled at its end of the list, and keeps the opened play in view inside the list.
+- `review-row` moves the selection, and the board with it, when a row in the list is clicked.
 - `review-strip` moves the opened play when a mark on the strip is clicked.
 - `review-replay` opens the `Replay` tab at the selected play's first whole second from `Start review in the replay`.
 - `review-phone` puts Game review under the board and above the scoreboard at 390px, with no sideways scroll and step buttons at least 44px tall.
@@ -24,6 +25,7 @@ Preconditions:
 
 - **Open the sample.** Go to KR_8416261221. Three tiles, eleven grades, `Book` shows `–`, `Blunder` shows `0`, and the `aria-current` play is 20:54, with its mark pressed and the eval bar on its chance.
 - **Step.** `Next play` goes to 22:10, `Previous play` back to 20:54, `First play` to 3:22 and `Last play` to 24:15, the board following each time. At each end the two buttons there are disabled, and the opened play is inside its list's box.
+- **Row.** From the first play, click the second row (`ol > li > button`, which leaves out the opened play's own buttons). The board goes to 5:54 and `First play` is enabled.
 - **Strip.** Click the mark at 5:54. It's the `aria-current` play.
 - **The 33:36 play.** Go to KR_8419370694. `First play`, then `Last play`, lands on 33:36. `Start review in the replay` selects `Replay`, and the `Game time` slider's `aria-valuetext` starts `33:37:`.
 - **Phone, at 390px.** Game review starts under the board and ends above `Scoreboard by lane`, `scrollWidth` isn't over `clientWidth`, `Previous play` is at least 44px tall and moves the eval bar, and `Start review in the replay` opens the replay at 18:45.

@@ -377,6 +377,11 @@ const journeys: Journey[] = [
         await expect(review.getByRole("button", { name: "First play" })).toBeDisabled();
         await expect(review.getByRole("button", { name: "Previous play" })).toBeDisabled();
       });
+      await step("a row in the list selects the play on the board", async () => {
+        await review.locator("ol > li > button").nth(1).click();
+        await expect(review.getByRole("button", { name: "First play" })).toBeEnabled();
+        await expectBoardOn("5:54");
+      });
       await step("last play, with the list scrolled to it", async () => {
         await review.getByRole("button", { name: "Last play" }).click();
         await expectBoardOn("24:15");
