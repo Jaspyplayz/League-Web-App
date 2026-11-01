@@ -6,9 +6,10 @@ import type { BuildItem, BuildView as Build } from "@/lib/match-builds";
 
 const KEYS = ["Q", "W", "E", "R"];
 
-// One player's build in the Build tab: items in the order they were bought,
-// grouped by minute, then the order they levelled their abilities. Runs in
-// the browser, inside Build and runes' player picker.
+// One player's build: items in the order they were bought, grouped by
+// minute, then the order they levelled their abilities. Shown in Build and
+// runes on the match page's Stats tab and, until JAS-106 removes it, in the
+// Build tab of a profile's match row, which fetches the build when opened.
 export function BuildView({ build }: { build: Build }) {
   return (
     <div className="flex flex-col gap-5">

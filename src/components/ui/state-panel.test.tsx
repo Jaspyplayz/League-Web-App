@@ -40,6 +40,14 @@ describe("the problem panel", () => {
     expect(html).toContain("Riot&#x27;s servers didn&#x27;t answer");
     expect(html).not.toMatch(ALARM_COLOURS);
   });
+
+  it("drops its own fill when nested inside another panel", () => {
+    const own = renderToStaticMarkup(<ProblemPanel title="Riot didn't answer" />);
+    const nested = renderToStaticMarkup(<ProblemPanel title="Riot didn't answer" nested />);
+    expect(own).toContain("bg-panel");
+    expect(nested).not.toContain("bg-panel");
+    expect(nested).toContain('role="alert"');
+  });
 });
 
 describe("Riot's errors", () => {

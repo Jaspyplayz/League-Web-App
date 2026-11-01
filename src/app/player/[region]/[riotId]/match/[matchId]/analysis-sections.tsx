@@ -199,8 +199,9 @@ export function AnalysisSections({
         />
       )}
 
-      {/* Side by side when there's room, Deaths under Team gold on phones. */}
-      <div className="flex flex-wrap items-start gap-6">
+      {/* Side by side when there's room, Deaths under Team gold on phones,
+          with the same 28px gap as the tab's other panels. */}
+      <div className="flex flex-wrap items-start gap-7">
         <TeamGold points={a.teamGold} objectives={a.objectives} />
         <Deaths deaths={a.deaths} name={name} />
       </div>

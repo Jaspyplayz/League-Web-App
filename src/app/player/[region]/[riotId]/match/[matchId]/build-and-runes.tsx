@@ -44,9 +44,10 @@ export function BuildAndRunes({
           <ProblemPanel
             title="Items and runes can't load from Riot right now"
             actions={<TryAgainButton />}
+            nested
           >
             <p>
-              Their names and pictures come from Riot&apos;s Data Dragon, which didn&apos;t answer.
+              Their names and pictures come from Riot&apos;s Data Dragon, which didn&apos;t load.
               This is usually brief. The skill order below doesn&apos;t need it.
             </p>
           </ProblemPanel>
