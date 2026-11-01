@@ -147,6 +147,31 @@ describe("review-board-type", () => {
     expect(await turnpointRules(template, "src/app/x.tsx")).toEqual(["turnpoint/review-board-type"]);
   });
 
+  it.each([
+    ['an SVG font', 'export const A = () => <text fontFamily="Barlow Condensed">1</text>;'],
+    ["SVG letter spacing", 'export const A = () => <text letterSpacing="2">1</text>;'],
+    ["a style's font", 'export const A = () => <p style={{ fontFamily: "monospace" }} />;'],
+    ["a style's letter spacing", 'export const A = () => <p style={{ letterSpacing: "0.14em" }} />;'],
+    ["a style's all-caps", 'export const A = () => <p style={{ textTransform: "none" }} />;'],
+    ["a <code> tag", "export const A = () => <code>1</code>;"],
+    ["a <pre> tag", "export const A = () => <pre>1</pre>;"],
+    ["a <kbd> tag", "export const A = () => <kbd>1</kbd>;"],
+    ["a <samp> tag", "export const A = () => <samp>1</samp>;"],
+  ])("fails on %s", async (_, code) => {
+    expect(await turnpointRules(code, "src/app/x.tsx")).toEqual(["turnpoint/review-board-type"]);
+  });
+
+  it("passes an SVG font size, since the charts draw their labels in SVG", async () => {
+    const code = 'export const A = () => <text fontSize="15">1</text>;';
+    expect(await turnpointRules(code, "src/app/x.tsx")).toEqual([]);
+  });
+
+  it("lets the share image, which has no stylesheet, name its font", async () => {
+    const code = 'export const a = { fontFamily: "sans-serif" };';
+    const path = "src/app/player/[region]/[riotId]/match/[matchId]/opengraph-image.tsx";
+    expect(await turnpointRules(code, path)).toEqual([]);
+  });
+
   it("names the fix in the error", async () => {
     const [message] = await turnpointMessages('export const c = "font-mono";', "src/app/x.tsx");
     expect(message.message).toContain("tabular-nums");

@@ -10,8 +10,9 @@ import { describe, expect, it } from "vitest";
 
 const ALLOWED = /^rounded(?:-(?:[trblse]|[tb][lr]|s[se]|e[se]))?-(?:sm|md|full)$/;
 const BEVELED = [/hud-cut/, /corner-shape\s*:/, /border-radius:\s*[^;{]*\b0\b/];
-// The share image has no stylesheet to read classes from, so it sets its own.
-const SETS_ITS_OWN_RADIUS = /opengraph-image\.tsx$/;
+// The share image has no stylesheet to read classes from, so it writes its
+// corners out. A test below holds them to the same 6px.
+const SHARE_IMAGE = /opengraph-image\.tsx$/;
 
 // The parts of a file that can set a corner: its strings, and any style key
 // such as borderRadius. A variable called `rounded` or a comment saying "rounded
@@ -69,7 +70,7 @@ function cornerProblems(path: string, source: string): string[] {
   if (isCss && /border(?:-[a-z]+)*-radius\s*:/.test(withoutComments)) {
     problems.push(`${path} sets a border radius: use rounded-md, rounded-sm or rounded-full instead`);
   }
-  if (radiusKeys.length > 0 && !SETS_ITS_OWN_RADIUS.test(path)) {
+  if (radiusKeys.length > 0 && !SHARE_IMAGE.test(path)) {
     problems.push(`${path} sets ${radiusKeys[0]}: use rounded-md, rounded-sm or rounded-full instead`);
   }
   return problems;
@@ -158,8 +159,15 @@ describe("corners", () => {
     expect(cornerProblems("src/components/x.tsx", source)).not.toEqual([]);
   });
 
+  const files = sourceFiles("src").filter((path) => /\.(tsx?|css)$/.test(path) && !/\.test\.tsx?$/.test(path));
+
+  it("gives the share image the same 6px corners", () => {
+    const shareImage = files.filter((path) => SHARE_IMAGE.test(path));
+    const radii = shareImage.flatMap((path) => [...readFileSync(path, "utf8").matchAll(/border\w*Radius: ([^,\s}]+)/g)]);
+    expect(radii.map((match) => match[1])).toEqual(["6", "6"]);
+  });
+
   it("passes on every file in src", () => {
-    const files = sourceFiles("src").filter((path) => /\.(tsx?|css)$/.test(path) && !/\.test\.tsx?$/.test(path));
     expect(files.length).toBeGreaterThan(100);
     expect(files.flatMap((path) => cornerProblems(path, readFileSync(path, "utf8")))).toEqual([]);
   });

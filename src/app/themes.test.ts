@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // The both-themes check. globals.css sets every colour twice: the dark value
@@ -121,15 +122,31 @@ describe("Review board tokens", () => {
   });
 
   it("has no old size, font or corner left, and no all-caps rule", () => {
-    for (const old of ["--text-label", "--font-display", "--font-mono", "--radius-soft", "@utility soft-round", "uppercase"]) {
-      expect(withoutComments).not.toContain(old);
-    }
+    const OLD = [
+      "--text-label",
+      "--radius-soft",
+      "@utility soft-round",
+      "font-display",
+      "font-mono",
+      "font-family",
+      "uppercase",
+      "text-transform",
+      "tracking-wide",
+      "letter-spacing",
+    ];
+    expect(OLD.filter((old) => withoutComments.includes(old))).toEqual([]);
   });
 
-  // A font the layout loads is a download for every player, even if nothing
-  // shows it, and neither lint rule reads imports.
+  // A font a page loads is a download for every player, even if nothing shows
+  // it, and neither lint rule reads imports.
   it("loads only Rubik", () => {
-    const layout = readFileSync("src/app/layout.tsx", "utf8");
-    expect(layout).toMatch(/import \{ Rubik \} from "next\/font\/google";/);
+    const files = readdirSync("src", { recursive: true, encoding: "utf8" }).filter(
+      (path) => /\.tsx?$/.test(path) && !path.includes(".test."),
+    );
+    const imports = files.flatMap(
+      (path) => readFileSync(join("src", path), "utf8").match(/import[^;]*next\/font[^;]*;/g) ?? [],
+    );
+    expect(imports.length).toBeGreaterThan(0);
+    expect(new Set(imports)).toEqual(new Set(['import { Rubik } from "next/font/google";']));
   });
 });

@@ -17,7 +17,7 @@ The look is the **Review board** ([0022](../../docs/adr/0022-the-review-board-lo
 
 **Type.** A page's title is `text-title` (28px), a section heading `text-heading` (19px) and a panel heading `text-subheading` (17px); `ui/section-heading.tsx` and `ui/panel-heading.tsx` use them. Other text is `text-body` (15px), `text-note` (13px) or a Tailwind size. `text-[Npx]` fails lint (`turnpoint/review-board-type`).
 
-**Corners.** `rounded-md` (6px: panels, buttons, inputs, portraits), `rounded-sm` (4px: eval bar, small chips), `rounded-full` (grade marks, controls already pills), and their one-side forms where an open row meets its panel. Data marks under about 24px take `rounded-sm` or none. `src/app/corners.test.ts` fails on anything else: `soft-round*`, plain `rounded`, `rounded-lg` or bigger, made-up sizes, a border radius in CSS, a class or a style, and beveled corners. Only the share image sets its own radius, because it has no stylesheet.
+**Corners.** `rounded-md` (6px: panels, buttons, inputs, portraits), `rounded-sm` (4px: eval bar, small chips), `rounded-full` (grade marks, controls already pills), and their one-side forms where an open row meets its panel. Data marks under about 24px take `rounded-sm` or none. `src/app/corners.test.ts` fails on anything else: `soft-round*`, plain `rounded`, `rounded-lg` or bigger, made-up sizes, a border radius in CSS, a class or a style, and beveled corners. The share image writes its 6px out, because it has no stylesheet.
 
 **Spacing and motion.** 40px page sides, 68px header, 24 to 28px between columns, 14px between panels. Hover fades in 0.12s and out 0.32s, never during a theme switch or under reduced motion.
 

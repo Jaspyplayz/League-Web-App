@@ -153,6 +153,12 @@ const OLD_TYPE = [
   },
 ];
 
+// The same type set without a class: SVG attributes and style keys. fontSize
+// stays allowed, since the charts draw their labels in SVG.
+const INLINE_TYPE = new Set(["fontFamily", "letterSpacing", "textTransform"]);
+// The browser draws these in a monospace font unless a class says otherwise.
+const MONOSPACE_TAGS = new Set(["code", "kbd", "pre", "samp"]);
+
 const reviewBoardType = {
   meta: {
     type: "problem",
@@ -162,13 +168,38 @@ const reviewBoardType = {
     schema: [],
   },
   create(context) {
-    return everyString((node, text) => {
-      const isSentence = SENTENCE.test(text);
-      for (const { pattern, found, fix, isAlsoAWord } of OLD_TYPE) {
-        if (isAlsoAWord && isSentence) continue;
-        if (pattern.test(text)) context.report({ node, messageId: "oldType", data: { found, fix } });
-      }
-    });
+    const reportInline = (node, name) =>
+      context.report({
+        node,
+        messageId: "oldType",
+        data: { found: `inline ${name}`, fix: "remove it, since every page is Rubik in sentence case" },
+      });
+    return {
+      ...everyString((node, text) => {
+        const isSentence = SENTENCE.test(text);
+        for (const { pattern, found, fix, isAlsoAWord } of OLD_TYPE) {
+          if (isAlsoAWord && isSentence) continue;
+          if (pattern.test(text)) context.report({ node, messageId: "oldType", data: { found, fix } });
+        }
+      }),
+      JSXAttribute(node) {
+        if (INLINE_TYPE.has(node.name.name)) reportInline(node, node.name.name);
+      },
+      Property(node) {
+        if (!node.computed && INLINE_TYPE.has(node.key.name ?? node.key.value)) {
+          reportInline(node, node.key.name ?? node.key.value);
+        }
+      },
+      JSXOpeningElement(node) {
+        if (MONOSPACE_TAGS.has(node.name.name)) {
+          context.report({
+            node,
+            messageId: "oldType",
+            data: { found: `<${node.name.name}>`, fix: "use a span with tabular-nums, since the browser draws this tag in a monospace font" },
+          });
+        }
+      },
+    };
   },
 };
 
