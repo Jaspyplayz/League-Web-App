@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -73,10 +73,21 @@ describe("changedLines and reviewHistory", () => {
     // After the verdict: put guard.ts back, make run.sh runnable, add a
     // binary and a file with a tab in its name.
     git("checkout", shas.base, "--", "src/guard.ts");
-    chmodSync(join(repo, "scripts/run.sh"), 0o755);
     write("public/font.bin", Buffer.from([0, 1, 2, 0, 3]));
-    write("src/tab\tname.ts", "export const t = 1;\n".repeat(3));
-    shas.head = commit("after the verdict");
+    git("add", "-A");
+    // Set in the index, since Windows doesn't record a chmod on the disk.
+    git("update-index", "--chmod=+x", "scripts/run.sh");
+    // Windows can't make a file with a tab in its name, so it goes straight
+    // into git's index instead of onto the disk, with Git for Windows' guard
+    // against such names turned off for this one call. Git stores it the same way.
+    const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+      cwd: repo,
+      input: "export const t = 1;\n".repeat(3),
+      encoding: "utf8",
+    }).trim();
+    git("-c", "core.protectNTFS=false", "update-index", "--add", "--cacheinfo", `100644,${blob},src/tab\tname.ts`);
+    git("commit", "-q", "-m", "after the verdict");
+    shas.head = git("rev-parse", "HEAD");
   });
   afterAll(() => rmSync(repo, { recursive: true, force: true }));
 

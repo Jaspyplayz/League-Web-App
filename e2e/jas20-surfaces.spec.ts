@@ -62,10 +62,10 @@ test.describe("JAS-20 key surfaces", () => {
     await shot(page, "03-match-summary");
   });
 
-  test("match deep dive", async ({ page }) => {
+  test("match replay", async ({ page }) => {
     await page.goto(MATCH);
-    await expect(page.getByRole("tab", { name: "Deep dive" })).toBeVisible(READY);
-    await page.getByRole("tab", { name: "Deep dive" }).click();
+    await expect(page.getByRole("tab", { name: "Replay" })).toBeVisible(READY);
+    await page.getByRole("tab", { name: "Replay" }).click();
     await expect(page.getByRole("heading", { name: "Replay", exact: true })).toBeVisible();
     await rejectStandIns(page);
     await shot(page, "04-match-deep-dive");

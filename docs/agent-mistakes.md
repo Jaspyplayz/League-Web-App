@@ -43,6 +43,8 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A throwing read moved onto a page that didn't expect it](agent-mistakes/throwing-read-moved-to-a-busier-page.md) | 1 | check |
 | [Text on screen that promises more than the feature does](agent-mistakes/screen-text-promises-more-than-the-feature.md) | 1 | none yet |
 | [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | none yet |
+| [Renamed words on a page break the browser tests](agent-mistakes/renamed-words-break-e2e.md) | 1 | check |
+| [A test that can't pass on Windows](agent-mistakes/test-that-cannot-pass-on-windows.md) | 1 | none yet |
 
 ## Rules and what enforces them
 
@@ -59,6 +61,7 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | A PR that touches the risky list is Jasper's to merge | `npm run can-merge`, which refuses it (`scripts/risky-paths.ts`) |
 | The Agent merge workflow merges only a PR whose builder wrote `**Ready to merge:** yes at <head sha>` | `readyToMerge` in `scripts/can-merge-action-steps.ts` and its tests |
 | CI started by hand runs only on main, so it can't stand in for a PR's own `check` | The first step of `.github/workflows/ci.yml`, pinned by test `fails at once when started by hand anywhere but main` in `scripts/can-merge-action-steps.test.ts` |
+| The words the browser tests look for are on a page | `src/app/e2e-text.test.ts` |
 | Every agent mistake entry has all five lines | `scripts/agent-mistakes.test.ts` |
 | Each line in the reviewer's Judgement calls checklist names a class file that exists | `scripts/agent-mistakes.test.ts` |
 | Every reviewer blocker ends with a `Check could catch this:` line, kept in the PR's Review section | Nothing yet: `.claude/agents/reviewer.md` and `docs/workflow.md`; check 5 of [the wellness check](wellness.md#check-5-agent-mistakes) reads it twice a month |
