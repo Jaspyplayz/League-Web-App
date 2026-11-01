@@ -18,7 +18,7 @@ export function TeamGold({ points, objectives }: { points: DiffPoint[]; objectiv
       className={`${panelClass} flex min-w-0 flex-[999_1_600px] flex-col gap-[18px] p-6`}
     >
       <PanelHeading id="team-gold-heading">Team gold</PanelHeading>
-      <div className="flex flex-wrap gap-[18px] text-[13px] text-muted">
+      <div className="flex flex-wrap gap-[18px] text-note text-quiet">
         <LegendSwatch className="bg-ahead">Your team ahead</LegendSwatch>
         <LegendSwatch className="bg-behind">Enemy team ahead</LegendSwatch>
       </div>
@@ -104,9 +104,9 @@ function ObjectiveStrip({ points, objectives }: { points: DiffPoint[]; objective
         width="100%"
         role="img"
         aria-label={`Objectives. ${summarize(objectives, true, "Your team")} ${summarize(objectives, false, "The enemy team")}`}
-        className="block font-mono"
+        className="block tabular-nums"
       >
-        <g fontSize="15" fill="var(--color-faint)" textAnchor="end">
+        <g fontSize="15" fill="var(--color-quiet)" textAnchor="end">
           <text x={left - 12} y={top + ROW_HEIGHT / 2 + 5}>
             You
           </text>
@@ -119,7 +119,7 @@ function ObjectiveStrip({ points, objectives }: { points: DiffPoint[]; objective
           x2={width - right}
           y1={dividerY}
           y2={dividerY}
-          stroke="var(--color-line-strong)"
+          stroke="var(--color-divider)"
           strokeWidth="1.5"
         />
         <g fontSize="15" fontWeight="500" textAnchor="middle">
@@ -127,7 +127,7 @@ function ObjectiveStrip({ points, objectives }: { points: DiffPoint[]; objective
           {theirs.map((o) => circle(o, dividerY + ROW_HEIGHT / 2 + o.row * ROW_HEIGHT, "behind"))}
         </g>
       </svg>
-      <p className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-faint" aria-hidden="true">
+      <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-quiet" aria-hidden="true">
         {kindsUsed.map((kind) => (
           <span key={kind}>
             {OBJECTIVE_NAMES[kind].short} {OBJECTIVE_NAMES[kind].name}
