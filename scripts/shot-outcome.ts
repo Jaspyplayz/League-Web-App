@@ -35,7 +35,7 @@ export const RIOT_KEY_NOTICE = "The site's Riot API key isn't working";
 
 // The player page's answer to a Riot ID that doesn't exist. It is an ordinary
 // page, not the not-found one, so it has neither a 404 nor noindex.
-export const NO_PLAYER = "No player found";
+export const NO_PLAYER = "No player called";
 
 // src/app/global-error.tsx, and Next.js's own message when the page crashes in
 // the browser.

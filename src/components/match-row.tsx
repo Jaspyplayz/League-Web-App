@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { ChampionIcon, ItemSlots, SummonerSpellIcon } from "@/components/game-icons";
-import { GameScore } from "@/components/game-score";
-import { SegmentBar } from "@/components/ui/segment-bar";
+import { ChampionIcon } from "@/components/game-icons";
+import { scoreReason } from "@/components/game-score";
 import type { PlayerScore } from "@/lib/analyzer/score";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import {
@@ -13,10 +12,16 @@ import {
 import type { Region } from "@/lib/regions";
 import { toSlug } from "@/lib/riot-id";
 
-// One game in the player's match list: result, champion and spells, KDA, CS,
-// items, game score and both teams' players. Render it inside a <ul>. The
-// whole row is one link to the game's match page (`href`); the players' names
-// inside it stay links to their own profiles.
+// One game in the player's match list (JAS-87): the result, the champion, the
+// KDA, the game score with its reason, and both teams. Render it inside a
+// <ul> marked `@container`: the row lays itself out by the list's width, not
+// the screen's, because the list shares the screen with the side column.
+//   - under 576px (phones): two lines, the champion, KDA and score, then
+//     the result, queue and time;
+//   - 576px and up: one line, with the score's reason;
+//   - 768px and up: the ten players too.
+// The whole row is one link to the game's match page (`href`); the players'
+// names inside it stay links to their own profiles.
 export function MatchRow({
   match: m,
   dd,
@@ -36,114 +41,116 @@ export function MatchRow({
   href: string; // the game's match page, e.g. "/player/na/Name-TAG/match/NA1_1"
   id?: string; // so "Show 10 more games" can scroll to the first new row
 }) {
-  // Victory and Defeat, like the game's own end screen.
-  const result = m.remake ? "Remake" : m.win ? "Victory" : "Defeat";
+  const result = m.remake ? "Remake" : m.win ? "Win" : "Loss";
   const resultColor = m.remake ? "text-quiet" : m.win ? "text-ahead" : "text-behind";
-  // The champion portrait is framed in the result's color, so the list reads
-  // at a glance: blue for a win, red for a loss.
-  const portraitFrame = m.remake ? "border-divider" : m.win ? "border-ahead" : "border-behind";
-  // The whole row is tinted and outlined in the result's color too, so wins
-  // and losses stand apart when scanning the list.
-  const tint = m.remake
-    ? "border-divider bg-panel"
-    : m.win
-      ? "border-ahead/50 bg-ahead/10"
-      : "border-behind/50 bg-behind/10";
+  // A win is tinted blue and a loss red, over the panel colour: 10% in dark,
+  // 7% in light, where the same tint looks stronger. A remake stays plain.
+  const tint = m.remake ? "" : m.win ? "bg-ahead/10 light:bg-ahead/7" : "bg-behind/10 light:bg-behind/7";
   const champion = championName(dd, m.championName);
 
   return (
+    // `group`, so hovering anywhere on the row lights up its name and chevron.
     // `relative`, so the link's cover below spreads over the whole row.
-    <li id={id} className={`relative scroll-mt-4 rounded-md border ${tint} px-[18px] py-3.5`}>
-      <div className="flex items-center gap-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[18px] gap-y-3.5">
-          <div className="flex w-[92px] shrink-0 flex-col text-xs whitespace-nowrap text-quiet">
-            <span className={`text-sm font-semibold ${resultColor}`}>{result}</span>
-            <span>{m.queue}</span>
-            <span className="tabular-nums">
-              {timeAgo(m.startedAt, now)} · {formatDuration(m.durationS)}
-            </span>
-          </div>
-
-          <div className="flex min-w-0 flex-1 basis-[130px] items-center gap-3">
-            <div className="flex shrink-0 gap-1">
-              <ChampionIcon
-                dd={dd}
-                name={m.championName}
-                size={48}
-                className={`rounded-md border-2 ${portraitFrame}`}
-              />
-              <div className="flex flex-col gap-1">
-                <SummonerSpellIcon dd={dd} spellId={m.spells[0]} size={22} className="rounded-sm" />
-                <SummonerSpellIcon dd={dd} spellId={m.spells[1]} size={22} className="rounded-sm" />
-              </div>
-            </div>
-            <div className="min-w-0">
-              {/* The row's one link. Its ::after covers the whole row, so a
-                  click or tap anywhere opens the game, and a hover lightens
-                  the row. Only the players' links further on sit above the
-                  cover. The cover also hides the score's and items' hover
-                  titles; screen readers still hear what helped the score. */}
-              <Link
-                href={href}
-                aria-label={`Open this ${champion} game (${result}, ${timeAgo(m.startedAt, now)})`}
-                className="block truncate font-semibold text-main after:absolute after:inset-0 after:rounded-md after:transition-colors after:duration-320 hover:after:bg-select hover:after:duration-120 focus-visible:outline-none focus-visible:after:outline-3 focus-visible:after:outline-offset-3 focus-visible:after:outline-ahead/45 motion-reduce:after:transition-none"
-              >
-                {champion}
-              </Link>
-              {m.position && <p className="text-note text-quiet">{m.position}</p>}
-            </div>
-          </div>
-
-          <div className="w-[104px] shrink-0 whitespace-nowrap tabular-nums">
-            <p>
-              {m.kills} / {m.deaths} / {m.assists}
-            </p>
-            <p className="text-xs text-quiet">{m.kda.toFixed(1)} KDA</p>
-            {badges.length > 0 && (
-              <ul aria-label="Highlights" className="mt-1 flex flex-wrap gap-1">
-                {badges.map((badge) => (
-                  <li
-                    key={badge}
-                    className="rounded-sm border border-ahead-soft px-1.5 text-xs whitespace-nowrap text-ahead-soft"
-                  >
-                    {badge}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="w-[84px] shrink-0 whitespace-nowrap tabular-nums">
-            <p>{m.cs} CS</p>
-            <p className="text-xs text-quiet">{m.csPerMin.toFixed(1)}/min</p>
-          </div>
-
-          {score && (
-            <div className="flex w-[72px] shrink-0 flex-col gap-1">
-              <GameScore score={score} size="lg" />
-              {/* The 0 to 100 score as ten blocks, like a health bar. */}
-              <SegmentBar
-                filled={score.score / 100}
-                segments={10}
-                on={m.win ? "bg-ahead" : "bg-behind"}
-                className="h-1.5 w-full gap-[2px]"
-                label={`Score ${score.score} out of 100`}
-              />
-              <p className="text-xs text-quiet">Score</p>
-            </div>
-          )}
-
-          <ItemSlots dd={dd} items={m.items} />
-
-          {teams && <Teams dd={dd} region={teams.region} players={teams.players} />}
+    <li id={id} className="group relative scroll-mt-4 rounded-md bg-panel">
+      <div
+        className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 rounded-md p-3 @xl:grid-cols-[76px_140px_112px_minmax(0,1fr)_16px] @xl:px-3.5 @3xl:grid-cols-[76px_140px_112px_minmax(0,1fr)_176px_16px] ${tint}`}
+      >
+        {/* Every part sits on the first line except the result, which drops
+            to a second line on phones and leads the row on wider lists. */}
+        <div className="col-span-3 row-start-2 flex flex-wrap gap-x-1.5 text-note text-quiet @xl:col-span-1 @xl:row-start-1 @xl:flex-col">
+          <span className={`font-semibold ${resultColor} @xl:text-body`}>{result}</span>
+          <span>{m.queue}</span>
+          {/* "15d ago · 16:51" on a phone's one line; two lines on wider
+              lists, where the column is narrow. */}
+          <span className="tabular-nums">{timeAgo(m.startedAt, now)}</span>
+          <span className="tabular-nums">
+            <span className="@xl:hidden">· </span>
+            {formatDuration(m.durationS)}
+          </span>
         </div>
+
+        <div className="row-start-1 flex min-w-0 items-center gap-2.5">
+          <ChampionIcon dd={dd} name={m.championName} size={44} className="rounded-md" />
+          <div className="min-w-0">
+            {/* The row's one link. Its ::after covers the whole row, so a
+                click or tap anywhere opens the game. Only the players' links
+                further on sit above the cover. */}
+            <Link
+              href={href}
+              aria-label={`Open this ${champion} game (${result}, ${timeAgo(m.startedAt, now)})`}
+              className="block truncate font-medium text-main decoration-quiet underline-offset-[3px] group-hover:underline after:absolute after:inset-0 after:rounded-md focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-main"
+            >
+              {champion}
+            </Link>
+            {m.position && <p className="text-note text-quiet">{m.position}</p>}
+          </div>
+        </div>
+
+        <div className="row-start-1 text-right whitespace-nowrap tabular-nums @xl:text-left">
+          <p className="text-body font-semibold @xl:text-subheading">
+            {m.kills} / {m.deaths} / {m.assists}
+          </p>
+          <p className="text-note text-quiet">{m.kda.toFixed(1)} KDA</p>
+          {/* No room for CS beside the champion's name on a phone. */}
+          <p className="hidden text-note text-quiet @xl:block">
+            {m.cs} CS · {m.csPerMin.toFixed(1)}/min
+          </p>
+          {/* One line each, since two side by side would run under the score. */}
+          {badges.map((badge) => (
+            <p key={badge} className="hidden text-note text-quiet @xl:block">
+              {badge}
+            </p>
+          ))}
+        </div>
+
+        <div className="row-start-1 flex min-w-0 items-start gap-2.5">
+          <span
+            // The cover hides hover titles, so the number is named for
+            // screen readers and the reason is written out beside it.
+            role="img"
+            aria-label={score ? `Game score ${score.score} out of 100` : "No game score"}
+            className="flex h-8 min-w-10 shrink-0 items-center justify-center rounded-md bg-raised px-1.5 text-base font-bold tabular-nums"
+          >
+            {score ? score.score : "–"}
+          </span>
+          {score ? (
+            <>
+              {/* One line, as drawn: the main thing that helped or held the
+                  score back. Screen readers hear the whole reason instead. */}
+              <p aria-hidden="true" className="hidden min-w-0 truncate text-note leading-8 text-quiet @xl:block">
+                {shortReason(score)}
+              </p>
+              <p className="sr-only">{[score.badge, scoreReason(score)].filter(Boolean).join(". ")}</p>
+            </>
+          ) : (
+            <p className="hidden min-w-0 truncate text-note leading-8 text-quiet @xl:block">
+              {/* A remake, a game under 10 minutes or a mode without lanes
+                  (isScorable in src/lib/analyzer/score.ts) gets no score. */}
+              {m.remake ? "No score for a remake" : "No game score for this game"}
+            </p>
+          )}
+        </div>
+
+        {teams && <Teams region={teams.region} players={teams.players} />}
+
         <Chevron />
       </div>
     </li>
   );
 }
 
-// Points right, to say the row opens a page.
+// The reason cut to one line, after MVP or ACE when the player was the best
+// on their team: what helped most for a score of 50 or more, what held it
+// back most below 50, where most bad games still have something that helped.
+// "MVP · Helped by strong KDA", "Held back by many deaths"
+export function shortReason(score: PlayerScore): string {
+  const helped = score.strengths[0] && `Helped by ${score.strengths[0]}`;
+  const heldBack = score.weakness && `Held back by ${score.weakness}`;
+  const main = (score.score < 50 ? heldBack || helped : helped || heldBack) || "";
+  return [score.badge, main].filter(Boolean).join(" · ");
+}
+
+// Points right, to say the row opens a page. Hidden on phones, as drawn.
 function Chevron() {
   return (
     <svg
@@ -156,43 +163,25 @@ function Chevron() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="shrink-0 text-quiet"
+      className="row-start-1 hidden shrink-0 text-quiet transition-colors duration-320 group-hover:text-main group-hover:duration-120 motion-reduce:transition-none @xl:block"
     >
       <path d="M9 6l6 6-6 6" />
     </svg>
   );
 }
 
-// Two columns of five, blue side on the left, like op.gg. Hidden on phones,
-// where the row has no room for them; the match page shows everyone.
+// Two columns of five names, blue side on the left, with the player in the
+// text colour. Only on lists 768px and wider; the match page shows everyone.
 // `relative z-10` lifts the names above the row link's cover, so each one
 // still opens that player's profile; `pointer-events-none` lets a click in
 // the gaps between names fall through to the cover and open the game.
-function Teams({
-  dd,
-  region,
-  players,
-}: {
-  dd: DataDragon | null;
-  region: Region;
-  players: [TeamPlayer[], TeamPlayer[]];
-}) {
+function Teams({ region, players }: { region: Region; players: [TeamPlayer[], TeamPlayer[]] }) {
   return (
-    <div className="pointer-events-none relative z-10 ml-auto hidden shrink-0 gap-3 sm:flex">
+    <div className="pointer-events-none relative z-10 row-start-1 hidden grid-cols-2 gap-x-3 @3xl:grid">
       {players.map((team, side) => (
-        <ul
-          key={side}
-          aria-label={side === 0 ? "Blue side" : "Red side"}
-          className="flex w-[108px] flex-col gap-0.5 text-xs"
-        >
+        <ul key={side} aria-label={side === 0 ? "Blue side" : "Red side"} className="min-w-0 text-xs leading-normal">
           {team.map((p, i) => {
-            const inner = (
-              <>
-                <ChampionIcon dd={dd} name={p.championName} size={16} className="rounded-sm" />
-                <span className="truncate">{p.name}</span>
-              </>
-            );
-            const look = `flex min-w-0 items-center gap-1.5 ${p.isMe ? "font-semibold text-main" : "text-quiet"}`;
+            const look = `block truncate ${p.isMe ? "font-semibold text-main" : "text-quiet"}`;
             return (
               <li key={i}>
                 {p.riotId ? (
@@ -201,10 +190,10 @@ function Teams({
                     title={`${p.riotId.gameName}#${p.riotId.tagLine}`}
                     className={`${look} pointer-events-auto hover:text-main hover:underline`}
                   >
-                    {inner}
+                    {p.name}
                   </Link>
                 ) : (
-                  <span className={look}>{inner}</span>
+                  <span className={look}>{p.name}</span>
                 )}
               </li>
             );

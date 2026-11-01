@@ -27,7 +27,7 @@ Preconditions:
 - **Profile.** Go to `/player/kr/Hide%20on%20bush-KR1`. Heading `Recent matches` visible, calm. Navigation `Profile sections` has exactly the links `Matches`, `Champions`, `Insights`; `Matches` and, in navigation `Matches view`, `List` have `aria-current="page"`.
 - **By day.** Click `By day` in `Matches view`. The URL ends `?view=day`, `By day` is current, and heading `Days` or the text `No games in the last …` is visible (saved as `notes.byDay`). `Matches` is still the current tab. Calm.
 - **List.** Click `List`. Heading `Recent matches` visible and the URL has no query.
-- **Row.** Note the first link named `Open this <champion> game (…)` (saved as `notes.row`), then mouse-click the middle of the first row's `Items` group. The URL contains `/match/KR_` and tab `Summary` has `aria-selected="true"`. Calm.
+- **Row.** Note the first link named `Open this <champion> game (…)` (saved as `notes.row`), then mouse-click the middle of the first row's game score box (labelled `Game score N out of 100`, or `No game score`). The URL contains `/match/KR_` and tab `Summary` has `aria-selected="true"`. Calm.
 - **Old Log address.** Go to `/player/kr/Hide%20on%20bush-KR1/log`. The page lands on `/player/kr/Hide%20on%20bush-KR1?view=day` with `By day` current. Calm.
 - **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-profile-games`.
 - **Proof.** `01-open-the-profile.png`, `02-switch-to-by-day.png`, `04-click-a-game-row-and-land-on-its-match-page.png`, `05-old-log-address-lands-on-by-day.png`, with the ARIA snapshots showing which tab and view are current.
