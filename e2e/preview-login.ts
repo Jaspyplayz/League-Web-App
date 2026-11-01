@@ -22,12 +22,15 @@ type Sent = { origin: string; secret: boolean };
 // Headers a route adds show up only once the request has gone out, so read
 // them when it finishes, not when it starts.
 //
-// The function this returns ends the recording, so call it once, at the end. A
-// request that finishes later can't change its answer, and the browser may be
-// closing by then: that read would reject with nothing waiting for it, and
-// Playwright fails the running test for any unhandled rejection (JAS-141).
+// The function this returns ends the recording, so it can be called only once,
+// and a request that finishes later isn't checked. Reading one would be no use
+// anyway: the browser may be closing by then, so the read would reject with
+// nothing waiting for it, and Playwright fails the running test for any
+// unhandled rejection (JAS-141). A second call throws instead of answering from
+// the old list, which could hide a leak that came after the first.
 export function recordSent(context: BrowserContext): () => Promise<Sent[]> {
   const sent: Promise<Sent>[] = [];
+  let ended = false;
   const onFinished = (request: Request) => {
     const url = new URL(request.url());
     if (!url.protocol.startsWith("http")) return;
@@ -39,6 +42,8 @@ export function recordSent(context: BrowserContext): () => Promise<Sent[]> {
   };
   context.on("requestfinished", onFinished);
   return () => {
+    if (ended) throw new Error("This recording has ended. Start a new one to check later requests.");
+    ended = true;
     context.off("requestfinished", onFinished);
     return Promise.all(sent);
   };

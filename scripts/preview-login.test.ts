@@ -72,4 +72,14 @@ describe("recordLeaks", () => {
 
     expect(late.allHeaders).not.toHaveBeenCalled();
   });
+
+  // Answering from the old list would pass a test whose leak came after the
+  // first check.
+  it("refuses a second check", async () => {
+    const { context } = fakeContext();
+    const leaked = recordLeaks(context, PREVIEW);
+    await leaked();
+
+    await expect(leaked()).rejects.toThrow("This recording has ended");
+  });
 });
