@@ -99,11 +99,12 @@ export function SavedPlayersBox({
 
   const typed = query.trim().toLowerCase();
   const matches = (p: SavedPlayer) => `${p.gameName}#${p.tagLine}`.toLowerCase().includes(typed);
-  // A name that's only on the other tab shows there, so the box never says
-  // no player matches about someone it has.
-  // Clicking a tab beats that until the typing changes.
+  // A name that's only on the other tab shows there. Clicking a tab beats that
+  // until the typing changes, so a click is forgotten as soon as it does.
   const [clickedWhileTyping, setClickedWhileTyping] = useState<string | null>(null);
-  const fallsThrough = typed && typed !== clickedWhileTyping && !chosen.players.some(matches) && other.players.some(matches);
+  if (clickedWhileTyping !== null && clickedWhileTyping !== typed) setClickedWhileTyping(null);
+  const nameIsOnOtherTab = !chosen.players.some(matches) && other.players.some(matches);
+  const fallsThrough = typed && clickedWhileTyping === null && nameIsOnOtherTab;
   const tab = fallsThrough ? other : chosen;
   // A button holding focus loses it along with its row, and Escape stops working,
   // so hand it back. Not after a tap, which never focuses the button: focusing
@@ -176,7 +177,7 @@ export function SavedPlayersBox({
             ))}
           </ul>
         ) : (
-          <p className="px-4 py-4 text-sm text-quiet">{typed ? "No saved player matches." : tab.empty}</p>
+          <p className="px-4 py-4 text-sm text-quiet">{!typed ? tab.empty : nameIsOnOtherTab ? `No one on ${tab.label} matches.` : "No saved player matches."}</p>
         )}
       </div>
     </div>

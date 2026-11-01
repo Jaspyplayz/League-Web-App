@@ -147,10 +147,12 @@ test("clicking a tab while typing opens it, even when the name is on the other o
 
   await pinned.click();
   await expect(pinned).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByText("No saved player matches.")).toBeVisible();
+  await expect(page.getByText("No one on Pinned matches.")).toBeVisible();
 
-  // The next change to the typing finds the name again.
+  // The next change to the typing finds the name again, and stays found.
   await riotId(page).fill("hid");
+  await expect(recent).toHaveAttribute("aria-selected", "true");
+  await riotId(page).fill("hide");
   await expect(recent).toHaveAttribute("aria-selected", "true");
 });
 
