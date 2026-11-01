@@ -98,6 +98,34 @@ test("shows no dash when the read fails, and tries again next time", async ({ pa
   await expect(page.getByTitle("Diamond I")).toBeVisible();
 });
 
+test("a tab with nobody on it can still be opened", async ({ page }) => {
+  await fakeAnswers(page, [{ json: { ranks: {}, you: null } }]);
+  await openHomeWithSaved(page, [faker]);
+  await riotId(page).click();
+
+  const pinned = page.getByRole("tab", { name: /^Pinned/ });
+  await pinned.click();
+  await expect(pinned).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("Star a player to keep them here.")).toBeVisible();
+});
+
+// Same region as the header starts on, so the form stays mounted. Another
+// region would start a fresh form and hide the bug.
+test("a search error doesn't follow you to the player you pick", async ({ page }) => {
+  await fakeAnswers(page, [{ json: { ranks: {}, you: null } }]);
+  await openHomeWithSaved(page, [me]);
+  await page.goto("/privacy");
+  await riotId(page).fill("no tag here");
+  await page.keyboard.press("Enter");
+  const error = page.getByRole("alert").filter({ hasText: "#" });
+  await expect(error).toBeVisible(FIRST_LOAD);
+
+  await riotId(page).fill("");
+  await page.getByRole("link", { name: /Turnpoint Tester/ }).click();
+  await expect(page).toHaveURL(/\/player\/na\//, FIRST_LOAD);
+  await expect(error).toBeHidden();
+});
+
 test("hands focus back when a row leaves under the keyboard", async ({ page }) => {
   await fakeAnswers(page, [{ json: { ranks: {}, you: null } }]);
   await openHomeWithSaved(page, [], [faker]);

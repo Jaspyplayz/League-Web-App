@@ -114,13 +114,12 @@ function samePlayer(a: SavedPlayer, b: SavedPlayer): boolean {
 }
 
 // What the box under the search needs from the server (api/saved-players).
-// `ranks` is keyed by savedPlayerKey and holds only players with a solo queue
-// rank on file: anyone missing shows a dash, whether the site never looked
-// them up or they're unranked. `you` is the signed-in player's "This is me".
+// `you` is the signed-in player's "This is me".
 export type SavedRank = { tier: Tier; division: Division };
 export type SavedPlayerDetails = {
   // By savedPlayerKey, for every player asked about: null means no solo queue
-  // rank on file, and a player missing here hasn't been asked about yet.
+  // rank on file. A player missing here hasn't been asked about yet, or isn't a
+  // real Riot ID, which only a hand-edited list can hold.
   ranks: Record<string, SavedRank | null>;
   you: SavedPlayer | null;
 };

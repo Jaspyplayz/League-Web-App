@@ -45,6 +45,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | none yet |
 | [An empty state that guards the wrong empty case](agent-mistakes/empty-state-guards-the-wrong-case.md) | 1 | check |
 | [A server answer read once and kept for the page's life](agent-mistakes/server-answer-read-once.md) | 1 | check |
+| [A control tested only as static markup](agent-mistakes/control-tested-only-as-static-markup.md) | 1 | check |
 
 ## Rules and what enforces them
 

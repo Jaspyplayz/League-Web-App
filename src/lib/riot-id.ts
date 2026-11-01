@@ -4,8 +4,8 @@
 
 export type RiotId = { gameName: string; tagLine: string };
 
-// Any character except line breaks and control characters, which Postgres
-// refuses in a query (a NUL makes it throw).
+// Any character except line breaks and control characters. A NUL, for one,
+// makes Postgres throw.
 const GAME_NAME = /^[^\p{Cc}\u2028\u2029]{3,16}$/u;
 const TAG_LINE = /^[\p{L}\p{N}]{3,5}$/u;
 

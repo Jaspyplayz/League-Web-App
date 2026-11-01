@@ -17,13 +17,16 @@ export function usePlayerSearch(errorId: string) {
   // What's typed in the Riot ID box, to narrow the saved players.
   const [query, setQuery] = useState("");
   const [wanted, setWanted] = useState(false);
+  // Picking a saved player leaves the last search's error behind, and the
+  // header's form stays on screen across pages.
+  const [errorDismissed, setErrorDismissed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const saved = useSavedPlayersBox(wanted);
   const boxOpen = wanted && !pending && saved.hasAny;
   // One or the other, since they'd sit in the same spot. The error comes back
   // when the box closes.
-  const error = boxOpen ? null : state.error;
+  const error = boxOpen || errorDismissed ? null : state.error;
 
   // A click outside closes the box. Blur can't catch it: a tap outside on an
   // iPhone leaves the input focused.
@@ -44,6 +47,7 @@ export function usePlayerSearch(errorId: string) {
     const riotId = parseRiotId(String(form.get("riotId") ?? ""));
     if (isRegion(region) && riotId) noteSearch({ region, ...riotId });
     setWanted(false);
+    setErrorDismissed(false);
   }
 
   const formProps = {
@@ -90,6 +94,7 @@ export function usePlayerSearch(errorId: string) {
       onPick={() => {
         setWanted(false);
         setQuery("");
+        setErrorDismissed(true);
       }}
       // A row that leaves takes keyboard focus with it, so hand it back.
       onRowGone={() => inputRef.current?.focus()}

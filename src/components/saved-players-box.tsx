@@ -101,7 +101,12 @@ export function SavedPlayersBox({
   const matches = (p: SavedPlayer) => `${p.gameName}#${p.tagLine}`.toLowerCase().includes(typed);
   // A name that's only on the other tab shows there, so the box never says
   // no player matches about someone it has.
-  const tab = !chosen.players.some(matches) && other.players.some(matches) ? other : chosen;
+  const tab = typed && !chosen.players.some(matches) && other.players.some(matches) ? other : chosen;
+  // A keyboard press loses its focus along with the row, so hand it back. Not a
+  // tap (detail above 0): focusing the search would open a phone's keyboard.
+  const rowGone = (event: React.MouseEvent) => {
+    if (event.detail === 0) onRowGone();
+  };
   const rows = tab.players.filter(matches);
 
   return (
@@ -150,15 +155,15 @@ export function SavedPlayersBox({
                 }}
                 pinned={hasPlayer(pinned, p)}
                 pinsFull={pinned.length >= MAX_PINNED_PLAYERS}
-                onPin={() => {
+                onPin={(event) => {
                   updateSavedPlayers(PINNED_PLAYERS_KEY, (list) => togglePinnedPlayer(list, p));
                   // On Pinned, unpinning takes the row away.
-                  if (tab.id === "pinned") onRowGone();
+                  if (tab.id === "pinned") rowGone(event);
                 }}
                 removeLabel={`from ${tab.label.toLowerCase()} players`}
-                onRemove={() => {
+                onRemove={(event) => {
                   updateSavedPlayers(tab.storageKey, (list) => removePlayer(list, p));
-                  onRowGone();
+                  rowGone(event);
                 }}
               />
             ))}
@@ -192,9 +197,9 @@ function PlayerRow({
   onPick: () => void;
   pinned?: boolean;
   pinsFull?: boolean;
-  onPin?: () => void;
+  onPin?: (event: React.MouseEvent) => void;
   removeLabel?: string;
-  onRemove?: () => void;
+  onRemove?: (event: React.MouseEvent) => void;
 }) {
   const riotId = `${p.gameName}#${p.tagLine}`;
   return (
