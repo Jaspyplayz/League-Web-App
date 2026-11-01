@@ -1,6 +1,6 @@
 **Tier:** tiny, normal or risky, and why.
 **Builder:** Claude Code on Opus 5.5, in a local or cloud session.
-**Ready to merge:** no. As its last step the builder changes this to `yes at <head sha>`; the Agent merge workflow merges only then, and a later push holds it again (docs/workflow.md step 11).
+**Ready to merge:** no. As its last step the builder changes this to `yes at <head sha>`; the Agent merge workflow merges only then, and a later push holds it again (docs/workflow.md step 11). A risky PR does this too once the panel and the reviewer clear it. A PR on Jasper's list in `scripts/risky-paths.ts`, or a one-way door, keeps `no: Jasper merges this one by hand.`
 Closes #
 
 ## Summary
@@ -33,7 +33,8 @@ the new code writes while it's live, money spent on Claude calls, a message
 sent, or a setting changed outside this repo (Vercel, GitHub, Supabase,
 Linear). Files or browser storage the new code writes are two-way, since the
 reverted code stops reading them. A one-way door is Jasper's to merge, so it
-takes the risky tier (decision record 0008).
+takes the risky tier, and can-merge refuses it (decision records 0008 and
+0025). A risky PR needs this line.
 
 **Blast radius:** low, medium or high, then what could break and for whom if
 this is wrong. High: sign-in, saved data, money, or a page most players open
@@ -55,9 +56,10 @@ with no bullet or bold: `Fixed:` and the test, or `Rejected:` and the
 evidence. The `postmortem` skill starts from the check line, and wellness
 check 5 reads both (`docs/workflow.md`, Recording).
 
-Risky PRs: the pstack `interrogate` panel too, starting
-`Interrogate panel at <sha>: <n> to act on`, or "no interrogate panel yet" if
-it couldn't run. Any other check gets its own line too, such as
+Risky PRs, and any PR that touches the panel list in `scripts/risky-paths.ts`:
+the pstack `interrogate` panel too, on a line of its own after a blank line,
+starting `Interrogate panel at <sha>: <n> to act on`, or "no interrogate panel
+yet" if it couldn't run. can-merge won't merge one without that line. Any other check gets its own line too, such as
 `Security check at <sha>: no findings`. Keep each review's findings under its
 line, and use that `<name> at <sha>:` shape only for reviews.
 

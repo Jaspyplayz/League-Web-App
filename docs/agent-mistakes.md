@@ -56,7 +56,9 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Lint and typecheck pass before Claude commits | The commit hook, `.claude/hooks/check-before-commit.mjs` |
 | No PR merges before the reviewer clears it (its head, or an earlier commit with only small changes since) | GitHub's required `reviewer` check |
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
-| A PR that touches the risky list is Jasper's to merge | `npm run can-merge`, which refuses it (`scripts/risky-paths.ts`) |
+| A PR that touches Jasper's list (migrations, anything that defines a check) is Jasper's to merge | `npm run can-merge`, gate "No files Jasper merges" (`jaspersFiles` in `scripts/risky-paths.ts`) |
+| A risky PR merges only after the interrogate panel ran on one of its commits | `npm run can-merge`, gate "Interrogate panel ran", and its tests in `scripts/can-merge-gates.test.ts` |
+| A one-way door is Jasper's to merge | `npm run can-merge`, gate "Two-way door" |
 | The Agent merge workflow merges only a PR whose builder wrote `**Ready to merge:** yes at <head sha>` | `readyToMerge` in `scripts/can-merge-action-steps.ts` and its tests |
 | CI started by hand runs only on main, so it can't stand in for a PR's own `check` | The first step of `.github/workflows/ci.yml`, pinned by test `fails at once when started by hand anywhere but main` in `scripts/can-merge-action-steps.test.ts` |
 | Every agent mistake entry has all five lines | `scripts/agent-mistakes.test.ts` |
