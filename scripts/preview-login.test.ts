@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { BrowserContext, Request } from "@playwright/test";
 import { describe, expect, it, vi } from "vitest";
-import { recordLeaks } from "../e2e/preview-login";
+import { recordLeaks, recordSent } from "../e2e/preview-login";
 
 // These live here because Vitest skips e2e/, and Playwright would run a
 // .test.ts file placed there as a browser test.
@@ -65,21 +65,27 @@ describe("recordLeaks", () => {
   it("starts no read for a request that finishes after the check starts", async () => {
     const { context, finish } = fakeContext();
     const leaked = recordLeaks(context, PREVIEW);
-    await leaked();
+    const check = leaked();
 
+    // In the same step as the check starting, so there's no gap to finish in.
     const late = fakeRequest(`${OTHER}/image.png`, closedBrowser);
     finish(late);
+    await check;
 
     expect(late.allHeaders).not.toHaveBeenCalled();
   });
+});
 
+describe("recordSent", () => {
   // Answering from the old list would pass a test whose leak came after the
-  // first check.
-  it("refuses a second check", async () => {
+  // first check. Rejecting, not throwing, is what a caller's catch can handle.
+  it("rejects a second read", async () => {
     const { context } = fakeContext();
-    const leaked = recordLeaks(context, PREVIEW);
-    await leaked();
+    const sent = recordSent(context);
+    await sent();
 
-    await expect(leaked()).rejects.toThrow("This recording has ended");
+    const second = sent();
+
+    await expect(second).rejects.toThrow("This recording has ended");
   });
 });

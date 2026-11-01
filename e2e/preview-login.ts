@@ -5,7 +5,8 @@ import type { BrowserContext, Request } from "@playwright/test";
 // so it goes only to the preview's own origin. Playwright's extraHTTPHeaders
 // would also send it with every image from Data Dragon and every report to
 // Sentry (#156). A redirect from the preview to another site still carries it,
-// and e2e/fixtures.ts fails the test when that happens.
+// and e2e/fixtures.ts fails the test if that redirect finishes before the
+// check (JAS-142 has the gaps).
 export async function passPreviewLogin(context: BrowserContext, origin: string) {
   const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (!secret) return;
@@ -23,10 +24,11 @@ type Sent = { origin: string; secret: boolean };
 // them when it finishes, not when it starts.
 //
 // The function this returns ends the recording, so it can be called only once.
-// A request that finishes later isn't checked, so a leak in it would go unseen
-// (JAS-142). It can't be read safely: the browser may be closing by then, so the
-// read would reject with nothing waiting for it, and Playwright fails the running
-// test for any unhandled rejection (JAS-141). A second call fails instead of
+// A request that finishes later isn't checked, and neither is one that fails, so
+// a leak in either would go unseen (JAS-142). A later one can't be read safely:
+// the browser may be closing by then, so the read would reject with nothing
+// waiting for it, and Playwright fails the running test for any unhandled
+// rejection (JAS-141). A second call fails instead of
 // answering from the old list, which could hide a leak that came after the first.
 export function recordSent(context: BrowserContext): () => Promise<Sent[]> {
   const sent: Promise<Sent>[] = [];
