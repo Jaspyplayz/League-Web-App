@@ -2,7 +2,7 @@
 export function LegendSwatch({ className, children }: { className: string; children: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span aria-hidden="true" className={`size-3 rounded-[3px] ${className}`} />
+      <span aria-hidden="true" className={`size-3 rounded-sm ${className}`} />
       {children}
     </span>
   );

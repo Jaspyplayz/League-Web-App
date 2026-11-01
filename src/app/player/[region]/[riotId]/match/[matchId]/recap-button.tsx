@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { writeRecapAction } from "@/app/account/actions";
+import { mainButtonClass } from "@/components/ui/state-panel";
 import type { Recap } from "@/lib/recap";
 import { RecapText } from "./recap-text";
 
@@ -31,7 +32,7 @@ export function RecapButton({ region, matchId, puuid }: Props) {
   if (recap) return <RecapText headline={recap.headline} detail={recap.detail} />;
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-muted">
+      <p className="text-quiet">
         Get a few short points on what decided this game, written by AI from the stats on this page.
       </p>
       <div className="flex flex-wrap items-center gap-3">
@@ -39,7 +40,7 @@ export function RecapButton({ region, matchId, puuid }: Props) {
           type="button"
           onClick={write}
           disabled={isPending}
-          className="soft-round-sm min-h-10 bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
+          className={mainButtonClass}
         >
           {isPending ? "Writing…" : "Write recap"}
         </button>

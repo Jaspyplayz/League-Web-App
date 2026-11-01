@@ -16,7 +16,7 @@ export async function LiveBadge({ region, puuid }: { region: Region; puuid: stri
   // eslint-disable-next-line react-hooks/purity
   const label = liveGameLabel(game.value, Date.now());
   return (
-    <span className="inline-flex items-center gap-2 border border-ahead/50 bg-ahead/10 px-2.5 py-1 font-mono text-xs tracking-wider text-ahead-soft uppercase">
+    <span className="inline-flex items-center gap-2 rounded-sm border border-ahead/50 bg-ahead/10 px-2.5 py-1 text-xs text-ahead-soft tabular-nums">
       <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-ahead" />
       {label}
     </span>
