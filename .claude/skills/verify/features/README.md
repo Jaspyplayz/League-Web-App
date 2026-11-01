@@ -11,13 +11,13 @@ The pages a player uses, and how to prove each one works with `npm run shot` ([S
 ## Driving conventions
 
 - Paths are URL-encoded: `Hide%20on%20bush-KR1`, not `Hide on bush#KR1`.
-- Name labels and roles as players see them (`--tab "Deep dive"`), never CSS classes.
+- Name labels and roles as players see them (`--tab "Replay"`), never CSS classes.
 - The data shown for a live player changes with every game they play. Prove a criterion about saved or computed data on the sample game.
 
 ## Features
 
 - [Search and profile](./search-and-profile.md): the home page search, a player's profile and its sections.
-- [Match page](./match-page.md): the Summary and Deep dive tabs of one game, including the replay.
+- [Match page](./match-page.md): the Summary, Replay and Stats tabs of one game, including the replay and Ask.
 - [Insights](./insights.md): the three Insights views.
 - [Theme](./theme.md): the header's dark and light switch, which every page follows.
 

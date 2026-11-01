@@ -40,6 +40,9 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 6 | check |
 | [Automation that merges before the builder is done](agent-mistakes/merge-before-the-builder-is-done.md) | 1 | design |
 | [A new way to start a check that the merge gates trust](agent-mistakes/new-trigger-feeds-the-gates.md) | 1 | check |
+| [A throwing read moved onto a page that didn't expect it](agent-mistakes/throwing-read-moved-to-a-busier-page.md) | 1 | check |
+| [Text on screen that promises more than the feature does](agent-mistakes/screen-text-promises-more-than-the-feature.md) | 1 | none yet |
+| [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | none yet |
 
 ## Rules and what enforces them
 

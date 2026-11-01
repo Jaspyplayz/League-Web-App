@@ -53,6 +53,8 @@ Each folder and the files worth knowing in it. `CLAUDE.md` gives agents the shor
 ```
 src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   .../match/[matchId]/ under it is the match analysis page
+                  (Summary, Replay and Stats tabs, with Ask beside the replay;
+                  .../ask/ only sends the old Ask tab's address to the profile)
                   and .../insights/ the trends across the last 20 to 100 games,
                   .../log/ the Log tab (one card per day, src/lib/daily-log.ts),
                   .../champions/ the season's stats per champion and enemy
@@ -63,7 +65,7 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   api/cron/season-sync/ the daily job that saves "This is me"
                   players' new games (docs/database.md);
                   robots.ts keeps crawlers off player pages and the API
-src/components/   React components; ui/ holds small shared pieces
+src/components/   React components; ui/ holds small shared pieces, ask/ the Ask panel
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (retries; rate-limit.ts counts requests, shared
                   across servers in Postgres by rate-limit-store.ts) and one function per endpoint
@@ -93,7 +95,7 @@ src/lib/trend-games.ts  A player's recent games summarized for Insights, a few t
 src/lib/season-store.ts Season champion stats from slim season_games rows; loads 10 more per plain profile visit,
                   and syncSeasons fills in "This is me" players once a day (api/cron/season-sync)
 src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
-src/lib/ask.ts    Claude API agent loop for the Ask tab; ask-store.ts saves each question before Claude answers, ask-rules.ts the caps
+src/lib/ask.ts    Claude API agent loop for the Ask panel beside the replay; ask-store.ts saves each question before Claude answers, ask-rules.ts the caps
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
 scripts/          Command-line jobs run with tsx (benchmarks, train-score, check-score, train-win-chance, train-phase-score, tempo study, item check, shot for screenshots, remap-puuids after a Riot key change, can-merge and the risky-paths list for Claude Code's own merges, can-merge-action for the Agent merge workflow, wellness for the biweekly check in docs/wellness.md; can-merge-rest.ts turns GitHub's REST answers into what the gates check, tested on the saved answers in can-merge-fixtures/)

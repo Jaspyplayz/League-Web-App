@@ -1,12 +1,12 @@
 # Search and profile
 
-A player types a Riot ID on the home page, picks a region and lands on that player's profile: rank cards, recent matches, and the sections Champions, Insights, Log and Ask.
+A player types a Riot ID on the home page, picks a region and lands on that player's profile: rank cards, recent matches, and the sections Champions, Insights and Log.
 
 ## Sub-features
 
 - `search` sends the Riot ID and region to the profile's URL.
 - `profile` shows the player summary, rank cards and recent matches.
-- `profile-sections` switches between Matches, Champions, Insights, Log and Ask.
+- `profile-sections` switches between Matches, Champions, Insights and Log.
 - `not-found` sends a bad link to the 404 page, which has its own search box.
 
 ## How to get to it (user POV)
@@ -22,7 +22,7 @@ Preconditions: `npm run shot -- --check` exits 0, and its profile line says `ok`
 
 - **Home page.** `npm run shot -- --pr <n> /` shows the heading "Find the minute" and the search form.
 - **Profile.** `npm run shot -- --pr <n> "/player/kr/Hide%20on%20bush-KR1"` shows the region named `Player summary`, the `Ranked Solo/Duo` card and `Recent matches`. Searching lands on this URL, so shoot it directly.
-- **Sections.** Add `/champions`, `/insights`, `/log` or `/ask` to the profile path.
+- **Sections.** Add `/champions`, `/insights` or `/log` to the profile path. Ask is on a game's Replay tab now ([match page](./match-page.md)).
 - **Not found.** `npm run shot -- --pr <n> --expect not-found /this-page-does-not-exist` saves the 404 page. Without `--expect` it reports `not-found` and exits 1, and so does a player or match link with a typo, even though those pages answer 200.
 
 ## Gotchas

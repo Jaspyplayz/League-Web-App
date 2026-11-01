@@ -154,8 +154,8 @@ flowchart LR
 src/
   app/                          Next.js routes (App Router)
     page.tsx                    Home page with the search form
-    player/[region]/[riotId]/   Player profile, with Insights, Champions, Log and Ask tabs
-      match/[matchId]/          Match analysis page (Summary and Deep dive tabs)
+    player/[region]/[riotId]/   Player profile, with Insights, Champions and Log tabs
+      match/[matchId]/          Match analysis page (Summary, Replay and Stats tabs, Ask beside the replay)
     api/mcp/                    The MCP server
     how-it-works/               How the analyzer and models work, for players
     privacy/, terms/            Legal pages
