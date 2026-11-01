@@ -54,7 +54,7 @@ export function ReplayMap({
       <div
         role="img"
         aria-label={label}
-        className="soft-round relative aspect-square w-full overflow-hidden border border-line bg-page"
+        className="relative aspect-square w-full overflow-hidden rounded-md bg-page"
       >
         <MapBackground pictureUrl={mapUrl} />
         {recent.map((k, i) =>
@@ -82,13 +82,13 @@ export function ReplayMap({
           <BackIn key={person.participantId} now={moment(person.participantId)} t={t} />
         ))}
       </div>
-      <div aria-hidden="true" className="flex flex-wrap gap-x-4 gap-y-1.5 text-note text-muted">
+      <div aria-hidden="true" className="flex flex-wrap gap-x-4 gap-y-1.5 text-note text-quiet">
         <RingSwatch className="border-ahead">Your team</RingSwatch>
         <RingSwatch className="border-behind">Enemy team</RingSwatch>
         <span>Faded: dead, with the time until they&apos;re back</span>
         <span>×: a kill in the last 10 seconds</span>
       </div>
-      <p className="text-note text-faint">
+      <p className="text-note text-quiet">
         Spots are exact at each minute mark, at deaths and at the fountain, and estimated in
         between.
       </p>
@@ -136,15 +136,15 @@ function Champion({
       style={{ ...place(now.position), zIndex: layer }}
     >
       <span
-        className={`flex size-full items-center justify-center overflow-hidden rounded-full bg-surface ${ring} ${
+        className={`flex size-full items-center justify-center overflow-hidden rounded-full bg-panel ${ring} ${
           ours ? "border-ahead" : "border-behind"
         } ${dead ? "opacity-45 grayscale" : ""}`}
       >
         {person.iconUrl ? (
           <Picture src={person.iconUrl} alt="" size={26} className="size-full rounded-full" />
         ) : (
-          <span className="text-[10px] font-semibold text-ink-soft">
-            {person.name.slice(0, 2).toUpperCase()}
+          <span className="text-xs font-semibold text-main">
+            {person.name.slice(0, 2)}
           </span>
         )}
       </span>
@@ -157,7 +157,7 @@ function BackIn({ now, t }: { now: PlayerMoment; t: number }) {
   if (now.respawnAt === null) return null;
   return (
     <span
-      className="absolute z-[7] -translate-x-1/2 translate-y-[14px] whitespace-nowrap rounded-[4px] bg-page px-[3px] py-0.5 font-mono text-[10px] leading-none text-ink"
+      className="absolute z-[7] -translate-x-1/2 translate-y-[14px] whitespace-nowrap rounded-sm bg-page px-1 py-0.5 text-xs leading-none tabular-nums text-main"
       style={place(now.position)}
     >
       {backIn(now, t)}
@@ -196,7 +196,7 @@ function KillCross({ position, ours }: { position: MapPosition; ours: boolean })
 function RingSwatch({ className, children }: { className: string; children: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={`size-[11px] rounded-full border-2 ${className}`} />
+      <span className={`size-3 rounded-full border-2 ${className}`} />
       {children}
     </span>
   );

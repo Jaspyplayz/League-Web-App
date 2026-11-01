@@ -1,6 +1,6 @@
 "use client";
 
-// The replay (beta): the whole game on one timeline you can drag or play,
+// The replay: the whole game on one timeline you can drag or play,
 // with the map and scoreboard at that second under it, so you can see where
 // every champion was and each player's level, kills, CS, gold and items at
 // any moment. Above them, your team's chance to win at that second; under the
@@ -38,6 +38,10 @@ import {
   PlayMarks,
   PlayNow,
   ReplayPlays,
+  SWITCH,
+  SWITCH_BUTTON,
+  SWITCH_OFF,
+  SWITCH_ON,
 } from "./replay-plays";
 import { ReplayScoreboard, type ItemInfo, type ReplayPerson } from "./replay-scoreboard";
 import { useReviewLinks } from "./review-links";
@@ -225,19 +229,16 @@ export function Replay({
 
   return (
     <section aria-labelledby="replay-heading" className={`${panelClass} flex flex-col gap-[18px] p-6`}>
+      {/* The one-line beta note above the panel says the replay is a beta,
+          so the heading has no badge of its own (JAS-109). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <PanelHeading id="replay-heading">Replay</PanelHeading>
-          <span className="rounded-full border border-line-strong px-2.5 py-0.5 font-mono text-label uppercase tracking-[0.12em] text-faint">
-            Beta
-          </span>
-        </div>
+        <PanelHeading id="replay-heading">Replay</PanelHeading>
         <button
           type="button"
           aria-expanded={help}
           aria-controls="replay-help"
           onClick={() => setHelp((open) => !open)}
-          className="soft-round-sm flex min-h-9 items-center gap-1.5 border border-line-strong px-3 py-1.5 text-note text-muted hover:text-ink"
+          className="flex min-h-9 items-center gap-1.5 rounded-md bg-raised px-3 py-1.5 text-note font-medium text-main hover:bg-divider"
         >
           How to read this
           <svg
@@ -262,7 +263,7 @@ export function Replay({
       <div
         id="replay-help"
         hidden={!help}
-        className="soft-round flex flex-col gap-3 border border-line p-4 text-note text-muted"
+        className="flex flex-col gap-3 rounded-md bg-raised p-4 text-note text-quiet"
       >
         <p className="text-sm">
           The whole game, second by second. Drag along the timeline or press play, and the map
@@ -286,7 +287,7 @@ export function Replay({
         </div>
         <p>
           {chances
-            ? "Each dot under the win chance line is a play: blue when it raised your team's chance, red when it lowered it, grey when it barely moved it, bigger the more it moved, and square when it took an objective. "
+            ? "Each dot under the win chance line is a play, in its grade's colour (the same as its mark in the list), bigger the more it moved your team's chance, and square when it took an objective. "
             : ""}
           Letters mark the epic monsters each team took (D dragon, E Elder, G grubs, H Herald, B
           Baron, A Atakhan), in blue for your team and red for the enemy&apos;s, and ticks mark the
@@ -296,7 +297,7 @@ export function Replay({
         <p>
           Riot logs kills, deaths, level-ups and items to the second, but positions, gold and CS
           only once a minute, so between those snapshots they&apos;re estimates.{" "}
-          <a href={docsHref} className="text-ahead-soft hover:text-ahead-bright">
+          <a href={docsHref} className={LINK}>
             How the replay is worked out
           </a>
           .
@@ -342,7 +343,7 @@ export function Replay({
                 if (e.currentTarget.hasPointerCapture(e.pointerId)) seek(e.clientX);
               }}
               onKeyDown={onKeyDown}
-              className="relative flex cursor-ew-resize touch-pan-y select-none flex-col gap-1 soft-round-sm"
+              className="relative flex cursor-ew-resize touch-pan-y select-none flex-col gap-1 rounded-sm"
             >
               {chances && (
                 <>
@@ -361,7 +362,7 @@ export function Replay({
               )}
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute -inset-y-1 w-0.5 -translate-x-1/2 rounded-full bg-ink"
+                className="pointer-events-none absolute -inset-y-1 w-0.5 -translate-x-1/2 rounded-full bg-main"
                 style={{ left: left(t) }}
               />
             </div>
@@ -369,7 +370,7 @@ export function Replay({
               {ticks.map((tick) => (
                 <span
                   key={tick}
-                  className={`absolute top-1 -translate-x-1/2 font-mono text-label text-faint ${
+                  className={`absolute top-1 -translate-x-1/2 text-xs tabular-nums text-quiet ${
                     tick % 600_000 === 0 ? "" : "max-sm:hidden"
                   }`}
                   style={{ left: left(tick) }}
@@ -384,7 +385,7 @@ export function Replay({
 
         {/* The play bar: the controls, the play the replay is on and your
             team's chance to win, with what happened in the play under it. */}
-        <div className="soft-round flex flex-col border border-line-strong bg-surface-hover">
+        <div className="flex flex-col rounded-md bg-raised">
           <div className="flex flex-wrap items-center gap-x-[18px] gap-y-3 px-3.5 py-3">
             <div className="flex items-center gap-1.5">
               <StepButton
@@ -399,7 +400,7 @@ export function Replay({
                 aria-label={playing ? "Pause" : "Play"}
                 title={playing ? "Pause" : "Play"}
                 onClick={play}
-                className="flex size-12 items-center justify-center rounded-full bg-ahead text-page transition-colors hover:bg-ahead-soft"
+                className="flex size-12 items-center justify-center rounded-full bg-main text-page hover:opacity-90"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   {playing ? (
@@ -416,40 +417,34 @@ export function Replay({
               >
                 <path d="M9 6l6 6-6 6" />
               </StepButton>
-              <span className="ml-1.5 whitespace-nowrap font-mono text-sm text-ink-soft">
-                {formatClock(t)} <span className="text-faint">/ {formatClock(end)}</span>
+              <span className="ml-1.5 whitespace-nowrap text-sm tabular-nums text-main">
+                {formatClock(t)} <span className="text-quiet">/ {formatClock(end)}</span>
               </span>
             </div>
             {plays && <PlayNow plays={plays} play={current} replay={replay} names={names} />}
             <div className="ml-auto flex items-center gap-3.5">
               {chance !== null && (
                 <div className="flex flex-col items-end">
-                  <span className="font-mono text-label uppercase tracking-[0.12em] text-faint">
+                  <span className="text-note text-quiet">
                     <span className="sr-only">Your team&apos;s </span>Win chance
                   </span>
                   <span
-                    className={`font-mono text-[22px] font-medium leading-tight ${
-                      chance > 0.5 ? "text-ahead-soft" : chance < 0.5 ? "text-behind" : "text-ink"
+                    className={`text-xl font-semibold leading-tight tabular-nums ${
+                      chance > 0.5 ? "text-ahead-soft" : chance < 0.5 ? "text-behind" : "text-main"
                     }`}
                   >
                     {percent(chance)}
                   </span>
                 </div>
               )}
-              <div
-                role="group"
-                aria-label="Playback speed"
-                className="soft-round-sm inline-flex overflow-hidden border border-line-strong text-note"
-              >
+              <div role="group" aria-label="Playback speed" className={`${SWITCH} bg-panel`}>
                 {SPEEDS.map((x) => (
                   <button
                     key={x}
                     type="button"
                     aria-pressed={speed === x}
                     onClick={() => setSpeed(x)}
-                    className={`px-2.5 py-1.5 font-mono ${
-                      speed === x ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
-                    }`}
+                    className={`${SWITCH_BUTTON} tabular-nums ${speed === x ? SWITCH_ON : SWITCH_OFF}`}
                   >
                     {x}×
                   </button>
@@ -496,6 +491,10 @@ export function Replay({
   );
 }
 
+// A link in the text colour, underlined, as on How it works: blue and red
+// only ever mean you and the opponent.
+const LINK = "text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main";
+
 // 0.6143 -> "61%".
 function percent(chance: number): string {
   return `${Math.round(chance * 100)}%`;
@@ -503,7 +502,7 @@ function percent(chance: number): string {
 
 function RowLabel({ className, children }: { className: string; children: string }) {
   return (
-    <span className={`flex items-center truncate pr-2 text-note text-faint ${className}`} title={children}>
+    <span className={`flex items-center truncate pr-2 text-note text-quiet ${className}`} title={children}>
       {children}
     </span>
   );
@@ -528,7 +527,7 @@ function MonsterMarks({
           <span
             key={`${m.kind}-${m.timestamp}`}
             title={`${ours ? "Your team" : "Enemy team"} took ${OBJECTIVE_NAMES[m.kind].name} at ${formatClock(m.timestamp)}`}
-            className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono text-label leading-none ${
+            className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-semibold leading-none ${
               ours ? "text-ahead-soft" : "text-behind"
             }`}
             style={{ left: left(m.timestamp) }}
@@ -558,7 +557,7 @@ function KillMarks({
 }) {
   return (
     <div aria-hidden="true" className="relative h-6">
-      <span className="absolute inset-x-0 top-1/2 h-px bg-line" />
+      <span className="absolute inset-x-0 top-1/2 h-px bg-divider" />
       {kills.map((k, i) => {
         const ours = teamOf.get(k.victimId) !== myTeamId;
         const victim = names[k.victimId] ?? "someone";

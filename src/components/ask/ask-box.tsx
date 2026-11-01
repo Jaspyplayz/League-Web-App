@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useState, useTransition, type FormEvent } from "react";
 import { askAction } from "@/app/account/actions";
+import { LoadingBlock, StatusLine } from "@/components/ui/loading";
+import { mainButtonClass } from "@/components/ui/state-panel";
 import { MAX_QUESTION_LENGTH } from "@/lib/ask-rules";
 import type { AskedQuestion } from "@/lib/ask-store";
+import { AskNote } from "./ask-note";
 
 type Props = {
   region: string;
@@ -13,6 +16,10 @@ type Props = {
   history: AskedQuestion[];
   historyFailed: boolean; // the past questions couldn't be read, so history is empty for now
   left: number; // questions this account can still ask today, 0 once any limit is reached
+  // Why this account can't ask right now (the day's questions, the account's
+  // month or the site's month, from allowance() in src/lib/ask-rules.ts).
+  // Shown in place of the question box.
+  limit?: string;
   examples?: string[]; // buttons that fill in a question; the match page names its game in them
 };
 
@@ -22,8 +29,11 @@ const DEFAULT_EXAMPLES = [
   "When do I usually die, and how?",
 ];
 
+const WAITING = "Reading the games. This can take up to a minute.";
+
 // The question box and the answers under it. Runs in the browser to show
-// "Thinking…" while Claude reads the games, which can take up to a minute.
+// that Claude is reading the games while it does, which can take up to a
+// minute: a grey answer where the answer will go, and a line saying so.
 export function AskBox({
   region,
   riotId,
@@ -31,9 +41,13 @@ export function AskBox({
   history,
   historyFailed,
   left,
+  limit,
   examples = DEFAULT_EXAMPLES,
 }: Props) {
   const [text, setText] = useState("");
+  // The question being answered, shown above its grey answer while Claude
+  // reads the games.
+  const [asking, setAsking] = useState("");
   const [answers, setAnswers] = useState(history);
   const [remaining, setRemaining] = useState(left);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +56,7 @@ export function AskBox({
   function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setAsking(text.trim());
     startTransition(async () => {
       try {
         const result = await askAction(region, riotId, text);
@@ -63,60 +78,59 @@ export function AskBox({
 
   return (
     <div className="flex flex-col gap-6">
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <label htmlFor="ask-question" className="text-sm text-quiet">
-          Your question about this player&apos;s games. Only you see your questions.
-        </label>
-        <textarea
-          id="ask-question"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={MAX_QUESTION_LENGTH}
-          rows={3}
-          placeholder="e.g. Why do I lose games on Viego?"
-          className="w-full resize-y rounded-md border border-divider bg-page px-4 py-3 text-main placeholder:text-placeholder focus:border-ahead"
-        />
-        <div className="flex flex-wrap gap-2">
-          {examples.map((example) => (
+      {limit ? (
+        <AskNote title={limit} />
+      ) : (
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <label htmlFor="ask-question" className="text-sm text-quiet">
+            Your question about this player&apos;s games. Only you see your questions.
+          </label>
+          <textarea
+            id="ask-question"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={MAX_QUESTION_LENGTH}
+            rows={3}
+            placeholder="e.g. Why do I lose games on Viego?"
+            className="w-full resize-y rounded-md border border-transparent bg-raised px-4 py-3 text-main placeholder:text-placeholder focus:border-ahead"
+          />
+          <div className="flex flex-wrap gap-2">
+            {examples.map((example) => (
+              <button
+                key={example}
+                type="button"
+                onClick={() => setText(example)}
+                className="min-h-9 rounded-md bg-raised px-3 py-1.5 text-left text-sm text-main hover:bg-divider"
+              >
+                {example}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              key={example}
-              type="button"
-              onClick={() => setText(example)}
-              className="rounded-full border border-divider px-3 py-1 text-left text-sm text-quiet hover:border-ahead hover:text-main"
+              type="submit"
+              disabled={isPending || text.trim() === "" || remaining <= 0}
+              className={mainButtonClass}
             >
-              {example}
+              {isPending ? "Thinking…" : "Ask"}
             </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={isPending || text.trim() === "" || remaining <= 0}
-            className="min-h-[52px] rounded-md bg-ahead px-5 text-sm font-semibold text-page transition-colors hover:bg-ahead-soft disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isPending ? "Thinking…" : "Ask"}
-          </button>
-          <p role="status" className="text-sm">
-            {error ? (
-              <span className="text-behind">{error}</span>
-            ) : (
-              isPending && (
-                <span className="text-quiet">Reading the games. This can take up to a minute.</span>
-              )
-            )}
-          </p>
-          <p className="ml-auto text-sm text-quiet">
-            {/* At 0 the limit may be the month's, not the day's; a reload says which. */}
-            {remaining > 0
-              ? `${remaining} ${remaining === 1 ? "question" : "questions"} left today`
-              : "No questions left for now"}
-          </p>
-        </div>
-      </form>
+            <p className="ml-auto text-sm tabular-nums text-quiet">
+              {/* At 0 the limit may be the month's, not the day's; a reload says which. */}
+              {remaining > 0
+                ? `${remaining} ${remaining === 1 ? "question" : "questions"} left today`
+                : "No questions left for now"}
+            </p>
+          </div>
+        </form>
+      )}
+
+      <AskStatus error={error} asking={isPending ? asking : null} />
 
       {/* Where the past questions go, so it still shows under a new answer (#167). */}
       {historyFailed && (
-        <p className="text-behind">Couldn&apos;t load your past questions. Reload to try again.</p>
+        <AskNote title="Couldn't load your past questions." problem>
+          Reload to try again. You can still ask a new one.
+        </AskNote>
       )}
       {answers.length > 0 && (
         <ol className="flex flex-col gap-4">
@@ -131,7 +145,7 @@ export function AskBox({
                     <Link
                       key={game.matchId}
                       href={`${playerPath}/match/${game.matchId}`}
-                      className="font-medium text-ahead-soft hover:underline"
+                      className="font-medium text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main"
                     >
                       {game.label}
                     </Link>
@@ -146,5 +160,45 @@ export function AskBox({
         Answers are written by AI from the stats Turnpoint shows, and can be wrong.
       </p>
     </div>
+  );
+}
+
+// What's happening with the question just sent: Claude reading the games, or
+// why it wasn't answered. Exported for its test, since the waiting and failed
+// states only appear after pressing Ask.
+export function AskStatus({
+  error,
+  asking,
+}: {
+  error: string | null;
+  // The question being answered, or null when none is.
+  asking: string | null;
+}) {
+  return (
+    <>
+      {/* Screen readers hear the waiting line, or why a question wasn't
+          answered, from this line, which is always there so they notice it
+          change. The same words show on screen below. */}
+      <p role="status" className="sr-only">
+        {error ?? (asking !== null ? WAITING : "")}
+      </p>
+      {/* A question that couldn't be answered. The messages say what
+          happened and what to do, like "Couldn't answer right now. Try again
+          in a moment." The question stays in the box to send again. */}
+      {error && <AskNote title={error} problem />}
+      {/* While Claude reads the games: the question, then a grey answer
+          where its answer will go. */}
+      {asking !== null && (
+        <div className="flex flex-col gap-3 rounded-md bg-raised p-5">
+          <p className="font-semibold text-main">{asking}</p>
+          <StatusLine label={WAITING} slow={false} />
+          <div aria-hidden="true" className="flex flex-col gap-2 motion-safe:animate-pulse">
+            <LoadingBlock className="h-3.5 w-full" />
+            <LoadingBlock className="h-3.5 w-11/12" />
+            <LoadingBlock className="h-3.5 w-3/5" />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
