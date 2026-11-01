@@ -45,6 +45,20 @@ async function inViewport(page: Page, name: string) {
   if (!box || box.y < -box.height || box.y > vh) throw new Error(`"${name}" heading is not on screen (y=${box?.y})`);
 }
 
+// Fills this browser's saved lists, the way searching and the star do.
+async function savePlayers(page: Page, recent: unknown[], pinned: unknown[]) {
+  await page.evaluate(
+    ([r, p]) => {
+      localStorage.setItem("turnpoint:recent-players", JSON.stringify(r));
+      localStorage.setItem("turnpoint:pinned-players", JSON.stringify(p));
+    },
+    [recent, pinned],
+  );
+}
+
+const SAMPLE_PLAYER = { region: "kr", gameName: "Hide on bush", tagLine: "KR1" };
+const NEVER_LOOKED_UP = { region: "na", gameName: "Never Looked Up", tagLine: "0000" };
+
 const journeys: Journey[] = [
   {
     name: "ux-search-recovery",
@@ -96,6 +110,171 @@ const journeys: Journey[] = [
         const open = page.getByRole("link", { name: "Open this game", exact: true });
         await open.scrollIntoViewIfNeeded();
         await expect(open).toBeVisible();
+      });
+    },
+  },
+  {
+    name: "ux-saved-players",
+    feature: "saved-players.md",
+    needs: ["nothing"],
+    run: async ({ page, step, note }) => {
+      const riotId = page.getByRole("textbox", { name: "Riot ID" });
+      const recentTab = page.getByRole("tab", { name: /^Recent/ });
+      await step("a first visit gets no box", async () => {
+        await page.goto("/", LOAD);
+        await riotId.click();
+        await riotId.pressSequentially("hide");
+        await expect(recentTab).toBeHidden();
+        await expectCalm(page);
+      });
+      await step("clicking the search opens the box", async () => {
+        await savePlayers(page, [SAMPLE_PLAYER, NEVER_LOOKED_UP], [SAMPLE_PLAYER]);
+        await page.reload(LOAD);
+        await riotId.click();
+        await expect(recentTab).toHaveText(/Recent\s*2/);
+        await expect(page.getByRole("tab", { name: /^Pinned/ })).toHaveText(/Pinned\s*1/);
+        await expect(page.getByTitle("No solo queue rank on file").first()).toBeVisible(LOAD);
+        note("sampleBadge", await page.getByRole("listitem").first().locator("span[title]").getAttribute("title"));
+      });
+      await step("typing narrows the rows", async () => {
+        await riotId.fill("never");
+        const panel = page.getByRole("tabpanel", { name: "Recent" });
+        await expect(panel.getByRole("listitem")).toHaveCount(1);
+        await expect(panel).toContainText("Never Looked Up");
+        await riotId.fill("");
+        await expect(panel.getByRole("listitem")).toHaveCount(2);
+      });
+      await step("the star pins a player", async () => {
+        await page.getByRole("button", { name: "Pin Never Looked Up#0000" }).click();
+        await page.getByRole("tab", { name: /^Pinned/ }).click();
+        await expect(page.getByRole("tab", { name: /^Pinned/ })).toHaveText(/Pinned\s*2/);
+        await expect(page.getByRole("tabpanel", { name: "Pinned" })).toContainText("Never Looked Up");
+      });
+      await step("the x removes a player from that list only", async () => {
+        await page.getByRole("button", { name: "Remove Never Looked Up#0000 from pinned players" }).click();
+        await expect(page.getByRole("tab", { name: /^Pinned/ })).toHaveText(/Pinned\s*1/);
+        await expect(recentTab).toHaveText(/Recent\s*2/);
+      });
+      await step("escape closes it and keeps the cursor in the search", async () => {
+        await page.keyboard.press("Escape");
+        await expect(recentTab).toBeHidden();
+        await expect(riotId).toBeFocused();
+      });
+      await step("clicking again opens it and a click outside closes it", async () => {
+        await riotId.click();
+        await expect(recentTab).toBeVisible();
+        await page.getByRole("heading", { level: 1 }).click();
+        await expect(recentTab).toBeHidden();
+      });
+      await step("the lists survive a reload", async () => {
+        await page.reload(LOAD);
+        await riotId.click();
+        await expect(recentTab).toHaveText(/Recent\s*2/);
+        await expect(page.getByRole("tab", { name: /^Pinned/ })).toHaveText(/Pinned\s*1/);
+      });
+      await step("the header's search on another page opens it too", async () => {
+        await page.goto("/how-it-works", LOAD);
+        await page.getByRole("textbox", { name: "Riot ID" }).click();
+        await expect(recentTab).toHaveText(/Recent\s*2/);
+        await page.keyboard.press("Escape");
+        await expect(recentTab).toBeHidden();
+      });
+      await step("a row opens that player's page", async () => {
+        await page.goto("/how-it-works", LOAD);
+        await page.getByRole("textbox", { name: "Riot ID" }).click();
+        await page.getByRole("link", { name: /Never Looked Up/ }).click();
+        await expect(page).toHaveURL(/\/player\/na\/Never%20Looked%20Up-0000/, LOAD);
+        await expect(recentTab).toBeHidden();
+      });
+    },
+  },
+  {
+    name: "ux-saved-players-phone",
+    feature: "saved-players.md",
+    needs: ["nothing"],
+    phone: true,
+    run: async ({ page, step, note }) => {
+      await step("open the box at 390px", async () => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto("/", LOAD);
+        await savePlayers(page, [SAMPLE_PLAYER, NEVER_LOOKED_UP], [SAMPLE_PLAYER]);
+        await page.reload(LOAD);
+        await page.getByRole("textbox", { name: "Riot ID" }).click();
+        await expect(page.getByRole("tab", { name: /^Recent/ })).toBeVisible();
+        await expect(page.getByTitle("No solo queue rank on file").first()).toBeVisible(LOAD);
+      });
+      await step("no sideways scroll and big enough to tap", async () => {
+        const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+        note("scrollWidth", sw);
+        note("clientWidth", cw);
+        if (sw > cw + 1) throw new Error(`page scrolls sideways: scrollWidth ${sw} > clientWidth ${cw}`);
+        const star = await page.getByRole("button", { name: "Pin Never Looked Up#0000" }).boundingBox();
+        const remove = await page.getByRole("button", { name: /^Remove Never Looked Up/ }).boundingBox();
+        for (const button of [star, remove]) {
+          if (!button || button.height < 44 || button.x + button.width > cw) {
+            throw new Error(`row button off screen or under 44px: ${JSON.stringify(button)}`);
+          }
+        }
+      });
+      await step("in light mode", async () => {
+        await page.evaluate(() => localStorage.setItem("turnpoint-theme", "light"));
+        await page.reload(LOAD);
+        await page.getByRole("textbox", { name: "Riot ID" }).click();
+        await expect(page.getByRole("tab", { name: /^Recent/ })).toBeVisible();
+        await expect(page.getByTitle("No solo queue rank on file").first()).toBeVisible(LOAD);
+      });
+    },
+  },
+  {
+    name: "ux-saved-players-search",
+    feature: "saved-players.md",
+    needs: ["riot"],
+    run: async ({ page, step, note }) => {
+      await step("search a player", async () => {
+        await page.goto("/", LOAD);
+        await page.getByRole("textbox", { name: "Riot ID" }).fill(TEST_PLAYER.riotId);
+        await page.getByRole("combobox", { name: "Region" }).selectOption(TEST_PLAYER.region);
+        await page.getByRole("button", { name: "Search", exact: true }).click();
+        await expect(page).toHaveURL(/\/player\//, LOAD);
+        await expect(page.getByRole("region", { name: "Player summary" })).toBeVisible(LOAD);
+      });
+      await step("see them in recent, with their rank", async () => {
+        await page.getByRole("textbox", { name: "Riot ID" }).click();
+        const panel = page.getByRole("tabpanel", { name: "Recent" });
+        await expect(panel.getByRole("listitem")).toHaveCount(1, LOAD);
+        // A dash here would mean the rank query found nothing for a player
+        // whose profile just saved them.
+        const badge = panel.locator("span[title]").first();
+        await expect(badge).toBeVisible(LOAD);
+        await expect(badge).not.toHaveAttribute("title", "No solo queue rank on file");
+        note("badge", await badge.getAttribute("title"));
+      });
+    },
+  },
+  {
+    name: "ux-saved-players-sample-match",
+    feature: "saved-players.md",
+    needs: ["database"],
+    phone: true,
+    run: async ({ page, step, note }) => {
+      await step("open the sample game at 390px in light mode", async () => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto("/", LOAD);
+        await savePlayers(page, [SAMPLE_PLAYER, NEVER_LOOKED_UP], [SAMPLE_PLAYER]);
+        await page.evaluate(() => localStorage.setItem("turnpoint-theme", "light"));
+        await page.reload(LOAD);
+        await page.getByRole("link", { name: "Open this game", exact: true }).click();
+        await expect(page).toHaveURL(/\/match\/KR_/, LOAD);
+        await expect(page.getByRole("region", { name: "Match summary" })).toBeVisible(LOAD);
+      });
+      await step("the header's search opens the box there", async () => {
+        await page.getByRole("textbox", { name: "Riot ID" }).click();
+        await expect(page.getByRole("tab", { name: /^Recent/ })).toHaveText(/Recent\s*2/);
+        await expect(page.getByTitle("No solo queue rank on file").first()).toBeVisible(LOAD);
+        const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+        note("scrollWidth", sw);
+        note("clientWidth", cw);
+        if (sw > cw + 1) throw new Error(`page scrolls sideways: scrollWidth ${sw} > clientWidth ${cw}`);
       });
     },
   },

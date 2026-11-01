@@ -78,6 +78,34 @@ test("scan the home page", async ({ page }) => {
   await scan(page, "Home");
 });
 
+// The box of saved players is only on the page while it's open. The sample
+// game's player has a rank on the preview, and the other has a dash.
+test("scan the saved players box, in both themes", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const players = [
+      { region: "kr", gameName: "Hide on bush", tagLine: "KR1" },
+      { region: "na", gameName: "Never Looked Up", tagLine: "0000" },
+    ];
+    localStorage.setItem("turnpoint:recent-players", JSON.stringify(players));
+    localStorage.setItem("turnpoint:pinned-players", JSON.stringify(players.slice(0, 1)));
+  });
+  await page.reload();
+
+  async function scanOpenBox(pageName: string) {
+    await page.getByRole("textbox", { name: "Riot ID" }).click();
+    await expect(page.getByRole("tab", { name: "Recent" })).toBeVisible();
+    // Wait for the ranks, or the scan sees the empty badges instead.
+    await expect(page.getByTitle("No solo queue rank on file").first()).toBeVisible(FIRST_LOAD);
+    await scan(page, pageName, "form[role=search]");
+  }
+
+  await scanOpenBox("Saved players box");
+  await switchToLightMode(page);
+  await page.goto("/");
+  await scanOpenBox("Saved players box, light mode");
+});
+
 test("scan the sample analysis, all three tabs", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Open this game", exact: true }).click();
