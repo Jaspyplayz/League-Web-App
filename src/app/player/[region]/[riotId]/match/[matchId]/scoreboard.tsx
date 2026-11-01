@@ -15,8 +15,8 @@ import { participantRiotId, toSlug } from "@/lib/riot-id";
 // blue and the losing team red, and you and your opponent are outlined. Each
 // player's name links to their own profile, so you can look up anyone you
 // played with or against. The page shows it when there's no board, for a game
-// that isn't analyzed or has no timeline; it copes with any team sizes, where
-// the board's LaneBoard needs 5v5.
+// that isn't analyzed or has no timeline, and LaneBoard falls back to it when
+// the roles don't pair up. It copes with any team sizes and roles.
 export function Scoreboard({
   region,
   dd,

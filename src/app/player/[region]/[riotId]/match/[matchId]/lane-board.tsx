@@ -2,17 +2,39 @@ import Link from "next/link";
 import { ChampionIcon } from "@/components/game-icons";
 import { Gap } from "@/components/ui/gap";
 import { Panel } from "@/components/ui/panel";
-import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
+import { playedPosition } from "@/lib/analyzer/matchup";
+import { teamOrder } from "@/lib/analyzer/team-analysis";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import type { Region } from "@/lib/regions";
 import type { Participant } from "@/lib/riot/types";
 import { participantRiotId, toSlug } from "@/lib/riot-id";
 import { POSITION_NAMES } from "./match-header";
+import { Scoreboard } from "./scoreboard";
 
 // The scoreboard under the board: both teams paired by lane, so you read each
 // matchup straight across, with the lane's gold gap in words from your team's
-// side. Your own row is tinted, like a selected row. Each player links to their
-// own profile. It only draws analyzed games, which are always 5v5.
+// side. Your own row is outlined. Each player links to their own profile. It
+// only draws analyzed games, which are always 5v5.
+
+const LANES = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
+
+// Each lane's two players, or null unless both teams have exactly one player in
+// every lane. A blank or doubled role happens in unusual games, and pairing
+// those by list position would state gold gaps between different roles.
+function pairByLane(allies: Participant[], enemies: Participant[]) {
+  const onlyOne = (team: Participant[], lane: string) => {
+    const found = team.filter((p) => playedPosition(p) === lane);
+    return found.length === 1 ? found[0] : null;
+  };
+  const pairs: { lane: string; ally: Participant; enemy: Participant }[] = [];
+  for (const lane of LANES) {
+    const ally = onlyOne(allies, lane);
+    const enemy = onlyOne(enemies, lane);
+    if (!ally || !enemy) return null;
+    pairs.push({ lane, ally, enemy });
+  }
+  return pairs;
+}
 
 // 5012 -> "5.0k", 340 -> "340".
 function goldSize(size: number): string {
@@ -34,8 +56,20 @@ export function LaneBoard({
 }) {
   const myTeamId = participants.find((p) => p.participantId === meId)?.teamId;
   const [allies, enemies] = teamOrder(myTeamId).map((teamId) =>
-    byRole(participants.filter((p) => p.teamId === teamId)),
+    participants.filter((p) => p.teamId === teamId),
   );
+  const lanes = pairByLane(allies, enemies);
+  if (!lanes) {
+    return (
+      <Scoreboard
+        region={region}
+        dd={dd}
+        participants={participants}
+        meId={meId}
+        opponentId={opponentId}
+      />
+    );
+  }
   const kills = (team: Participant[]) => team.reduce((sum, p) => sum + p.kills, 0);
   const won = allies[0]?.win ?? false;
 
@@ -58,13 +92,12 @@ export function LaneBoard({
           </span>
         </div>
         <ul>
-          {allies.map((ally, i) => {
-            const enemy = enemies[i];
+          {lanes.map(({ lane, ally, enemy }) => {
             return (
               <li
-                key={ally.participantId}
+                key={lane}
                 className={`grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-md px-2 py-2 sm:gap-3 sm:px-2.5 ${
-                  ally.participantId === meId ? "bg-select" : ""
+                  ally.participantId === meId ? "outline -outline-offset-1 outline-main" : ""
                 }`}
               >
                 <Side
@@ -73,8 +106,8 @@ export function LaneBoard({
                   p={ally}
                   tag={ally.participantId === meId ? "You" : null}
                 />
-                <div className="flex w-[72px] flex-col items-center text-center sm:w-24">
-                  <span className="text-xs text-quiet">{POSITION_NAMES[ally.teamPosition]}</span>
+                <div className="flex w-20 flex-col items-center whitespace-nowrap text-center sm:w-24">
+                  <span className="text-xs text-quiet">{POSITION_NAMES[lane]}</span>
                   <Gap
                     you={ally.goldEarned}
                     them={enemy.goldEarned}

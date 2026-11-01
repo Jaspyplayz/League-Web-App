@@ -6,7 +6,7 @@ describe("loading skeletons", () => {
   it("draws the profile instead of a lookup sentence", () => {
     const html = renderToStaticMarkup(<ProfileSkeleton />);
     expect(html).toContain('aria-label="Looking up player"');
-    expect(html).toContain("bg-line-strong");
+    expect(html).toContain("bg-divider");
     expect(html).not.toContain("Looking up player…");
   });
 
@@ -22,7 +22,7 @@ describe("loading skeletons", () => {
   it("draws insights instead of a loading sentence", () => {
     const html = renderToStaticMarkup(<InsightsSkeleton />);
     expect(html).toContain('aria-label="Loading insights"');
-    expect(html).toContain("bg-line-strong");
+    expect(html).toContain("bg-divider");
     expect(html).not.toContain("Loading insights…");
   });
 });

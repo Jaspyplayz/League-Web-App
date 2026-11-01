@@ -59,15 +59,48 @@ describe("the scoreboard by lane", () => {
     expect(html()).toMatch(/text-behind[^>]*>15<.*Enemy team/);
   });
 
-  it("tags you and your opponent, and tints only your row", () => {
+  it("tags you and your opponent, and outlines only your row", () => {
     const rows = html().split("<li").slice(1);
     expect(rows[2]).toContain("You");
     expect(rows[2]).toContain("Opponent");
-    expect(rows[2]).toContain("bg-select");
-    expect(rows[0]).not.toContain("bg-select");
+    expect(rows[2]).toContain("outline-main");
+    expect(rows[0]).not.toContain("outline-main");
   });
 
   it("links each player to their profile", () => {
     expect(html()).toContain('href="/player/kr/Name3-KR1"');
+  });
+
+  // Every lane's real gap is 0 here, so any "ahead" or "behind" pairs two roles.
+  const evenGame = (change: (p: Participant) => Participant) =>
+    renderToStaticMarkup(
+      <LaneBoard
+        region="kr"
+        dd={null}
+        participants={[
+          ...ROLES.map((role, i) => change(player(i + 1, 100, role, (i + 1) * 1000, true))),
+          ...ROLES.map((role, i) => player(i + 6, 200, role, (i + 1) * 1000, false)),
+        ]}
+        meId={1}
+        opponentId={6}
+      />,
+    );
+
+  it("uses where a player spent the game when Riot's assigned role is blank", () => {
+    const board = evenGame((p) =>
+      p.teamPosition === "JUNGLE" ? { ...p, teamPosition: "", individualPosition: "JUNGLE" } : p,
+    );
+    expect(board).toContain("Scoreboard by lane");
+    expect(board).not.toMatch(/(ahead|behind)</);
+  });
+
+  it.each([
+    ["blank", { teamPosition: "", individualPosition: "" }],
+    ["doubled", { teamPosition: "TOP", individualPosition: "TOP" }],
+  ])("shows the two team tables when a role is %s, instead of pairing the wrong players", (_, role) => {
+    const board = evenGame((p) => (p.participantId === 2 ? { ...p, ...role } : p));
+    expect(board).not.toContain("Scoreboard by lane");
+    expect(board).not.toMatch(/(ahead|behind)</);
+    expect(board).toContain("EnemyTOP");
   });
 });

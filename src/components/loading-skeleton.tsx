@@ -13,7 +13,7 @@ function Frame({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Bar({ className }: { className: string }) {
-  return <div aria-hidden="true" className={`rounded bg-line-strong ${className}`} />;
+  return <div aria-hidden="true" className={`rounded-sm bg-divider ${className}`} />;
 }
 
 export function ProfileSkeleton() {
