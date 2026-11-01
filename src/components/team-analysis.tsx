@@ -5,7 +5,7 @@ import { championName, type DataDragon } from "@/lib/ddragon";
 import { formatThousands } from "@/lib/match-summary";
 import type { Participant } from "@/lib/riot/types";
 
-// The match panel's Team analysis tab, laid out like op.gg's: one card per
+// Team analysis on the match page's Stats tab, laid out like op.gg's: one card per
 // stat (kills, gold, damage dealt and taken, wards, CS). Your team is on the
 // left and the enemy on the right, each in role order, so every row lines a
 // champion up with the one they played against. The ring in the middle
@@ -41,7 +41,7 @@ export function TeamAnalysis({
 
 function Legend() {
   return (
-    <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted">
+    <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-note text-quiet">
       <li className="flex items-center gap-1.5">
         <span className="size-2.5 rounded-sm bg-ahead" aria-hidden="true" />
         Winning team
@@ -51,11 +51,14 @@ function Legend() {
         Losing team
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-sm border border-ink" aria-hidden="true" />
+        <span className="size-2.5 rounded-sm border border-main" aria-hidden="true" />
         You
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-sm border border-dashed border-faint" aria-hidden="true" />
+        <span
+          className="size-2.5 rounded-sm border border-dashed border-quiet"
+          aria-hidden="true"
+        />
         Your opponent
       </li>
     </ul>
@@ -80,16 +83,16 @@ function StatCard({
       {team.players.map((p) => {
         const mark =
           p.participantId === youId
-            ? "border-ink"
+            ? "border-main"
             : p.participantId === opponentId
-              ? "border-dashed border-faint"
+              ? "border-dashed border-quiet"
               : "border-transparent";
         return (
           <li
             key={p.participantId}
-            className={`soft-round-sm flex items-center gap-1.5 border p-px ${mark}`}
+            className={`flex items-center gap-1.5 rounded-sm border p-px ${mark}`}
           >
-            <ChampionIcon dd={dd} name={p.championName} size={20} className="rounded" />
+            <ChampionIcon dd={dd} name={p.championName} size={20} className="rounded-sm" />
             <span className="sr-only">
               {championName(dd, p.championName)}
               {p.participantId === youId ? " (you)" : ""}
@@ -109,8 +112,8 @@ function StatCard({
   );
 
   return (
-    <section className="soft-round flex flex-col gap-3 border border-line bg-surface/60 p-4">
-      <h4 className="text-center text-[13px] font-semibold text-ink-soft">{stat.label}</h4>
+    <section className="flex flex-col gap-3 rounded-md bg-raised p-4">
+      <h4 className="text-center text-note font-semibold">{stat.label}</h4>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         {column(left)}
         <TotalsRing left={left} right={right} label={stat.label} />
@@ -157,11 +160,11 @@ function TotalsRing({
         strokeDasharray={`${leftShare * circumference} ${circumference}`}
         transform="rotate(-90 36 36)"
       />
-      <g className="font-mono" fontSize="10" textAnchor="middle">
+      <g className="tabular-nums" fontSize="10" textAnchor="middle">
         <text x="36" y="32" fill={color(left.won)}>
           {formatThousands(left.total)}
         </text>
-        <line x1="24" y1="37" x2="48" y2="37" stroke="var(--color-line-strong)" />
+        <line x1="24" y1="37" x2="48" y2="37" stroke="var(--color-divider)" />
         <text x="36" y="49" fill={color(right.won)}>
           {formatThousands(right.total)}
         </text>
