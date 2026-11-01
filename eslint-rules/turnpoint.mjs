@@ -104,8 +104,14 @@ const noGreenClasses = {
   },
 };
 
-// A class list never starts with a capital, so this string is words for a person.
-const SENTENCE = /^[A-Z]/;
+// Words for a person, not a class list: no piece looks like a class, and it
+// starts with a capital or runs to three words. "Card rounded p-4" has a class
+// in it, and "values rounded to whole blocks" doesn't.
+export function isSentence(text) {
+  const words = text.trim().split(/\s+/);
+  const hasClass = words.some((word) => /-|\[|:./.test(word));
+  return !hasClass && (/^[A-Z]/.test(text) || words.length >= 3);
+}
 
 // Calls check(node, text) for every string and template piece in a file, which
 // is where class names live. Comments and JSX text aren't checked.
@@ -133,6 +139,12 @@ const OLD_TYPE = [
     isAlsoAWord: true,
   },
   {
+    pattern: /(?<![\w-])capitalize(?![\w-])/,
+    found: "capitalize",
+    fix: "write the words in sentence case",
+    isAlsoAWord: true,
+  },
+  {
     // A negative value is fine: the page titles sit slightly tighter.
     pattern: /(?<![\w-])tracking-(?:wide(?:r|st)?(?![\w-])|\[(?!-)|\()|\[letter-spacing:/,
     found: "wide letter spacing",
@@ -145,9 +157,19 @@ const OLD_TYPE = [
     found: "second font",
     fix: "remove it, since Rubik is the only font",
   },
+  {
+    pattern: /(?<![\w-])font-(?:thin|extralight|light|extrabold|black)(?![\w-])/,
+    found: "font weight outside 400 to 700",
+    fix: "use font-normal, font-medium, font-semibold or font-bold",
+  },
+  {
+    pattern: /\[font(?:-variant[\w-]*)?:/,
+    found: "font set by hand",
+    fix: "use a text size class and a font weight",
+  },
   { pattern: /(?<![\w-])text-label(?![\w-])/, found: "text-label", fix: "use text-note" },
   {
-    pattern: /(?<![\w-])text-(?:\[(?:length:|[\d.])|\(length:)|\[font-size:/,
+    pattern: /(?<![\w-])text-(?:\[(?:length:|[\d.]|clamp\(|calc\(|min\(|max\()|\(length:)|\[font-size:/,
     found: "made-up text size",
     fix: "use text-title, text-heading, text-subheading, text-body, text-note or a Tailwind size",
   },
@@ -155,9 +177,10 @@ const OLD_TYPE = [
 
 // The same type set without a class: SVG attributes and style keys. fontSize
 // stays allowed, since the charts draw their labels in SVG.
-const INLINE_TYPE = new Set(["fontFamily", "letterSpacing", "textTransform"]);
+const INLINE_TYPE = new Set(["font", "fontfamily", "fontvariant", "letterspacing", "texttransform"]);
+const isInlineType = (name) => typeof name === "string" && INLINE_TYPE.has(name.replaceAll("-", "").toLowerCase());
 // The browser draws these in a monospace font unless a class says otherwise.
-const MONOSPACE_TAGS = new Set(["code", "kbd", "pre", "samp"]);
+const MONOSPACE_TAGS = new Set(["code", "kbd", "pre", "samp", "tt"]);
 
 const reviewBoardType = {
   meta: {
@@ -176,19 +199,18 @@ const reviewBoardType = {
       });
     return {
       ...everyString((node, text) => {
-        const isSentence = SENTENCE.test(text);
         for (const { pattern, found, fix, isAlsoAWord } of OLD_TYPE) {
-          if (isAlsoAWord && isSentence) continue;
+          if (isAlsoAWord && isSentence(text)) continue;
           if (pattern.test(text)) context.report({ node, messageId: "oldType", data: { found, fix } });
         }
       }),
       JSXAttribute(node) {
-        if (INLINE_TYPE.has(node.name.name)) reportInline(node, node.name.name);
+        if (isInlineType(node.name.name)) reportInline(node, node.name.name);
       },
-      Property(node) {
-        if (!node.computed && INLINE_TYPE.has(node.key.name ?? node.key.value)) {
-          reportInline(node, node.key.name ?? node.key.value);
-        }
+      // Only an object being built: a prop called letterSpacing can be read.
+      "ObjectExpression > Property"(node) {
+        const name = node.key.type === "Identifier" && !node.computed ? node.key.name : node.key.value;
+        if (isInlineType(name)) reportInline(node, name);
       },
       JSXOpeningElement(node) {
         if (MONOSPACE_TAGS.has(node.name.name)) {
@@ -207,12 +229,12 @@ const reviewBoardType = {
 // "_" is allowed on both sides, since it's how Tailwind writes a space inside
 // [box-shadow:0_0_#123456]. Three or four characters can also be a rank in a
 // sentence ("Rank #123") or a link to an SVG gradient ("url(#fade)").
-const LONG_HEX = /(?<![&a-z0-9])#(?:[0-9a-f]{8}|[0-9a-f]{6})(?![a-z0-9-])/i;
+const LONG_HEX = /(?<![&a-z0-9]|url\()#(?:[0-9a-f]{8}|[0-9a-f]{6})(?![a-z0-9-])/i;
 const SHORT_HEX = /(?<![&a-z0-9]|url\()#[0-9a-f]{3,4}(?![a-z0-9-])/i;
-const COLOUR_FUNCTION = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
+const COLOUR_FUNCTION = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/i;
 
 function hasRawColour(text) {
-  return LONG_HEX.test(text) || COLOUR_FUNCTION.test(text) || (!SENTENCE.test(text) && SHORT_HEX.test(text));
+  return LONG_HEX.test(text) || COLOUR_FUNCTION.test(text) || (!isSentence(text) && SHORT_HEX.test(text));
 }
 
 // Tailwind builds no CSS for a colour that doesn't exist, so one of these
@@ -237,7 +259,7 @@ const OLD_COLOUR = new RegExp(
 // Tailwind's own colours draw, but don't follow the theme switch. Green, emerald
 // and lime are left to no-green-classes, which says why.
 const PALETTE_COLOUR = new RegExp(
-  `(?<![\\w-])(?:${COLOUR_UTILITY})-(?:white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|[1-9]00|950))(?![\\w-])`,
+  `(?<![\\w-])(?:${COLOUR_UTILITY})-(?:white|black|(?!green|emerald|lime)[a-z]+-(?:50|[1-9]00|950))(?![\\w-])`,
 );
 
 const tokensOnly = {

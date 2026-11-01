@@ -14,7 +14,7 @@ This directory is the maintained source for verifying that Turnpoint's player-fa
 
 - Drive through `npx tsx .claude/skills/verify-turnpoint/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey>`. Each feature file names its journey.
 - Prefer ARIA roles and accessible names (`getByRole`, `getByLabel`) over CSS classes or position. A restyle can change how a page looks; its labels and regions should not.
-- Match accessible names, or match text case-insensitively, so a change of case doesn't fail a journey.
+- Prefer accessible names, and match text case-insensitively, so a change of case is less likely to fail a journey.
 - Type and click the way a player does. Go straight to a URL only when the recipe's entry point is a pasted link.
 - Wait for a role or URL, not a fixed sleep. Cold dev compiles and Riot lookups take up to ~45 s.
 - These journeys are read-only. Nothing to restore.

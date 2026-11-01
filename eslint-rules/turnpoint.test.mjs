@@ -166,10 +166,55 @@ describe("review-board-type", () => {
     expect(await turnpointRules(code, "src/app/x.tsx")).toEqual([]);
   });
 
-  it("lets the share image, which has no stylesheet, name its font", async () => {
-    const code = 'export const a = { fontFamily: "sans-serif" };';
+  it("checks the share image's type too, so its one font is a line of its own", async () => {
+    const code = 'export const a = { textTransform: "none" };';
     const path = "src/app/player/[region]/[riotId]/match/[matchId]/opengraph-image.tsx";
-    expect(await turnpointRules(code, path)).toEqual([]);
+    expect(await turnpointRules(code, path)).toEqual(["turnpoint/review-board-type"]);
+  });
+
+  it.each([
+    ["a style's font shorthand", 'export const A = () => <p style={{ font: "13px monospace" }} />;'],
+    ["a style's font variant", 'export const A = () => <p style={{ fontVariant: "small-caps" }} />;'],
+    ["a font with its key in quotes", 'export const A = () => <p style={{ "font-family": "monospace" }} />;'],
+    ["a font with a computed key", 'export const A = () => <p style={{ ["fontFamily"]: "monospace" }} />;'],
+    ["an SVG font written with a hyphen", 'export const A = () => <text font-family="Georgia">1</text>;'],
+    ["SVG letter spacing written with a hyphen", 'export const A = () => <text letter-spacing="2">1</text>;'],
+    ["a <tt> tag", "export const A = () => <tt>1</tt>;"],
+    ["capitalize", 'export const c = "capitalize p-2";'],
+    ["a font set by hand", 'export const c = "[font:600_13px_monospace]";'],
+    ["a font variant set by hand", 'export const c = "[font-variant:small-caps]";'],
+    ["a size from clamp", 'export const c = "text-[clamp(1rem,2vw,2rem)]";'],
+    ["a size from calc", 'export const c = "text-[calc(1rem+2px)]";'],
+    ["a weight below 400", 'export const c = "font-light";'],
+    ["a weight above 700", 'export const c = "font-black";'],
+    ["a class after a capital word", 'export const c = "Card uppercase-ish uppercase";'],
+  ])("fails on %s", async (_, code) => {
+    expect(await turnpointRules(code, "src/app/x.tsx")).toEqual(["turnpoint/review-board-type"]);
+  });
+
+  it.each([
+    ["a prop read by that name", "export function A({ letterSpacing }) { return letterSpacing; }"],
+    ["a lowercase sentence", 'export const c = "must be uppercase to match";'],
+    ["the weights the site uses", 'export const c = "font-normal font-medium font-semibold font-bold";'],
+    ["a colour size from a variable", 'export const c = "text-[var(--x)]";'],
+  ])("passes %s", async (_, code) => {
+    expect(await turnpointRules(code, "src/app/x.tsx")).toEqual([]);
+  });
+
+  it.each([
+    ["a palette family Tailwind added later", 'export const c = "bg-mauve-500";'],
+    ["a colour mix", 'export const c = "bg-[color-mix(in_srgb,white,black)]";'],
+    ["a colour function", 'export const c = "bg-[color(srgb_1_0_0)]";'],
+    ["a short hex after a capital word", 'export const c = "Panel bg-[#abc]";'],
+  ])("fails on %s", async (_, code) => {
+    expect(await turnpointRules(code, "src/app/x.tsx")).toEqual(["turnpoint/tokens-only"]);
+  });
+
+  it.each([
+    ["a link to a gradient with a long id", 'export const A = () => <rect fill="url(#abcdef)" />;'],
+    ["a number in a lowercase sentence", 'export const c = "game #123 failed today";'],
+  ])("passes %s", async (_, code) => {
+    expect(await turnpointRules(code, "src/app/x.tsx")).toEqual([]);
   });
 
   it("names the fix in the error", async () => {

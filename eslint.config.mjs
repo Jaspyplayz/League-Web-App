@@ -25,8 +25,7 @@ const eslintConfig = defineConfig([
   },
   {
     files: ["src/**/*.{ts,tsx}"],
-    // The share image is drawn without the site's stylesheet, so it names a font.
-    ignores: ["**/*.test.{ts,tsx}", "src/app/player/**/opengraph-image.tsx"],
+    ignores: ["**/*.test.{ts,tsx}"],
     rules: { "turnpoint/review-board-type": "error" },
   },
   {

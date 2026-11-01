@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { compile } from "tailwindcss";
 import { describe, expect, it } from "vitest";
 
 // The both-themes check. globals.css sets every colour twice: the dark value
@@ -148,5 +149,47 @@ describe("Review board tokens", () => {
     );
     expect(imports.length).toBeGreaterThan(0);
     expect(new Set(imports)).toEqual(new Set(['import { Rubik } from "next/font/google";']));
+  });
+
+  // Tailwind builds nothing for a colour that doesn't exist, and nothing else
+  // fails: the text or fill just isn't drawn. So build each class the real way.
+  const COLOUR_CLASS =
+    /^(?:[\w-]+:)*!?(?:bg|text|border(?:-[a-z]+)?|divide|ring|fill|stroke|outline|decoration|accent|caret|placeholder|from|via|to|shadow)-[a-z][\w-]*(?:\/\d+)?$/;
+
+  async function classesThatBuildNothing(classes: string[]): Promise<string[]> {
+    const compiler = await compile(readFileSync("src/app/globals.css", "utf8"), {
+      base: "src/app",
+      loadStylesheet: async (id, base) => {
+        const path = id === "tailwindcss" ? "node_modules/tailwindcss/index.css" : join(base, id);
+        return { path, base: dirname(path), content: readFileSync(path, "utf8") };
+      },
+    });
+    let built = compiler.build([]).length;
+    return [...new Set(classes)].filter((name) => {
+      const before = built;
+      built = compiler.build([name]).length;
+      return built === before;
+    });
+  }
+
+  it("spots a colour class that builds nothing", async () => {
+    expect(await classesThatBuildNothing(["bg-panel", "text-main", "bg-surface-2", "hover:bg-raisd"])).toEqual([
+      "bg-surface-2",
+      "hover:bg-raisd",
+    ]);
+  });
+
+  it("builds CSS for every colour class in src", async () => {
+    const files = readdirSync("src", { recursive: true, encoding: "utf8" }).filter(
+      (path) => /\.tsx?$/.test(path) && !path.includes(".test."),
+    );
+    // Comments can say "text-colored" without meaning a class.
+    const code = (path: string) =>
+      readFileSync(join("src", path), "utf8").replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "");
+    const words = files.flatMap((path) => code(path).match(/[^\s"'`]+/g) ?? []);
+    // "from-zero" is a stat's kind in src/lib/analyzer/skill.ts, not a gradient.
+    const classes = words.filter((word) => COLOUR_CLASS.test(word) && word !== "from-zero");
+    expect(classes.length).toBeGreaterThan(500);
+    expect(await classesThatBuildNothing(classes)).toEqual([]);
   });
 });

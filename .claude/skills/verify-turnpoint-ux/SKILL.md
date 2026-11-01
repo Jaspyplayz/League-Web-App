@@ -96,4 +96,4 @@ Stops only the server `launch.ts` recorded and its children, removes the state f
 | `runner.ts` | imported from `../../verify-turnpoint/scripts/runner` | browser and device, preview bypass, step recorder, evidence layout |
 | `cleanup.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts` | stops our dev server, keeps evidence |
 
-Keep the map honest as the app changes with `/maintain-verification-skill`. When a page moves to the Review board look, re-run every journey that visits it, look at the screenshots, and update feature files whose copy or layout changed.
+Keep the map honest as the app changes with `/maintain-verification-skill`. When a page's look changes, re-run every journey that visits it, look at the screenshots, and update feature files whose copy or layout changed.
