@@ -175,7 +175,7 @@ export function focusResults(games: LogGame[], focus: Focus): (boolean | null)[]
     });
 }
 
-// One square in the month strip at the top of the Log tab.
+// One square in the month strip at the top of By day.
 export type StripDay = { day: string; games: number; wins: number; losses: number };
 
 // The last LOG_DAYS days, oldest first so the strip reads left to right.

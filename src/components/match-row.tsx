@@ -79,8 +79,10 @@ export function MatchRow({
             </div>
             <div className="min-w-0">
               {/* The row's one link. Its ::after covers the whole row, so a
-                  click anywhere opens the game, and a hover lightens the row.
-                  The players' links further on sit above the cover. */}
+                  click or tap anywhere opens the game, and a hover lightens
+                  the row. Only the players' links further on sit above the
+                  cover. The cover also hides the score's and items' hover
+                  titles; screen readers still hear what helped the score. */}
               <Link
                 href={href}
                 aria-label={`Open this ${champion} game (${result}, ${timeAgo(m.startedAt, now)})`}
@@ -116,10 +118,8 @@ export function MatchRow({
             <p className="text-xs text-quiet">{m.csPerMin.toFixed(1)}/min</p>
           </div>
 
-          {/* The score and items sit above the link's cover too, so hovering
-              them still shows what helped the score and each item's name. */}
           {score && (
-            <div className="relative z-10 flex w-[72px] shrink-0 flex-col gap-1">
+            <div className="flex w-[72px] shrink-0 flex-col gap-1">
               <GameScore score={score} size="lg" />
               {/* The 0 to 100 score as ten blocks, like a health bar. */}
               <SegmentBar
@@ -133,9 +133,7 @@ export function MatchRow({
             </div>
           )}
 
-          <div className="relative z-10">
-            <ItemSlots dd={dd} items={m.items} />
-          </div>
+          <ItemSlots dd={dd} items={m.items} />
 
           {teams && <Teams dd={dd} region={teams.region} players={teams.players} />}
         </div>

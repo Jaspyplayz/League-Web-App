@@ -262,7 +262,12 @@ const journeys: Journey[] = [
       await step("click a game row and land on its match page", async () => {
         const row = page.getByRole("link", { name: /^Open this .+ game/ }).first();
         note("row", (await row.getAttribute("aria-label")) ?? "");
-        await row.click();
+        // Click the row's items, not the link's own text, to prove a click
+        // anywhere on the row opens the game. A mouse click at that spot,
+        // because the row link's cover sits over the items on purpose.
+        const items = await page.getByRole("group", { name: "Items" }).first().boundingBox();
+        if (!items) throw new Error("the first row has no items");
+        await page.mouse.click(items.x + items.width / 2, items.y + items.height / 2);
         await expect(page).toHaveURL(/\/match\/KR_/, LOAD);
         await expect(page.getByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true", LOAD);
         await expectCalm(page);
