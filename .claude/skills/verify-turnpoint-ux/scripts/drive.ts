@@ -242,9 +242,39 @@ const journeys: Journey[] = [
         await page.getByRole("textbox", { name: "Riot ID" }).click();
         const panel = page.getByRole("tabpanel", { name: "Recent" });
         await expect(panel.getByRole("listitem")).toHaveCount(1, LOAD);
+        // A dash here would mean the rank query found nothing for a player
+        // whose profile just saved them.
         const badge = panel.locator("span[title]").first();
-        await expect(badge).not.toHaveAttribute("title", /^$/, LOAD);
+        await expect(badge).toBeVisible(LOAD);
+        await expect(badge).not.toHaveAttribute("title", "No solo queue rank on file");
         note("badge", await badge.getAttribute("title"));
+      });
+    },
+  },
+  {
+    name: "ux-saved-players-sample-match",
+    feature: "saved-players.md",
+    needs: ["database"],
+    phone: true,
+    run: async ({ page, step, note }) => {
+      await step("open the sample game at 390px in light mode", async () => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto("/", LOAD);
+        await savePlayers(page, [SAMPLE_PLAYER, NEVER_LOOKED_UP], [SAMPLE_PLAYER]);
+        await page.evaluate(() => localStorage.setItem("turnpoint-theme", "light"));
+        await page.reload(LOAD);
+        await page.getByRole("link", { name: "Open this game", exact: true }).click();
+        await expect(page).toHaveURL(/\/match\/KR_/, LOAD);
+        await expect(page.getByRole("region", { name: "Match summary" })).toBeVisible(LOAD);
+      });
+      await step("the header's search opens the box there", async () => {
+        await page.getByRole("textbox", { name: "Riot ID" }).click();
+        await expect(page.getByRole("tab", { name: /^Recent/ })).toHaveText(/Recent\s*2/);
+        await expect(page.getByTitle("No solo queue rank on file").first()).toBeVisible(LOAD);
+        const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+        note("scrollWidth", sw);
+        note("clientWidth", cw);
+        if (sw > cw + 1) throw new Error(`page scrolls sideways: scrollWidth ${sw} > clientWidth ${cw}`);
       });
     },
   },

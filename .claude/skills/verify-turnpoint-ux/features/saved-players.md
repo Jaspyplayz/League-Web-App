@@ -4,11 +4,11 @@ Clicking or typing in either search, home's or the header's, opens a box under i
 
 ## Sub-features
 
-- `box-open` opens on a click or on typing, and never when nothing is saved and nobody is signed in.
+- `box-open` opens on a click or on typing, and never when nothing is saved and nobody is signed in. It asks the server again on each opening.
 - `box-close` closes on Escape, with the cursor back in the search, and on a click outside.
 - `box-filter` narrows the rows to what's typed.
 - `box-pin` stars a player onto Pinned; `box-remove` takes them off the open tab's list only.
-- `box-badge` shows a short tag ("D1", "GM", "C") on the tier's tint, or a dash for no rank on file.
+- `box-badge` shows a short tag ("D1", "GM", "C") on the tier's tint, a dash for no rank on file, or an empty block while the rank is on its way or couldn't be read.
 - `box-phone` fits 390px with no sideways scroll and 44px buttons.
 
 ## How to get to it (user POV)
@@ -32,9 +32,13 @@ Clicking or typing in either search, home's or the header's, opens a box under i
 
 `ux-saved-players-phone`: at 390px wide, `scrollWidth` stays within `clientWidth`, and the star and × are on screen and at least 44px tall, then the same in light mode.
 
-`ux-saved-players-search` needs the Riot key: search the test player, then click the header's `Riot ID`. The Recent panel has them, with their badge saved as `notes.badge`.
+`ux-saved-players-search` needs the Riot key: search the test player, then click the header's `Riot ID`. The Recent panel has them with a real rank, not a dash, saved as `notes.badge`.
 
-- **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-saved-players ux-saved-players-phone ux-saved-players-search`.
+`ux-saved-players-sample-match` needs the database: open the sample game at 390px in light mode, then click the header's `Riot ID`. The box opens with no sideways scroll.
+
+`e2e/saved-players.spec.ts` runs on each preview: shut with nothing saved, Escape and click outside, asking again on each opening, a failed read, focus after a row leaves, and the real route's answer.
+
+- **Run.** `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] ux-saved-players ux-saved-players-phone ux-saved-players-search ux-saved-players-sample-match`.
 - **Proof.** Each step's screenshot.
 
 ## Gotchas

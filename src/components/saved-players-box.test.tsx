@@ -11,13 +11,13 @@ function box({
   recent = [faker, unknown],
   pinned = [faker],
   you = null,
-  ranks = { "kr/hide on bush#kr1": { tier: "CHALLENGER", division: "I" } },
+  ranks = { "kr/hide on bush#kr1": { tier: "CHALLENGER", division: "I" }, "na/never seen#na1": null },
   query = "",
 }: {
   recent?: SavedPlayer[];
   pinned?: SavedPlayer[];
   you?: SavedPlayer | null;
-  ranks?: Record<string, SavedRank> | null;
+  ranks?: Record<string, SavedRank | null>;
   query?: string;
 } = {}) {
   return renderToStaticMarkup(
@@ -25,7 +25,7 @@ function box({
       saved={{ recent, pinned, you, ranks, hasAny: true }}
       query={query}
       onPick={() => {}}
-      onRemove={() => {}}
+      onRowGone={() => {}}
     />,
   );
 }
@@ -87,7 +87,24 @@ describe("SavedPlayersBox", () => {
     expect(box({ you: me, query: "hide" })).not.toContain(">You<");
   });
 
-  it("shows empty badges, not dashes, until the ranks arrive", () => {
-    expect(box({ ranks: null })).not.toContain("No solo queue rank on file");
+  it("shows empty badges, not dashes, for players not asked about yet", () => {
+    expect(box({ ranks: {} })).not.toContain("No solo queue rank on file");
+  });
+
+  it("opens on Pinned when only Pinned has someone", () => {
+    expect(box({ recent: [] })).toMatch(/aria-selected="true"[^>]*>Pinned</);
+  });
+
+  it("shows a name that's only on the other tab, not a false no match", () => {
+    const html = box({ recent: [unknown], pinned: [faker], query: "hide" });
+    expect(html).toMatch(/aria-selected="true"[^>]*>Pinned</);
+    expect(html).toContain("Hide on bush");
+    expect(html).not.toContain("No saved player matches.");
+  });
+
+  it("says no match when neither tab has the name", () => {
+    expect(box({ recent: [unknown], pinned: [faker], query: "nobody" })).toMatch(
+      /aria-selected="true"[^>]*>Recent<[\s\S]*No saved player matches\./,
+    );
   });
 });

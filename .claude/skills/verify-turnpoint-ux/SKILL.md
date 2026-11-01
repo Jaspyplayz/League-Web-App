@@ -54,6 +54,7 @@ npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --pr 155 ux-search-r
 | `ux-saved-players` | nothing | Desktop Chrome | [features/saved-players.md](features/saved-players.md) |
 | `ux-saved-players-phone` | nothing | Pixel 7 at 390px | [features/saved-players.md](features/saved-players.md) |
 | `ux-saved-players-search` | riot | Desktop Chrome | [features/saved-players.md](features/saved-players.md) |
+| `ux-saved-players-sample-match` | database | Pixel 7 at 390px | [features/saved-players.md](features/saved-players.md) |
 | `ux-review-path` | database | Desktop Chrome | [features/review-path.md](features/review-path.md) |
 | `ux-signed-out-teasers` | database, supabase | Desktop Chrome | [features/signed-out-teasers.md](features/signed-out-teasers.md) |
 | `ux-insights-peer-card` | riot, database | Desktop Chrome | [features/insights-peer-card.md](features/insights-peer-card.md) |

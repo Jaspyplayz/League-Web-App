@@ -62,8 +62,8 @@ describe("RankBadge", () => {
     expect(html).not.toContain("background-color");
   });
 
-  it("stays empty while the rank is on its way, so it doesn't look missing", () => {
-    expect(renderToStaticMarkup(<RankBadge rank="loading" />)).not.toContain("–");
+  it("stays empty until the rank is known, so it doesn't look missing", () => {
+    expect(renderToStaticMarkup(<RankBadge rank={undefined} />)).not.toContain("–");
   });
 });
 

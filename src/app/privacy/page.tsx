@@ -113,7 +113,7 @@ export default function PrivacyPage() {
       <p>
         Turnpoint remembers the last few players you searched for, so you can click back to
         them from the box under the search. That list is kept in your own browser&apos;s local
-        storage. When you open the box, your browser sends the Riot IDs on it to Turnpoint, which
+        storage. When you click into a search, your browser sends the Riot IDs on it to Turnpoint, which
         uses them only to read each player&apos;s saved rank and doesn&apos;t keep them. Remove a
         player with the × next to their name.
       </p>

@@ -6,6 +6,7 @@ import { MAX_PINNED_PLAYERS, MAX_RECENT_PLAYERS } from "@/lib/saved-players";
 import { POST } from "./route";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/lib/my-player", () => ({ readMyPlayer: vi.fn() }));
 vi.mock("@/lib/profile-store", () => ({ savedSoloRanks: vi.fn() }));
@@ -24,7 +25,7 @@ beforeEach(() => {
 
 describe("POST /api/saved-players", () => {
   it("answers with the ranks of the players it was sent", async () => {
-    const ranks = { "kr/hide on bush#kr1": { tier: "CHALLENGER" as const, division: "I" } };
+    const ranks = { "kr/hide on bush#kr1": { tier: "CHALLENGER" as const, division: "I" as const } };
     vi.mocked(savedSoloRanks).mockResolvedValue(ranks);
 
     const response = await call(JSON.stringify([faker]));
@@ -42,8 +43,37 @@ describe("POST /api/saved-players", () => {
     },
   );
 
+  it.each([
+    ["a NUL, which Postgres refuses", { ...faker, gameName: "bad\u0000name" }],
+    ["a name too long for a Riot ID", { ...faker, gameName: "x".repeat(200) }],
+    ["a tag that isn't one", { ...faker, tagLine: "#" }],
+  ])("drops an entry with %s", async (_name, entry) => {
+    await call(JSON.stringify([entry, faker]));
+    expect(savedSoloRanks).toHaveBeenCalledExactlyOnceWith([faker]);
+  });
+
+  it("refuses a body far bigger than a browser's lists", async () => {
+    const response = await call(JSON.stringify([{ ...faker, gameName: "x".repeat(5000) }]));
+    expect(response.status).toBe(413);
+    expect(savedSoloRanks).not.toHaveBeenCalled();
+  });
+
+  it("says the read failed, so the box doesn't show everyone as unranked", async () => {
+    vi.mocked(savedSoloRanks).mockResolvedValue(null);
+    const response = await call(JSON.stringify([faker]));
+    expect(response.status).toBe(503);
+  });
+
+  it("still reads the ranks when sign-in throws", async () => {
+    vi.mocked(getCurrentUser).mockRejectedValue(new Error("auth is down"));
+    const response = await call(JSON.stringify([faker]));
+    expect(response.status).toBe(200);
+    expect((await response.json()).you).toBeNull();
+    expect(savedSoloRanks).toHaveBeenCalledExactlyOnceWith([faker]);
+  });
+
   it("reads no more rows than a browser can save", async () => {
-    await call(JSON.stringify(Array.from({ length: 500 }, () => faker)));
+    await call(JSON.stringify(Array.from({ length: 30 }, () => faker)));
     expect(vi.mocked(savedSoloRanks).mock.calls[0][0]).toHaveLength(
       MAX_RECENT_PLAYERS + MAX_PINNED_PLAYERS,
     );

@@ -12,7 +12,7 @@ import { getMatchIds, getRankedEntries, getSummoner } from "@/lib/riot/api";
 import { RiotApiError, settle, type RiotErrorKind } from "@/lib/riot/client";
 import type { Account, LeagueEntry } from "@/lib/riot/types";
 import { savedPlayerKey, type SavedPlayer, type SavedRank } from "@/lib/saved-players";
-import { isTier } from "@/lib/tiers";
+import { isDivision, isTier } from "@/lib/tiers";
 
 // A player's profile works like op.gg's: it's a snapshot saved in Postgres.
 // Turnpoint asks Riot for a new one the first time anyone opens the player,
@@ -154,11 +154,19 @@ export async function savedSoloRank(
 
 // The solo queue rank of each player in the box under the search, by Riot ID,
 // in one query for all of them and with no Riot call. Players the site never
-// looked up, or who are unranked, are left out.
-export async function savedSoloRanks(list: SavedPlayer[]): Promise<Record<string, SavedRank>> {
-  if (list.length === 0) return {};
-  const rows = await readCache((db) =>
-    db
+// looked up, or who are unranked, get null. Null for the whole answer means the
+// read failed, so nobody's rank is known either way.
+export async function savedSoloRanks(
+  list: SavedPlayer[],
+): Promise<Record<string, SavedRank | null> | null> {
+  const ranks: Record<string, SavedRank | null> = {};
+  for (const player of list) ranks[savedPlayerKey(player)] = null;
+  const db = database();
+  if (list.length === 0 || !db) return ranks;
+
+  let rows;
+  try {
+    rows = await db
       .select({
         region: tables.players.region,
         gameName: tables.players.gameName,
@@ -185,18 +193,24 @@ export async function savedSoloRanks(list: SavedPlayer[]): Promise<Record<string
           ),
         ),
       )
-      .orderBy(desc(tables.players.fetchedAt)),
-  );
+      .orderBy(desc(tables.players.fetchedAt));
+  } catch (error) {
+    // Not the error itself, and so not readCache: Drizzle's message quotes the
+    // query's values, and /privacy says these Riot IDs are only used to read ranks.
+    const code = (error as { cause?: { code?: unknown } }).cause?.code;
+    Sentry.captureException(new Error(`Couldn't read the saved players' ranks (${String(code)})`));
+    return null;
+  }
 
   // A Riot ID can pass from one account to another, leaving two rows with the
-  // same name. The newest row is the player now, ranked or not.
+  // same name. The query puts the newest first, and that row is the player
+  // now, ranked or not.
   const seen = new Set<string>();
-  const ranks: Record<string, SavedRank> = {};
-  for (const row of rows ?? []) {
+  for (const row of rows) {
     const key = savedPlayerKey(row);
     if (seen.has(key)) continue;
     seen.add(key);
-    if (row.tier && row.division && isTier(row.tier)) {
+    if (row.tier && row.division && isTier(row.tier) && isDivision(row.division)) {
       ranks[key] = { tier: row.tier, division: row.division };
     }
   }

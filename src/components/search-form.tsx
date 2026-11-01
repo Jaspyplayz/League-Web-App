@@ -21,6 +21,9 @@ export function usePlayerSearch(errorId: string) {
   const inputRef = useRef<HTMLInputElement>(null);
   const saved = useSavedPlayersBox(wanted);
   const boxOpen = wanted && !pending && saved.hasAny;
+  // One or the other, since they'd sit in the same spot. The error comes back
+  // when the box closes.
+  const error = boxOpen ? null : state.error;
 
   // A click outside closes the box. Blur can't catch it: a tap outside on an
   // iPhone leaves the input focused.
@@ -56,7 +59,7 @@ export function usePlayerSearch(errorId: string) {
       }
     },
     onKeyDown: (event: React.KeyboardEvent<HTMLFormElement>) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || !wanted) return;
       // Back to the Riot ID box first, since focus on a row would otherwise be
       // lost. In this order the focus can't reopen the box.
       inputRef.current?.focus();
@@ -76,8 +79,8 @@ export function usePlayerSearch(errorId: string) {
     },
     // Focus alone misses a click after Escape, when the input kept focus.
     onClick: () => setWanted(true),
-    "aria-invalid": state.error ? true : undefined,
-    "aria-describedby": state.error ? errorId : undefined,
+    "aria-invalid": error ? true : undefined,
+    "aria-describedby": error ? errorId : undefined,
   };
 
   const box = boxOpen && (
@@ -88,12 +91,12 @@ export function usePlayerSearch(errorId: string) {
         setWanted(false);
         setQuery("");
       }}
-      // A removed row's × takes keyboard focus with it, so hand it back.
-      onRemove={() => inputRef.current?.focus()}
+      // A row that leaves takes keyboard focus with it, so hand it back.
+      onRowGone={() => inputRef.current?.focus()}
     />
   );
 
-  return { error: state.error, pending, formProps, riotIdProps, boxOpen, box };
+  return { error, pending, formProps, riotIdProps, boxOpen, box };
 }
 
 // The region choices, shown by their short codes ("NA") with the full name on
@@ -119,10 +122,8 @@ export function SearchForm() {
       <div className="relative">
         <div
           className={`flex h-14 w-full items-center gap-1 bg-panel pr-2 pl-2 ${
-            boxOpen
-              ? "rounded-t-md outline-1 outline-divider"
-              : "rounded-md focus-within:outline-2 focus-within:outline-quiet"
-          } ${error && !boxOpen ? "outline-[1.5px] outline-main" : ""}`}
+            boxOpen ? "rounded-t-md outline-1 outline-divider" : "rounded-md"
+          } focus-within:outline-2 focus-within:outline-quiet ${error ? "outline-[1.5px] outline-main" : ""}`}
         >
           <span className="relative shrink-0">
             <select

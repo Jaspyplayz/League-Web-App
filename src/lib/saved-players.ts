@@ -1,13 +1,13 @@
 import { isRegion, type Region } from "./regions";
-import type { Tier } from "./tiers";
+import type { Division, Tier } from "./tiers";
 
 // Two short lists of players, kept in your own browser (localStorage), so they
-// need no account. The server never stores them; opening the box under the
-// search sends them, to read each player's rank (api/saved-players):
+// need no account. The server never stores them; clicking into a search sends
+// them, to read each player's rank for the box under it (api/saved-players):
 // - recent: the players you searched for lately, newest first. Only searches
 //   count: clicking through to someone from a match doesn't add them.
-// - pinned: players you starred on their profile, so they stay at hand until
-//   you unpin them.
+// - pinned: players you starred on their profile or in that box, so they stay
+//   at hand until you unpin them.
 // These helpers are plain functions on the saved text, so they can be tested
 // without a browser; src/components/saved-players.tsx does the reading and
 // writing.
@@ -117,5 +117,10 @@ function samePlayer(a: SavedPlayer, b: SavedPlayer): boolean {
 // `ranks` is keyed by savedPlayerKey and holds only players with a solo queue
 // rank on file: anyone missing shows a dash, whether the site never looked
 // them up or they're unranked. `you` is the signed-in player's "This is me".
-export type SavedRank = { tier: Tier; division: string };
-export type SavedPlayerDetails = { ranks: Record<string, SavedRank>; you: SavedPlayer | null };
+export type SavedRank = { tier: Tier; division: Division };
+export type SavedPlayerDetails = {
+  // By savedPlayerKey, for every player asked about: null means no solo queue
+  // rank on file, and a player missing here hasn't been asked about yet.
+  ranks: Record<string, SavedRank | null>;
+  you: SavedPlayer | null;
+};
