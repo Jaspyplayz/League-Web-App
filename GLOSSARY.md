@@ -88,6 +88,10 @@ _Avoid_: Diff, gap, difference
 The chart of your lead over your lane opponent across a game.
 _Avoid_: Difference curve, diff graph
 
+**Eval bar**:
+The thin bar beside the gold chart that shows your team's win chance at the selected play.
+_Avoid_: Win bar, meter
+
 **Phase**:
 The early, mid or late part of a game.
 _Avoid_: Stage, period
@@ -124,9 +128,13 @@ _Avoid_: Swing, impact, value
 The word a play earns from its win chance added, on a chess-style scale: Brilliant, Great, Excellent, Good, Even, Inaccuracy, Mistake or Blunder.
 _Avoid_: Rating, score
 
+**Game review**:
+The match page's column that scores the game's phases, counts each grade and steps through every play you were in.
+_Avoid_: Review (on its own), analysis
+
 **60-second review**:
-The short list of plays you were in that moved your team's win chance the most, each with a question to think over.
-_Avoid_: Summary, highlights reel
+The short list of plays you were in that moved your team's win chance the most, each with a question to think over. Its moments are marked inside the Game review.
+_Avoid_: Summary, highlights reel, Game review
 
 **Moment**:
 One item in the 60-second review.
@@ -216,12 +224,12 @@ _Avoid_: Chat, assistant, AI coach
 The one recurring weakness a player picked to track game by game.
 _Avoid_: Focus (for the skill to improve), target
 
-**Log**:
-The profile tab with a calendar of a player's days and the notes they kept.
-_Avoid_: Journal, diary
+**By day**:
+The view of the profile's Matches tab that groups a player's games into days, with the notes they kept. It replaced the Log tab.
+_Avoid_: Log, journal, diary
 
 **Day note**:
-A note a player writes about one day of games in the Log.
+A note a player writes about one day of games in By day.
 _Avoid_: Journal entry, daily note
 
 **Game note**:

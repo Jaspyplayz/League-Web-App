@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { fromSlug, isPlayerPath, parseRiotId, participantRiotId, toSlug } from "./riot-id";
 
+describe("control characters in a Riot ID", () => {
+  it.each(["bad\u0000name#KR1", "bad\nname#KR1", "bad\u2028name#KR1"])("refuses %j", (input) => {
+    expect(parseRiotId(input)).toBeNull();
+  });
+
+  it("still takes spaces and other alphabets", () => {
+    expect(parseRiotId("Hide on bush#KR1")).toEqual({ gameName: "Hide on bush", tagLine: "KR1" });
+    expect(parseRiotId("한글 이름#KR1")).toEqual({ gameName: "한글 이름", tagLine: "KR1" });
+  });
+});
+
 describe("parseRiotId", () => {
   it("splits a game name and tag line", () => {
     expect(parseRiotId("Faker#KR1")).toEqual({ gameName: "Faker", tagLine: "KR1" });

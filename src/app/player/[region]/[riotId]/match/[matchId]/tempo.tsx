@@ -1,13 +1,14 @@
-// The parts of the replay only junglers see (beta): a strip across the game,
-// blue while you were up tempo and red while the enemy jungler was, each
-// jungler's deaths and shop visits under it, and why the moment the replay
-// is on got its call. The call changes at the second someone died,
-// respawned, levelled up or shopped. How it's made is in
+// The parts of the replay only junglers see (beta, with a mark of its own):
+// a strip across the game, blue while you were up tempo and red while the
+// enemy jungler was, each jungler's deaths and shop visits under it, and why
+// the moment the replay is on got its call. The call changes at the second
+// someone died, respawned, levelled up or shopped. How it's made is in
 // src/lib/analyzer/tempo.ts and docs/tempo.md.
 //
 // replay.tsx owns the clock and lays these out. They draw whatever moment
 // it passes them.
 
+import { linkClass } from "@/components/ui/state-panel";
 import { formatClock } from "@/lib/analyzer/format";
 import { describeSpot } from "@/lib/analyzer/map";
 import { OBJECTIVE_NAMES } from "@/lib/analyzer/objectives";
@@ -29,12 +30,12 @@ import { LegendSwatch } from "./legend-swatch";
 const TONE_FILL: Record<TempoTone, string> = {
   ahead: "bg-ahead",
   behind: "bg-behind",
-  even: "bg-line-strong",
+  even: "bg-divider",
 };
 const TONE_TEXT: Record<TempoTone, string> = {
   ahead: "text-ahead-soft",
   behind: "text-behind",
-  even: "text-ink-soft",
+  even: "text-main",
 };
 
 // The first clear is usually done by about 3:15, so the replay opens on the
@@ -70,7 +71,7 @@ export function TempoLegend({ them }: { them: string }) {
     <>
       <LegendSwatch className="bg-ahead">You up tempo</LegendSwatch>
       <LegendSwatch className="bg-behind">{`${them} up tempo`}</LegendSwatch>
-      <LegendSwatch className="bg-line-strong">Even</LegendSwatch>
+      <LegendSwatch className="bg-divider">Even</LegendSwatch>
     </>
   );
 }
@@ -86,7 +87,7 @@ export function TempoBar({
   width: (from: number, to: number) => string;
 }) {
   return (
-    <div aria-hidden="true" className="soft-round-sm relative h-9 overflow-hidden bg-line-strong">
+    <div aria-hidden="true" className="relative h-9 overflow-hidden rounded-sm bg-divider">
       {runs.map((r) => (
         <span
           key={r.from}
@@ -113,7 +114,7 @@ export function JunglerMarks({
 }) {
   return (
     <div aria-hidden="true" className="relative h-6">
-      <span className="absolute inset-x-0 top-1/2 h-px bg-line" />
+      <span className="absolute inset-x-0 top-1/2 h-px bg-divider" />
       {activities.map((a) =>
         a.type === "died" ? (
           <span
@@ -186,15 +187,17 @@ export function TempoReadout({
   const soon = (list: Activity[]) => list.filter((a) => a.timestamp > t && a.timestamp <= nextUntil);
 
   return (
-    <section aria-labelledby="tempo-heading" className="flex flex-col gap-4 border-t border-line pt-5">
+    <section aria-labelledby="tempo-heading" className="flex flex-col gap-4 border-t border-divider pt-5">
       <div className="flex flex-col gap-1.5">
-        <h3
-          id="tempo-heading"
-          className="font-display text-[22px] font-bold uppercase leading-tight tracking-[0.01em]"
-        >
-          Jungle tempo
-        </h3>
-        <p className="text-sm text-muted">
+        <div className="flex items-center gap-2.5">
+          <h3 id="tempo-heading" className="text-body font-semibold">
+            Jungle tempo
+          </h3>
+          {/* The beta note above the replay covers the whole replay, and
+              tempo keeps a mark of its own as well (JAS-109). */}
+          <span className="rounded-sm bg-raised px-1.5 py-0.5 text-note text-quiet">Beta</span>
+        </div>
+        <p className="text-sm text-quiet">
           Which jungler had the time advantage, so could make the next play while the other had to
           farm, back or give way. A jungler counts as up tempo when they&apos;re the only one alive,
           or when their lead adds up to at least {TEMPO_LEAD.toLocaleString("en-US")} gold: the gold
@@ -210,11 +213,11 @@ export function TempoReadout({
             <span className={`text-body font-semibold ${TONE_TEXT[now.tone]}`}>
               {formatClock(t)} · {title}
             </span>
-            <span className="text-note text-faint">
+            <span className="text-note text-quiet">
               From {formatClock(run.from)} to {formatClock(run.to)}
             </span>
           </div>
-          <ul className="flex flex-col gap-1.5 text-sm text-muted">
+          <ul className="flex flex-col gap-1.5 text-sm text-quiet">
             {reasons.map((reason) => (
               <li key={reason}>{reason}</li>
             ))}
@@ -223,7 +226,7 @@ export function TempoReadout({
         </div>
 
         <div className="flex min-w-[260px] flex-[1_1_340px] flex-col gap-3">
-          <h4 className="font-mono text-label uppercase tracking-[0.12em] text-faint">
+          <h4 className="text-note font-medium text-quiet">
             In the next minute, to {formatClock(nextUntil)}
           </h4>
           <div className="flex flex-wrap gap-5">
@@ -245,13 +248,13 @@ export function TempoReadout({
         </div>
       </div>
 
-      <p className="text-note text-faint">
+      <p className="text-note text-quiet">
         Riot logs deaths, level-ups and purchases to the second, but gold only once a minute and
         nothing about waves, vision or cooldowns, so the tempo is an estimate.
         {tempo.exactItemGold
           ? ""
           : " This game was saved before Turnpoint kept unspent gold, so item gold is estimated from when each jungler shopped."}{" "}
-        <a href={docsHref} className="text-ahead-soft hover:text-ahead-bright">
+        <a href={docsHref} className={linkClass}>
           How it&apos;s worked out, and how well it held up in real games
         </a>
         .
@@ -282,7 +285,7 @@ function MonstersUp({ windows, at }: { windows: ObjectiveWindow[]; at: number })
 }
 
 const chipClass =
-  "soft-round-sm border border-line-strong bg-page px-3 py-1.5 text-sm text-ink-soft";
+  "rounded-sm bg-raised px-3 py-1.5 text-sm text-main";
 
 function DidList({
   title,
@@ -303,9 +306,9 @@ function DidList({
         {title}
       </h5>
       {activities.length === 0 ? (
-        <p className="text-sm text-faint">No kills, deaths, epic monsters or shopping.</p>
+        <p className="text-sm text-quiet">No kills, deaths, epic monsters or shopping.</p>
       ) : (
-        <ul className="flex flex-col gap-1 text-sm text-muted">
+        <ul className="flex flex-col gap-1 text-sm text-quiet">
           {activities.map((a, i) => (
             <li key={`${a.timestamp}-${i}`}>{describeActivity(a, names, myTeamId)}</li>
           ))}

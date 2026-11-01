@@ -1,3 +1,4 @@
+import { useId } from "react";
 import {
   buildDiffChart,
   DEFAULT_BOX,
@@ -31,9 +32,17 @@ type Props = {
   // picture, the minute labels only under the bottom one, and lines at every
   // 10 minutes so the eye can follow a moment from one chart to the other.
   domain?: MinuteDomain;
+  // The picture's size in chart units. It's drawn at the width it's given,
+  // so a wider box with the same height makes a flatter chart with the same
+  // size text: home's chart (fitted-diff-chart.tsx) sets both from its box.
+  width?: number;
   height?: number;
   minuteLabels?: boolean;
   minuteLines?: boolean;
+  // A vertical line at this minute, for the board's selected play.
+  cursor?: number | null;
+  // Draw the line blue above zero and red below, instead of in the text colour.
+  lineBySide?: boolean;
 };
 
 const TONE_COLOR = { ahead: "var(--color-ahead)", behind: "var(--color-behind)" };
@@ -48,12 +57,19 @@ export function DiffChart({
   range,
   formatTick = formatDiff,
   domain,
+  width: boxWidth = DEFAULT_BOX.width,
   height: boxHeight = DEFAULT_BOX.height,
   minuteLabels = true,
   minuteLines = false,
+  cursor = null,
+  lineBySide = false,
 }: Props) {
+  // Clip paths need an id unique on the page; useId's has characters SVG's
+  // url() can't take.
+  const clipId = useId().replace(/[^a-zA-Z0-9]/g, "");
   const box = {
     ...DEFAULT_BOX,
+    width: boxWidth,
     height: boxHeight,
     // Without minute labels underneath, the space kept for them isn't needed.
     bottom: minuteLabels ? DEFAULT_BOX.bottom : 24,
@@ -71,9 +87,9 @@ export function DiffChart({
       width="100%"
       role="img"
       aria-label={description}
-      className="block font-mono"
+      className="block tabular-nums"
     >
-      <g stroke="var(--color-line-strong)" strokeWidth="1.5" strokeDasharray="4 6">
+      <g stroke="var(--color-divider)" strokeWidth="1.5" strokeDasharray="4 6">
         {chart.yTicks
           .filter((v) => v !== 0)
           .map((v) => (
@@ -81,13 +97,13 @@ export function DiffChart({
           ))}
       </g>
       {minuteLines && (
-        <g stroke="var(--color-line)" strokeWidth="1.5">
+        <g stroke="var(--color-divider)" strokeWidth="1.5">
           {chart.xTicks.map((m) => (
             <line key={m} x1={chart.x(m)} x2={chart.x(m)} y1={top} y2={height - bottom} />
           ))}
         </g>
       )}
-      <g fontSize="22" fill="var(--color-faint)" textAnchor="end">
+      <g fontSize="22" fill="var(--color-quiet)" textAnchor="end">
         {chart.yTicks.map((v) => (
           <text key={v} x={left - 12} y={chart.y(v) + 7}>
             {formatTick(v)}
@@ -95,23 +111,60 @@ export function DiffChart({
         ))}
       </g>
 
-      <path d={chart.aheadArea} fill="var(--color-ahead)" fillOpacity="0.35" />
-      <path d={chart.behindArea} fill="var(--color-behind)" fillOpacity="0.3" />
+      <path d={chart.aheadArea} fill="var(--color-ahead-fill)" />
+      <path d={chart.behindArea} fill="var(--color-behind-fill)" />
       <line
         x1={left}
         x2={width - right}
         y1={chart.zeroY}
         y2={chart.zeroY}
-        stroke="var(--color-faint)"
+        stroke="var(--color-quiet)"
         strokeWidth="1.5"
       />
-      <path
-        d={chart.line}
-        fill="none"
-        stroke="var(--color-ink)"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
+      {lineBySide ? (
+        <>
+          <clipPath id={`${clipId}-above`}>
+            <rect x={0} y={0} width={width} height={chart.zeroY} />
+          </clipPath>
+          <clipPath id={`${clipId}-below`}>
+            <rect x={0} y={chart.zeroY} width={width} height={height - chart.zeroY} />
+          </clipPath>
+          <path
+            d={chart.line}
+            fill="none"
+            stroke="var(--color-ahead)"
+            strokeWidth="3"
+            strokeLinejoin="round"
+            clipPath={`url(#${clipId}-above)`}
+          />
+          <path
+            d={chart.line}
+            fill="none"
+            stroke="var(--color-behind)"
+            strokeWidth="3"
+            strokeLinejoin="round"
+            clipPath={`url(#${clipId}-below)`}
+          />
+        </>
+      ) : (
+        <path
+          d={chart.line}
+          fill="none"
+          stroke="var(--color-main)"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+      )}
+      {cursor !== null && (
+        <line
+          x1={Math.min(width - right, Math.max(left, chart.x(cursor)))}
+          x2={Math.min(width - right, Math.max(left, chart.x(cursor)))}
+          y1={top}
+          y2={height - bottom}
+          stroke="var(--color-main)"
+          strokeWidth="3"
+        />
+      )}
 
       <g fontSize="19" fontWeight="500" textAnchor="middle">
         {markers.map((m, i) => (
@@ -137,7 +190,7 @@ export function DiffChart({
       </g>
 
       {minuteLabels && (
-        <g fontSize="22" fill="var(--color-faint)" textAnchor="middle">
+        <g fontSize="22" fill="var(--color-quiet)" textAnchor="middle">
           {chart.xTicks.map((m, i) => {
             const isLast = i === chart.xTicks.length - 1;
             // Keep the last label ("30 min") inside the picture at the right edge.

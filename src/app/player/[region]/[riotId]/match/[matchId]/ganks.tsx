@@ -1,6 +1,7 @@
 import { formatClock, formatGap, plural, times } from "@/lib/analyzer/format";
 import { SubHeading } from "@/components/ui/panel-heading";
 import type { Gank, GankLog, GankOutcome } from "@/lib/analyzer/ganks";
+import { LANE_LABEL } from "./pathing";
 
 const OUTCOME_TEXT: Record<GankOutcome, string> = {
   kill: "Kill",
@@ -43,27 +44,25 @@ function GankList({ title, ganks, yours }: { title: string; ganks: Gank[]; yours
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <SubHeading>{title}</SubHeading>
-        <span className="font-mono text-note text-faint">{summary(ganks)}</span>
+        <span className="text-note text-quiet tabular-nums">{summary(ganks)}</span>
       </div>
       {ganks.length === 0 ? (
-        <p className="text-sm text-muted">None before 14:00.</p>
+        <p className="text-sm text-quiet">None before 14:00.</p>
       ) : (
-        <ol className="soft-round flex flex-col divide-y divide-line border border-line">
+        <ol className="flex flex-col divide-y divide-divider rounded-md bg-raised">
           {ganks.map((g) => (
             <li
               key={`${g.timestamp}-${g.lane}`}
               className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5"
             >
-              <span className="w-11 font-mono text-body text-muted">
+              <span className="w-11 text-body text-quiet tabular-nums">
                 {formatClock(g.timestamp)}
               </span>
-              <span className="w-9 font-mono text-label uppercase tracking-[0.1em] text-ink-soft">
-                {g.lane}
-              </span>
+              <span className="w-9 text-sm">{LANE_LABEL[g.lane]}</span>
               <span className={`w-16 text-sm font-semibold ${outcomeColor(g.outcome, yours)}`}>
                 {OUTCOME_TEXT[g.outcome]}
               </span>
-              <span className="min-w-0 flex-1 text-sm text-muted">{details(g)}</span>
+              <span className="min-w-0 flex-1 text-sm text-quiet">{details(g)}</span>
             </li>
           ))}
         </ol>
@@ -77,7 +76,7 @@ function GankList({ title, ganks, yours }: { title: string; ganks: Gank[]; yours
 function outcomeColor(outcome: GankOutcome, yours: boolean): string {
   if (outcome === "kill") return yours ? "text-ahead" : "text-behind";
   if (outcome === "death") return yours ? "text-behind" : "text-ahead";
-  return "text-ink-soft";
+  return "text-main";
 }
 
 // "2 vs 1 · lane 600 ahead · both junglers"

@@ -1,40 +1,50 @@
 import { SubHeading } from "@/components/ui/panel-heading";
-import { panelClass } from "@/components/ui/panel";
 import { plural } from "@/lib/analyzer/format";
 import type { SkillFocus, SkillTrack } from "@/lib/analyzer/skill";
 
+// "Skill to improve": the one stat you're furthest behind the rank in, as a
+// raised box at the top of "You vs [rank]". You're behind by definition, so
+// your number and the gap are red.
 export function SkillCompare({ focus }: { focus: SkillFocus | null }) {
   if (focus === null) return null;
   if (focus.status === "level") {
-    return <p className={`${panelClass} px-5 py-4 text-body text-muted`}>{focus.sentence}</p>;
+    return <p className="rounded-md bg-raised px-4 py-3.5 text-body text-quiet">{focus.sentence}</p>;
   }
 
   return (
-    <div className={`${panelClass} flex flex-col gap-3 px-5 py-4`}>
-      <SubHeading>Skill to improve</SubHeading>
-      <p className="font-semibold text-ink">{focus.label}</p>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="text-sm text-behind">
-          You <span className="font-mono">{focus.youText}</span>
-        </p>
-        <p className="text-sm text-ink-soft">
-          {focus.rankName} <span className="font-mono">{focus.rankText}</span>
-        </p>
+    <div className="flex flex-col gap-2.5 rounded-md bg-raised px-4 py-3.5">
+      <div className="flex flex-col gap-0.5">
+        <SubHeading>Skill to improve</SubHeading>
+        <p className="text-xl font-semibold">{focus.label}</p>
       </div>
-      <p className="font-mono text-xs text-faint">{plural(focus.games, "game")}</p>
+      <dl className="flex flex-wrap gap-x-8 gap-y-2">
+        <div>
+          <dt className="text-note text-quiet">You</dt>
+          <dd className="text-xl font-semibold text-behind">{focus.youText}</dd>
+        </div>
+        <div>
+          <dt className="text-note text-quiet">{focus.rankName}</dt>
+          <dd className="text-xl font-semibold">{focus.rankText}</dd>
+        </div>
+        <div>
+          <dt className="text-note text-quiet">Gap, {plural(focus.games, "game")}</dt>
+          <dd className="text-xl font-semibold text-behind">{focus.gap.text}</dd>
+        </div>
+      </dl>
       <SkillLine track={focus.track} />
-      <p className="font-mono text-behind">{focus.gap.text}</p>
-      <p className="text-body text-muted">{focus.sentence}</p>
+      <p className="text-note text-quiet">{focus.sentence}</p>
     </div>
   );
 }
 
+// Where you and the rank sit on one line, with a tick at zero when the
+// stat can go negative (a gold lead, say).
 function SkillLine({ track }: { track: SkillTrack }) {
   return (
     <div aria-hidden="true" className="relative h-6">
-      <div className="absolute top-1/2 right-1.5 left-1.5 h-1 -translate-y-1/2 bg-line" />
-      {track.zero !== null && <Mark at={track.zero} className="h-4 w-px bg-faint" />}
-      <Mark at={track.rank} className="size-2 rounded-full bg-ink-soft" />
+      <div className="absolute top-1/2 right-1.5 left-1.5 h-1 -translate-y-1/2 rounded-sm bg-divider" />
+      {track.zero !== null && <Mark at={track.zero} className="h-4 w-px bg-quiet" />}
+      <Mark at={track.rank} className="size-2 rounded-full bg-main" />
       <Mark at={track.you} className="size-2.5 rounded-full bg-behind" />
     </div>
   );

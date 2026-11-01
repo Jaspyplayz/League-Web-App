@@ -65,7 +65,7 @@ export function MatchDetails({
         ally: p.teamId === me?.teamId,
         won: p.win,
         label: [championName(dd, p.championName), p.riotIdGameName].filter(Boolean).join(", "),
-        icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="soft-round-sm" />,
+        icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="rounded-md" />,
       }))}
       defaultPlayerId={me?.participantId ?? 1}
       analysisHref={isAnalyzable(match) ? analysisHref : null}
@@ -106,22 +106,22 @@ function MatchOverview({
         const gold = team.reduce((sum, p) => sum + p.goldEarned, 0);
         return (
           <div key={teamId} className="overflow-x-auto">
-            <table className="w-full min-w-[680px] table-fixed border-collapse text-[13px]">
-              <caption className="pb-1.5 text-left text-xs text-muted">
+            <table className="w-full min-w-[680px] table-fixed border-collapse text-note">
+              <caption className="pb-1.5 text-left text-xs text-quiet">
                 <span
-                  className={`font-display text-base font-bold tracking-[0.04em] uppercase ${won ? "text-ahead" : "text-behind"}`}
+                  className={`text-base font-semibold ${won ? "text-ahead" : "text-behind"}`}
                 >
                   {me ? (teamId === me.teamId ? "Your team" : "Enemy team") : sideName(teamId)} ·{" "}
                   {won ? "Victory" : "Defeat"}
                 </span>
-                <span className="ml-3 font-mono">
+                <span className="ml-3 tabular-nums">
                   {me && `${sideName(teamId)} · `}
                   {kills} kills · {formatThousands(gold)} gold
                 </span>
               </caption>
               {/* Fixed column widths, so the two teams' tables line up. */}
               <thead>
-                <tr className="text-left font-mono text-[10px] tracking-[0.1em] text-faint uppercase">
+                <tr className="text-left text-xs text-quiet">
                   <th scope="col" className="py-1 pr-3 font-medium">
                     Player
                   </th>
@@ -170,7 +170,7 @@ function MatchOverview({
         );
       })}
 
-      {skipped && <p className="text-[13px] text-faint">{skipped}</p>}
+      {skipped && <p className="text-note text-quiet">{skipped}</p>}
     </div>
   );
 }
@@ -205,8 +205,8 @@ function PlayerRow({
     <>
       {/* Champion with their final level in the corner, like in the game. */}
       <span className="relative shrink-0">
-        <ChampionIcon dd={dd} name={p.championName} size={28} className="soft-round-sm" />
-        <span className="absolute -right-1 -bottom-1 rounded bg-page px-0.5 font-mono text-[9px] leading-tight text-ink-soft">
+        <ChampionIcon dd={dd} name={p.championName} size={28} className="rounded-md" />
+        <span className="absolute -right-1 -bottom-1 rounded-sm bg-page px-0.5 text-xs leading-tight text-main tabular-nums">
           {p.champLevel}
         </span>
       </span>
@@ -221,12 +221,12 @@ function PlayerRow({
           <RuneIcon dd={dd} runeId={secondary.style} size={13} />
         </span>
       )}
-      <span className="min-w-0 truncate underline-offset-2 group-hover:text-ink group-hover:underline">
+      <span className="min-w-0 truncate underline-offset-2 group-hover:underline">
         {name}
       </span>
       {tag && (
         <span
-          className={`shrink-0 rounded-full border px-1.5 font-mono text-[9px] tracking-[0.1em] text-ink-soft uppercase ${tag === "You" ? "border-ink-soft" : "border-dashed border-faint"}`}
+          className={`shrink-0 rounded-full border px-2 text-xs text-main ${tag === "You" ? "border-main" : "border-dashed border-quiet"}`}
         >
           {tag}
         </span>
@@ -238,7 +238,7 @@ function PlayerRow({
     // Outlines instead of a tint, so they don't clash with the team colors:
     // solid for you, dashed for your opponent.
     <tr
-      className={`border-t border-line ${tag === "You" ? "outline -outline-offset-1 outline-ink" : tag === "Opponent" ? "outline outline-dashed -outline-offset-1 outline-faint" : ""}`}
+      className={`border-t border-divider ${tag === "You" ? "outline -outline-offset-1 outline-main" : tag === "Opponent" ? "outline outline-dashed -outline-offset-1 outline-quiet" : ""}`}
     >
       <th scope="row" className="py-1.5 pr-3 text-left font-normal">
         {riotId ? (
@@ -247,19 +247,19 @@ function PlayerRow({
           <Link
             href={`/player/${region}/${toSlug(riotId)}`}
             title={`${riotId.gameName}#${riotId.tagLine} · ${championName(dd, p.championName)}`}
-            className="soft-round-sm group flex items-center gap-1.5 text-ink-soft"
+            className="group flex items-center gap-1.5 rounded-sm text-main"
           >
             {who}
           </Link>
         ) : (
-          <div className="flex items-center gap-1.5 text-ink-soft">{who}</div>
+          <div className="flex items-center gap-1.5 text-main">{who}</div>
         )}
       </th>
       {showScore && <td className="px-2 py-1.5">{score && <GameScore score={score} />}</td>}
-      <td className="px-2 py-1.5 font-mono whitespace-nowrap">
+      <td className="px-2 py-1.5 whitespace-nowrap tabular-nums">
         {p.kills} / {p.deaths} / {p.assists}
       </td>
-      <td className="px-2 py-1.5 font-mono">{p.totalMinionsKilled + p.neutralMinionsKilled}</td>
+      <td className="px-2 py-1.5 tabular-nums">{p.totalMinionsKilled + p.neutralMinionsKilled}</td>
       <td className="px-2 py-1.5">
         {/* One scale for all ten players: the top damage dealer's bar is full. */}
         <div className="flex">
@@ -281,7 +281,7 @@ function PlayerRow({
               dd={dd}
               itemId={id}
               size={20}
-              className={slot === 6 ? "ml-1 rounded-full" : "rounded"}
+              className={slot === 6 ? "ml-1 rounded-full" : "rounded-sm"}
             />
           ))}
         </div>

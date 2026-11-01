@@ -7,7 +7,7 @@ description: Prove Turnpoint's UX journeys behave the way a player should experi
 
 UX journeys follow a player through a flow and assert how it behaves at every step: the right thing is selected and on screen, nothing shows an error alert, the way back is kept, signed-out visitors get a clear teaser instead of a broken form. Functional checks (lookup, match list, data present) are in `verify-turnpoint`; this skill reuses its launch, doctor, harness and cleanup and adds only its own journeys.
 
-The feature map is [features/README.md](features/README.md). Read it, then the feature file you are proving. The site is moving to the Review board look page by page (see `.claude/rules/design.md`). These journeys assert roles, names, focus, scroll and URLs, which should survive each restyle. Do not fail a journey on colors or corner radii.
+The feature map is [features/README.md](features/README.md). Read it, then the feature file you are proving. The site's look is the Review board (see `.claude/rules/design.md`). These journeys assert roles, names, focus, scroll and URLs, which should survive a restyle. Do not fail a journey on colors or corner radii.
 
 ## Launch
 
@@ -19,7 +19,7 @@ npx tsx .claude/skills/verify-turnpoint/scripts/launch.ts          # http://127.
 
 Pick the target from the journey's `needs:`:
 
-- `needs: nothing` (`ux-search-recovery`, `ux-phone-home`): the local dev server works with no `.env.local`.
+- `needs: nothing` (`ux-search-recovery`, `ux-phone-home`, `ux-saved-players`, `ux-saved-players-phone`): the local dev server works with no `.env.local`.
 - `database`, `riot`, `supabase`: the local server needs `.env.local` (`RIOT_API_KEY`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`). Without it, use the live site (`--base https://league-web-app.vercel.app`, what `main` shows now) or a PR preview (`--pr <number>`, which needs `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment or `.env.local`; only Jasper can add it). A `--base` URL never gets the secret, so a preview passed that way shows `vercel-login`.
 
 Launch details (port rules, `npm ci`, the state file `.cache/verify-turnpoint-server/instance.json`, one server per checkout) are in `.claude/skills/verify-turnpoint/SKILL.md` → Launch. No migrations or seed step; never run `npm run db:migrate`.
@@ -51,9 +51,16 @@ npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --pr 155 ux-search-r
 |---|---|---|---|
 | `ux-search-recovery` | nothing | Desktop Chrome | [features/search-recovery.md](features/search-recovery.md) |
 | `ux-phone-home` | nothing | Pixel 7 | [features/phone-home.md](features/phone-home.md) |
+| `ux-saved-players` | nothing | Desktop Chrome | [features/saved-players.md](features/saved-players.md) |
+| `ux-saved-players-phone` | nothing | Pixel 7 at 390px | [features/saved-players.md](features/saved-players.md) |
+| `ux-saved-players-search` | riot | Desktop Chrome | [features/saved-players.md](features/saved-players.md) |
+| `ux-saved-players-sample-match` | database | Pixel 7 at 390px | [features/saved-players.md](features/saved-players.md) |
 | `ux-review-path` | database | Desktop Chrome | [features/review-path.md](features/review-path.md) |
+| `ux-game-review` | database | Desktop Chrome | [features/game-review.md](features/game-review.md) |
+| `ux-game-review-phone` | database | Pixel 7 at 390px | [features/game-review.md](features/game-review.md) |
 | `ux-signed-out-teasers` | database, supabase | Desktop Chrome | [features/signed-out-teasers.md](features/signed-out-teasers.md) |
 | `ux-insights-peer-card` | riot, database | Desktop Chrome | [features/insights-peer-card.md](features/insights-peer-card.md) |
+| `ux-profile-games` | riot, database | Desktop Chrome | [features/profile-games.md](features/profile-games.md) |
 
 "Calm" (the `expectCalm` helper in `scripts/drive.ts`) means: no `role=alert` element with text on the page, and the page is the app (not the Riot-key notice, an error page, or the Vercel login). Next.js's route announcer (`<next-route-announcer>`) is also `role=alert` and reads the new page title after every client-side navigation; it is skipped. Browser contexts use `reducedMotion: "reduce"`, so smooth scrolls land at once.
 
@@ -89,4 +96,4 @@ Stops only the server `launch.ts` recorded and its children, removes the state f
 | `runner.ts` | imported from `../../verify-turnpoint/scripts/runner` | browser and device, preview bypass, step recorder, evidence layout |
 | `cleanup.ts` | `npx tsx .claude/skills/verify-turnpoint/scripts/cleanup.ts` | stops our dev server, keeps evidence |
 
-Keep the map honest as the app changes with `/maintain-verification-skill`. When a page moves to the Review board look, re-run every journey that visits it, look at the screenshots, and update feature files whose copy or layout changed.
+Keep the map honest as the app changes with `/maintain-verification-skill`. When a page's look changes, re-run every journey that visits it, look at the screenshots, and update feature files whose copy or layout changed.

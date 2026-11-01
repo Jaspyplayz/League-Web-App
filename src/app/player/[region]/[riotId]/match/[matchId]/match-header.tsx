@@ -1,12 +1,12 @@
 import { ChampionIcon } from "@/components/game-icons";
 import { formatSigned } from "@/lib/analyzer/format";
 import type { Snapshot } from "@/lib/analyzer/matchup";
-import { playedPosition } from "@/lib/analyzer/matchup";
+import { findOpponent, playedPosition } from "@/lib/analyzer/matchup";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import { formatDuration, gameDurationSeconds, queueName, timeAgo } from "@/lib/match-summary";
 import type { Match, Participant } from "@/lib/riot/types";
 
-const POSITION_NAMES: Record<string, string> = {
+export const POSITION_NAMES: Record<string, string> = {
   TOP: "Top",
   JUNGLE: "Jungle",
   MIDDLE: "Mid",
@@ -14,59 +14,60 @@ const POSITION_NAMES: Record<string, string> = {
   UTILITY: "Support",
 };
 
-// Result, queue, length and kill score: the top of the page.
-export function MatchHeader({ match, me, now }: { match: Match; me: Participant; now: number }) {
+// The top of the page: "Victory as Syndra vs Zoe", the result in blue or red,
+// then your KDA, role, queue, length, patch and when it was played.
+export function MatchHeader({
+  match,
+  me,
+  dd,
+  now,
+}: {
+  match: Match;
+  me: Participant;
+  dd: DataDragon | null;
+  now: number;
+}) {
   const { info } = match;
   const durationS = gameDurationSeconds(info);
   const remake = me.gameEndedInEarlySurrender ?? durationS < 5 * 60;
-  const kills = (teamId: number) =>
-    info.participants.filter((p) => p.teamId === teamId).reduce((sum, p) => sum + p.kills, 0);
-  const enemyTeamId = me.teamId === 100 ? 200 : 100;
+  const opponent = findOpponent(info.participants, me);
+  const position = POSITION_NAMES[playedPosition(me)];
   // "16.20.712.3456" -> "16.20"
   const patch = info.gameVersion.split(".").slice(0, 2).join(".");
 
   const result = remake ? "Remake" : me.win ? "Victory" : "Defeat";
-  const resultColor = remake ? "text-faint" : me.win ? "text-ahead" : "text-behind";
-  // The kill score follows the team rule: the winners' kills in blue, the
-  // losers' in red, and no color at all for a remake.
-  const winnersColor = remake ? "" : "text-ahead";
-  const losersColor = remake ? "" : "text-behind";
+  const resultColor = remake ? "text-quiet" : me.win ? "text-ahead" : "text-behind";
 
   return (
     <section
       aria-label="Match summary"
-      className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4"
+      className="flex flex-wrap items-baseline gap-x-4 gap-y-1"
     >
-      <div className="flex flex-col gap-1.5">
-        <p className="font-mono text-[13px] text-faint">
-          {queueName(info.queueId)} · {formatDuration(durationS)} · Patch {patch} ·{" "}
-          {timeAgo(info.gameStartTimestamp, now)}
-        </p>
-        <h1
-          className={`font-display text-[clamp(52px,8vw,72px)] font-bold uppercase leading-[0.95] tracking-[0.01em] ${resultColor}`}
-        >
-          {result}
-        </h1>
-      </div>
-      <p className="flex items-center gap-4 font-display text-[40px] font-bold leading-none">
-        <span className="font-mono text-xs font-normal uppercase tracking-[0.12em] text-faint">
-          Kills
-        </span>
-        <span className={me.win ? winnersColor : losersColor}>{kills(me.teamId)}</span>
-        <span className="text-placeholder" aria-label="to">
-          –
-        </span>
-        <span className={me.win ? losersColor : winnersColor}>{kills(enemyTeamId)}</span>
+      <h1 className="text-title font-semibold">
+        <span className={resultColor}>{result}</span> as {championName(dd, me.championName)}
+        {opponent && (
+          <span className="text-quiet"> vs {championName(dd, opponent.championName)}</span>
+        )}
+      </h1>
+      <p className="text-quiet tabular-nums">
+        {[
+          `${me.kills}/${me.deaths}/${me.assists}`,
+          position,
+          queueName(info.queueId),
+          formatDuration(durationS),
+          `Patch ${patch}`,
+          timeAgo(info.gameStartTimestamp, now),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </p>
     </section>
   );
 }
 
-// "You vs your opponent": both players and a verdict. It fills the left of
-// the strip it shares with "Game by phase", so it stacks: verdict on top,
-// then you, then your opponent. When it has the strip to itself (a game too
-// short to rate), there's room to put you and your opponent side by side
-// with the verdict between, which a container query checks.
+// "You vs your opponent": both players and a verdict, stacked in the Summary's
+// narrow column: verdict on top, then you, then your opponent. With nobody else
+// in your role there's no verdict or opponent, and the board says why.
 export function Matchup({
   dd,
   me,
@@ -81,17 +82,11 @@ export function Matchup({
   finalGoldDiff: number | null;
 }) {
   return (
-    <section aria-label="Matchup" className="@container min-w-0 p-6">
-      <div className="flex flex-col gap-5 @2xl:flex-row @2xl:items-center @2xl:justify-between @2xl:gap-8">
+    <section aria-label="Matchup" className="min-w-0 p-5">
+      <div className="flex flex-col gap-4">
         <PlayerSide dd={dd} player={me} side="you" />
         <Verdict at15={at15} finalGoldDiff={finalGoldDiff} hasOpponent={opponent !== null} />
-        {opponent ? (
-          <PlayerSide dd={dd} player={opponent} side="opponent" />
-        ) : (
-          <p className="text-muted @2xl:flex-[1_1_260px] @2xl:text-right">
-            No single enemy played your role this game, so there&apos;s no head-to-head comparison.
-          </p>
-        )}
+        {opponent && <PlayerSide dd={dd} player={opponent} side="opponent" />}
       </div>
     </section>
   );
@@ -120,18 +115,13 @@ function Verdict({
   const pill = {
     ahead: "border-ahead/40 bg-ahead/10 text-ahead-soft",
     behind: "border-behind/40 bg-behind/10 text-behind",
-    even: "border-line-strong bg-page text-muted",
+    even: "border-divider bg-page text-quiet",
   }[tone];
 
-  // Stacked, the verdict leads; side by side, it sits in the middle.
   return (
-    <div className="order-first flex flex-wrap items-center gap-x-3 gap-y-2 @2xl:order-none @2xl:flex-col @2xl:text-center">
-      <span
-        className={`rounded-full border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.12em] ${pill}`}
-      >
-        {text}
-      </span>
-      <span className="text-sm text-muted">
+    <div className="order-first flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className={`rounded-full border px-3 py-1 text-note font-medium ${pill}`}>{text}</span>
+      <span className="text-sm text-quiet tabular-nums">
         {formatSigned(diff)} gold {at15 ? "at 15 min" : "at the end"}
       </span>
     </div>
@@ -151,30 +141,25 @@ function PlayerSide({
   const position = POSITION_NAMES[playedPosition(p)];
   const riotName = p.riotIdGameName ?? "";
 
-  // Side by side, your opponent is mirrored on the right, portrait outside.
   return (
-    <div
-      className={`flex min-w-0 items-center gap-4 @2xl:flex-[1_1_260px] ${isYou ? "" : "@2xl:flex-row-reverse @2xl:text-right"}`}
-    >
+    <div className="flex min-w-0 items-center gap-3">
       <ChampionIcon
         dd={dd}
         name={p.championName}
-        size={56}
-        className={`soft-round-sm flex-none border-2 ${isYou ? "border-ahead" : "border-behind"}`}
+        size={48}
+        className={`flex-none rounded-md border-2 ${isYou ? "border-ahead" : "border-behind"}`}
       />
       <div className="min-w-0">
-        <p
-          className={`font-mono text-[11px] uppercase tracking-[0.12em] ${isYou ? "text-ahead-soft" : "text-behind"}`}
-        >
+        <p className={`text-note font-medium ${isYou ? "text-ahead-soft" : "text-behind"}`}>
           {isYou ? "You" : "Your opponent"}
         </p>
-        <p className="text-lg font-semibold">
+        <p className="font-semibold">
           {championName(dd, p.championName)}{" "}
-          <span className="text-[15px] font-normal text-faint">
+          <span className="text-note font-normal text-quiet">
             {[riotName, position].filter(Boolean).join(" · ")}
           </span>
         </p>
-        <p className="font-mono text-[15px] text-ink-soft">
+        <p className="text-note tabular-nums">
           {p.kills} / {p.deaths} / {p.assists} · {p.totalMinionsKilled + p.neutralMinionsKilled} CS
         </p>
       </div>

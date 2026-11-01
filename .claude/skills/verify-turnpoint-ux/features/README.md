@@ -8,13 +8,13 @@ This directory is the maintained source for verifying how Turnpoint's flows beha
 - `npx tsx .claude/skills/verify-turnpoint/scripts/doctor.ts [--base <url> | --pr <number>]` reports `home page ok` and `ok` for each capability the journey needs.
 - Test player `Hide on bush#KR1` on `kr`; sample game `/player/kr/Hide%20on%20bush-KR1/match/KR_8416261221` (stored, so it needs no Riot key).
 - Signed out, fresh browser context, `reducedMotion: "reduce"`.
-- The current UI, whichever look a page has. Assert behavior, not colors or radii.
+- The current UI. Assert behavior, not colors or radii.
 
 ## Driving conventions
 
 - Drive through `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts [--base <url> | --pr <number>] [--run <id>] <journey>`.
 - Arrive the way a player does: click the home card, the tab, the button. A direct URL is used only where the recipe says the player arrives from a pasted link.
-- Use roles and accessible names. Headings on pages still in the old look render uppercase through CSS; match names, or match text case-insensitively.
+- Use roles and accessible names; match names, or match text case-insensitively.
 - "Calm" = no `role=alert` with text (Next's `<next-route-announcer>` is skipped) and the page is the app. Check it after every navigation the player makes.
 - "On screen" = the heading's box is inside the viewport, checked after the scroll.
 - Read-only journeys. Nothing to restore.
@@ -41,7 +41,10 @@ Keep implementation details out of the map. Name only user paths, stable handles
 ## Features
 
 - [Search form recovery](./search-recovery.md) covers a Riot ID without a tag: a clear inline message, the input kept, no page change. Journey `ux-search-recovery`.
-- [Home on a phone](./phone-home.md) covers the home page on a Pixel 7: no sideways scroll, a reachable Analyze button, the start cards. Journey `ux-phone-home`.
+- [Saved players box](./saved-players.md) covers the box under both searches: opening and closing it, the tabs, filtering, pin, remove, rank badges, 390px. Journeys `ux-saved-players`, `ux-saved-players-phone`, `ux-saved-players-search`.
+- [Home on a phone](./phone-home.md) covers the home page on a Pixel 7: no sideways scroll, a reachable Search button, the example game. Journey `ux-phone-home`.
 - [60-second review path](./review-path.md) covers home → sample game → review → Watch in replay → back to Summary. Journey `ux-review-path`.
+- [Game review](./game-review.md) covers the Summary's right column: score tiles, grade counts, stepping through your plays with the board following, Start review in the replay, 390px. Journeys `ux-game-review`, `ux-game-review-phone`.
 - [Signed-out teasers](./signed-out-teasers.md) covers Ask, Game recap and Your notes for a signed-out visitor, and the Sign in round trip. Journey `ux-signed-out-teasers`.
 - [Insights peer card](./insights-peer-card.md) covers the You vs others card, switching rank, and a bad Riot ID in Compare with a player. Journey `ux-insights-peer-card`.
+- [Profile games](./profile-games.md) covers the profile's three tabs, the List / By day switch, a game row opening its match page, and the old Log address. Journey `ux-profile-games`.

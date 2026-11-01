@@ -7,8 +7,10 @@ import { loadMatch } from "@/lib/match-store";
 import { isMatchIdFor, isRegion } from "@/lib/regions";
 import { isPlayerPath } from "@/lib/riot-id";
 
-// The panel under a match row on the profile, rendered when the row first
-// opens instead of with the page (see src/components/expandable-row.tsx).
+// The panel that used to open under a match row on the profile, rendered
+// when the row first opened instead of with the page. Nothing calls it since
+// each row became a link to its match page (JAS-106); it stays until the
+// backend clean-up decides its fate.
 // The profile saved the match when it listed it, so this reads it from the
 // database; only a game whose save hasn't finished yet costs a Riot call.
 //

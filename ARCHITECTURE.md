@@ -56,7 +56,9 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   (Summary, Replay and Stats tabs, with Ask beside the replay;
                   .../ask/ only sends the old Ask tab's address to the profile)
                   and .../insights/ the trends across the last 20 to 100 games,
-                  .../log/ the Log tab (one card per day, src/lib/daily-log.ts),
+                  by-day.tsx Matches' By day view (one card per day,
+                  src/lib/daily-log.ts), .../log/ only sends the old Log
+                  tab's address there,
                   .../champions/ the season's stats per champion and enemy
                   champion (src/lib/champion-stats.ts);
                   settings/ only sends the old Settings page home (the theme
@@ -64,6 +66,7 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   api/mcp/ is the MCP server, with its tools in src/lib/mcp/;
                   api/cron/season-sync/ the daily job that saves "This is me"
                   players' new games (docs/database.md);
+                  api/saved-players/ what the box under the search reads: ranks and your own row;
                   robots.ts keeps crawlers off player pages and the API
 src/components/   React components; ui/ holds small shared pieces, ask/ the Ask panel
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
@@ -90,7 +93,8 @@ src/lib/match-store.ts  Loads matches and timelines from Postgres, falling back 
 src/lib/own-data.ts  readOwnData: reads data a signed-in player made (notes, "This is me", Ask
                   history) and says when the read failed, unlike match-store's readCache
 src/lib/profile-store.ts  A player's saved profile (rank, latest match IDs) and its Update button;
-                  each save also adds changed ranks to rank_history for the LP graph
+                  each save also adds changed ranks to rank_history for the LP graph;
+                  savedSoloRanks reads the ranks for the saved players box (api/saved-players), in one query
 src/lib/trend-games.ts  A player's recent games summarized for Insights, a few timelines per view
 src/lib/season-store.ts Season champion stats from slim season_games rows; loads 10 more per plain profile visit,
                   and syncSeasons fills in "This is me" players once a day (api/cron/season-sync)
@@ -106,7 +110,8 @@ docs/             Design and research docs, decision records in adr/, and the ag
 e2e/              Playwright smoke test and accessibility scan, run against each Vercel preview;
                   fixtures.ts gets past the preview login (shot uses preview-login.ts too)
 eslint-rules/     The project's own lint rules (Riot hosts only in src/lib/riot/, "server-only"
-                  on files that read secrets, no green classes), run by npm run lint, tested in npm test
+                  on files that read secrets, no green classes, the Review board's type and colour
+                  tokens), run by npm run lint, tested in npm test
 .github/          CI, smoke test, dependency review, reviewer and agent merge workflows, Dependabot, PR and issue templates
 .claude/          Claude Code settings, hooks/ (lint and typecheck before commits, installs when
                   a cloud session starts, pstack's startup instruction, and Matt Pocock's skills

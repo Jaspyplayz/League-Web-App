@@ -17,16 +17,16 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 // "Summary | Replay | Stats" under the match header. Summary holds what most
-// people come for (scoreboard, verdict, lead and win chance), so the page
-// isn't a wall of charts; Replay holds the replay with Ask beside it, and
-// Stats the detailed tables.
+// people come for (the board, the scoreboard, Game review), so the page isn't a
+// wall of charts; Replay holds the replay with Ask beside it, and Stats the
+// detailed tables.
 //
 // All three tabs are drawn on the server and stay in the page, only hidden,
 // so switching is instant and the replay keeps its spot when you come back.
 //
-// The tabs also pass on the 60-second review's buttons (review-links.tsx):
-// "Watch in replay" opens Replay at that moment, and "Add to notes" puts a
-// line in the notes box on Summary.
+// The tabs also pass on Game review's buttons (review-links.tsx): "Watch in
+// replay" and "Start review in the replay" open Replay at that play, and "Add
+// to notes" puts a line in the notes box on Summary.
 export function AnalysisTabs({
   summary,
   replay,
@@ -93,7 +93,7 @@ export function AnalysisTabs({
             onClick={() => setTab(t.id)}
             className={`-mb-px border-b-2 px-[18px] py-3 ${
               tab === t.id
-                ? "border-ahead font-semibold text-main"
+                ? "border-main font-semibold text-main"
                 : "border-transparent font-medium text-quiet hover:text-main"
             }`}
           >

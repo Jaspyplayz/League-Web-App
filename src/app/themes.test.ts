@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { compile } from "tailwindcss";
 import { describe, expect, it } from "vitest";
 
 // The both-themes check. globals.css sets every colour twice: the dark value
@@ -9,11 +11,6 @@ import { describe, expect, it } from "vitest";
 // The Rift's own colours are the same in both themes on purpose, so the
 // replay's map matches Riot's picture of it.
 const SAME_IN_BOTH_THEMES = new Set(["rift-ground", "rift-wall"]);
-
-// A token whose value is just another colour token, like
-// `--color-surface: var(--color-panel)`, follows that token into either theme,
-// so it needs no light value of its own.
-const ALIAS = /^var\(--color-([\w-]+)\)$/;
 
 // The colour tokens set inside the first block that starts with `opener`,
 // as name (without --color-) to value.
@@ -40,7 +37,7 @@ function missingLightValues(css: string): string[] {
   const dark = colourTokens(css, DARK);
   const light = colourTokens(css, LIGHT);
   return [...dark]
-    .filter(([name, value]) => !ALIAS.test(value) && !SAME_IN_BOTH_THEMES.has(name) && !light.has(name))
+    .filter(([name]) => !SAME_IN_BOTH_THEMES.has(name) && !light.has(name))
     .map(([name]) => `--color-${name} has a dark value and no light one: add it to the data-theme="light" block in src/app/globals.css`);
 }
 
@@ -52,7 +49,7 @@ describe("both themes", () => {
   });
 
   it("catches a colour with a dark value and no light one", () => {
-    const sample = `${DARK}\n  --color-page: #000;\n  --color-new: #123456;\n  --color-rift-wall: #000a13;\n  --color-alias: var(--color-page);\n}\n${LIGHT}\n  --color-page: #fff;\n}\n`;
+    const sample = `${DARK}\n  --color-page: #000;\n  --color-new: #123456;\n  --color-rift-wall: #000a13;\n}\n${LIGHT}\n  --color-page: #fff;\n}\n`;
     expect(missingLightValues(sample)).toEqual([
       '--color-new has a dark value and no light one: add it to the data-theme="light" block in src/app/globals.css',
     ]);
@@ -64,24 +61,17 @@ describe("both themes", () => {
     expect(extra).toEqual([]);
   });
 
-  it("keeps each alias following its token in both themes", () => {
-    const dark = colourTokens(css, DARK);
-    const light = colourTokens(css, LIGHT);
-    const problems: string[] = [];
-    for (const [name, value] of dark) {
-      const target = ALIAS.exec(value)?.[1];
-      if (!target) continue;
-      if (!dark.has(target)) problems.push(`--color-${name} points at --color-${target}, which doesn't exist`);
-      // A light value here would stop the alias following its token.
-      if (light.has(name)) problems.push(`--color-${name} is an alias, so the light theme shouldn't set it`);
-    }
-    expect(problems).toEqual([]);
+  // JAS-94 left no aliases: a second name for a colour is how the old names
+  // lasted through the move.
+  it("keeps one name for each colour, with no token pointing at another", () => {
+    const aliases = [...colourTokens(css, DARK), ...colourTokens(css, LIGHT)]
+      .filter(([, value]) => /^var\(--color-/.test(value))
+      .map(([name]) => name);
+    expect(aliases).toEqual([]);
   });
 });
 
-// The Review board tokens (JAS-94) and where each old name points while pages
-// move to the new names (JAS-96's table). The contract ticket deletes the old
-// names and this part of the test with them.
+// The Review board tokens (JAS-94), and the old names and sizes JAS-98 removed.
 describe("Review board tokens", () => {
   // Every approved value as [dark, light]: JAS-94's table (with light ahead,
   // light behind and dark behind nudged to pass 4.5:1, which Jasper approved on
@@ -116,17 +106,6 @@ describe("Review board tokens", () => {
     "grade-blunder": ["#ff5f57", "#cb2c2c"],
   };
 
-  const OLD_TO_NEW: Record<string, string> = {
-    surface: "panel",
-    "surface-hover": "raised",
-    line: "divider",
-    "line-strong": "divider",
-    ink: "main",
-    "ink-soft": "main",
-    muted: "quiet",
-    faint: "quiet",
-  };
-
   it("sets every approved value in both themes", () => {
     const dark = colourTokens(css, DARK);
     const light = colourTokens(css, LIGHT);
@@ -134,14 +113,90 @@ describe("Review board tokens", () => {
     expect(actual).toEqual(SPEC);
   });
 
-  it("points each old name at its new token", () => {
-    const dark = colourTokens(css, DARK);
-    const pointsAt = Object.fromEntries(Object.keys(OLD_TO_NEW).map((old) => [old, ALIAS.exec(dark.get(old) ?? "")?.[1]]));
-    expect(pointsAt).toEqual(OLD_TO_NEW);
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // Lint doesn't read CSS, and a rule here reading an old name would quietly
+  // lose its colour, as the page's own body colour nearly did.
+  it("sets and reads no old colour name anywhere in the stylesheet", () => {
+    const old = /--color-(?:surface-hover|surface|line-strong|line|frame|ink-soft|ink|muted|faint)\b/g;
+    expect(withoutComments.match(old)).toBeNull();
   });
 
-  it("hides the panel outline, since Review board panels have no border", () => {
-    expect(colourTokens(css, DARK).get("frame")).toBe("transparent");
-    expect(colourTokens(css, LIGHT).get("frame")).toBe("transparent");
+  it("has no old size, font or corner left, and no all-caps rule", () => {
+    const OLD = [
+      "--text-label",
+      "--radius-soft",
+      "@utility soft-round",
+      "font-display",
+      "font-mono",
+      "font-family",
+      "uppercase",
+      "text-transform",
+      "tracking-wide",
+      "letter-spacing",
+    ];
+    expect(OLD.filter((old) => withoutComments.includes(old))).toEqual([]);
+  });
+
+  // A font a page loads is a download for every player, even if nothing shows
+  // it, and neither lint rule reads imports.
+  it("loads only Rubik", () => {
+    const files = readdirSync("src", { recursive: true, encoding: "utf8" }).filter(
+      (path) => /\.tsx?$/.test(path) && !path.includes(".test."),
+    );
+    const imports = files.flatMap(
+      (path) => readFileSync(join("src", path), "utf8").match(/import[^;]*next\/font[^;]*;/g) ?? [],
+    );
+    expect(imports.length).toBeGreaterThan(0);
+    expect(new Set(imports)).toEqual(new Set(['import { Rubik } from "next/font/google";']));
+  });
+
+  // Tailwind builds nothing for a colour that doesn't exist, and nothing else
+  // fails: the text or fill just isn't drawn. So build each class the real way.
+  const COLOUR_CLASS =
+    /^(?:[^\s:]+:)*!?(?:bg|text|border(?:-[a-z]+)?|divide|ring|fill|stroke|outline|decoration|accent|caret|placeholder|from|via|to|shadow)-[a-z][\w-]*(?:\/\d+)?$/;
+
+  async function classesThatBuildNothing(classes: string[]): Promise<string[]> {
+    const compiler = await compile(readFileSync("src/app/globals.css", "utf8"), {
+      base: "src/app",
+      loadStylesheet: async (id, base) => {
+        const path = id === "tailwindcss" ? "node_modules/tailwindcss/index.css" : join(base, id);
+        return { path, base: dirname(path), content: readFileSync(path, "utf8") };
+      },
+    });
+    let built = compiler.build([]).length;
+    return [...new Set(classes)].filter((name) => {
+      const before = built;
+      built = compiler.build([name]).length;
+      return built === before;
+    });
+  }
+
+  it("spots a colour class that builds nothing", async () => {
+    const classes = ["bg-panel", "[&_a]:text-main", "bg-surface-2", "hover:bg-raisd", "[&_a]:text-mian"];
+    expect(classes.filter((name) => COLOUR_CLASS.test(name))).toEqual(classes);
+    expect(await classesThatBuildNothing(classes)).toEqual(["bg-surface-2", "hover:bg-raisd", "[&_a]:text-mian"]);
+  });
+
+  // Tailwind builds a class for any name in a file it reads, so without these
+  // two lines the checks that name banned classes would put them in the CSS.
+  it("has Tailwind read only src and not its tests", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain('@import "tailwindcss" source("..");');
+    expect(css).toContain('@source not "../**/*.test.{ts,tsx}";');
+  });
+
+  it("builds CSS for every colour class in src", async () => {
+    const files = readdirSync("src", { recursive: true, encoding: "utf8" }).filter(
+      (path) => /\.tsx?$/.test(path) && !path.includes(".test."),
+    );
+    // Comments can say "text-colored" without meaning a class.
+    const code = (path: string) =>
+      readFileSync(join("src", path), "utf8").replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "");
+    const words = files.flatMap((path) => code(path).match(/[^\s"'`]+/g) ?? []);
+    // "from-zero" is a stat's kind in src/lib/analyzer/skill.ts, not a gradient.
+    const classes = words.filter((word) => COLOUR_CLASS.test(word) && word !== "from-zero");
+    expect(classes.length).toBeGreaterThan(500);
+    expect(await classesThatBuildNothing(classes)).toEqual([]);
   });
 });

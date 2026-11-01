@@ -83,8 +83,10 @@ Check in this order:
    migration, code that writes database rows, new paid Claude calls, a sent
    message, or a setting changed outside the repo; files, browser storage and
    a setting changed in code are two-way (`.github/pull_request_template.md`
-   has the definitions). A one-way door on a tiny or normal PR is a blocker,
-   since it changes who merges. A blast radius that reads low against the
+   has the definitions). A one-way door whose Door line says two-way, or that
+   has no Door line, is a blocker on any tier, risky included: `can-merge` reads
+   only that line to decide who merges, so you are the only check on it. A
+   blast radius that reads low against the
    template's definitions is a should-fix. On a PR Claude Code didn't build,
    such as Dependabot's, write the door and blast radius in your report.
 9. Judgement calls: does the diff repeat a lesson in the checklist below? A
@@ -114,7 +116,7 @@ other review, such as the `interrogate` panel on a risky PR, starts with its own
 name, like `Interrogate panel at <sha>:`. When a finding quotes a review
 line, leave out its `at <sha>:` part, since a quoted one counts as a review.
 The builder copies it into the PR's Review section, and `npm run can-merge` merges a
-normal PR only when the newest line clears it.
+PR only when the newest line clears it.
 
 Report at most 7 findings. For each: severity (blocker, should-fix, nit), file:line,
 the failing case as concrete input and wrong output, and your confidence. If nothing

@@ -74,18 +74,57 @@ async function openPlayerPage(page: Page) {
 
 test("scan the home page", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint");
   await scan(page, "Home");
 });
 
+// The box of saved players is only on the page while it's open. The sample
+// game's player has a rank on the preview, and the other has a dash.
+test("scan the saved players box, in both themes", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const players = [
+      { region: "kr", gameName: "Hide on bush", tagLine: "KR1" },
+      { region: "na", gameName: "Never Looked Up", tagLine: "0000" },
+    ];
+    localStorage.setItem("turnpoint:recent-players", JSON.stringify(players));
+    localStorage.setItem("turnpoint:pinned-players", JSON.stringify(players.slice(0, 1)));
+  });
+  await page.reload();
+
+  async function scanOpenBox(pageName: string) {
+    await page.getByRole("textbox", { name: "Riot ID" }).click();
+    await expect(page.getByRole("tab", { name: "Recent" })).toBeVisible();
+    // Wait for the ranks, or the scan sees the empty badges instead.
+    await expect(page.getByTitle("No solo queue rank on file").first()).toBeVisible(FIRST_LOAD);
+    await scan(page, pageName, "form[role=search]");
+  }
+
+  await scanOpenBox("Saved players box");
+  await switchToLightMode(page);
+  await page.goto("/");
+  await scanOpenBox("Saved players box, light mode");
+});
+
+async function selectLostPlay(page: Page) {
+  const review = page.getByRole("region", { name: "Game review" });
+  await review.locator("ol > li > button", { hasText: "−" }).first().click();
+  await expect(review.locator("ol > li > button[aria-current]")).toContainText("−");
+}
+
 test("scan the sample analysis, all three tabs", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
     "Victory",
     FIRST_LOAD,
   );
   await scan(page, "Sample analysis, Summary tab");
+
+  // The sample game opens on a play you gained from. A lost one puts red text
+  // on the selected row's fill.
+  await selectLostPlay(page);
+  await scan(page, "Sample analysis, Summary tab, a lost play selected");
 
   // Replay has the Ask panel beside it, whichever state Ask is in on the
   // preview (usually not set up there, since previews have no sign-in).
@@ -147,10 +186,12 @@ test("scan light mode", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await scan(page, "Home, light mode");
 
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
     "Victory",
     FIRST_LOAD,
   );
   await scan(page, "Sample analysis, light mode");
+  await selectLostPlay(page);
+  await scan(page, "Sample analysis, light mode, a lost play selected");
 });

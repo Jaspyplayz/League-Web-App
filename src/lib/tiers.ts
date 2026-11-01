@@ -25,6 +25,10 @@ export function isTier(value: string): value is Tier {
   return (TIERS as readonly string[]).includes(value);
 }
 
+export function isDivision(value: string): value is Division {
+  return (DIVISIONS as readonly string[]).includes(value);
+}
+
 export function isApexTier(tier: Tier): tier is ApexTier {
   return (APEX_TIERS as readonly string[]).includes(tier);
 }

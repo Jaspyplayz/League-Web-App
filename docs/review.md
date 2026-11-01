@@ -1,8 +1,14 @@
 # 60-second review
 
-Reviewing a 30-minute game takes too long, and most players don't know what to look for, so most never do it. The 60-second review makes it short: near the top of a game's Summary tab (under the scoreboard and the strip with your matchup and phase ratings), the three plays you were in that moved your team's chance to win the most, each with a question to think over and a button that opens the replay at that second.
+Reviewing a 30-minute game takes too long, and most players don't know what to look for, so most never do it. The 60-second review makes it short: the three plays you were in that moved your team's chance to win the most, each with a question to think over and a button that opens the replay at that second. They're marked "60s" in Game review, the right column of a game's Summary tab (on a phone, right under the board), among all the plays you were in.
 
-The moments are picked in [`src/lib/analyzer/review.ts`](../src/lib/analyzer/review.ts) from the replay's [graded plays](replay.md#how-the-plays-are-graded). The panel is `match/[matchId]/review.tsx`, and its buttons reach the replay and the notes box through `review-links.tsx`, which the tabs (`analysis-tabs.tsx`) hold.
+The moments are picked in [`src/lib/analyzer/review.ts`](../src/lib/analyzer/review.ts) from the replay's [graded plays](replay.md#how-the-plays-are-graded). The column is `match/[matchId]/game-review.tsx`, and its buttons reach the replay and the notes box through `review-links.tsx`, which the tabs (`analysis-tabs.tsx`) hold.
+
+## Game review
+
+Game review is modelled on chess.com's game review. Top to bottom it has your scores (Overall, then the Early, Mid and Late [phase ratings](phase-ratings.md)), how many of your plays earned each grade, and your plays in time order. The scale has eleven grades. The analyzer can award eight, and the other three (Best, Book and Miss) show a dash until it can ([decision record 0023](adr/0023-chess-style-grades.md)).
+
+One play is opened at a time. It opens on the play that moved the game most, the same one the board's eval bar starts on, because `summary-columns.tsx` holds the selection for both of them. Choosing a play in the list, on the strip or with the first, previous, next and last buttons moves the eval bar, the strip's mark and the chart's cursor together. "Start review in the replay" opens the Replay tab at the selected play.
 
 ## Which plays
 
@@ -10,13 +16,15 @@ The moments are picked in [`src/lib/analyzer/review.ts`](../src/lib/analyzer/rev
 2. **That moved the chance by a point or more**, either way. Smaller ones are graded Even and are mostly farming noise.
 3. **The three that moved it most**, shown in game order.
 
-A game can have fewer than three, and a game where you weren't in any such play says so. Games the [win chance](win-chance.md) model doesn't cover have no review.
+A game can have fewer than three, and a game where you weren't in any such play says so. Games the [win chance](win-chance.md) model doesn't cover have no plays or grades. Game review then shows only your scores, or isn't drawn if the game has none.
 
 A play's size is Win Probability Added: how much it changed your team's chance to win. That says what the play did to the game, not whether it was the right call. A fight that was the right call can still go wrong, and once a game is decided even a big fight barely moves the chance (see [replay.md](replay.md#how-the-plays-are-graded)).
 
 ## Each moment
 
-- **The time and what happened**, named the way the replay's plays list names it: "Won a fight 3 for 0, your team took Dragon".
+Any play you open in Game review shows the time, what happened, the grade and the chance. Only a moment has the tempo line, the question and "Add to notes".
+
+- **The time and what happened**, named the way the replay's plays list names it: "Won a fight 3 for 0, your team took Dragon", with one line per kill or objective under it.
 - **The grade and the chance before and after**: "Mistake −4.1%, from 52.2% to 48.1%". The grade is the replay's, from Brilliant to Blunder ([how the plays are graded](replay.md#how-the-plays-are-graded)). The moments are the biggest moves, so they're mostly Excellent, Great, Mistake or Blunder, with Good or Inaccuracy in a quiet game.
 - **For junglers, who had tempo** just before it, from the [tempo timeline](tempo.md).
 - **A question to think over**, picked by what happened:

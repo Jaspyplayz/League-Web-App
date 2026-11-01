@@ -9,6 +9,7 @@ import {
   parseSavedPlayers,
   PENDING_SEARCH_MS,
   removePlayer,
+  savedPlayerKey,
   togglePinnedPlayer,
   type SavedPlayer,
 } from "./saved-players";
@@ -110,6 +111,20 @@ describe("parsePendingSearch", () => {
       expect(parsePendingSearch(saved)).toBeNull();
     },
   );
+});
+
+describe("savedPlayerKey", () => {
+  it("is the same whatever the capitals", () => {
+    expect(savedPlayerKey({ region: "kr", gameName: "HIDE on Bush", tagLine: "kr1" })).toBe(
+      savedPlayerKey({ region: "kr", gameName: "Hide on bush", tagLine: "KR1" }),
+    );
+  });
+
+  it("differs by region", () => {
+    expect(savedPlayerKey({ region: "kr", gameName: "A", tagLine: "B" })).not.toBe(
+      savedPlayerKey({ region: "na", gameName: "A", tagLine: "B" }),
+    );
+  });
 });
 
 describe("isPendingSearch", () => {

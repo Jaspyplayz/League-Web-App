@@ -54,7 +54,7 @@ describe("classify", () => {
   });
 
   it("reports a Riot ID that doesn't exist", () => {
-    const text = "No player found\nThere's no Foo#BAR in Korea.";
+    const text = "No player called Foo#BAR on Korea\nCheck the spelling and the tag after the #, or try another region.";
     expect(classify(load({ text })).outcome).toBe("not-found");
   });
 
@@ -72,7 +72,7 @@ describe("classify", () => {
   // change them here too.
   it("looks for the words the site really shows", () => {
     expect(source("src/components/riot-error-notice.tsx")).toContain(RIOT_KEY_NOTICE);
-    expect(source("src/app/player/[region]/[riotId]/page.tsx")).toContain(NO_PLAYER);
+    expect(source("src/app/player/[region]/[riotId]/player-not-found.tsx")).toContain(NO_PLAYER);
     expect(source("src/app/global-error.tsx")).toContain(ERROR_TEXTS[0]);
   });
 });

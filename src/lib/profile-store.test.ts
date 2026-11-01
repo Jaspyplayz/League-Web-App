@@ -1,7 +1,10 @@
+import * as Sentry from "@sentry/nextjs";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RiotApiError } from "@/lib/riot/client";
 import { getMatchIds, getRankedEntries, getSummoner } from "@/lib/riot/api";
-import { loadProfile, updateProfile } from "./profile-store";
+import { loadProfile, savedSoloRanks, updateProfile } from "./profile-store";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
@@ -12,7 +15,8 @@ vi.mock("@/lib/riot/api", () => ({
 }));
 
 // A pretend database holding at most one saved player. readCache hands it to
-// the code under test; database() returns null so nothing is written.
+// the code under test; database() returns null so nothing is written, except
+// for savedSoloRanks, which reads through it.
 type SavedPlayer = {
   puuid: string;
   gameName: string;
@@ -24,14 +28,37 @@ type SavedPlayer = {
   matchIdsFetchedAt: Date | null;
 };
 let saved: SavedPlayer | undefined;
+// The rows savedSoloRanks's one query gets back, and what it asked for.
+type RankRow = { region: string; gameName: string; tagLine: string; tier: string | null; division: string | null };
+let rankRows: RankRow[] = [];
+let selects = 0;
+let rankWhere: SQL | undefined;
+let rankError: Error | undefined;
 const fakeDb = {
   query: {
     players: { findFirst: async () => saved },
     rankedEntries: { findMany: async () => [] },
   },
+  select: () => {
+    selects++;
+    const chain = {
+      from: () => chain,
+      leftJoin: () => chain,
+      where: (where: SQL) => {
+        rankWhere = where;
+        return chain;
+      },
+      orderBy: async () => {
+        if (rankError) throw rankError;
+        return rankRows;
+      },
+    };
+    return chain;
+  },
 };
+let directDb: typeof fakeDb | null = null;
 vi.mock("@/lib/match-store", () => ({
-  database: () => null,
+  database: () => directDb,
   readCache: (read: (db: typeof fakeDb) => unknown) => read(fakeDb),
 }));
 
@@ -51,6 +78,11 @@ function savePlayer(fetchedAt: Date, region = "na") {
 
 beforeEach(() => {
   saved = undefined;
+  rankRows = [];
+  selects = 0;
+  rankWhere = undefined;
+  rankError = undefined;
+  directDb = null;
   vi.mocked(getSummoner).mockReset().mockResolvedValue({
     puuid: "p1",
     profileIconId: 7,
@@ -58,6 +90,94 @@ beforeEach(() => {
   });
   vi.mocked(getRankedEntries).mockReset().mockResolvedValue([]);
   vi.mocked(getMatchIds).mockReset().mockResolvedValue(["NA1_new"]);
+});
+
+describe("savedSoloRanks", () => {
+  const known = { region: "kr" as const, gameName: "Hide on bush", tagLine: "KR1" };
+  const unranked = { region: "na" as const, gameName: "Jasper", tagLine: "NA1" };
+  const unknown = { region: "euw" as const, gameName: "Never Seen", tagLine: "EUW" };
+  const row = (p: typeof known | typeof unranked, tier: string | null, division: string | null) => ({
+    ...p,
+    tier,
+    division,
+  });
+
+  beforeEach(() => {
+    directDb = fakeDb;
+  });
+
+  it("gives a known player's rank, and null for unranked and unknown players", async () => {
+    rankRows = [row(known, "DIAMOND", "I"), row(unranked, null, null)];
+    expect(await savedSoloRanks([known, unranked, unknown])).toEqual({
+      "kr/hide on bush#kr1": { tier: "DIAMOND", division: "I" },
+      "na/jasper#na1": null,
+      "euw/never seen#euw": null,
+    });
+  });
+
+  it("answers with null, not empty ranks, when the read fails", async () => {
+    rankError = new Error("connection lost");
+    expect(await savedSoloRanks([known])).toBeNull();
+  });
+
+  it("keeps the Riot IDs out of the error it reports", async () => {
+    // Drizzle's own message quotes the query's values.
+    rankError = Object.assign(new Error('Failed query: select ... params: kr,Hide on bush,KR1'), {
+      cause: { code: "57014" },
+    });
+    await savedSoloRanks([known]);
+
+    const [reported] = vi.mocked(Sentry.captureException).mock.lastCall!;
+    expect(String(reported)).toContain("57014");
+    expect(String(reported)).not.toContain("Hide on bush");
+    expect(reported).not.toBe(rankError);
+  });
+
+  it("gives null for everyone without a database, since nobody was looked up", async () => {
+    directDb = null;
+    expect(await savedSoloRanks([known])).toEqual({ "kr/hide on bush#kr1": null });
+  });
+
+  it("runs one query for all the players and never calls Riot", async () => {
+    await savedSoloRanks([known, unranked, unknown]);
+    expect(selects).toBe(1);
+    expect(getSummoner).not.toHaveBeenCalled();
+    expect(getRankedEntries).not.toHaveBeenCalled();
+    expect(getMatchIds).not.toHaveBeenCalled();
+  });
+
+  it("asks for each player by region and Riot ID, whatever the capitals", async () => {
+    await savedSoloRanks([known, unranked]);
+    const query = new PgDialect().sqlToQuery(rankWhere!);
+    expect(query.sql.match(/lower\("players"\."game_name"\) = lower\(/g)).toHaveLength(2);
+    expect(query.sql.match(/lower\("players"\."tag_line"\) = lower\(/g)).toHaveLength(2);
+    expect(query.params).toEqual(["kr", "Hide on bush", "KR1", "na", "Jasper", "NA1"]);
+  });
+
+  it("doesn't query for an empty list", async () => {
+    expect(await savedSoloRanks([])).toEqual({});
+    expect(selects).toBe(0);
+  });
+
+  it("matches a saved spelling with different capitals", async () => {
+    rankRows = [row(known, "GOLD", "II")];
+    const ranks = await savedSoloRanks([{ region: "kr", gameName: "hide ON bush", tagLine: "kr1" }]);
+    expect(ranks?.["kr/hide on bush#kr1"]).toEqual({ tier: "GOLD", division: "II" });
+  });
+
+  it("trusts the newest row when a Riot ID has passed to another account", async () => {
+    // Newest first, as the query orders them.
+    rankRows = [row(known, null, null), row(known, "DIAMOND", "I")];
+    expect(await savedSoloRanks([known])).toEqual({ "kr/hide on bush#kr1": null });
+  });
+
+  it.each([
+    ["tier", "WOOD", "I"],
+    ["division", "DIAMOND", "V"],
+  ])("gives null for a %s it doesn't know", async (_name, tier, division) => {
+    rankRows = [row(known, tier, division)];
+    expect(await savedSoloRanks([known])).toEqual({ "kr/hide on bush#kr1": null });
+  });
 });
 
 describe("loadProfile", () => {

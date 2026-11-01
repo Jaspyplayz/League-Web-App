@@ -10,7 +10,7 @@ test("send the preview bypass secret only to the preview", async ({ page, baseUR
   const sent = recordSent(page.context());
 
   await page.goto("/");
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText("Victory", {
     timeout: 30_000,
   });

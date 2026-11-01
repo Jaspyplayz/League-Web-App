@@ -1,22 +1,32 @@
-import { Panel } from "@/components/ui/panel";
+import { LoadingBlock, LoadingSection } from "@/components/ui/loading";
 
-// `quiet` drops the loading label. A parent skeleton already announces the wait.
+// The game rows while they load: grey blocks in each row's shape (the
+// champion, its name, the KDA and the score) and about its height (the five
+// player names set it on wider screens), so little jumps when they arrive.
+// `quiet` drops the status line, for when a parent skeleton already says
+// what's loading.
 export function MatchListSkeleton({ quiet = false }: { quiet?: boolean }) {
-  return (
-    <div
-      className={`flex flex-col gap-3 ${quiet ? "" : "motion-safe:animate-pulse"}`}
-      {...(quiet ? { "aria-hidden": true } : { role: "status" as const, "aria-busy": true, "aria-label": "Loading matches" })}
-    >
-      {quiet ? null : <span className="sr-only">Loading matches</span>}
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Panel key={i} className="flex h-20 items-center gap-4 p-4">
-          <div className="soft-round-sm size-12 bg-line-strong" />
-          <div className="flex flex-col gap-2">
-            <div className="h-3 w-24 rounded bg-line-strong" />
-            <div className="h-3 w-40 rounded bg-line-strong" />
+  const rows = (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 5 }, (_, i) => (
+        <div key={i} className="flex h-[92px] items-center gap-3 rounded-md bg-panel px-3.5 sm:h-[114px]">
+          <LoadingBlock className="hidden h-9 w-16 sm:block" />
+          <LoadingBlock className="size-11 shrink-0" />
+          <div className="flex flex-1 flex-col gap-2">
+            <LoadingBlock className="h-3.5 w-24" />
+            <LoadingBlock className="h-3 w-16" />
           </div>
-        </Panel>
+          <LoadingBlock className="h-8 w-10" />
+        </div>
       ))}
     </div>
   );
+  if (quiet) {
+    return (
+      <div aria-hidden="true" className="motion-safe:animate-pulse">
+        {rows}
+      </div>
+    );
+  }
+  return <LoadingSection label="Loading games">{rows}</LoadingSection>;
 }

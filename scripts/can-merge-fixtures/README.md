@@ -11,3 +11,9 @@
 | `check-runs-195.json` | `GET .../commits/a18e2fc.../check-runs?filter=all&per_page=100` | Check runs: every run of every check at #195's head, re-runs included |
 | `workflow-runs-195.json` | `GET .../actions/runs?head_sha=a18e2fc...&per_page=100` | The workflow runs those check runs belong to, matched by `check_suite_id` |
 | `status-195.json` | `GET .../commits/a18e2fc.../status?per_page=100` | A commit status: Vercel's deployment check |
+
+`scripts/can-merge-gates.test.ts` reads one more:
+
+| File | Request | What it covers |
+|---|---|---|
+| `body-245.md` | `gh api repos/Jaspyplayz/League-Web-App/pulls/245 --jq .body`, saved on 2026-11-01 | A real risky PR's description (the sign-in page, normal tier), unchanged: it has two reviewer verdicts and no interrogate panel line (JAS-128) |

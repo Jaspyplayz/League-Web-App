@@ -2,7 +2,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
-import { matchesPattern, RISKY_PATHS, riskyFiles } from "./risky-paths";
+import { FEATURE_NOTE, jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, riskyFiles } from "./risky-paths";
+
+const RISKY_PATHS = [...JASPERS_PATHS, ...PANEL_PATHS];
 
 // -z lists names unquoted, so a file named in other letters is still checked.
 const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
@@ -13,7 +15,7 @@ const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others",
 
 // The only risky patterns allowed to match no file in the repo (see the
 // "names only paths that exist" test below).
-const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/"];
+const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/", "vite.config", ".npmrc", ".mcp.json"];
 
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
@@ -63,7 +65,7 @@ describe("riskyFiles", () => {
         "package.json",
       ]),
     ).toEqual([
-      { path: "src/db/schema.ts", why: "the database schema and queries" },
+      { path: "src/db/schema.ts", why: "the tables migrations are generated from" },
       { path: "drizzle/0012_ask_budget.sql", why: "database migrations" },
       { path: "src/lib/riot/client.ts", why: "the Riot client and rate limiter" },
       { path: "src/app/api/mcp/route.ts", why: "API routes, including the MCP server" },
@@ -158,12 +160,126 @@ describe("riskyFiles", () => {
     ).toEqual([]);
   });
 
+  // Jasper merges migrations and anything that defines or runs a check, since
+  // an agent could otherwise loosen its own gate and merge that (JAS-128).
+  it("keeps migrations and every check-defining path Jasper's to merge", () => {
+    const paths = [
+      "drizzle/0014_notes.sql",
+      "drizzle.config.ts",
+      "src/db/schema.ts",
+      ".github/workflows/ci.yml",
+      ".claude/settings.json",
+      ".claude/hooks/check-before-commit.mjs",
+      ".claude/agents/reviewer.md",
+      ".claude/skills/verify-turnpoint-ux/SKILL.md",
+      ".claude/rules/design.md",
+      ".claude/agent-merge.json",
+      ".cursor/rules/x.mdc",
+      "eslint.config.mjs",
+      "eslint-rules/no-green-classes.mjs",
+      "tsconfig.json",
+      "next.config.ts",
+      "vercel.json",
+      "vitest.config.mts",
+      "playwright.config.ts",
+      "e2e/fixtures.ts",
+      "e2e/preview-login.ts",
+      "e2e/preview-secret.spec.ts",
+      "src/app/themes.test.ts",
+      "src/app/corners.test.ts",
+      "package.json",
+      "package-lock.json",
+      ".npmrc",
+      ".nvmrc",
+      ".mcp.json",
+      "scripts/can-merge-gates.ts",
+      "scripts/risky-paths.ts",
+      "src/lib/.claude/rules/x.md",
+    ];
+    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // Each tool loads another file name ahead of the one the repo has today, so
+  // an exact name would let a new file replace a check's config.
+  it.each(["eslint.config.js", "next.config.js", "vitest.config.ts", "vite.config.ts", "playwright.config.js", "tsconfig.base.json"])(
+    "keeps %s Jasper's, which could replace a check's config",
+    (path) => {
+      expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
+    },
+  );
+
+  // These are risky, so they get the interrogate panel, but Claude merges them
+  // once it clears them. e2e/ holds the smoke test's specs; what decides
+  // whether and how they run (playwright.config.ts, .github/) stays Jasper's.
+  it("lets Claude merge the product's risky paths after the panel", () => {
+    const paths = [
+      "src/db/freshness.ts",
+      "src/lib/match-note-store.ts",
+      "src/app/sign-in/page.tsx",
+      "src/lib/riot/client.ts",
+      "src/app/api/mcp/route.ts",
+      "src/lib/ask.ts",
+      "src/lib/analyzer/score-model.json",
+      "src/app/privacy/page.tsx",
+      "src/app/globals.css",
+      "e2e/smoke.spec.ts",
+    ];
+    expect(jaspersFiles(paths)).toEqual([]);
+    expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // Most redesign PRs update the verify skill's feature notes, so Jasper chose
+  // to let Claude merge them; the skill itself stays his (JAS-128). Agents
+  // follow the notes, so they still get the panel.
+  it("lets Claude merge the verify skill's feature notes after the panel, and nothing else in .claude/skills/", () => {
+    const notes = [".claude/skills/verify-turnpoint-ux/features/review-path.md", ".claude/skills/verify-turnpoint-ux/Features/x.md"];
+    expect(jaspersFiles(notes)).toEqual([]);
+    expect(riskyFiles(notes)).toEqual(notes.map((path) => ({ path, why: "the verify skill's feature notes, which agents follow" })));
+    const still = [
+      ".claude/skills/verify-turnpoint-ux/SKILL.md",
+      ".claude/skills/verify-turnpoint-ux/scripts/drive.ts",
+      ".claude/skills/verify-turnpoint-ux/features/drive.ts",
+      ".claude/skills/verify-turnpoint-ux/features/.claude/rules/x.md",
+      ".claude/skills/verify-turnpoint-ux/features/deep/SKILL.md",
+      ".claude/skills/verify-turnpoint-ux/features/README.md",
+      ".claude/skills/verify-turnpoint-ux/features/CLAUDE.md",
+      ".claude/skills/verify-turnpoint-ux/features/CLAUDE.local.md",
+      ".claude/skills/verify-turnpoint-ux/features/AGENTS.md",
+      ".claude/skills/verify-turnpoint-ux/features/SKILL.md",
+      ".claude/skills/verify-turnpoint/features/ask-teaser.md",
+      "src/.claude/skills/verify-turnpoint-ux/features/x.md",
+    ];
+    expect(jaspersFiles(still).map((file) => file.path)).toEqual(still);
+  });
+
+  // A new kind of Claude Code config, such as a commands folder, could steer
+  // agents too, so it is Jasper's until someone decides otherwise.
+  it("keeps a new file anywhere in .claude/ Jasper's", () => {
+    expect(jaspersFiles([".claude/commands/ship.md"])).toEqual([
+      { path: ".claude/commands/ship.md", why: "Claude Code's own setup, which steers every agent here" },
+    ]);
+  });
+
+  // A file on Jasper's list can sit in a panel folder, like src/db/schema.ts
+  // in src/db/, but a whole panel pattern inside his list would do nothing.
+  it("puts no panel pattern inside one of Jasper's", () => {
+    const both = PANEL_PATHS.filter(({ pattern }) => JASPERS_PATHS.some((jaspers) => matchesPattern(jaspers.pattern, pattern)));
+    expect(both).toEqual([]);
+  });
+
+  // A carve-out that matches no file does nothing, so renaming the skill's
+  // folder would quietly send its notes back to Jasper.
+  it("carves out feature notes that exist", () => {
+    const notes = repoFiles.filter((file) => FEATURE_NOTE.test(file));
+    expect(notes.length).toBeGreaterThan(0);
+    expect(jaspersFiles(notes)).toEqual([]);
+  });
+
   // A folder renamed without updating the list would quietly stop being risky.
-  // The Cursor patterns are the exception: .cursor/ was deleted when Cursor
-  // stopped being used (decision record 0012), so they match no file, but
-  // they stay so a Cursor settings or rules file added later still goes to
-  // Jasper.
-  it("names only paths that exist in the repo, except the kept Cursor patterns", () => {
+  // The exceptions name files that don't exist yet: .cursor/ was deleted when
+  // Cursor stopped being used (decision record 0012), and the others would
+  // change how a check or an agent runs if someone added them.
+  it("names only paths that exist in the repo, except the ones kept for files added later", () => {
     const missing = RISKY_PATHS.filter(
       ({ pattern }) => !KEPT_WITHOUT_FILES.includes(pattern) && !repoFiles.some((file) => matchesPattern(pattern, file)),
     );

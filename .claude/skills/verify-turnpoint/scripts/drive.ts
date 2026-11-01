@@ -15,7 +15,7 @@ const journeys: Journey[] = [
     run: async ({ page, step }) => {
       await step("open home", async () => {
         await page.goto("/", LOAD);
-        await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint");
         await expect(page.getByRole("search", { name: "Player lookup" })).toBeVisible();
       });
       await step("type riot id and region", async () => {
@@ -23,8 +23,8 @@ const journeys: Journey[] = [
         await page.getByLabel("Region").selectOption(TEST_PLAYER.region);
         await expect(page.getByLabel("Riot ID")).toHaveValue(TEST_PLAYER.riotId);
       });
-      await step("press analyze", async () => {
-        await page.getByRole("button", { name: "Analyze" }).click();
+      await step("press search", async () => {
+        await page.getByRole("button", { name: "Search", exact: true }).click();
         await expect(page).toHaveURL(/\/player\/kr\/Hide%20on%20bush-KR1$/, LOAD);
         await assertAppPage(page);
         await expect(page.getByRole("heading", { level: 1 })).toContainText(/Hide on bush/i, LOAD);
@@ -45,10 +45,10 @@ const journeys: Journey[] = [
       });
       await step("match list has rows", async () => {
         const list = page.getByRole("region", { name: "Recent matches" });
-        await expect(list.getByText(/^(Victory|Defeat|Remake)$/i).first()).toBeVisible(LOAD);
-        const rows = await list.getByText(/^(Victory|Defeat|Remake)$/i).count();
+        await expect(list.getByText(/^(Win|Loss|Remake)$/).first()).toBeVisible(LOAD);
+        const rows = await list.getByText(/^(Win|Loss|Remake)$/).count();
         note("resultLabels", rows);
-        if (rows < 1) throw new Error("no match rows: the list shows no Victory/Defeat rows");
+        if (rows < 1) throw new Error("no match rows: the list shows no Win/Loss rows");
       });
       await step("switch queue to Ranked Solo/Duo", async () => {
         await page.getByRole("region", { name: "Recent matches" }).getByRole("link", { name: "Ranked Solo/Duo", exact: true }).click();
@@ -69,14 +69,14 @@ const journeys: Journey[] = [
         await expect(page.getByText("Victory", { exact: false }).first()).toBeVisible();
       });
       await step("60-second review has moments", async () => {
-        const review = page.getByRole("region", { name: "60-second review" });
+        const review = page.getByRole("region", { name: "Game review" });
         await review.scrollIntoViewIfNeeded();
         await expect(review).toBeVisible();
-        const moments = await review.getByRole("listitem").count();
+        const moments = await review.getByRole("button", { name: "In your 60-second review" }).count();
         note("moments", moments);
         if (moments < 1 || moments > 3) throw new Error(`expected 1-3 moments, saw ${moments}`);
-        await expect(review.getByText("Think about").first()).toBeVisible();
-        await expect(review.getByRole("button", { name: "Watch in replay" }).first()).toBeVisible();
+        await expect(review.getByText("Think about")).toBeVisible();
+        await expect(review.getByRole("button", { name: "Watch in replay" })).toBeVisible();
       });
     },
   },

@@ -25,11 +25,11 @@ test.afterEach(async ({ page }, testInfo) => {
 
 test("search a player and see their profile", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint");
 
   await page.getByLabel("Riot ID").fill("Hide on bush#KR1");
   await page.getByLabel("Region").selectOption("kr");
-  await page.getByRole("button", { name: "Analyze" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Search", exact: true }).click();
   await expect(page).toHaveURL(/\/player\/kr\/Hide%20on%20bush-KR1/);
 
   // Wait for either the profile or the expired-key notice, whichever comes.
@@ -42,28 +42,89 @@ test("search a player and see their profile", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Ranked Solo/Duo" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible();
 
-  // A match row's panel is rendered by a Server Action when the row first
-  // opens, not sent with the page, so open one and wait for its tabs.
-  await page.getByRole("button", { name: /^Show details for this/ }).first().click();
-  await expect(page.getByRole("tab", { name: "Overview" }).first()).toBeVisible(FIRST_LOAD);
+  // Matches switches to By day and back.
+  const views = page.getByRole("navigation", { name: "Matches view" });
+  await views.getByRole("link", { name: "By day" }).click();
+  await expect(views.getByRole("link", { name: "By day" })).toHaveAttribute("aria-current", "page");
+  // Days, or the empty panel if the player hasn't played in four weeks.
+  const days = page.getByRole("heading", { name: "Days", exact: true });
+  await expect(days.or(page.getByText(/^No games in the last/))).toBeVisible(FIRST_LOAD);
+  await views.getByRole("link", { name: "List" }).click();
+  await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible(FIRST_LOAD);
+
+  // Each game row is one link to that game's match page.
+  await page.getByRole("link", { name: /^Open this .+ game/ }).first().click();
+  await expect(page).toHaveURL(/\/match\/KR_/);
+  await expect(page.getByRole("tab", { name: "Summary" })).toBeVisible(FIRST_LOAD);
+});
+
+// The Log was a profile tab; it's now the By day view of Matches. Reaching
+// the new address is enough, so this passes even with an expired Riot key.
+test("send the old Log address to By day", async ({ page }) => {
+  await page.goto("/player/kr/Hide%20on%20bush-KR1/log");
+  await expect(page).toHaveURL(/\/player\/kr\/Hide%20on%20bush-KR1\?view=day$/);
 });
 
 // The sample game is served from the database, so unlike the search above it
-// must work even when the Riot key has expired.
+// must work even when the Riot key has expired. Home's chart opens it too;
+// `exact` keeps this to the button.
 test("open the sample analysis", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page).toHaveURL(/\/match\/KR_/);
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
     "Victory",
     FIRST_LOAD,
   );
   await expect(page.getByText("Biggest swings")).toBeVisible();
+  // A grade mark on the strip is a button: clicking one selects its play, and
+  // the eval bar moves to that play's chance.
+  const mark = page
+    .getByRole("button", { name: /chance to win after it/ })
+    .and(page.locator('[aria-pressed="false"]'))
+    .first();
+  const label = (await mark.getAttribute("aria-label")) ?? "";
+  const chance = label.match(/\d+%$/)?.[0];
+  await mark.click();
+  // `mark` looks for an unpressed mark, so it now means a different one. A
+  // mark's label doesn't change.
+  await expect(page.getByRole("button", { name: label, exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("img", { name: `chance to win: ${chance}` })).toBeVisible();
   // The replay lives on the Replay tab, hidden until it's opened.
   const replay = page.getByRole("heading", { name: "Replay", exact: true });
   await expect(replay).toBeHidden();
   await page.getByRole("tab", { name: "Replay" }).click();
   await expect(replay).toBeVisible();
+
+  // Game review's step buttons select the play on the board too, and its main
+  // button opens the replay at that play.
+  await page.getByRole("tab", { name: "Summary" }).click();
+  const review = page.getByRole("region", { name: "Game review" });
+  // The first play is already selected from the strip above, so this is the
+  // second: picking a row has to move the selection for these to pass. The
+  // ">" leaves out the opened play's own buttons, such as Watch in replay.
+  await review.locator("ol > li > button").nth(1).click();
+  await expect(review.getByRole("button", { name: "First play" })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: /chance to win after it/ }).nth(1),
+  ).toHaveAttribute("aria-pressed", "true");
+  await review.getByRole("button", { name: "Last play" }).click();
+  await expect(review.getByRole("button", { name: "Next play" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: /chance to win after it/ }).last(),
+  ).toHaveAttribute("aria-pressed", "true");
+  await review.getByRole("button", { name: "Start review in the replay" }).click();
+  await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute("aria-selected", "true");
+  await expect(replay).toBeVisible();
+  // The sample game's last play starts at 24:15, and the replay opens on its
+  // first whole second.
+  await expect(page.getByRole("slider", { name: "Game time" })).toHaveAttribute(
+    "aria-valuetext",
+    /^24:1[56]:/,
+  );
 });
 
 // The theme is applied by a script in <head>, so check it survives a reload:
@@ -82,14 +143,14 @@ test("switch to light mode from the header", async ({ page }) => {
 test("send the old Settings page home", async ({ page }) => {
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint");
 });
 
 // Every page but home has a search in the header. Reaching the player's
 // address is enough here, so this passes even with an expired Riot key.
 test("search a player from the header on a match page", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page).toHaveURL(/\/match\/KR_/);
   const search = page.getByRole("search", { name: "Search a player" });
   // On a KR player's page the region starts on KR.

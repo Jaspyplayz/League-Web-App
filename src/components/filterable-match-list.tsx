@@ -18,8 +18,9 @@ export function FilterableMatchList({
   const shown = games.filter((g) => matchesChampion(g.champion, query));
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="soft-round-sm flex items-center gap-2 self-start border border-line-strong bg-surface px-3 focus-within:border-ahead">
+    <div className="flex flex-col gap-3.5">
+      {/* 280px wide on wider screens, the full width on phones. */}
+      <div className="flex h-11 items-center gap-2 rounded-md bg-panel px-3 text-quiet focus-within:outline-2 focus-within:outline-main sm:h-10 sm:max-w-[280px]">
         <SearchIcon />
         <label htmlFor="champion-search" className="sr-only">
           Search a champion
@@ -31,13 +32,14 @@ export function FilterableMatchList({
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search a champion"
           autoComplete="off"
-          className="min-h-10 w-48 bg-transparent text-sm text-ink outline-none placeholder:text-placeholder focus-visible:outline-none"
+          className="h-full min-w-0 flex-1 bg-transparent text-body text-main outline-none placeholder:text-quiet"
         />
       </div>
       {shown.length > 0 ? (
-        <ul className="flex flex-col gap-3">{shown.map((g) => g.row)}</ul>
+        // `@container`: each row lays itself out by the list's width (match-row.tsx).
+        <ul className="@container flex flex-col gap-2">{shown.map((g) => g.row)}</ul>
       ) : (
-        <p className="text-muted">No games on &ldquo;{query}&rdquo; here.</p>
+        <p className="text-body text-quiet">No games on &ldquo;{query}&rdquo; here.</p>
       )}
     </div>
   );
@@ -54,7 +56,7 @@ function SearchIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       aria-hidden="true"
-      className="text-faint"
+      className="shrink-0"
     >
       <circle cx="11" cy="11" r="7" />
       <path d="M20 20l-3.5-3.5" />

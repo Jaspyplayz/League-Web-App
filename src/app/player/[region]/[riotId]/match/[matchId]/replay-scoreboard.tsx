@@ -79,8 +79,8 @@ export function ReplayScoreboard({
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-mono text-[32px] leading-none text-ink">{formatClock(t)}</span>
-        <span className="text-body text-muted">
+        <span className="text-3xl font-semibold leading-none tabular-nums text-main">{formatClock(t)}</span>
+        <span className="text-body text-quiet">
           {gold.tone === "even" ? (
             "Gold even"
           ) : (
@@ -112,14 +112,14 @@ export function ReplayScoreboard({
             <div key={team.teamId} className="row-span-2 grid min-w-0 grid-rows-subgrid gap-2">
               <h3 id={headingId} className="flex flex-wrap items-baseline gap-x-2.5">
                 <span
-                  className={`font-display text-lg font-bold uppercase tracking-[0.04em] ${
+                  className={`text-body font-semibold ${
                     won ? "text-ahead" : "text-behind"
                   }`}
                 >
                   {team.teamId === myTeamId ? "Your team" : "Enemy team"} ·{" "}
                   {won ? "Victory" : "Defeat"}
                 </span>
-                <span className="font-mono text-note text-muted">{teamLine(team)}</span>
+                <span className="text-note tabular-nums text-quiet">{teamLine(team)}</span>
               </h3>
 
               <table
@@ -127,7 +127,7 @@ export function ReplayScoreboard({
                 className="w-full table-fixed border-collapse text-sm max-sm:hidden"
               >
                 <thead>
-                  <tr className="text-left font-mono text-[11px] uppercase tracking-[0.1em] text-faint">
+                  <tr className="text-left text-note text-quiet">
                     <th scope="col" className="py-1.5 pl-2 pr-2 font-medium">
                       Player
                     </th>
@@ -167,7 +167,7 @@ export function ReplayScoreboard({
         })}
       </div>
       {!showItems && (
-        <p className="text-note text-faint">
+        <p className="text-note text-quiet">
           This game was saved before Turnpoint kept item sales and used-up items, and Riot
           couldn&apos;t be reached to fetch it again, so items aren&apos;t shown. Reloading the page
           tries again.
@@ -190,14 +190,14 @@ function teamLine(team: TeamMoment): string {
 // Outlines instead of a tint, so they don't clash with the team colors:
 // solid for you, dashed for your opponent.
 function outline(tag: ReplayPerson["tag"]): string {
-  if (tag === "You") return "outline -outline-offset-1 outline-ink";
-  if (tag === "Opponent") return "outline outline-dashed -outline-offset-1 outline-faint";
+  if (tag === "You") return "outline -outline-offset-1 outline-main";
+  if (tag === "Opponent") return "outline outline-dashed -outline-offset-1 outline-quiet";
   return "";
 }
 
 function TableRow({ person, now, t, items, roleSlot }: RowProps) {
   return (
-    <tr className={`border-t border-line ${outline(person.tag)}`}>
+    <tr className={`border-t border-divider ${outline(person.tag)}`}>
       <th scope="row" className="py-1.5 pl-2 pr-2 text-left font-normal">
         <div className="flex items-center gap-2.5">
           <ChampionPicture person={person} now={now} />
@@ -207,11 +207,11 @@ function TableRow({ person, now, t, items, roleSlot }: RowProps) {
           </div>
         </div>
       </th>
-      <td className="whitespace-nowrap px-1.5 py-1.5 font-mono">
+      <td className="whitespace-nowrap px-1.5 py-1.5 tabular-nums">
         {now.kills} / {now.deaths} / {now.assists}
       </td>
-      <td className="px-1.5 py-1.5 font-mono">{now.cs}</td>
-      <td className="px-1.5 py-1.5 font-mono">{formatThousands(now.gold)}</td>
+      <td className="px-1.5 py-1.5 tabular-nums">{now.cs}</td>
+      <td className="px-1.5 py-1.5 tabular-nums">{formatThousands(now.gold)}</td>
       {items && now.items && (
         <td className="py-1.5 pl-1.5 pr-2">
           <ItemRow inventory={now.items} items={items} roleSlot={roleSlot} />
@@ -226,17 +226,17 @@ function TableRow({ person, now, t, items, roleSlot }: RowProps) {
 // items.
 function PhoneRow({ person, now, t, items, roleSlot }: RowProps) {
   return (
-    <li className={`flex gap-2.5 border-t border-line px-2 py-2 ${outline(person.tag)}`}>
+    <li className={`flex gap-2.5 border-t border-divider px-2 py-2 ${outline(person.tag)}`}>
       <ChampionPicture person={person} now={now} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
           <NameAndTag person={person} />
-          <span className="whitespace-nowrap font-mono">
+          <span className="whitespace-nowrap tabular-nums">
             <span className="sr-only">Kills, deaths and assists: </span>
             {now.kills} / {now.deaths} / {now.assists}
           </span>
         </div>
-        <div className="flex flex-wrap justify-between gap-x-2 font-mono text-note text-muted">
+        <div className="flex flex-wrap justify-between gap-x-2 text-note tabular-nums text-quiet">
           <DeadNote now={now} t={t} />
           <span className="ml-auto whitespace-nowrap">
             {now.cs} CS · {formatThousands(now.gold)} gold
@@ -257,9 +257,9 @@ function ChampionPicture({ person, now }: { person: ReplayPerson; now: PlayerMom
         src={person.iconUrl}
         alt=""
         size={30}
-        className={`rounded-[8px] ${now.respawnAt !== null ? "opacity-40 grayscale" : ""}`}
+        className={`rounded-md ${now.respawnAt !== null ? "opacity-40 grayscale" : ""}`}
       />
-      <span className="absolute -bottom-1 -right-1.5 rounded-full border border-line-strong bg-page px-1 font-mono text-[10px] leading-[14px] text-ink-soft">
+      <span className="absolute -bottom-1 -right-1.5 rounded-full bg-page px-1 text-xs leading-[14px] tabular-nums text-main">
         <span className="sr-only">Level </span>
         {now.level}
       </span>
@@ -274,8 +274,8 @@ function NameAndTag({ person }: { person: ReplayPerson }) {
       <span className="font-semibold">{person.name}</span>
       {person.tag && (
         <span
-          className={`rounded-full border px-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft ${
-            person.tag === "You" ? "border-ink-soft" : "border-dashed border-faint"
+          className={`rounded-sm border px-1.5 text-xs text-main ${
+            person.tag === "You" ? "border-main" : "border-dashed border-quiet"
           }`}
         >
           {person.tag}
@@ -289,7 +289,7 @@ function DeadNote({ now, t }: { now: PlayerMoment; t: number }) {
   if (now.respawnAt === null) return null;
   // Rounded up, so it never says "back in 0:00" while they're still dead.
   const left = Math.ceil((now.respawnAt - t) / 1000) * 1000;
-  return <div className="font-mono text-label text-faint">Dead, back in {formatClock(left)}</div>;
+  return <div className="text-xs tabular-nums text-quiet">Dead, back in {formatClock(left)}</div>;
 }
 
 // Six item slots and the trinket, drawn round like in the game. Between
@@ -313,7 +313,7 @@ function ItemRow({
       ))}
       {roleSlot &&
         (inventory.roleItem > 0 ? (
-          <ItemSlot info={items[inventory.roleItem]} className="ml-1 rounded-[5px]" />
+          <ItemSlot info={items[inventory.roleItem]} className="ml-1 rounded-sm" />
         ) : (
           <span aria-hidden className="ml-1 w-5 shrink-0" />
         ))}
@@ -325,7 +325,7 @@ function ItemRow({
   );
 }
 
-function ItemSlot({ info, className = "rounded-[5px]" }: { info?: ItemInfo; className?: string }) {
+function ItemSlot({ info, className = "rounded-sm" }: { info?: ItemInfo; className?: string }) {
   // Items have no text beside them, so the name is the alt text, and
   // `title` shows it as a tooltip on hover.
   return (
@@ -356,7 +356,7 @@ export function Picture({
 }) {
   if (!src) {
     return (
-      <span style={{ width: size, height: size }} className={`block shrink-0 bg-line ${className}`} />
+      <span style={{ width: size, height: size }} className={`block shrink-0 bg-divider ${className}`} />
     );
   }
   // `unoptimized` because Data Dragon already serves small PNGs from a fast
@@ -369,7 +369,7 @@ export function Picture({
       width={size}
       height={size}
       unoptimized
-      className={`shrink-0 bg-line ${className}`}
+      className={`shrink-0 bg-divider ${className}`}
     />
   );
 }

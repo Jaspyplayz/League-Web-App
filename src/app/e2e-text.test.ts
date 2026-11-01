@@ -20,6 +20,12 @@ const BUILT_FROM_DATA: Record<string, string> = {
   "Continue with Google": "src/app/sign-in/page.tsx: Continue with {PROVIDERS[provider]}",
   "Continue with Discord": "src/app/sign-in/page.tsx: Continue with {PROVIDERS[provider]}",
   "You vs Challenger": "insights/tier-comparison.tsx: You vs {tierName(tier)}",
+  "Diamond I": "components/rank-badge.tsx: ${tierName(tier)} ${division}",
+  "No one on Pinned matches.": "components/saved-players-box.tsx: No one on ${tab.label} matches.",
+  "Remove Hide on bush#KR1 from recent players": "components/saved-players-box.tsx: Remove ${riotId} from ${tab.label} players",
+  "Unpin Hide on bush#KR1": "components/saved-players-box.tsx: Unpin ${riotId}",
+  // The test's own template string, read as it's written in e2e/smoke.spec.ts.
+  "chance to win: ${chance}": "match/[matchId]/board.tsx: Your team's chance to win: ${shown}%",
 };
 
 // A quoted name in getByRole(..., { name: "..." }), or the first argument of

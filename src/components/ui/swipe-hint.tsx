@@ -4,7 +4,7 @@
 // nothing says the rest of the game is there. Hidden once the chart fits.
 export function SwipeHint() {
   return (
-    <p className="text-note text-faint md:hidden">
+    <p className="text-note text-quiet md:hidden">
       Swipe the chart sideways to see the whole game →
     </p>
   );

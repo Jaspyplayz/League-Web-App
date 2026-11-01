@@ -14,21 +14,21 @@ export function RecapText({
   const points = recapPoints(detail);
   return (
     <>
-      <p className="text-body font-semibold text-ink">{headline}</p>
-      <ul className="flex flex-col divide-y divide-line">
+      <p className="text-body font-semibold text-main">{headline}</p>
+      <ul className="flex flex-col divide-y divide-divider">
         {points.map((point, i) => (
           <li key={i} className="flex gap-4 py-2">
             {point.time && (
-              <span className="w-24 shrink-0 font-mono text-sm leading-6 text-ahead-soft tabular-nums">
+              <span className="w-24 shrink-0 text-sm leading-6 text-ahead-soft tabular-nums">
                 {point.time}
               </span>
             )}
-            <span className="text-ink-soft">{point.text}</span>
+            <span className="text-main">{point.text}</span>
           </li>
         ))}
       </ul>
       {fromThisPage && (
-        <p className="text-note text-faint">
+        <p className="text-note text-quiet">
           Written by AI (Claude) from the stats on this page. It can get things wrong.
         </p>
       )}

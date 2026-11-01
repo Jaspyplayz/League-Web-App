@@ -1,11 +1,13 @@
 import { isRegion, type Region } from "./regions";
+import type { Division, Tier } from "./tiers";
 
 // Two short lists of players, kept in your own browser (localStorage), so they
-// need no account and never reach our server:
+// need no account. The server never stores them; clicking into a search sends
+// them, to read each player's rank for the box under it (api/saved-players):
 // - recent: the players you searched for lately, newest first. Only searches
 //   count: clicking through to someone from a match doesn't add them.
-// - pinned: players you starred on their profile, so they stay at hand until
-//   you unpin them.
+// - pinned: players you starred on their profile or in that box, so they stay
+//   at hand until you unpin them.
 // These helpers are plain functions on the saved text, so they can be tested
 // without a browser; src/components/saved-players.tsx does the reading and
 // writing.
@@ -103,10 +105,21 @@ export function togglePinnedPlayer(list: SavedPlayer[], player: SavedPlayer): Sa
 
 // Riot IDs aren't case sensitive, so "faker#kr1" and "Faker#KR1" are the same
 // player. The same name in two regions is two different players.
-function samePlayer(a: SavedPlayer, b: SavedPlayer): boolean {
-  return (
-    a.region === b.region &&
-    a.gameName.toLowerCase() === b.gameName.toLowerCase() &&
-    a.tagLine.toLowerCase() === b.tagLine.toLowerCase()
-  );
+export function savedPlayerKey(p: { region: string; gameName: string; tagLine: string }): string {
+  return `${p.region}/${p.gameName}#${p.tagLine}`.toLowerCase();
 }
+
+function samePlayer(a: SavedPlayer, b: SavedPlayer): boolean {
+  return savedPlayerKey(a) === savedPlayerKey(b);
+}
+
+// What the box under the search needs from the server (api/saved-players).
+// `you` is the signed-in player's "This is me".
+export type SavedRank = { tier: Tier; division: Division };
+export type SavedPlayerDetails = {
+  // By savedPlayerKey, for every player asked about: null means no solo queue
+  // rank on file. A player missing here hasn't been asked about yet, or isn't a
+  // real Riot ID, which only a hand-edited list can hold.
+  ranks: Record<string, SavedRank | null>;
+  you: SavedPlayer | null;
+};

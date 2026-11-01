@@ -6,11 +6,11 @@ import { REPO_URL } from "@/components/site-header";
 import { TeamAnalysis } from "@/components/team-analysis";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { linkClass } from "@/components/ui/state-panel";
 import type { MatchAnalysis } from "@/lib/analyzer";
 import { formatClock } from "@/lib/analyzer/format";
 import type { PhaseRating } from "@/lib/analyzer/phase-score";
 import type { ReplayChances } from "@/lib/analyzer/plays";
-import { reviewMoments } from "@/lib/analyzer/review";
 import { byRole, teamOrder } from "@/lib/analyzer/team-analysis";
 import {
   championIconUrl,
@@ -19,6 +19,7 @@ import {
   riftMapUrl,
   type DataDragon,
 } from "@/lib/ddragon";
+import { boardPlays, quietLines } from "@/lib/board";
 import { scoreGame } from "@/lib/game-score";
 import type { BuildView } from "@/lib/match-builds";
 import type { Region } from "@/lib/regions";
@@ -30,23 +31,25 @@ import { BuildAndRunes } from "./build-and-runes";
 import { Deaths } from "./deaths";
 import { EarlyJungle } from "./early-jungle";
 import { GameTimeline } from "./game-timeline";
+import { LaneBoard } from "./lane-board";
 import { Matchup } from "./match-header";
-import { PhaseRatings } from "./phase-ratings";
+import { phaseSpan, PhaseRatings } from "./phase-ratings";
 import { Replay } from "./replay";
-import { Review } from "./review";
 import type { ItemInfo, ReplayPerson } from "./replay-scoreboard";
-import { Scoreboard } from "./scoreboard";
 import { SnapshotTable } from "./snapshot-table";
+import { SummaryColumns } from "./summary-columns";
 import { TeamGold } from "./team-gold";
+import { SWING_LETTERS, WinChanceNote } from "./win-chance";
 
 // Everything below the match header, once the match has been analyzed, in
 // three tabs so the vital part comes first (Jasper's order, 2026-10-19, and
 // the Summary, Replay and Stats split, JAS-105):
-// - Summary: the scoreboard; one strip with you vs your opponent and your
-//   early, mid, late and overall ratings; the 60-second review; "How the
-//   game went", the lead and win chance charts on one time axis with the
-//   turning points and biggest swings beside them; then the recap and your
-//   notes side by side (the "shared timeline" layout, 2026-10-20).
+// - Summary: layout A from JAS-89, in two columns on wide screens and one on
+//   phones, with the board first. On the left, the board (the gold lead with an
+//   eval bar, and the win-chance strip with your plays on it), the scoreboard
+//   paired by lane, "How the game went" beside you vs your opponent with your
+//   ratings, then the recap and your notes. On the right, Game review, which
+//   steps through your plays with the board (summary-columns.tsx).
 // - Replay: a one-line beta note, then the replay (with the tempo timeline
 //   for junglers) and the Ask panel beside it on wide screens, under it on
 //   narrower ones.
@@ -100,9 +103,45 @@ export function AnalysisSections({
     tone: p.swing > 0 ? "ahead" : "behind",
   }));
 
+  const swings = winChance?.swings ?? [];
+  const overall = scoreGame(match).get(a.me.participantId) ?? null;
+
   const summary = (
-    <>
-      <Scoreboard
+    <SummaryColumns
+      board={{
+        lead:
+          a.series && a.opponent
+            ? { series: a.series, opponentName: label(a.opponent.championName) }
+            : null,
+        teamGold: a.teamGold,
+        markers,
+        chances: chances && {
+          perSecond: chances.perSecond,
+          plays: boardPlays(chances, a.replay, a.me.participantId, names, a.tempo),
+        },
+        swings: swings.map((s, i) => ({
+          minute: s.timestamp / 60_000,
+          letter: SWING_LETTERS[i],
+        })),
+        quiet: quietLines({
+          hasOpponent: a.series !== null && a.opponent !== null,
+          turningPoints: a.turningPoints.length,
+          hasWinChance: winChance !== null,
+          swings: swings.length,
+        }),
+        note: winChance && <WinChanceNote model={winChance.model} />,
+      }}
+      review={{
+        scores: [
+          ...(overall ? [{ label: "Overall", span: "Whole game", score: overall.score }] : []),
+          ...phases.map((p) => ({ label: p.label, span: phaseSpan(p), score: p.score })),
+        ],
+        // "Add to notes" only when there's a notes box, which needs sign-in to
+        // be set up.
+        notes: supabaseConfig() !== null,
+      }}
+    >
+      <LaneBoard
         region={region}
         dd={dd}
         participants={participants}
@@ -110,62 +149,38 @@ export function AnalysisSections({
         opponentId={a.opponent?.participantId ?? null}
       />
 
-      <section
-        aria-label="You vs your opponent and game by phase"
-        className={`${panelClass} grid ${phases.length > 0 ? "lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" : ""}`}
-      >
-        <Matchup
-          dd={dd}
-          me={a.me}
-          opponent={a.opponent}
-          at15={a.at15}
-          finalGoldDiff={a.series?.gold.at(-1)?.diff ?? null}
-        />
-        {phases.length > 0 && (
-          <PhaseRatings
-            phases={phases}
-            overall={scoreGame(match).get(a.me.participantId) ?? null}
+      {/* Layout A has neither of these. They stay here, side by side when
+          there's room, so nothing on Summary disappears: the strip's letters
+          and the chart's numbers point at the first one. */}
+      <div className="flex flex-wrap items-start gap-3.5 *:min-w-0 *:flex-[1_1_340px]">
+        <GameTimeline turningPoints={a.series ? a.turningPoints : []} swings={swings} />
+        <section aria-label="You vs your opponent and game by phase" className={panelClass}>
+          <Matchup
+            dd={dd}
+            me={a.me}
+            opponent={a.opponent}
+            at15={a.at15}
+            finalGoldDiff={a.series?.gold.at(-1)?.diff ?? null}
           />
-        )}
-      </section>
-
-      {/* "Add to notes" only when there's a notes box, which needs sign-in
-          to be set up. */}
-      {chances && (
-        <Review
-          moments={reviewMoments(chances, a.replay, a.me.participantId, names, a.tempo)}
-          notes={supabaseConfig() !== null}
-        />
-      )}
-
-      <GameTimeline
-        lead={
-          a.series && a.opponent
-            ? { series: a.series, markers, opponentName: label(a.opponent.championName) }
-            : null
-        }
-        turningPoints={a.turningPoints}
-        winChance={winChance}
-      />
+          {phases.length > 0 && <PhaseRatings phases={phases} overall={overall} />}
+        </section>
+      </div>
 
       {/* Side by side when both show. Either can be missing (no recap
           without the API key, no notes without sign-in), and the other then
           takes the full width. */}
-      <div className="flex flex-wrap gap-5 empty:hidden *:min-w-0 *:flex-[1_1_340px]">
+      <div className="flex flex-wrap gap-3.5 empty:hidden *:min-w-0 *:flex-[1_1_340px]">
         {recap}
         {notes}
       </div>
-    </>
+    </SummaryColumns>
   );
 
   const replay = (
     <>
       <p className="text-note text-quiet">
         Beta: the replay is rebuilt from Riot&apos;s timeline, so it can be a little off.{" "}
-        <a
-          href={`${REPO_URL}/blob/main/docs/replay.md`}
-          className="font-medium text-ahead-soft hover:underline"
-        >
+        <a href={`${REPO_URL}/blob/main/docs/replay.md`} className={linkClass}>
           How it&apos;s checked
         </a>
       </p>
@@ -199,7 +214,9 @@ export function AnalysisSections({
         />
       )}
 
-      <div className="flex flex-wrap items-start gap-5">
+      {/* Side by side when there's room, Deaths under Team gold on phones,
+          with the same 28px gap as the tab's other panels. */}
+      <div className="flex flex-wrap items-start gap-7">
         <TeamGold points={a.teamGold} objectives={a.objectives} />
         <Deaths deaths={a.deaths} name={name} />
       </div>
@@ -240,6 +257,7 @@ export function AnalysisSections({
           icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="rounded-md" />,
         }))}
         defaultPlayerId={a.me.participantId}
+        dataDragonFailed={dd === null}
       />
     </>
   );

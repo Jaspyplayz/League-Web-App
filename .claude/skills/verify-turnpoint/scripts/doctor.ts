@@ -71,14 +71,14 @@ async function run() {
       if (text.includes(RIOT_KEY_NOTICE)) return "riot-key";
       const err = ERROR_TEXTS.find((t) => text.includes(t));
       if (err) return `error (${err})`;
-      // innerText follows CSS text-transform (headings are uppercase), so compare case-insensitively.
+      // Compare case-insensitively, so a change of case doesn't fail the check.
       if (!text.toLowerCase().includes(want.toLowerCase())) return `missing "${want}" (status ${res?.status()})`;
       return "ok";
     } catch (e) {
       return `unreachable (${String(e).split("\n")[0]})`;
     }
   };
-  const home = await probe("/", "Find the minute");
+  const home = await probe("/", "Look up any player by Riot ID");
   const db = await probe(SAMPLE_MATCH_PATH, "60-second review");
   const riot = await probe(TEST_PLAYER.path, "Recent matches");
   // Ask sits on the sample game's Replay tab, hidden until it's opened, so

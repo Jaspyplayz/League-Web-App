@@ -42,9 +42,18 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A new way to start a check that the merge gates trust](agent-mistakes/new-trigger-feeds-the-gates.md) | 1 | check |
 | [A throwing read moved onto a page that didn't expect it](agent-mistakes/throwing-read-moved-to-a-busier-page.md) | 1 | check |
 | [Text on screen that promises more than the feature does](agent-mistakes/screen-text-promises-more-than-the-feature.md) | 1 | none yet |
-| [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | none yet |
+| [Opening a gate without keeping what it quietly guarded](agent-mistakes/opened-gate-dropped-its-guard.md) | 3 | check |
+| [A changed file keeps the old design names](agent-mistakes/changed-file-keeps-old-design-names.md) | 1 | check |
+| [An empty state that guards the wrong empty case](agent-mistakes/empty-state-guards-the-wrong-case.md) | 1 | check |
+| [A server answer read once and kept for the page's life](agent-mistakes/server-answer-read-once.md) | 1 | check |
+| [A control tested only as static markup](agent-mistakes/control-tested-only-as-static-markup.md) | 1 | check |
+| [A browser test's locator filters on what the click changes](agent-mistakes/browser-locator-filters-on-what-it-changes.md) | 1 | none yet |
+| [Coloured text on a tint nobody checked it against](agent-mistakes/coloured-text-on-a-new-tint.md) | 1 | none yet |
+| [Pairs players by their place in a list](agent-mistakes/pairs-players-by-list-position.md) | 1 | check |
+| [A browser test checked only on the dev server](agent-mistakes/browser-test-run-only-on-dev-server.md) | 1 | none yet |
 | [Renamed words on a page break the browser tests](agent-mistakes/renamed-words-break-e2e.md) | 1 | check |
 | [A test that can't pass on Windows](agent-mistakes/test-that-cannot-pass-on-windows.md) | 1 | none yet |
+| [A browser test's locator matches more than it names](agent-mistakes/browser-locator-matches-more-than-it-names.md) | 1 | none yet |
 
 ## Rules and what enforces them
 
@@ -55,10 +64,15 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Riot API hosts appear only in `src/lib/riot/` | Lint rule `turnpoint/no-riot-api-host` |
 | Files that read secrets import `"server-only"` | Lint rule `turnpoint/server-only-env` |
 | No green in the UI | Lint rule `turnpoint/no-green-classes` |
+| Rubik only and sentence case, with no made-up text sizes | Lint rule `turnpoint/review-board-type` |
+| Colours come from the theme's tokens, with the old names gone | Lint rule `turnpoint/tokens-only`, and `src/app/themes.test.ts` for the stylesheet |
+| Every corner is `rounded-md`, `rounded-sm` or `rounded-full` | `src/app/corners.test.ts` |
 | Lint and typecheck pass before Claude commits | The commit hook, `.claude/hooks/check-before-commit.mjs` |
 | No PR merges before the reviewer clears it (its head, or an earlier commit with only small changes since) | GitHub's required `reviewer` check |
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
-| A PR that touches the risky list is Jasper's to merge | `npm run can-merge`, which refuses it (`scripts/risky-paths.ts`) |
+| A PR that touches Jasper's list (migrations, anything that defines a check) is Jasper's to merge | `npm run can-merge`, gate "No files Jasper merges" (`jaspersFiles` in `scripts/risky-paths.ts`) |
+| A risky PR merges only after the interrogate panel ran on one of its commits | `npm run can-merge`, gate "Interrogate panel ran", and its tests in `scripts/can-merge-gates.test.ts` |
+| A one-way door is Jasper's to merge | `npm run can-merge`, gate "Two-way door", reads what the PR says. For a one-way door labelled two-way, nothing yet but the reviewer (`.claude/agents/reviewer.md`, check 8); JAS-69 would compare the line with the diff |
 | The Agent merge workflow merges only a PR whose builder wrote `**Ready to merge:** yes at <head sha>` | `readyToMerge` in `scripts/can-merge-action-steps.ts` and its tests |
 | CI started by hand runs only on main, so it can't stand in for a PR's own `check` | The first step of `.github/workflows/ci.yml`, pinned by test `fails at once when started by hand anywhere but main` in `scripts/can-merge-action-steps.test.ts` |
 | The words the browser tests look for are on a page | `src/app/e2e-text.test.ts` |

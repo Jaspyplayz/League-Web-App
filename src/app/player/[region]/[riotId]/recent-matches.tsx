@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { Suspense, type ReactNode } from "react";
+import { Suspense } from "react";
 import { FilterableMatchList } from "@/components/filterable-match-list";
-import { PanelSkeleton } from "@/components/loading-skeleton";
 import { MatchRow } from "@/components/match-row";
 import { RiotErrorNotice } from "@/components/riot-error-notice";
+import { LoadingBlock, LoadingSection } from "@/components/ui/loading";
+import { panelClass } from "@/components/ui/panel";
+import { EmptyPanel, linkClass, secondButtonClass } from "@/components/ui/state-panel";
 import { findPlayer } from "@/lib/analyzer";
 import { championName, getDataDragon } from "@/lib/ddragon";
 import { scoreGame } from "@/lib/game-score";
@@ -19,7 +21,6 @@ import {
 import { loadMatches } from "@/lib/match-store";
 import {
   GAMES_STEP,
-  HISTORY_DAYS,
   isPlainProfilePage,
   listEnd,
   matchListHref,
@@ -33,8 +34,7 @@ import type { Region } from "@/lib/regions";
 import { getManyMatchIds } from "@/lib/riot/api";
 import { settle } from "@/lib/riot/client";
 import type { Match } from "@/lib/riot/types";
-import { loadMatchDetailsAction } from "./match-details-action";
-import { QueueTabs } from "./queue-tabs";
+import { MatchesControls, matchesHref } from "./queue-tabs";
 import { RecentSummary } from "./recent-summary";
 import { SeasonChampions } from "./season-champions";
 import { MasteryCard } from "./mastery-card";
@@ -43,8 +43,13 @@ import { MasteryCard } from "./mastery-card";
 // `queue` is the game-mode tab picked above the list. `gamesParam` is the
 // URL's ?games=, how many games to show after "Show 10 more games" (see
 // src/lib/more-games.ts); missing means the first 10. playerPath is this
-// player's page, e.g. "/player/na/Name-TAG". Each row opens a panel with both teams' scoreboard
-// and a link to the match analysis under that path, loaded when it opens.
+// player's page, e.g. "/player/na/Name-TAG". Each row links to that game's
+// match page under that path.
+//
+// It draws two parts of the Matches grid that page.tsx lays out: the games
+// column on the right (`GAMES_COLUMN`) and, under the ranks on the left,
+// Season 2026 and Champion mastery (`SIDE_BOTTOM`). On phones they stack in
+// that order: ranks, games, then the side panels.
 type Props = {
   region: Region;
   puuid: string;
@@ -52,8 +57,12 @@ type Props = {
   queue: QueueFilter;
   gamesParam: string | string[] | undefined;
   playerPath: string;
-  ranks?: ReactNode; // the rank cards, shown at the top of the side column
 };
+
+// Where each part sits in page.tsx's grid on wide screens. The left column's
+// first row holds the ranks; the games span both rows on the right.
+export const GAMES_COLUMN = "flex min-w-0 flex-col gap-3.5 lg:col-start-2 lg:row-span-2 lg:row-start-1";
+export const SIDE_BOTTOM = "flex flex-col gap-3.5 lg:col-start-1 lg:row-start-2";
 
 export async function RecentMatches({
   region,
@@ -62,7 +71,6 @@ export async function RecentMatches({
   queue,
   gamesParam,
   playerPath,
-  ranks,
 }: Props) {
   // React's lint rule warns that reading the clock makes a component give
   // different output each render. This is a Server Component, which renders
@@ -120,31 +128,10 @@ export async function RecentMatches({
     : "end";
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      <aside className="flex flex-col gap-4 lg:w-80 lg:shrink-0">
-        {ranks}
-        <Suspense fallback={<PanelSkeleton label="Loading season champions" />}>
-          <SeasonChampions
-            region={region}
-            puuid={puuid}
-            profileUpdatedAt={profile.updatedAt}
-            queue={queue}
-            loadMore={plainPage}
-            dd={dd}
-            recent={topChampions(matches, 4)}
-          />
-        </Suspense>
-        {/* Loads on its own and hides itself if Riot can't be reached. */}
-        <Suspense fallback={null}>
-          <MasteryCard region={region} puuid={puuid} dd={dd} />
-        </Suspense>
-      </aside>
-
-      <section aria-labelledby="matches-heading" className="flex min-w-0 flex-1 flex-col gap-3">
-        <h2 id="matches-heading" className="scroll-mt-4 text-xl font-semibold">
-          Recent matches
-        </h2>
-        <QueueTabs playerPath={playerPath} current={queue} />
+    <>
+      <section aria-labelledby="matches-heading" className={GAMES_COLUMN}>
+        <MatchesHeading />
+        <MatchesControls playerPath={playerPath} queue={queue} view="list" />
         {/* Covers every game in the list, so it grows to "Last 20 games"
             when more are shown. */}
         {record.games > 0 && <RecentSummary record={record} roles={roleCounts(matches)} />}
@@ -153,7 +140,16 @@ export async function RecentMatches({
           result.error ? (
             <RiotErrorNotice error={result.error} region={region} />
           ) : (
-            <p className="text-muted">{emptyMessage(queue)}</p>
+            <EmptyPanel
+              title={`No ${queue.id === "all" ? "" : `${queue.label} `}games in the last two months`}
+              action={
+                queue.id !== "all" && (
+                  <Link href={matchesHref(playerPath, "all", "list")} className={secondButtonClass}>
+                    Show every mode
+                  </Link>
+                )
+              }
+            />
           )
         ) : (
           <FilterableMatchList
@@ -170,28 +166,20 @@ export async function RecentMatches({
                   score={scoreGame(match).get(findPlayer(match, puuid)?.participantId ?? 0)}
                   teams={{ region, players: matchTeams(match, puuid) }}
                   badges={matchBadges(match, puuid)}
-                  // The panel is rendered when the row first opens, not sent
-                  // with the page (see src/components/expandable-row.tsx).
-                  loadDetails={loadMatchDetailsAction.bind(
-                    null,
-                    region,
-                    m.matchId,
-                    puuid,
-                    playerPath,
-                  )}
+                  href={`${playerPath}/match/${m.matchId}`}
                 />
               ),
             }))}
           />
         )}
         {end === "waiting" && matches.length > 0 && (
-          <p className="self-center text-sm text-faint">
+          <p className="self-center text-note text-quiet">
             {waiting} more {waiting === 1 ? "game hasn't" : "games haven't"} loaded from Riot yet.{" "}
             {/* A plain link, not next/link: a Link to this same URL reuses
                 the page it already has instead of asking the server again. */}
             <a
               href={matchListHref(playerPath, queue, count, `game-${games.length + 1}`)}
-              className="text-ink underline hover:text-ahead"
+              className={linkClass}
             >
               Refresh
             </a>{" "}
@@ -199,33 +187,74 @@ export async function RecentMatches({
           </p>
         )}
         {result.error && matches.length > 0 && (
-          <p className="self-center text-sm text-faint">
+          <p className="self-center text-note text-quiet">
             Some games couldn&rsquo;t be loaded from Riot just now.
           </p>
         )}
         {end === "two-months" && (
-          <p className="self-center text-sm text-faint">
-            That&rsquo;s every game from the last {HISTORY_DAYS / 30} months.
+          // HISTORY_DAYS is 60: Riot keeps about two months of games.
+          <p className="self-center text-note text-quiet">
+            That&rsquo;s every game from the last two months.
           </p>
         )}
         {end === "max" && (
-          <p className="self-center text-sm text-faint">The list stops at {MAX_GAMES} games.</p>
+          <p className="self-center text-note text-quiet">The list stops at {MAX_GAMES} games.</p>
         )}
         {end === "more" && (
           <Link
             // Lands on the first new game, where the list left off.
             href={matchListHref(playerPath, queue, count + GAMES_STEP, `game-${games.length + 1}`)}
-            className="soft-round-sm self-center border border-line-strong bg-surface px-5 py-2 text-sm font-semibold text-ink transition-colors hover:border-ahead"
+            className={`${secondButtonClass} sm:self-center`}
           >
             Show 10 more games
           </Link>
         )}
       </section>
-    </div>
+
+      <div className={SIDE_BOTTOM}>
+        <Suspense fallback={<SidePanelSkeleton label="Loading season champions" />}>
+          <SeasonChampions
+            region={region}
+            puuid={puuid}
+            profileUpdatedAt={profile.updatedAt}
+            queue={queue}
+            loadMore={plainPage}
+            dd={dd}
+            recent={topChampions(matches, 4)}
+            championsHref={`${playerPath}/champions`}
+          />
+        </Suspense>
+        {/* Loads on its own and hides itself if Riot can't be reached. */}
+        <Suspense fallback={null}>
+          <MasteryCard region={region} puuid={puuid} dd={dd} />
+        </Suspense>
+      </div>
+    </>
   );
 }
 
-function emptyMessage(queue: QueueFilter): string {
-  const mode = queue.id === "all" ? "" : `${queue.label} `;
-  return `No recent ${mode}games found.`;
+// The games column's heading. Only screen readers see it, as the mockup draws
+// none; the browser tests find the list by it too.
+export function MatchesHeading() {
+  return (
+    <h2 id="matches-heading" className="sr-only">
+      Recent matches
+    </h2>
+  );
+}
+
+// A side panel while it loads: its heading's block, then a few rows.
+export function SidePanelSkeleton({ label }: { label: string }) {
+  return (
+    <div className={`${panelClass} px-[18px] py-4`}>
+      <LoadingSection label={label}>
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="flex items-center gap-2.5">
+            <LoadingBlock className="size-8 shrink-0" />
+            <LoadingBlock className="h-3.5 flex-1" />
+          </div>
+        ))}
+      </LoadingSection>
+    </div>
+  );
 }
