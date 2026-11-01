@@ -221,7 +221,7 @@ function PlayList({
 // Marks a play as one of the 60-second review's moments.
 function MomentChip() {
   return (
-    <span className="shrink-0 rounded-sm bg-raised px-1 text-xs tabular-nums text-main">
+    <span className="shrink-0 rounded-sm bg-select px-1 text-xs tabular-nums text-main">
       <span aria-hidden="true">60s</span>
       <span className="sr-only">In your 60-second review</span>
     </span>

@@ -103,10 +103,12 @@ test("open the sample analysis", async ({ page }) => {
   // button opens the replay at that play.
   await page.getByRole("tab", { name: "Summary" }).click();
   const review = page.getByRole("region", { name: "Game review" });
-  await review.locator("ol button").first().click();
-  await expect(review.getByRole("button", { name: "First play" })).toBeDisabled();
+  // The first play is already selected from the strip above, so this is the
+  // second: picking a row has to move the selection for these to pass.
+  await review.locator("ol button").nth(1).click();
+  await expect(review.getByRole("button", { name: "First play" })).toBeEnabled();
   await expect(
-    page.getByRole("button", { name: /chance to win after it/ }).first(),
+    page.getByRole("button", { name: /chance to win after it/ }).nth(1),
   ).toHaveAttribute("aria-pressed", "true");
   await review.getByRole("button", { name: "Last play" }).click();
   await expect(review.getByRole("button", { name: "Next play" })).toBeDisabled();
