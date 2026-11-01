@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { WeaknessId } from "./analyzer/trends";
 import {
+  dayColour,
   dayKey,
   dayLp,
-  dayStats,
   daysAgo,
   focusResults,
+  formatDay,
+  formatMonth,
   groupDays,
   isDayKey,
-  LOG_DAYS,
-  monthStrip,
+  monthGrid,
+  monthsInRange,
   recentDays,
+  startMonth,
   type LogGame,
   type LogRankPoint,
 } from "./daily-log";
@@ -28,6 +31,7 @@ function game(startedAt: number, extra: Partial<LogGame> = {}): LogGame {
     ranked: true,
     championName: "Viego",
     championLabel: "Viego",
+    championIcon: null,
     kills: 5,
     deaths: 3,
     assists: 7,
@@ -113,27 +117,6 @@ describe("dayLp", () => {
   });
 });
 
-describe("dayStats", () => {
-  it("averages the day and counts champions", () => {
-    const stats = dayStats([
-      game(at(16, 14), { championLabel: "Lee Sin", score: 80, deaths: 2, goldAt15: 300 }),
-      game(at(16, 15), { score: null, deaths: 4 }),
-      game(at(16, 16), { championLabel: "Lee Sin", score: 40, deaths: 6, goldAt15: -100 }),
-    ]);
-    expect(stats.champions).toEqual([
-      { label: "Lee Sin", games: 2 },
-      { label: "Viego", games: 1 },
-    ]);
-    expect(stats.score).toBe(60);
-    expect(stats.deaths).toBe(4);
-    expect(stats.goldAt15).toBe(100);
-  });
-
-  it("leaves gold at 15 empty when no timeline is in yet", () => {
-    expect(dayStats([game(at(16, 14))]).goldAt15).toBeNull();
-  });
-});
-
 describe("focusResults", () => {
   const shows = (behind: boolean | null) =>
     ({ "behind-at-10": behind }) as Record<WeaknessId, boolean | null>;
@@ -153,12 +136,86 @@ describe("focusResults", () => {
   });
 });
 
-describe("monthStrip", () => {
-  it("has one square per day, oldest first, ending today", () => {
-    const strip = monthStrip(groupDays([game(at(16, 14)), game(at(14, 14), { win: false })], []), NOW);
-    expect(strip).toHaveLength(LOG_DAYS);
-    expect(strip.at(-1)).toEqual({ day: "2026-10-16", games: 1, wins: 1, losses: 0 });
-    expect(strip.at(-3)).toEqual({ day: "2026-10-14", games: 1, wins: 0, losses: 1 });
-    expect(strip.at(-2)?.games).toBe(0);
+describe("dayColour", () => {
+  it("is blue when most of the day's games were won", () => {
+    expect(dayColour({ wins: 2, losses: 1 })).toBe("won");
+  });
+
+  it("is red when most were lost", () => {
+    expect(dayColour({ wins: 1, losses: 3 })).toBe("lost");
+  });
+
+  it("is neither on a tie", () => {
+    expect(dayColour({ wins: 2, losses: 2 })).toBe("even");
+  });
+
+  it("is the plain fill on a day with no games", () => {
+    expect(dayColour(undefined)).toBe("none");
+    expect(dayColour({ wins: 0, losses: 0 })).toBe("none");
+  });
+});
+
+describe("monthGrid", () => {
+  const days = groupDays(
+    [
+      game(at(16, 14)),
+      game(at(16, 15), { win: false }),
+      game(at(14, 14), { win: false }),
+      game(at(13, 14)),
+    ],
+    [],
+  );
+  const grid = monthGrid("2026-10", days, NOW);
+
+  it("has every day of the month, starting on the right weekday", () => {
+    expect(grid).toHaveLength(31);
+    // 1 October 2026 is a Thursday: the fourth column when weeks start on Monday.
+    expect(grid[0]).toMatchObject({ day: "2026-10-01", date: 1, weekday: 3 });
+    expect(grid[4]).toMatchObject({ date: 5, weekday: 0 });
+    expect(grid[30].day).toBe("2026-10-31");
+  });
+
+  it("colours each day by its games and marks today", () => {
+    expect(grid[15]).toMatchObject({ colour: "even", today: true, wins: 1, losses: 1 });
+    expect(grid[13].colour).toBe("lost");
+    expect(grid[12].colour).toBe("won");
+    expect(grid[14]).toMatchObject({ colour: "none", today: false });
+  });
+
+  it("marks only the last four weeks as in range", () => {
+    // Four weeks back from 16 October is 19 September, so all of October up
+    // to today is in range and the days after it aren't.
+    expect(grid[0].inRange).toBe(true);
+    expect(grid[15].inRange).toBe(true);
+    expect(grid[16].inRange).toBe(false);
+    const september = monthGrid("2026-09", days, NOW);
+    expect(september).toHaveLength(30);
+    expect(september[17].inRange).toBe(false); // 18 September
+    expect(september[18].inRange).toBe(true); // 19 September
+  });
+
+  it("starts February 2027 on a Monday and gives it 28 days", () => {
+    const feb = monthGrid("2027-02", [], at(16, 20));
+    expect(feb).toHaveLength(28);
+    expect(feb[0].weekday).toBe(0);
+  });
+});
+
+describe("months", () => {
+  it("lists the one or two months the last four weeks touch, oldest first", () => {
+    expect(monthsInRange(NOW)).toEqual(["2026-09", "2026-10"]);
+    expect(monthsInRange(at(31, 12))).toEqual(["2026-10"]);
+  });
+
+  it("opens on the newest game's month, or this month with no games", () => {
+    const days = groupDays([game(new Date(2026, 8, 28, 14).getTime())], []);
+    expect(startMonth(days, at(2, 12))).toBe("2026-09");
+    expect(startMonth([], at(2, 12))).toBe("2026-10");
+  });
+
+  it("writes dates the way the day panels show them", () => {
+    expect(formatDay("2026-10-17")).toBe("Sat 17 Oct");
+    expect(formatDay("2026-09-03")).toBe("Thu 3 Sep");
+    expect(formatMonth("2026-10")).toBe("October 2026");
   });
 });

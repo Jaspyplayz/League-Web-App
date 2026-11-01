@@ -4,7 +4,7 @@ import { checkWeaknesses, isTrendGame, summarizeGame } from "@/lib/analyzer/tren
 import { getCurrentUser } from "@/lib/auth";
 import { dayKey, LOG_DAYS, type LogGame, type LogRankPoint } from "@/lib/daily-log";
 import { readDayNotes } from "@/lib/day-note-store";
-import { championName, getDataDragon } from "@/lib/ddragon";
+import { championIconUrl, championName, getDataDragon } from "@/lib/ddragon";
 import { playerKey } from "@/lib/focus";
 import { scoreGame } from "@/lib/game-score";
 import type { ReadDayNotesResult } from "@/lib/match-note";
@@ -23,8 +23,8 @@ import { AnalysisProgress } from "./insights/analysis-progress";
 import { DailyLog } from "./daily-log";
 
 // Matches' By day view (it was the Log tab): the last four weeks of games,
-// one card per day, with a short private note on each day for the player
-// who marked this profile "This is me". URL: /player/na/Name-TAG?view=day.
+// on a month calendar beside one panel per day, with a short private note on
+// each day for the player who marked this profile "This is me". URL: /player/na/Name-TAG?view=day.
 //
 // The server gathers every game and the saved ranks; the browser groups them
 // into days, because only it knows the viewer's timezone (see
@@ -95,6 +95,8 @@ export async function ByDay({
         ranked: match.info.queueId === SOLO_QUEUE,
         championName: summary.championName,
         championLabel: championName(dd, summary.championName),
+        // Worked out here because the browser part can't be sent all of Data Dragon.
+        championIcon: dd ? championIconUrl(dd, summary.championName) : null,
         kills: summary.kills,
         deaths: summary.deaths,
         assists: summary.assists,
