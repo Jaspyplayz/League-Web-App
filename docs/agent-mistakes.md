@@ -51,6 +51,9 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [Coloured text on a tint nobody checked it against](agent-mistakes/coloured-text-on-a-new-tint.md) | 1 | none yet |
 | [Pairs players by their place in a list](agent-mistakes/pairs-players-by-list-position.md) | 1 | check |
 | [A browser test checked only on the dev server](agent-mistakes/browser-test-run-only-on-dev-server.md) | 1 | none yet |
+| [Renamed words on a page break the browser tests](agent-mistakes/renamed-words-break-e2e.md) | 1 | check |
+| [A test that can't pass on Windows](agent-mistakes/test-that-cannot-pass-on-windows.md) | 1 | none yet |
+| [A browser test's locator matches more than it names](agent-mistakes/browser-locator-matches-more-than-it-names.md) | 1 | none yet |
 
 ## Rules and what enforces them
 
@@ -72,6 +75,7 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | A one-way door is Jasper's to merge | `npm run can-merge`, gate "Two-way door", reads what the PR says. For a one-way door labelled two-way, nothing yet but the reviewer (`.claude/agents/reviewer.md`, check 8); JAS-69 would compare the line with the diff |
 | The Agent merge workflow merges only a PR whose builder wrote `**Ready to merge:** yes at <head sha>` | `readyToMerge` in `scripts/can-merge-action-steps.ts` and its tests |
 | CI started by hand runs only on main, so it can't stand in for a PR's own `check` | The first step of `.github/workflows/ci.yml`, pinned by test `fails at once when started by hand anywhere but main` in `scripts/can-merge-action-steps.test.ts` |
+| Each quoted word a browser test looks for is in the text of some file in `src/`, though not always the page it opens, or its code if a page builds it from data | `src/app/e2e-text.test.ts` |
 | Every agent mistake entry has all five lines | `scripts/agent-mistakes.test.ts` |
 | Each line in the reviewer's Judgement calls checklist names a class file that exists | `scripts/agent-mistakes.test.ts` |
 | Every reviewer blocker ends with a `Check could catch this:` line, kept in the PR's Review section | Nothing yet: `.claude/agents/reviewer.md` and `docs/workflow.md`; check 5 of [the wellness check](wellness.md#check-5-agent-mistakes) reads it twice a month |
