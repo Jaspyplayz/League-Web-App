@@ -8,6 +8,7 @@
 // It's drawn inside the replay, a Client Component.
 
 import { useEffect, useRef, useState } from "react";
+import { GRADE_LOOKS, GradeMark } from "@/components/ui/grade-mark";
 import { formatClock, listNames } from "@/lib/analyzer/format";
 import {
   formatSwing,
@@ -24,32 +25,45 @@ import type { ReplayData } from "@/lib/analyzer/replay";
 import { stretchAt, type TempoTimeline } from "@/lib/analyzer/tempo";
 import type { ReplayRequest } from "./review-links";
 
-// The grade's pill: filled for Brilliant, Great and Blunder, tinted for
-// Excellent and Mistake, outlined for Good and Inaccuracy, grey for Even.
-// Blue when the chance went up, red when down. The Review board restyles
-// these later (JAS-107).
+// The old grade pill, which only the Summary's 60-second review still uses.
+// JAS-107 moves the review to the grade mark and deletes this.
 export const GRADE_CHIP: Record<Grade, string> = {
   Brilliant: "border-ahead-bright bg-ahead-bright text-page",
   Great: "border-ahead bg-ahead text-page",
   Excellent: "border-ahead bg-ahead/15 text-ahead-soft",
   Good: "border-ahead text-ahead-soft",
-  Even: "border-line-strong text-muted",
+  Even: "border-divider text-quiet",
   Inaccuracy: "border-behind text-behind",
   Mistake: "border-behind bg-behind/10 text-behind",
   Blunder: "border-behind bg-behind text-page",
 };
 
-// The play's mark on the timeline: bigger the more it moved the chance,
-// 2px a step.
-const GRADE_MARK: Record<Grade, string> = {
-  Brilliant: "size-[13px] bg-ahead-bright",
-  Great: "size-[11px] bg-ahead",
-  Excellent: "size-[9px] bg-ahead",
-  Good: "size-[7px] bg-ahead",
-  Even: "size-[5px] bg-faint",
-  Inaccuracy: "size-[7px] bg-behind",
-  Mistake: "size-[9px] bg-behind",
-  Blunder: "size-[11px] bg-behind",
+// How big the play's dot on the timeline is: bigger the more it moved the
+// chance. Its colour is the grade's, as on the marks in the list.
+const DOT_SIZE: Record<Grade, string> = {
+  Brilliant: "size-3.5",
+  Great: "size-3",
+  Excellent: "size-2.5",
+  Good: "size-2",
+  Even: "size-1.5",
+  Inaccuracy: "size-2",
+  Mistake: "size-2.5",
+  Blunder: "size-3",
+};
+
+// The ring round the play's dot: blue when it raised your team's chance, red
+// when it lowered it, so the direction reads without telling eleven grade
+// colours apart, and the pale grades (Good, Excellent) still show on the
+// light theme's white panel. Even has none.
+const DOT_RING: Record<Grade, string> = {
+  Brilliant: "ring-1 ring-ahead",
+  Great: "ring-1 ring-ahead",
+  Excellent: "ring-1 ring-ahead",
+  Good: "ring-1 ring-ahead",
+  Even: "",
+  Inaccuracy: "ring-1 ring-behind",
+  Mistake: "ring-1 ring-behind",
+  Blunder: "ring-1 ring-behind",
 };
 
 // The play's icon in the list: blue for a gain, red for a loss.
@@ -58,11 +72,24 @@ const GRADE_ICON: Record<Grade, string> = {
   Great: "text-ahead-soft",
   Excellent: "text-ahead-soft",
   Good: "text-ahead-soft",
-  Even: "text-faint",
+  Even: "text-quiet",
   Inaccuracy: "text-behind",
   Mistake: "text-behind",
   Blunder: "text-behind",
 };
+
+// The grade's mark, its name and how far the play moved your team's chance:
+// "(!) Great +9.2%". The name is in the text colour, since several grade
+// colours are too light to read as text.
+function GradeLabel({ grade, swing }: { grade: Grade; swing: number }) {
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap text-note">
+      <GradeMark grade={grade} />
+      <span className="font-semibold text-main">{grade}</span>
+      <span className="tabular-nums text-quiet">{formatSwing(swing)}</span>
+    </span>
+  );
+}
 
 // Your team's chance to win at the timeline's top: blue above even, red
 // below. One point per second, so kills show as steps.
@@ -81,11 +108,11 @@ export function ChanceRow({ perSecond }: { perSecond: number[] }) {
         preserveAspectRatio="none"
         className="absolute inset-0 size-full overflow-visible"
       >
-        <path d={area((v) => Math.max(v, 500))} className="fill-ahead opacity-25" />
-        <path d={area((v) => Math.min(v, 500))} className="fill-behind opacity-25" />
+        <path d={area((v) => Math.max(v, 500))} className="fill-ahead-fill" />
+        <path d={area((v) => Math.min(v, 500))} className="fill-behind-fill" />
         <path
           d={`M0 50 H${last}`}
-          className="stroke-faint"
+          className="stroke-quiet"
           strokeWidth={1}
           strokeDasharray="3 4"
           vectorEffect="non-scaling-stroke"
@@ -93,7 +120,7 @@ export function ChanceRow({ perSecond }: { perSecond: number[] }) {
         <path
           d={`M${line}`}
           fill="none"
-          className="stroke-ink-soft"
+          className="stroke-main"
           strokeWidth={1.5}
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
@@ -103,17 +130,18 @@ export function ChanceRow({ perSecond }: { perSecond: number[] }) {
   );
 }
 
-// A dot at each play, in its grade's color: round for fights, square when
-// it took an objective.
+// A dot at each play, in its grade's colour and ringed by direction: round
+// for fights, square when it took an objective.
 export function PlayMarks({ plays, left }: { plays: Play[]; left: (ms: number) => string }) {
   return (
     <div aria-hidden="true" className="relative h-6">
       {plays.map((play) => (
         <span
           key={play.from}
-          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${GRADE_MARK[play.grade]} ${
-            play.objectives.length > 0 ? "rounded-[2px]" : "rounded-full"
-          }`}
+          data-grade={play.grade}
+          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${DOT_SIZE[play.grade]} ${
+            GRADE_LOOKS[play.grade].dot
+          } ${DOT_RING[play.grade]} ${play.objectives.length > 0 ? "" : "rounded-full"}`}
           style={{ left: left(play.from) }}
         />
       ))}
@@ -141,27 +169,21 @@ export function PlayNow({
   replay: ReplayData;
   names: Record<number, string>;
 }) {
-  const swing = play ? playSwing(play) : 0;
-  const grade = play?.grade ?? "Even";
   return (
-    <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5 sm:border-l sm:border-line-strong sm:pl-[18px]">
-      <span className="font-mono text-label uppercase tracking-[0.12em] text-faint">
+    <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5 sm:border-l sm:border-divider sm:pl-[18px]">
+      <span className="text-note tabular-nums text-quiet">
         {play
           ? `Play ${plays.indexOf(play) + 1} of ${plays.length}`
           : `${plays.length} ${plays.length === 1 ? "play" : "plays"}`}
       </span>
       {play ? (
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-sm font-semibold text-ink">{playTitle(play, replay, names)}</span>
+          <span className="text-sm font-semibold text-main">{playTitle(play, replay, names)}</span>
           {play.mine && <YouTag />}
-          <span
-            className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-note font-semibold ${GRADE_CHIP[grade]}`}
-          >
-            {grade} {formatSwing(swing)}
-          </span>
+          <GradeLabel grade={play.grade} swing={playSwing(play)} />
         </span>
       ) : (
-        <span className="text-sm text-muted">
+        <span className="text-sm text-quiet">
           {plays.length > 0 ? `The first one is at ${formatClock(plays[0].from)}.` : "No plays this game."}
         </span>
       )}
@@ -189,13 +211,13 @@ export function PlayDetails({
 }) {
   const tone = tempo && stretchAt(tempo.stretches, play.from - 1)?.tone;
   return (
-    <div className="flex flex-col gap-1.5 border-t border-line-strong px-3.5 py-3 text-sm text-muted">
+    <div className="flex flex-col gap-1.5 border-t border-divider px-3.5 py-3 text-sm text-quiet">
       <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
         {playLines(play, replay, names).map((line, i) => (
           <li key={i}>{line}</li>
         ))}
       </ul>
-      <p className="text-ink-soft">
+      <p className="text-main">
         Your team&apos;s chance to win went from {percent(play.before)} to {percent(play.after)}.
         {tone === "ahead"
           ? " You were up tempo just before it."
@@ -277,32 +299,23 @@ export function ReplayPlays({
     <section aria-labelledby="plays-heading" className="flex min-w-0 flex-[1_1_340px] flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="flex flex-col">
-          <h3
-            id="plays-heading"
-            className="font-display text-[22px] font-bold uppercase leading-tight tracking-[0.01em]"
-          >
+          <h3 id="plays-heading" className="text-body font-semibold">
             Plays
           </h3>
-          <p className="text-sm text-ink-soft">
+          <p className="text-sm text-quiet">
             {yours === 0
               ? "You weren't in any of them."
               : `Your ${yours === 1 ? "play" : `${yours} plays`}: ${listNames(counts)}.`}
           </p>
         </div>
-        <div
-          role="group"
-          aria-label="Which plays"
-          className="soft-round-sm inline-flex overflow-hidden border border-line-strong text-note"
-        >
+        <div role="group" aria-label="Which plays" className={`${SWITCH} bg-raised`}>
           {[false, true].map((mineOnly) => (
             <button
               key={String(mineOnly)}
               type="button"
               aria-pressed={yoursOnly === mineOnly}
               onClick={() => setYoursOnly(mineOnly)}
-              className={`px-3 py-1.5 ${
-                yoursOnly === mineOnly ? "bg-line-strong text-ink" : "text-muted hover:text-ink"
-              }`}
+              className={`${SWITCH_BUTTON} ${yoursOnly === mineOnly ? SWITCH_ON : SWITCH_OFF}`}
             >
               {mineOnly ? "Yours" : "All"}
             </button>
@@ -311,11 +324,10 @@ export function ReplayPlays({
       </div>
 
       {shown.length === 0 ? (
-        <p className="text-sm text-muted">No plays to show.</p>
+        <p className="text-sm text-quiet">No plays to show.</p>
       ) : (
         <ol ref={list} className="relative flex max-h-[30rem] flex-col gap-1 overflow-y-auto pr-1">
           {shown.map((play) => {
-            const swing = playSwing(play);
             const { grade } = play;
             const isCurrent = play === current;
             return (
@@ -324,26 +336,22 @@ export function ReplayPlays({
                   type="button"
                   aria-current={isCurrent ? "true" : undefined}
                   onClick={() => onPick(playStart(play))}
-                  className={`soft-round grid min-h-11 w-full grid-cols-[2.75rem_1.125rem_minmax(0,1fr)] items-start gap-2 border px-2.5 py-2 text-left hover:bg-surface-hover ${
-                    isCurrent ? "border-line-strong bg-surface-hover" : "border-transparent"
+                  className={`grid min-h-11 w-full grid-cols-[2.75rem_1.125rem_minmax(0,1fr)] items-start gap-2 rounded-md px-2.5 py-2 text-left hover:bg-select ${
+                    isCurrent ? "bg-select" : ""
                   }`}
                 >
-                  <span className="pt-0.5 font-mono text-note text-faint">{formatClock(play.from)}</span>
+                  <span className="pt-0.5 text-note tabular-nums text-quiet">{formatClock(play.from)}</span>
                   <span className="pt-0.5">
                     <PlayIcon play={play} replay={replay} grade={grade} />
                   </span>
                   {/* The grade sits at the end of the row, or under the
                       title when there isn't room beside it. */}
                   <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                    <span className="text-sm text-ink">
+                    <span className="text-sm text-main">
                       {playTitle(play, replay, names)}
                       {play.mine && <YouTag className="ml-1.5" />}
                     </span>
-                    <span
-                      className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-note font-semibold ${GRADE_CHIP[grade]}`}
-                    >
-                      {grade} {formatSwing(swing)}
-                    </span>
+                    <GradeLabel grade={grade} swing={playSwing(play)} />
                   </span>
                 </button>
               </li>
@@ -355,11 +363,19 @@ export function ReplayPlays({
   );
 }
 
+// A pressed-or-not switch, like "All | Yours" and the replay's speeds: the
+// pressed one in the text colour, as the Review board's buttons are. Each
+// use adds its own fill, one step off what it sits on.
+export const SWITCH = "inline-flex gap-1 rounded-md p-1 text-note";
+export const SWITCH_BUTTON = "min-h-8 rounded-sm px-3 py-1";
+export const SWITCH_ON = "bg-main font-medium text-page";
+export const SWITCH_OFF = "text-quiet hover:text-main";
+
 // Marks the plays you were in.
 function YouTag({ className = "" }: { className?: string }) {
   return (
     <span
-      className={`inline-block rounded-[4px] border border-ahead px-1 align-[1px] font-mono text-[10px] uppercase leading-normal tracking-[0.08em] text-ahead-soft ${className}`}
+      className={`inline-block rounded-sm border border-ahead px-1 align-[1px] text-xs font-medium leading-normal text-ahead ${className}`}
     >
       You
     </span>

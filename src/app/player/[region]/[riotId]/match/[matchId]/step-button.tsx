@@ -20,7 +20,7 @@ export function StepButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="soft-round-sm flex size-10 items-center justify-center border border-line-strong bg-page text-muted transition-colors hover:text-ink disabled:opacity-40 disabled:hover:text-muted"
+      className="flex size-10 items-center justify-center rounded-md bg-panel text-main hover:bg-divider disabled:opacity-40 disabled:hover:bg-panel"
     >
       <svg
         width="18"

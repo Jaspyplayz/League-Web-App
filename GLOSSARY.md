@@ -220,12 +220,12 @@ _Avoid_: Chat, assistant, AI coach
 The one recurring weakness a player picked to track game by game.
 _Avoid_: Focus (for the skill to improve), target
 
-**Log**:
-The profile tab with a calendar of a player's days and the notes they kept.
-_Avoid_: Journal, diary
+**By day**:
+The view of the profile's Matches tab that groups a player's games into days, with the notes they kept. It replaced the Log tab.
+_Avoid_: Log, journal, diary
 
 **Day note**:
-A note a player writes about one day of games in the Log.
+A note a player writes about one day of games in By day.
 _Avoid_: Journal entry, daily note
 
 **Game note**:
