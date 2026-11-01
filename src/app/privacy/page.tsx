@@ -112,13 +112,14 @@ export default function PrivacyPage() {
       <h2>Stored in your browser</h2>
       <p>
         Turnpoint remembers the last few players you searched for, so you can click back to
-        them from the home page. That list is kept in your own browser&apos;s local storage: it
-        stays on your device and is never sent to Turnpoint. Remove a player with the ×
-        next to their name, or the whole list with the Clear button.
+        them from the box under the search. That list is kept in your own browser&apos;s local
+        storage. When you open the box, your browser sends the Riot IDs on it to Turnpoint, which
+        uses them only to read each player&apos;s saved rank and doesn&apos;t keep them. Remove a
+        player with the × next to their name.
       </p>
       <p>
-        Players you pin with the star on their profile are saved the same way, so they stay on
-        the home page until you unpin them.
+        Players you pin with the star are saved and looked up the same way, so they stay in that
+        box until you unpin them.
       </p>
       <p>
         If you pick a focus goal on the Insights tab, Turnpoint saves which weakness you

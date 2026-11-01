@@ -1,7 +1,7 @@
 import "server-only";
 
 import * as Sentry from "@sentry/nextjs";
-import { and, desc, eq, gte, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 import { tables } from "@/db";
 import { isFresh, secondsUntilUpdate, TTL_MS } from "@/db/freshness";
 import { database, readCache } from "@/lib/match-store";
@@ -11,6 +11,8 @@ import type { Region } from "@/lib/regions";
 import { getMatchIds, getRankedEntries, getSummoner } from "@/lib/riot/api";
 import { RiotApiError, settle, type RiotErrorKind } from "@/lib/riot/client";
 import type { Account, LeagueEntry } from "@/lib/riot/types";
+import { savedPlayerKey, type SavedPlayer, type SavedRank } from "@/lib/saved-players";
+import { isTier } from "@/lib/tiers";
 
 // A player's profile works like op.gg's: it's a snapshot saved in Postgres.
 // Turnpoint asks Riot for a new one the first time anyone opens the player,
@@ -148,6 +150,57 @@ export async function savedSoloRank(
     }),
   );
   return entry ?? null;
+}
+
+// The solo queue rank of each player in the box under the search, by Riot ID,
+// in one query for all of them and with no Riot call. Players the site never
+// looked up, or who are unranked, are left out.
+export async function savedSoloRanks(list: SavedPlayer[]): Promise<Record<string, SavedRank>> {
+  if (list.length === 0) return {};
+  const rows = await readCache((db) =>
+    db
+      .select({
+        region: tables.players.region,
+        gameName: tables.players.gameName,
+        tagLine: tables.players.tagLine,
+        tier: tables.rankedEntries.tier,
+        division: tables.rankedEntries.rank,
+      })
+      .from(tables.players)
+      .leftJoin(
+        tables.rankedEntries,
+        and(
+          eq(tables.rankedEntries.puuid, tables.players.puuid),
+          eq(tables.rankedEntries.queueType, "RANKED_SOLO_5x5"),
+        ),
+      )
+      .where(
+        or(
+          ...list.map((p) =>
+            and(
+              eq(tables.players.region, p.region),
+              eq(sql`lower(${tables.players.gameName})`, sql`lower(${p.gameName})`),
+              eq(sql`lower(${tables.players.tagLine})`, sql`lower(${p.tagLine})`),
+            ),
+          ),
+        ),
+      )
+      .orderBy(desc(tables.players.fetchedAt)),
+  );
+
+  // A Riot ID can pass from one account to another, leaving two rows with the
+  // same name. The newest row is the player now, ranked or not.
+  const seen = new Set<string>();
+  const ranks: Record<string, SavedRank> = {};
+  for (const row of rows ?? []) {
+    const key = savedPlayerKey(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (row.tier && row.division && isTier(row.tier)) {
+      ranks[key] = { tier: row.tier, division: row.division };
+    }
+  }
+  return ranks;
 }
 
 async function readProfile(region: Region, puuid: string): Promise<Profile | undefined> {

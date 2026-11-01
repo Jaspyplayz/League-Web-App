@@ -49,7 +49,7 @@ export function HeaderSearch({ region = "na" }: { region?: Region }) {
   // useId, not fixed ids, because the not-found page shows the big search
   // too and two boxes can't share one id.
   const errorId = useId();
-  const { error, pending, formProps, riotIdProps, menu } = usePlayerSearch(errorId);
+  const { error, pending, formProps, riotIdProps, boxOpen, box } = usePlayerSearch(errorId);
   const placeholder = usePlaceholder();
 
   return (
@@ -57,7 +57,9 @@ export function HeaderSearch({ region = "na" }: { region?: Region }) {
       {...formProps}
       aria-label="Search a player"
       // The field's outline turns blue while you type in it, as on home.
-      className="relative order-last mb-1.5 flex h-11 basis-full items-center gap-0.5 rounded-md border border-transparent bg-panel px-1 has-[input:focus-visible]:border-ahead lg:order-none lg:col-start-2 lg:mb-0 lg:h-10"
+      className={`relative order-last mb-1.5 flex h-11 basis-full items-center gap-0.5 border border-transparent bg-panel px-1 has-[input:focus-visible]:border-ahead lg:order-none lg:col-start-2 lg:mb-0 lg:h-10 ${
+        boxOpen ? "rounded-t-md" : "rounded-md"
+      }`}
     >
       <span className="relative flex shrink-0 items-center">
         <select
@@ -96,7 +98,8 @@ export function HeaderSearch({ region = "na" }: { region?: Region }) {
           {error}
         </p>
       ) : (
-        menu
+        // -inset-x-px: past the form's 1px border, to line up with its edges.
+        box && <div className="absolute -inset-x-px top-full z-30">{box}</div>
       )}
     </form>
   );
