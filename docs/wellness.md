@@ -112,3 +112,4 @@ Never change code, never push to main, never force-push, never run npm run db:mi
 | Date | Ran in | Checked up to | Tickets | `npm test` | `npm run build` | Notes |
 |---|---|---|---|---|---|---|
 | 2026-10-29 | cloud | `0e76a79` | JAS-39, JAS-40, JAS-41, JAS-42, JAS-43, JAS-44, JAS-45, JAS-46, JAS-47, JAS-48, JAS-49, JAS-50 | 20 s | 33 s | First run. Build time is the cold first run, a warm rerun took 8 s. Clone was shallow (JAS-45) |
+| 2026-11-01 | cloud | `ee828b6` | JAS-147, JAS-148, JAS-149, JAS-150, JAS-151, JAS-152, JAS-153, JAS-154, JAS-155, JAS-156, JAS-157, JAS-158, JAS-159, JAS-160, JAS-161, JAS-162 | 53 s | 74 s | Cold machine. Tests took 33 s against 25 s at base when interleaved, with 67% more tests. Comments on JAS-61, JAS-69, JAS-125 |
