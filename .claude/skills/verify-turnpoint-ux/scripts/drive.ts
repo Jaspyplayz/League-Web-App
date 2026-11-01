@@ -58,9 +58,9 @@ const journeys: Journey[] = [
       });
       await step("submit a riot id without a tag", async () => {
         await page.getByLabel("Riot ID").fill("Faker");
-        await page.getByRole("button", { name: "Analyze" }).click();
+        await page.getByRole("button", { name: "Search", exact: true }).click();
         const alert = page.locator("#search-error");
-        await expect(alert).toHaveText("Enter a Riot ID like Faker#KR1.", LOAD);
+        await expect(alert).toHaveText("Add the tag after a #, like Faker#KR1. It's on the player's Riot profile.", LOAD);
         await expect(alert).toHaveRole("alert");
         await expect(page.getByLabel("Riot ID")).toHaveAttribute("aria-invalid", "true");
         await expect(page.getByLabel("Riot ID")).toHaveAttribute("aria-describedby", "search-error");
@@ -68,7 +68,7 @@ const journeys: Journey[] = [
       await step("input kept and page did not move", async () => {
         await expect(page).toHaveURL(/\/$/);
         await expect(page.getByLabel("Riot ID")).toHaveValue("Faker");
-        await expect(page.getByRole("button", { name: "Analyze" })).toBeEnabled();
+        await expect(page.getByRole("button", { name: "Search", exact: true })).toBeEnabled();
       });
     },
   },
@@ -80,7 +80,7 @@ const journeys: Journey[] = [
     run: async ({ page, step, note }) => {
       await step("open home on a phone", async () => {
         await page.goto("/", LOAD);
-        await expect(page.getByRole("heading", { level: 1 })).toContainText(/Find the minute/i, LOAD);
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint", LOAD);
         await expectCalm(page);
       });
       await step("no sideways scroll and form fits", async () => {
@@ -88,14 +88,14 @@ const journeys: Journey[] = [
         note("scrollWidth", sw);
         note("clientWidth", cw);
         if (sw > cw + 1) throw new Error(`page scrolls sideways: scrollWidth ${sw} > clientWidth ${cw}`);
-        const btn = await page.getByRole("button", { name: "Analyze" }).boundingBox();
-        if (!btn || btn.x < 0 || btn.x + btn.width > cw + 1) throw new Error(`Analyze button is off screen: ${JSON.stringify(btn)}`);
-        if (btn.height < 44) throw new Error(`Analyze tap target is ${btn.height}px tall, under 44px`);
+        const btn = await page.getByRole("button", { name: "Search", exact: true }).boundingBox();
+        if (!btn || btn.x < 0 || btn.x + btn.width > cw + 1) throw new Error(`Search button is off screen: ${JSON.stringify(btn)}`);
+        if (btn.height < 44) throw new Error(`Search tap target is ${btn.height}px tall, under 44px`);
       });
-      await step("scroll to the start cards", async () => {
-        const cards = page.getByRole("region", { name: "Look at a game" });
-        await cards.scrollIntoViewIfNeeded();
-        await expect(cards.getByRole("link", { name: /See a sample analysis/ })).toBeVisible();
+      await step("scroll to the example game", async () => {
+        const open = page.getByRole("link", { name: "Open this game", exact: true });
+        await open.scrollIntoViewIfNeeded();
+        await expect(open).toBeVisible();
       });
     },
   },
@@ -108,8 +108,8 @@ const journeys: Journey[] = [
         await page.goto("/", LOAD);
         await expectCalm(page);
       });
-      await step("choose see a sample analysis", async () => {
-        await page.getByRole("link", { name: /See a sample analysis/ }).click();
+      await step("choose open this game", async () => {
+        await page.getByRole("link", { name: "Open this game", exact: true }).click();
         await expect(page).toHaveURL(/\/match\/KR_8416261221/, LOAD);
         await expect(page.getByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true", LOAD);
         await expectCalm(page);
