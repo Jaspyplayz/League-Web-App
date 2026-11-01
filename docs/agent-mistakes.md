@@ -61,6 +61,9 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Riot API hosts appear only in `src/lib/riot/` | Lint rule `turnpoint/no-riot-api-host` |
 | Files that read secrets import `"server-only"` | Lint rule `turnpoint/server-only-env` |
 | No green in the UI | Lint rule `turnpoint/no-green-classes` |
+| Rubik only and sentence case, with no made-up text sizes | Lint rule `turnpoint/review-board-type` |
+| Colours come from the theme's tokens, with the old names gone | Lint rule `turnpoint/tokens-only`, and `src/app/themes.test.ts` for the stylesheet |
+| Every corner is `rounded-md`, `rounded-sm` or `rounded-full` | `src/app/corners.test.ts` |
 | Lint and typecheck pass before Claude commits | The commit hook, `.claude/hooks/check-before-commit.mjs` |
 | No PR merges before the reviewer clears it (its head, or an earlier commit with only small changes since) | GitHub's required `reviewer` check |
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
