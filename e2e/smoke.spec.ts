@@ -42,6 +42,16 @@ test("search a player and see their profile", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Ranked Solo/Duo" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible();
 
+  // Matches switches to By day and back.
+  const views = page.getByRole("navigation", { name: "Matches view" });
+  await views.getByRole("link", { name: "By day" }).click();
+  await expect(views.getByRole("link", { name: "By day" })).toHaveAttribute("aria-current", "page");
+  // Days, or the empty panel if the player hasn't played in four weeks.
+  const days = page.getByRole("heading", { name: "Days", exact: true });
+  await expect(days.or(page.getByText(/^No games in the last/))).toBeVisible(FIRST_LOAD);
+  await views.getByRole("link", { name: "List" }).click();
+  await expect(page.getByRole("heading", { name: "Recent matches" })).toBeVisible(FIRST_LOAD);
+
   // Each game row is one link to that game's match page.
   await page.getByRole("link", { name: /^Open this .+ game/ }).first().click();
   await expect(page).toHaveURL(/\/match\/KR_/);

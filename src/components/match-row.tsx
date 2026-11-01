@@ -116,8 +116,10 @@ export function MatchRow({
             <p className="text-xs text-quiet">{m.csPerMin.toFixed(1)}/min</p>
           </div>
 
+          {/* The score and items sit above the link's cover too, so hovering
+              them still shows what helped the score and each item's name. */}
           {score && (
-            <div className="flex w-[72px] shrink-0 flex-col gap-1">
+            <div className="relative z-10 flex w-[72px] shrink-0 flex-col gap-1">
               <GameScore score={score} size="lg" />
               {/* The 0 to 100 score as ten blocks, like a health bar. */}
               <SegmentBar
@@ -131,7 +133,9 @@ export function MatchRow({
             </div>
           )}
 
-          <ItemSlots dd={dd} items={m.items} />
+          <div className="relative z-10">
+            <ItemSlots dd={dd} items={m.items} />
+          </div>
 
           {teams && <Teams dd={dd} region={teams.region} players={teams.players} />}
         </div>
@@ -164,7 +168,8 @@ function Chevron() {
 // Two columns of five, blue side on the left, like op.gg. Hidden on phones,
 // where the row has no room for them; the match page shows everyone.
 // `relative z-10` lifts the names above the row link's cover, so each one
-// still opens that player's profile.
+// still opens that player's profile; `pointer-events-none` lets a click in
+// the gaps between names fall through to the cover and open the game.
 function Teams({
   dd,
   region,
@@ -175,7 +180,7 @@ function Teams({
   players: [TeamPlayer[], TeamPlayer[]];
 }) {
   return (
-    <div className="relative z-10 ml-auto hidden shrink-0 gap-3 sm:flex">
+    <div className="pointer-events-none relative z-10 ml-auto hidden shrink-0 gap-3 sm:flex">
       {players.map((team, side) => (
         <ul
           key={side}
@@ -196,7 +201,7 @@ function Teams({
                   <Link
                     href={`/player/${region}/${toSlug(p.riotId)}`}
                     title={`${p.riotId.gameName}#${p.riotId.tagLine}`}
-                    className={`${look} hover:text-main hover:underline`}
+                    className={`${look} pointer-events-auto hover:text-main hover:underline`}
                   >
                     {inner}
                   </Link>

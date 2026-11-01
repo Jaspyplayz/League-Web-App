@@ -140,7 +140,7 @@ export async function RecentMatches({
       </aside>
 
       <section aria-labelledby="matches-heading" className="flex min-w-0 flex-1 flex-col gap-3">
-        <h2 id="matches-heading" className="scroll-mt-4 text-xl font-semibold">
+        <h2 id="matches-heading" className="scroll-mt-4 text-heading font-semibold">
           Recent matches
         </h2>
         <MatchesControls playerPath={playerPath} queue={queue} view="list" />
@@ -152,7 +152,7 @@ export async function RecentMatches({
           result.error ? (
             <RiotErrorNotice error={result.error} region={region} />
           ) : (
-            <p className="text-muted">{emptyMessage(queue)}</p>
+            <p className="text-quiet">{emptyMessage(queue)}</p>
           )
         ) : (
           <FilterableMatchList
@@ -176,13 +176,13 @@ export async function RecentMatches({
           />
         )}
         {end === "waiting" && matches.length > 0 && (
-          <p className="self-center text-sm text-faint">
+          <p className="self-center text-sm text-quiet">
             {waiting} more {waiting === 1 ? "game hasn't" : "games haven't"} loaded from Riot yet.{" "}
             {/* A plain link, not next/link: a Link to this same URL reuses
                 the page it already has instead of asking the server again. */}
             <a
               href={matchListHref(playerPath, queue, count, `game-${games.length + 1}`)}
-              className="text-ink underline hover:text-ahead"
+              className="text-main underline hover:text-ahead"
             >
               Refresh
             </a>{" "}
@@ -190,23 +190,23 @@ export async function RecentMatches({
           </p>
         )}
         {result.error && matches.length > 0 && (
-          <p className="self-center text-sm text-faint">
+          <p className="self-center text-sm text-quiet">
             Some games couldn&rsquo;t be loaded from Riot just now.
           </p>
         )}
         {end === "two-months" && (
-          <p className="self-center text-sm text-faint">
+          <p className="self-center text-sm text-quiet">
             That&rsquo;s every game from the last {HISTORY_DAYS / 30} months.
           </p>
         )}
         {end === "max" && (
-          <p className="self-center text-sm text-faint">The list stops at {MAX_GAMES} games.</p>
+          <p className="self-center text-sm text-quiet">The list stops at {MAX_GAMES} games.</p>
         )}
         {end === "more" && (
           <Link
             // Lands on the first new game, where the list left off.
             href={matchListHref(playerPath, queue, count + GAMES_STEP, `game-${games.length + 1}`)}
-            className="soft-round-sm self-center border border-line-strong bg-surface px-5 py-2 text-sm font-semibold text-ink transition-colors hover:border-ahead"
+            className="self-center rounded-md bg-panel px-5 py-2 text-sm font-semibold text-main transition-colors hover:bg-raised"
           >
             Show 10 more games
           </Link>
