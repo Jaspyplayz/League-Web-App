@@ -50,6 +50,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A browser test's locator filters on what the click changes](agent-mistakes/browser-locator-filters-on-what-it-changes.md) | 1 | none yet |
 | [Coloured text on a tint nobody checked it against](agent-mistakes/coloured-text-on-a-new-tint.md) | 1 | none yet |
 | [Pairs players by their place in a list](agent-mistakes/pairs-players-by-list-position.md) | 1 | check |
+| [A browser test checked only on the dev server](agent-mistakes/browser-test-run-only-on-dev-server.md) | 1 | none yet |
 
 ## Rules and what enforces them
 
