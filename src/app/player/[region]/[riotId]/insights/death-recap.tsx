@@ -68,7 +68,7 @@ export async function DeathRecapSection({
             <ul className="grid gap-x-6 gap-y-4 md:grid-cols-3">
               {recap.threats.map((threat) => (
                 <li key={threat.championName} className="flex min-w-0 gap-3">
-                  <ChampionIcon dd={dd} name={threat.championName} size={32} className="rounded-md" />
+                  <ChampionIcon dd={dd} name={threat.championName} size={32} className="shrink-0 self-start rounded-md" />
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <p className="text-body">
                       <span className="font-semibold">{name(threat.championName)}</span>{" "}

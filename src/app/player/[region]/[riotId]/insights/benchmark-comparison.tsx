@@ -126,7 +126,7 @@ function ChampionList({
               key={`${c.position}-${c.championName}`}
               className="flex gap-2.5 border-b border-divider py-2"
             >
-              <ChampionIcon dd={dd} name={c.championName} size={32} className="rounded-md" />
+              <ChampionIcon dd={dd} name={c.championName} size={32} className="shrink-0 self-start rounded-md" />
               <div className="flex min-w-0 flex-col">
                 <p className="text-sm">
                   <span className="font-medium">{championName(dd, c.championName)}</span>{" "}
