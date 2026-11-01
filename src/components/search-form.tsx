@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { searchPlayer } from "@/app/actions";
-import { isRegion, REGIONS } from "@/lib/regions";
+import { isRegion, REGIONS, type Region } from "@/lib/regions";
 import { parseRiotId } from "@/lib/riot-id";
 import { noteSearch } from "./saved-players";
 import { SavedPlayersBox, useSavedPlayersBox } from "./saved-players-box";
@@ -12,10 +12,10 @@ import { SavedPlayersBox, useSavedPlayersBox } from "./saved-players-box";
 // of saved players that opens under it. The box shows from clicking into the
 // form until you click or tab out of it, press Escape, search, or pick a
 // player. `errorId` ties the Riot ID box to the error for screen readers.
-export function usePlayerSearch(errorId: string) {
+export function usePlayerSearch(errorId: string, startingRiotId = "") {
   const [state, action, pending] = useActionState(searchPlayer, { error: null });
   // What's typed in the Riot ID box, to narrow the saved players.
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(startingRiotId);
   const [wanted, setWanted] = useState(false);
   // Picking a saved player leaves the last search's error behind, and the
   // header's form stays on screen across pages.
@@ -117,9 +117,13 @@ export function RegionOptions() {
 // The big search on the home page (and the not-found page), 56px tall: the
 // region as a pill with a caret, the Riot ID box, and Search in the text
 // colour, like the main button. The fields carry their names for screen
-// readers instead of visible labels (JAS-92).
-export function SearchForm() {
-  const { error, pending, formProps, riotIdProps, boxOpen, box } = usePlayerSearch("search-error");
+// readers instead of visible labels (JAS-92). `startWith` fills it in, so a
+// player who mistyped a Riot ID can fix one letter instead of typing it again.
+export function SearchForm({ startWith }: { startWith?: { region: Region; riotId: string } }) {
+  const { error, pending, formProps, riotIdProps, boxOpen, box } = usePlayerSearch(
+    "search-error",
+    startWith?.riotId,
+  );
   const phone = usePhone();
 
   return (
@@ -134,7 +138,7 @@ export function SearchForm() {
             <select
               id="region"
               name="region"
-              defaultValue="na"
+              defaultValue={startWith?.region ?? "na"}
               aria-label="Region"
               className="h-9 cursor-pointer appearance-none rounded-full bg-raised pr-8 pl-3.5 text-sm font-semibold text-main outline-none focus-visible:outline-2 focus-visible:outline-main"
             >

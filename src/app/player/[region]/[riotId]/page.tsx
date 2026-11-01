@@ -171,7 +171,7 @@ function PlayerNotFound({ region, id }: { region: Region; id: RiotId }) {
         Check the spelling and the tag after the #, or try another region.
       </p>
       <div className="mt-2.5">
-        <SearchForm />
+        <SearchForm startWith={{ region, riotId: `${id.gameName}#${id.tagLine}` }} />
       </div>
     </div>
   );
