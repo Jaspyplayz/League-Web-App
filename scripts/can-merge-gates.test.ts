@@ -460,6 +460,20 @@ describe("decide", () => {
       expect(detail(decision, "Interrogate panel ran")).toContain("src/app/sign-in/page.tsx");
     });
 
+    // Two panels can read the PR's risky files between them.
+    it("counts a risky file read by either of two panel lines", () => {
+      const both = ["src/app/sign-in/page.tsx", "src/lib/riot/client.ts"];
+      const first = (sha: string) => (sha === OLDER ? { commits: 1, lines: {}, files: ["src/app/sign-in/page.tsx"], created: [] } : undefined);
+      const review = [panel(OLDER), panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`];
+      const decision = decide(pr({ body: risky(review), files: both }), main(), history({ since: first }, both));
+      expect(failed(decision)).toEqual([]);
+    });
+
+    it("reads a panel line with its label in bold", () => {
+      const review = [`**Interrogate panel at ${HEAD}:** 3 to act on`, "", `Reviewer agent at ${HEAD}: no blockers`];
+      expect(failed(decide(pr({ body: risky(review), files: SIGN_IN }), main()))).toEqual([]);
+    });
+
     // Otherwise "tiny" would skip the criteria on a PR that changes sign-in.
     it("asks a tiny PR that changes a risky path for its acceptance criteria", () => {
       const review = [panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`];
@@ -569,13 +583,38 @@ describe("decide", () => {
       ["two-way, then one-way in its reason", "two-way, except the emails it sends are one-way."],
       ["two-way, then one-way after a full stop", "two-way. The rows it writes are one-way."],
       ["a word that only starts with two-way", "two-way-ish. Most of it reverts."],
+      ["two-way, then one way with a space", "two-way, apart from the emails, which are one way."],
+      ["two-way, then one-way with a non-breaking hyphen", "two-way, apart from the emails, which are one‑way."],
+      ["two-way with a word before it", "not two-way, I think."],
     ])("refuses a PR whose door is %s", (_, door) => {
       expect(failed(decide(pr({ body: body({ door }) }), main()))).toEqual(["Two-way door"]);
     });
 
+    // Two lines could each be the one GitHub shows, even on a PR that needn't have one.
+    it("refuses a tiny PR with two Door lines", () => {
+      const tiny = body({ tier: "tiny. Copy.", door: "two-way.\n**Door:** two-way, again." });
+      expect(failed(decide(pr({ body: tiny }), main()))).toEqual(["Two-way door"]);
+    });
+
+    // A code block can start after "- ", where the gate might read it as code
+    // and GitHub as text, so it fails closed here too.
+    it("refuses a one-way line inside a code block", () => {
+      const text = body({ tier: "tiny. Copy.", door: null }).replace("## Merge Danger\n", "## Merge Danger\n```\n**Door:** one-way\n```\n");
+      expect(failed(decide(pr({ body: text }), main()))).toEqual(["Two-way door"]);
+    });
+
     // These read as one-way on GitHub but aren't the exact "**Door:**" line, so
     // the gate must not count them as no line at all.
-    it.each(["- **Door:** one-way", "**Door: one-way.**", "**Door**: one-way", "Door: one-way", "> `**Door:**` one-way"])(
+    it.each([
+      "- **Door:** one-way",
+      "**Door: one-way.**",
+      "**Door**: one-way",
+      "Door: one-way",
+      "> `**Door:**` one-way",
+      "**Door**: one way",
+      "**Door** one-way",
+      "<b>Door:</b> one-way",
+    ])(
       "refuses a line that only looks like the Door line and says one-way: %s, at any tier",
       (line) => {
         for (const tier of ["tiny. Copy.", "normal. Copy."]) {

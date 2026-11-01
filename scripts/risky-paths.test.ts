@@ -241,6 +241,10 @@ describe("riskyFiles", () => {
       ".claude/skills/verify-turnpoint-ux/features/.claude/rules/x.md",
       ".claude/skills/verify-turnpoint-ux/features/deep/SKILL.md",
       ".claude/skills/verify-turnpoint-ux/features/README.md",
+      ".claude/skills/verify-turnpoint-ux/features/CLAUDE.md",
+      ".claude/skills/verify-turnpoint-ux/features/CLAUDE.local.md",
+      ".claude/skills/verify-turnpoint-ux/features/AGENTS.md",
+      ".claude/skills/verify-turnpoint-ux/features/SKILL.md",
       ".claude/skills/verify-turnpoint/features/ask-teaser.md",
       "src/.claude/skills/verify-turnpoint-ux/features/x.md",
     ];

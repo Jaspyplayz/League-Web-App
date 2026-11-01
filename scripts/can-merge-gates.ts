@@ -505,7 +505,7 @@ function skipsCriteriaAndDoor(pr: Pick<PrSnapshot, "files">, tier: Tier): boolea
 // GitHub shows counts, at the start of the line with at most bold or code
 // around it, so one in a comment, code block or bullet doesn't, and neither
 // does "Interrogate panel at <sha>: could not run".
-const PANEL = /^ {0,3}(?:\*\*|__|`+)?Interrogate panel at ([0-9a-f]{7,40}):\s*\d+ to act on\b/i;
+const PANEL = /^ {0,3}(?:\*\*|__|`+)?Interrogate panel at ([0-9a-f]{7,40}):[*_`\s]*\d+ to act on\b/i;
 
 // The panel's "act on" findings aren't read: the reviewer gate already needs
 // a no-blockers verdict at the head, which covers the fixes for them.
@@ -542,9 +542,13 @@ function panelResult(pr: ReviewInput, history: ReviewHistory, tier: Tier): Resul
   return pass(`Interrogate panel at ${shas[0].slice(0, 7)}`);
 }
 
+// "one-way", also with a space or any kind of dash, like a non-breaking hyphen.
+const ONE_WAY_WORDS = String.raw`\bone[\s\p{Pd}]*way\b`;
+const ONE_WAY = new RegExp(ONE_WAY_WORDS, "iu");
+
 // Any line that could pass for the Door line on GitHub, in a list or quote or
-// with its stars in another place, like "**Door**: one-way".
-const ONE_WAY_LINE = new RegExp(`${CONTAINER}[*_\`#\\s]*door[*_\`]*\\s*:[*_\`\\s]*one-way`, "i");
+// with its marks in another place, like "**Door**: one-way" or "<b>Door:</b>".
+const ONE_WAY_LINE = new RegExp(`${CONTAINER}(?:<[^>]+>|[*_\`#\\s])*door(?:<[^>]+>|[*_\`:\\s])*${ONE_WAY_WORDS}`, "iu");
 
 // A one-way door, a change a revert can't fully undo, stays Jasper's to merge
 // (decision record 0008), and Jasper kept that when risky PRs started merging
@@ -560,7 +564,7 @@ function doorResult(pr: Pick<PrSnapshot, "body" | "files">, tier: Tier): Result 
     if ("missing" in door && skipsCriteriaAndDoor(pr, tier)) return pass("a tiny PR with no risky paths needs no **Door:** line");
     return fail(`${door.why}: write "**Door:** two-way" if a revert undoes all of it, and leave a one-way door for Jasper`);
   }
-  if (/one-way/i.test(door.value)) return fail(`the **Door:** line says one-way, so Jasper merges it: "${door.value}"`);
+  if (ONE_WAY.test(door.value)) return fail(`the **Door:** line says one-way, so Jasper merges it: "${door.value}"`);
   if (/^\W*two-way(?![-\w])/i.test(door.value)) return pass("two-way");
   return fail(`the **Door:** line starts with "${door.value}", not two-way`);
 }
@@ -608,7 +612,7 @@ function lines(text: string): string[] {
 
 export type Field = { value: string } | { why: string; missing?: true };
 
-const escape =(text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // The text after "**Label:**" on the one line that starts with it. A second
 // such line anywhere, even in a code block or comment, fails closed: the

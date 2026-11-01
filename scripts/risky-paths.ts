@@ -1,6 +1,7 @@
 // The paths that make a PR risky (issue #158), in two lists (JAS-128):
 //
-// - JASPERS_PATHS: migrations, and anything that defines or runs a check.
+// - JASPERS_PATHS: migrations, the schema they come from, and anything that
+//   defines or runs a check, apart from the smoke test's specs in e2e/.
 //   `npm run can-merge` refuses a PR that touches one, whatever its tier
 //   says, since an agent could otherwise loosen its own gate and merge that.
 // - PANEL_PATHS: the rest of the risky code. Claude merges a PR that touches
@@ -67,8 +68,9 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
 // PANEL_PATHS. Most redesign PRs update the verify skill's feature notes, so
 // Jasper chose to let them go (2026-11-01). Only Markdown notes directly in the
 // folder: a script could be run by the skill, a subfolder could hold a skill
-// of its own, and the README says what counts as a pass.
-export const FEATURE_NOTE = /^\.claude\/skills\/verify-turnpoint-ux\/features\/(?!readme\.md$)[^/]+\.md$/i;
+// of its own, the README says what counts as a pass, and a CLAUDE, AGENTS or
+// SKILL file would steer agents rather than note a feature.
+export const FEATURE_NOTE = /^\.claude\/skills\/verify-turnpoint-ux\/features\/(?!(?:readme|claude|agents|skill)[^/]*\.md$)[^/]+\.md$/i;
 
 export const PANEL_PATHS: readonly RiskyPath[] = [
   // The risky row of docs/workflow.md's tier table.
