@@ -23,6 +23,23 @@ const eslintConfig = defineConfig([
     files: ["src/**/*.{ts,tsx}"],
     rules: { "turnpoint/no-green-classes": "error" },
   },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: { "turnpoint/review-board-type": "error" },
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    // The three files JAS-94 allows their own colours: the share image can't
+    // read CSS variables, and the brand logos and rank badge tints are fixed.
+    ignores: [
+      "**/*.test.{ts,tsx}",
+      "src/app/player/**/opengraph-image.tsx",
+      "src/components/icons.tsx",
+      "src/components/rank-tints.ts",
+    ],
+    rules: { "turnpoint/tokens-only": "error" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

@@ -110,3 +110,137 @@ describe("no-green-classes", () => {
     expect(await turnpointRules('export const c = "text-green-500";', "scripts/x.ts")).toEqual([]);
   });
 });
+
+describe("review-board-type", () => {
+  it.each([
+    "uppercase",
+    "hover:uppercase",
+    "[text-transform:uppercase]",
+    "tracking-wide",
+    "tracking-wider",
+    "tracking-widest",
+    "tracking-[0.14em]",
+    "font-mono",
+    "md:font-mono",
+    "font-display",
+    "font-serif",
+    "font-['Barlow_Condensed']",
+    "text-label",
+    "text-[13px]",
+    "text-[1.2rem]",
+  ])("fails on %s", async (name) => {
+    const code = `export const c = "p-4 ${name} bg-panel";`;
+    expect(await turnpointRules(code, "src/components/x.tsx")).toEqual(["turnpoint/review-board-type"]);
+  });
+
+  it("fails in a className and a template string", async () => {
+    const jsx = 'export const A = () => <p className="uppercase">Win</p>;';
+    const template = "export const c = (extra: string) => `font-mono ${extra}`;";
+    expect(await turnpointRules(jsx, "src/app/x.tsx")).toEqual(["turnpoint/review-board-type"]);
+    expect(await turnpointRules(template, "src/app/x.tsx")).toEqual(["turnpoint/review-board-type"]);
+  });
+
+  it("names the fix in the error", async () => {
+    const [message] = await turnpointMessages('export const c = "font-mono";', "src/app/x.tsx");
+    expect(message.message).toContain("tabular-nums");
+  });
+
+  it.each([
+    "tabular-nums",
+    "font-sans",
+    "font-semibold",
+    "font-[600]",
+    "tracking-tight",
+    "tracking-[-0.01em]",
+    "normal-case",
+    "text-note",
+    "text-xs",
+  ])("passes %s", async (name) => {
+    expect(await turnpointRules(`export const c = "${name}";`, "src/app/x.tsx")).toEqual([]);
+  });
+
+  it("passes the words in a comment or on the page", async () => {
+    const code = '// Not uppercase or font-mono.\nexport const A = () => <p>uppercase text-label</p>;';
+    expect(await turnpointRules(code, "src/app/x.tsx")).toEqual([]);
+  });
+
+  it.each(["src/app/x.test.tsx", "scripts/x.ts"])("does not check %s", async (filePath) => {
+    expect(await turnpointRules('export const c = "uppercase";', filePath)).toEqual([]);
+  });
+});
+
+describe("tokens-only", () => {
+  it.each([
+    "#fff",
+    "#ffff",
+    "#21201d",
+    "#21201dcc",
+    "bg-[#21201d]",
+    "rgb(255 255 255 / 7%)",
+    "rgba(0, 0, 0, 0.5)",
+    "hsl(10 20% 30%)",
+    "oklch(0.5 0.1 200)",
+  ])("fails on the raw colour %s", async (colour) => {
+    const code = `export const c = "${colour}";`;
+    expect(await turnpointRules(code, "src/components/x.tsx")).toEqual(["turnpoint/tokens-only"]);
+  });
+
+  it("fails on a colour in a JSX attribute and a style", async () => {
+    const attribute = 'export const A = () => <rect fill="#123456" />;';
+    const style = 'export const A = () => <p style={{ color: "rgb(1 2 3)" }} />;';
+    expect(await turnpointRules(attribute, "src/app/x.tsx")).toEqual(["turnpoint/tokens-only"]);
+    expect(await turnpointRules(style, "src/app/x.tsx")).toEqual(["turnpoint/tokens-only"]);
+  });
+
+  it.each([
+    ["bg-surface", "panel"],
+    ["hover:bg-surface-hover", "raised"],
+    ["border-line", "divider"],
+    ["divide-line", "divider"],
+    ["border-t-line-strong", "divider"],
+    ["border-frame", "nothing"],
+    ["text-ink", "main"],
+    ["group-hover:text-ink-soft", "main"],
+    ["outline-ink/50", "main"],
+    ["text-muted", "quiet"],
+    ["placeholder:text-faint", "quiet"],
+    ["var(--color-ink)", "main"],
+  ])("fails on the old colour %s and names its fix", async (name, fix) => {
+    const messages = await turnpointMessages(`export const c = "${name}";`, "src/app/x.tsx");
+    expect(messages.map((message) => message.ruleId)).toEqual(["turnpoint/tokens-only"]);
+    expect(messages[0].message).toContain(fix);
+  });
+
+  it.each([
+    "bg-panel text-main border-divider",
+    "#notes-heading",
+    "/player/kr/Faker#123",
+    "Hide on bush#KR1",
+    "&#123;",
+    "text-line-through",
+    "var(--color-main)",
+  ])("passes %s", async (text) => {
+    expect(await turnpointRules(`export const c = "${text}";`, "src/app/x.tsx")).toEqual([]);
+  });
+
+  it("passes a colour in a comment", async () => {
+    const code = "// It's the mockup's #3a3834 in dark, issue #167.\nexport const a = 1;";
+    expect(await turnpointRules(code, "src/app/x.tsx")).toEqual([]);
+  });
+
+  it.each([
+    "src/components/rank-tints.ts",
+    "src/components/icons.tsx",
+    "src/app/player/[region]/[riotId]/match/[matchId]/opengraph-image.tsx",
+    "src/app/x.test.tsx",
+    "scripts/x.ts",
+  ])("lets %s use its own colours", async (filePath) => {
+    expect(await turnpointRules('export const c = "#123456";', filePath)).toEqual([]);
+  });
+
+  it("allows only those files, not the same name in another folder", async () => {
+    expect(await turnpointRules('export const c = "#123456";', "src/app/rank-tints.ts")).toEqual([
+      "turnpoint/tokens-only",
+    ]);
+  });
+});
