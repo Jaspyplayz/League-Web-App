@@ -60,9 +60,11 @@ export async function SeasonChampions({
       dd={dd}
       champions={stats.champions}
       link={
-        <Link href={championsHref} className={allGamesLinkClass}>
-          All {stats.total} games
-        </Link>
+        stats.total > 0 && (
+          <Link href={championsHref} className={allGamesLinkClass}>
+            All {stats.total} games
+          </Link>
+        )
       }
     >
       {stats.loaded < stats.total && (

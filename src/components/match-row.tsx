@@ -47,21 +47,26 @@ export function MatchRow({
   // 7% in light, where the same tint looks stronger. A remake stays plain.
   const tint = m.remake ? "" : m.win ? "bg-ahead/10 light:bg-ahead/7" : "bg-behind/10 light:bg-behind/7";
   const champion = championName(dd, m.championName);
-  const when = `${timeAgo(m.startedAt, now)} · ${formatDuration(m.durationS)}`;
 
   return (
     // `group`, so hovering anywhere on the row lights up its name and chevron.
     // `relative`, so the link's cover below spreads over the whole row.
     <li id={id} className="group relative scroll-mt-4 rounded-md bg-panel">
       <div
-        className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 rounded-md p-3 @xl:grid-cols-[84px_132px_112px_minmax(0,1fr)_18px] @xl:px-3.5 @3xl:grid-cols-[84px_132px_112px_minmax(0,1fr)_192px_18px] ${tint}`}
+        className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 rounded-md p-3 @xl:grid-cols-[76px_124px_112px_minmax(0,1fr)_16px] @xl:px-3.5 @3xl:grid-cols-[76px_124px_112px_minmax(0,1fr)_176px_16px] ${tint}`}
       >
         {/* Every part sits on the first line except the result, which drops
             to a second line on phones and leads the row on wider lists. */}
-        <div className="col-span-3 row-start-2 flex flex-wrap gap-x-2 text-note text-quiet @xl:col-span-1 @xl:row-start-1 @xl:flex-col">
+        <div className="col-span-3 row-start-2 flex flex-wrap gap-x-1.5 text-note text-quiet @xl:col-span-1 @xl:row-start-1 @xl:flex-col">
           <span className={`font-semibold ${resultColor} @xl:text-body`}>{result}</span>
           <span>{m.queue}</span>
-          <span className="tabular-nums">{when}</span>
+          {/* "15d ago · 16:51" on a phone's one line; two lines on wider
+              lists, where the column is narrow. */}
+          <span className="tabular-nums">{timeAgo(m.startedAt, now)}</span>
+          <span className="tabular-nums">
+            <span className="@xl:hidden">· </span>
+            {formatDuration(m.durationS)}
+          </span>
         </div>
 
         <div className="row-start-1 flex min-w-0 items-center gap-2.5">
@@ -85,13 +90,10 @@ export function MatchRow({
           <p className="text-body font-semibold @xl:text-subheading">
             {m.kills} / {m.deaths} / {m.assists}
           </p>
-          <p className="text-note text-quiet">
-            {m.kda.toFixed(1)} KDA
-            {/* No room for CS beside the champion's name on a phone. */}
-            <span className="hidden @xl:inline">
-              {" "}
-              · {m.cs} CS · {m.csPerMin.toFixed(1)}/min
-            </span>
+          <p className="text-note text-quiet">{m.kda.toFixed(1)} KDA</p>
+          {/* No room for CS beside the champion's name on a phone. */}
+          <p className="hidden text-note text-quiet @xl:block">
+            {m.cs} CS · {m.csPerMin.toFixed(1)}/min
           </p>
           {badges.length > 0 && (
             <p className="hidden text-note text-quiet @xl:block">{badges.join(" · ")}</p>

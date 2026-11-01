@@ -52,7 +52,7 @@ function MasteryRow({ mastery, dd }: { mastery: ChampionMastery; dd: DataDragon 
         <p className="truncate font-medium">{championName(dd, id)}</p>
         <p className="text-note text-quiet">
           Level {mastery.championLevel}
-          {marks && ` · ${marks.earned} of ${marks.needed} marks`}
+          {marks && ` · ${marks.earned} of ${marks.needed} ${marks.needed === 1 ? "mark" : "marks"}`}
         </p>
       </div>
       <div className="text-right tabular-nums">
