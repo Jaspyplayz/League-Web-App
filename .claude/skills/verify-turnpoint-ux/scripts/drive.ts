@@ -265,7 +265,10 @@ const journeys: Journey[] = [
         // Click the row's items, not the link's own text, to prove a click
         // anywhere on the row opens the game. A mouse click at that spot,
         // because the row link's cover sits over the items on purpose.
-        const items = await page.getByRole("group", { name: "Items" }).first().boundingBox();
+        const group = page.getByRole("group", { name: "Items" }).first();
+        // A mouse click only lands on screen, so bring the items into view first.
+        await group.scrollIntoViewIfNeeded();
+        const items = await group.boundingBox();
         if (!items) throw new Error("the first row has no items");
         await page.mouse.click(items.x + items.width / 2, items.y + items.height / 2);
         await expect(page).toHaveURL(/\/match\/KR_/, LOAD);
