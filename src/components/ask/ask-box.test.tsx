@@ -72,6 +72,7 @@ describe("AskStatus", () => {
     const html = renderToStaticMarkup(<AskStatus error={null} asking={null} />);
     expect(html).toContain('role="status"');
     expect(html).not.toContain("Reading the games");
-    expect(html.replace(/<[^>]*>/g, "")).toBe("");
+    // No note and no grey answer: the status line is the only thing drawn.
+    expect(html).not.toContain("<div");
   });
 });

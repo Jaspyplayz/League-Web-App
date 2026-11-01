@@ -47,7 +47,13 @@ describe("Replay", () => {
   // the Review board does, not as the old pills.
   it("shows every play's grade as a grade mark", () => {
     const html = renderReplay(null);
-    for (const play of chances.plays) expect(html).toContain(`data-grade="${play.grade}"`);
+    // Grade marks are SVG circles; the timeline's dots are plain spans, so
+    // they can't stand in for the list's marks.
+    const marks = html.match(/<svg[^>]*data-grade="[A-Za-z]+"/g) ?? [];
+    expect(marks.length).toBeGreaterThanOrEqual(chances.plays.length);
+    for (const play of chances.plays) {
+      expect(html).toMatch(new RegExp(`<svg[^>]*data-grade="${play.grade}"`));
+    }
     for (const pill of Object.values(GRADE_CHIP)) expect(html).not.toContain(pill);
   });
 
