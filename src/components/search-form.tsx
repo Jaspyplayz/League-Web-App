@@ -41,9 +41,9 @@ export function usePlayerSearch(errorId: string, startingRiotId = "") {
 
   // Sends the form from here, because React resets a form it sends itself, and
   // that puts the region picker back where it started after a rejected search
-  // (JAS-135). A browser without JavaScript never gets here and uses `action`.
-  // Noting the search lets the profile page tell this player came from one and
-  // add them to Recent.
+  // (JAS-135). A browser without JavaScript, or a page whose scripts haven't
+  // loaded yet, never gets here and uses `action`. Noting the search lets the
+  // profile page tell this player came from one and add them to Recent.
   function sendSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
