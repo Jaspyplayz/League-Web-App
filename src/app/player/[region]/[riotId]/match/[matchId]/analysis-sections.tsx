@@ -199,7 +199,8 @@ export function AnalysisSections({
         />
       )}
 
-      <div className="flex flex-wrap items-start gap-5">
+      {/* Side by side when there's room, Deaths under Team gold on phones. */}
+      <div className="flex flex-wrap items-start gap-6">
         <TeamGold points={a.teamGold} objectives={a.objectives} />
         <Deaths deaths={a.deaths} name={name} />
       </div>
@@ -240,6 +241,7 @@ export function AnalysisSections({
           icon: <ChampionIcon dd={dd} name={p.championName} size={30} className="rounded-md" />,
         }))}
         defaultPlayerId={a.me.participantId}
+        dataDragonFailed={dd === null}
       />
     </>
   );

@@ -8,16 +8,14 @@ const KEYS = ["Q", "W", "E", "R"];
 
 // One player's build in the Build tab: items in the order they were bought,
 // grouped by minute, then the order they levelled their abilities. Runs in
-// the browser because the build is fetched when the tab is first opened.
+// the browser, inside Build and runes' player picker.
 export function BuildView({ build }: { build: Build }) {
-  const maxed = maxOrder(build.skills);
-
   return (
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-2.5">
-        <h4 className="font-mono text-[10px] tracking-[0.1em] text-faint uppercase">Item build</h4>
+        <h4 className="text-note font-semibold">Item build</h4>
         {build.items.length === 0 ? (
-          <p className="text-[13px] text-faint">No items bought.</p>
+          <p className="text-note text-quiet">No items bought.</p>
         ) : (
           <ol className="flex flex-wrap items-start gap-x-1.5 gap-y-3">
             {build.items.map((batch, i) => (
@@ -33,7 +31,7 @@ export function BuildView({ build }: { build: Build }) {
                       <ItemImage key={j} item={item} />
                     ))}
                   </div>
-                  <span className="font-mono text-[10px] text-faint">{batch.minute} min</span>
+                  <span className="text-xs text-quiet tabular-nums">{batch.minute} min</span>
                 </div>
               </li>
             ))}
@@ -41,41 +39,52 @@ export function BuildView({ build }: { build: Build }) {
         )}
       </section>
 
-      <section className="flex flex-col gap-2.5">
-        <h4 className="flex items-center gap-3 font-mono text-[10px] tracking-[0.1em] text-faint uppercase">
-          Skill order
-          {maxed.length > 0 && (
-            <span className="font-sans text-[13px] tracking-normal text-ink-soft normal-case">
-              Max {maxed.map((slot) => KEYS[slot - 1]).join(" > ")}
-            </span>
-          )}
-        </h4>
-        {build.skills.length === 0 ? (
-          <p className="text-[13px] text-faint">No skill data.</p>
-        ) : (
-          <SkillGrid skills={build.skills} />
-        )}
-      </section>
+      <SkillOrder skills={build.skills} />
     </div>
   );
 }
 
+// The order a player levelled their abilities, with which they maxed first.
+// Its own export because it needs no Data Dragon: Build and runes still shows
+// it when the item and rune pictures fail to load.
+export function SkillOrder({ skills }: { skills: number[] }) {
+  const maxed = maxOrder(skills);
+  return (
+    <section className="flex flex-col gap-2.5">
+      <h4 className="flex items-center gap-3 text-note font-semibold">
+        Skill order
+        {maxed.length > 0 && (
+          <span className="font-normal text-quiet">
+            Max {maxed.map((slot) => KEYS[slot - 1]).join(" > ")}
+          </span>
+        )}
+      </h4>
+      {skills.length === 0 ? (
+        <p className="text-note text-quiet">No skill data.</p>
+      ) : (
+        <SkillGrid skills={skills} />
+      )}
+    </section>
+  );
+}
+
 // A row per ability and a column per level-up, like op.gg: the cell for the
-// ability taken at that level shows the level number.
+// ability taken at that level shows the level number. Those cells are in the
+// text colour, not blue, because this can be any player's build.
 function SkillGrid({ skills }: { skills: number[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="border-separate border-spacing-0.5 font-mono text-[11px]">
+      <table className="border-separate border-spacing-0.5 text-xs tabular-nums">
         <tbody>
           {KEYS.map((key, row) => (
             <tr key={key}>
-              <th scope="row" className="w-5 pr-1 text-left font-semibold text-ink-soft">
+              <th scope="row" className="w-5 pr-1 text-left font-semibold">
                 {key}
               </th>
               {skills.map((slot, level) => (
                 <td
                   key={level}
-                  className={`size-5 rounded-[4px] text-center ${slot === row + 1 ? "bg-ahead text-page" : "bg-line"}`}
+                  className={`size-5 rounded-sm text-center ${slot === row + 1 ? "bg-main text-page" : "bg-raised"}`}
                 >
                   {slot === row + 1 ? level + 1 : ""}
                 </td>
@@ -90,7 +99,7 @@ function SkillGrid({ skills }: { skills: number[] }) {
 
 function ItemImage({ item }: { item: BuildItem }) {
   if (!item.iconUrl) {
-    return <div title={item.name} className="size-6 shrink-0 rounded bg-line" />;
+    return <div title={item.name} className="size-6 shrink-0 rounded-sm bg-raised" />;
   }
   // Same as ItemIcon: Data Dragon serves small PNGs, so skip the optimizer.
   return (
@@ -101,7 +110,7 @@ function ItemImage({ item }: { item: BuildItem }) {
       width={24}
       height={24}
       unoptimized
-      className="shrink-0 rounded bg-line"
+      className="shrink-0 rounded-sm bg-raised"
     />
   );
 }

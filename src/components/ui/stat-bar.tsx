@@ -19,7 +19,9 @@ export function StatBar({
 }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
-    <div className={`relative h-5 min-w-0 flex-1 overflow-hidden rounded bg-line ${className}`}>
+    <div
+      className={`relative h-5 min-w-0 flex-1 overflow-hidden rounded-sm bg-divider ${className}`}
+    >
       <div
         className={`h-full ${tone === "ahead" ? "bg-ahead" : "bg-behind"}`}
         style={{ width: `${pct}%` }}
@@ -27,7 +29,7 @@ export function StatBar({
       {/* A see-through backdrop in the page color keeps the number readable
           where it sits on top of the bar, in both themes. */}
       <span className="absolute inset-y-0 right-1 flex items-center">
-        <span className="rounded-sm bg-page/75 px-1 font-mono text-xs leading-4 text-ink">
+        <span className="rounded-sm bg-page/75 px-1 text-xs leading-4 text-main tabular-nums">
           {label}
         </span>
       </span>

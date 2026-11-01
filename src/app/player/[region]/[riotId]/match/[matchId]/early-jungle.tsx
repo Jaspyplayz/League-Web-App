@@ -6,7 +6,7 @@ import { GANKS_HELP, GankLists, gankSummary } from "./ganks";
 import { HowToRead } from "./how-to-read";
 import { PATHING_HELP, PathingGrid, pathingSummary } from "./pathing";
 
-// "Early jungle" on the Deep dive tab, for junglers: one line on the early
+// "Early jungle" on the Stats tab, for junglers: one line on the early
 // game, then early pathing on the left and both junglers' early ganks on the
 // right. What the grid and lists mean sits behind "How to read this". It
 // used to be two panels, Early pathing and Early ganks, each with its own
@@ -39,7 +39,7 @@ export function EarlyJungle({
         {path && <p>{PATHING_HELP}</p>}
         {gankLog && <p>{GANKS_HELP}</p>}
       </HowToRead>
-      <p className="text-body text-ink-soft">{summary.join(" ")}</p>
+      <p className="text-body">{summary.join(" ")}</p>
       <div
         className={`grid gap-x-8 gap-y-6 ${path && gankLog ? "lg:grid-cols-[minmax(0,5fr)_minmax(0,4fr)]" : ""}`}
       >
