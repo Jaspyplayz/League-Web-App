@@ -31,6 +31,10 @@ type Props = {
   // picture, the minute labels only under the bottom one, and lines at every
   // 10 minutes so the eye can follow a moment from one chart to the other.
   domain?: MinuteDomain;
+  // The picture's size in chart units. It's drawn at the width it's given,
+  // so a wider box with the same height makes a flatter chart with the same
+  // size text: home's chart (fitted-diff-chart.tsx) sets both from its box.
+  width?: number;
   height?: number;
   minuteLabels?: boolean;
   minuteLines?: boolean;
@@ -48,12 +52,14 @@ export function DiffChart({
   range,
   formatTick = formatDiff,
   domain,
+  width: boxWidth = DEFAULT_BOX.width,
   height: boxHeight = DEFAULT_BOX.height,
   minuteLabels = true,
   minuteLines = false,
 }: Props) {
   const box = {
     ...DEFAULT_BOX,
+    width: boxWidth,
     height: boxHeight,
     // Without minute labels underneath, the space kept for them isn't needed.
     bottom: minuteLabels ? DEFAULT_BOX.bottom : 24,
@@ -71,9 +77,9 @@ export function DiffChart({
       width="100%"
       role="img"
       aria-label={description}
-      className="block font-mono"
+      className="block tabular-nums"
     >
-      <g stroke="var(--color-line-strong)" strokeWidth="1.5" strokeDasharray="4 6">
+      <g stroke="var(--color-divider)" strokeWidth="1.5" strokeDasharray="4 6">
         {chart.yTicks
           .filter((v) => v !== 0)
           .map((v) => (
@@ -81,13 +87,13 @@ export function DiffChart({
           ))}
       </g>
       {minuteLines && (
-        <g stroke="var(--color-line)" strokeWidth="1.5">
+        <g stroke="var(--color-divider)" strokeWidth="1.5">
           {chart.xTicks.map((m) => (
             <line key={m} x1={chart.x(m)} x2={chart.x(m)} y1={top} y2={height - bottom} />
           ))}
         </g>
       )}
-      <g fontSize="22" fill="var(--color-faint)" textAnchor="end">
+      <g fontSize="22" fill="var(--color-quiet)" textAnchor="end">
         {chart.yTicks.map((v) => (
           <text key={v} x={left - 12} y={chart.y(v) + 7}>
             {formatTick(v)}
@@ -102,13 +108,13 @@ export function DiffChart({
         x2={width - right}
         y1={chart.zeroY}
         y2={chart.zeroY}
-        stroke="var(--color-faint)"
+        stroke="var(--color-quiet)"
         strokeWidth="1.5"
       />
       <path
         d={chart.line}
         fill="none"
-        stroke="var(--color-ink)"
+        stroke="var(--color-main)"
         strokeWidth="3"
         strokeLinejoin="round"
       />
@@ -137,7 +143,7 @@ export function DiffChart({
       </g>
 
       {minuteLabels && (
-        <g fontSize="22" fill="var(--color-faint)" textAnchor="middle">
+        <g fontSize="22" fill="var(--color-quiet)" textAnchor="middle">
           {chart.xTicks.map((m, i) => {
             const isLast = i === chart.xTicks.length - 1;
             // Keep the last label ("30 min") inside the picture at the right edge.

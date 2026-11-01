@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { panelClass } from "@/components/ui/panel";
+import { mainButtonClass, ProblemPanel } from "@/components/ui/state-panel";
 import {
   afterBatch,
   mergeCounts,
@@ -88,15 +89,11 @@ export function AnalysisProgress({
 
   const pct = shown.total > 0 ? (shown.analyzed / shown.total) * 100 : 0;
 
-  return (
-    <div role="status" className={`${panelClass} flex flex-col gap-3 px-5 py-4`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="font-semibold">
-          {stalled
-            ? `Riot isn't sending the rest of ${whose} right now`
-            : `Analyzing ${whose}: ${shown.analyzed} of ${shown.total} done`}
-        </p>
-        {stalled && (
+  if (stalled) {
+    return (
+      <ProblemPanel
+        title={`Riot isn't sending the rest of ${whose} right now`}
+        actions={
           <button
             type="button"
             onClick={() => {
@@ -104,19 +101,34 @@ export function AnalysisProgress({
               setHoldMs(0);
               setAttempt((n) => n + 1);
             }}
-            className="soft-round-sm min-h-10 border border-line-strong px-3.5 text-sm hover:bg-line"
+            className={mainButtonClass}
           >
             Try again
           </button>
-        )}
+        }
+      >
+        <p>
+          {shown.analyzed} of {shown.total} are analyzed so far. This is usually brief.
+        </p>
+      </ProblemPanel>
+    );
+  }
+
+  return (
+    <div role="status" className={`${panelClass} flex flex-col gap-2.5 px-5 py-4`}>
+      <p className="text-body font-semibold">
+        Analyzing {whose}: {shown.analyzed} of {shown.total} done
+      </p>
+      {/* In the text colour, not blue: blue means you or ahead. */}
+      <div className="h-1.5 rounded-sm bg-raised" aria-hidden="true">
+        <div
+          className="h-1.5 rounded-sm bg-main transition-all motion-reduce:transition-none"
+          style={{ width: `${pct}%` }}
+        />
       </div>
-      <div className="h-1.5 rounded-sm bg-line" aria-hidden="true">
-        <div className="h-1.5 rounded-sm bg-ahead transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="text-sm text-muted">
-        {stalled
-          ? "The insights below use the games analyzed so far."
-          : "Each game's minute-by-minute timeline comes from Riot once, then it's saved. Your trends fill in as games come in."}
+      <p className="text-note text-quiet">
+        Each game&apos;s minute-by-minute timeline comes from Riot once, then it&apos;s saved. Your
+        trends fill in as games come in.
       </p>
     </div>
   );

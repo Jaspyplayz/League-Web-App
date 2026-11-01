@@ -25,11 +25,11 @@ test.afterEach(async ({ page }, testInfo) => {
 
 test("search a player and see their profile", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint");
 
   await page.getByLabel("Riot ID").fill("Hide on bush#KR1");
   await page.getByLabel("Region").selectOption("kr");
-  await page.getByRole("button", { name: "Analyze" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Search", exact: true }).click();
   await expect(page).toHaveURL(/\/player\/kr\/Hide%20on%20bush-KR1/);
 
   // Wait for either the profile or the expired-key notice, whichever comes.
@@ -49,10 +49,11 @@ test("search a player and see their profile", async ({ page }) => {
 });
 
 // The sample game is served from the database, so unlike the search above it
-// must work even when the Riot key has expired.
+// must work even when the Riot key has expired. Home's chart opens it too;
+// `exact` keeps this to the button.
 test("open the sample analysis", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page).toHaveURL(/\/match\/KR_/);
   await expect(page.getByRole("region", { name: "Match summary" })).toContainText(
     "Victory",
@@ -82,14 +83,14 @@ test("switch to light mode from the header", async ({ page }) => {
 test("send the old Settings page home", async ({ page }) => {
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find the minute");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint");
 });
 
 // Every page but home has a search in the header. Reaching the player's
 // address is enough here, so this passes even with an expired Riot key.
 test("search a player from the header on a match page", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "See a sample analysis" }).click();
+  await page.getByRole("link", { name: "Open this game", exact: true }).click();
   await expect(page).toHaveURL(/\/match\/KR_/);
   const search = page.getByRole("search", { name: "Search a player" });
   // On a KR player's page the region starts on KR.
