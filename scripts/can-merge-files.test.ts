@@ -80,6 +80,7 @@ describe("changedLines and reviewHistory", () => {
     // Windows can't make a file with a tab in its name, so it goes straight
     // into git's index instead of onto the disk, with Git for Windows' guard
     // against such names turned off for this one call. Git stores it the same way.
+    // The file exists only in the index, so a later commit() would delete it.
     const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
       cwd: repo,
       input: "export const t = 1;\n".repeat(3),

@@ -68,7 +68,7 @@ test.describe("JAS-20 key surfaces", () => {
     await page.getByRole("tab", { name: "Replay" }).click();
     await expect(page.getByRole("heading", { name: "Replay", exact: true })).toBeVisible();
     await rejectStandIns(page);
-    await shot(page, "04-match-deep-dive");
+    await shot(page, "04-match-replay");
   });
 
   test("insights overview", async ({ page }) => {
