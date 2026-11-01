@@ -128,6 +128,30 @@ describe("the board", () => {
     expect(html).toContain("Your team&#x27;s chance to win: 73%");
   });
 
+  describe("the step buttons for screens where close marks overlap", () => {
+    const disabled = (html: string, name: string) =>
+      new RegExp(`<button[^>]*disabled=""[^>]*>${name}<`).test(html);
+
+    it("can't go past the last play, where the board opens here", () => {
+      const html = board();
+      expect(disabled(html, "Previous play")).toBe(false);
+      expect(disabled(html, "Next play")).toBe(true);
+    });
+
+    it("can't go before the first play", () => {
+      const html = board({
+        chances: { perSecond: PER_SECOND, plays: [PLAYS[2], PLAYS[0]] },
+      });
+      expect(disabled(html, "Previous play")).toBe(true);
+      expect(disabled(html, "Next play")).toBe(false);
+    });
+
+    it("aren't there with no plays to step through", () => {
+      const html = board({ chances: { perSecond: PER_SECOND, plays: [] } });
+      expect(html).not.toContain("Previous play");
+    });
+  });
+
   it("says so under the strip when the game had no big moments", () => {
     const html = board({ quiet: ["No single minute moved the win chance much."] });
     expect(html).toContain("No single minute moved the win chance much.");
