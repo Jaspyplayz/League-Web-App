@@ -457,6 +457,50 @@ describe("a ticket can't start twice", () => {
     }
   });
 
+  it("never moves or starts a Todo blocker whose PR is finished, and says why in Linear's words", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1", { blockedBy: ["JAS-9"] }), issue("JAS-9", { status: "Todo" })],
+      pulls: [pull(50, "claude/jas-9-x", "**Ready to merge:** no: Jasper merges this one by hand.")],
+      files: { 50: [{ filename: "src/JAS-9.ts" }] },
+    });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.promote).toEqual([]);
+    expect(plan.start).toEqual([]);
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([["JAS-1", ["It waits for JAS-9, whose builder has finished its PR, which waits to merge."]]]);
+  });
+
+  it("gives no slot to a ticket the queue started under 2 hours ago once its builder finished", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1"), issue("JAS-2"), issue("JAS-3"), issue("JAS-4"), issue("JAS-5")],
+      comments: { "JAS-5": [comment("c5", `${START_LINE}\n\n${RUN}`, STARTED_30_MIN_AGO)] },
+      pulls: [pull(9, "claude/jas-5-x", "**Ready to merge:** no: Jasper merges this one by hand.")],
+      files: { 9: [{ filename: "src/JAS-5.ts" }] },
+    });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.running).toEqual([]);
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-1", "JAS-2", "JAS-3", "JAS-4"]);
+  });
+
+  it("still counts a builder running while one of its PRs is open and not finished", () => {
+    const read = snapshot({
+      issues: [issue("JAS-5")],
+      pulls: [pull(9, "claude/jas-5-x", "**Ready to merge:** no: Jasper merges this one by hand."), pull(10, "claude/jas-5-y")],
+      files: { 9: [{ filename: "src/JAS-5.ts" }], 10: [{ filename: "src/JAS-5.ts" }] },
+    });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.running).toEqual([{ id: "JAS-5", why: "its PR 10 is open and isn't marked ready or left for Jasper" }]);
+    expect(plan.notes).toEqual([]);
+  });
+
+  it("says in the run's summary why a Ready ticket with a finished PR doesn't start", async () => {
+    const read = snapshot({ issues: [issue("JAS-5")], pulls: [pull(9, "claude/jas-5-x", "**Ready to merge:** yes at 4d2a4fe")], files: { 9: [{ filename: "src/JAS-5.ts" }] } });
+    const { effects, lines } = dryEffects();
+    await runRound(planRound(read, AT_0630, RUN), { dryRun: true }, effects);
+    expect(lines).toContain("Note: JAS-5's builder has finished PR 9, though Linear still has it Ready, so the queue treats it as In Review.");
+    expect(lines).toContain("No ticket starts this round.");
+    expect(lines.join("\n")).not.toContain("no ticket is Ready");
+  });
+
   it("counts no builder on a finished ticket, even with an old PR still open", () => {
     const read = snapshot({
       issues: [issue("JAS-1", { blockedBy: ["JAS-9"] }), issue("JAS-9", { status: "Canceled", description: "No Touches line." })],

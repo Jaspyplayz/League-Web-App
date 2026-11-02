@@ -308,8 +308,8 @@ export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why
     const id = issue.identifier;
     // A finished ticket has no builder, even with an old PR left open.
     if (FINISHED.includes(issue.state.name)) continue;
-    // A builder still working on any of its PRs is still running, whatever the
-    // ticket's status: one whose Linear writes failed leaves it Ready, and the
+    // A builder still working on any of its PRs is still running, in any
+    // unfinished status: one whose Linear writes failed leaves it Ready, and the
     // picker doesn't count a ticket's own PR as a clash, so a second builder
     // would start. One with no open PR has merged or closed it, and Linear
     // hasn't caught up.
@@ -467,9 +467,10 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   // would start a second builder. The picker sees it as In Review instead, so
   // it never starts and takes no slot, as decision record 0026 says a
   // finished PR doesn't, while that PR's files stay held.
-  const finishedEarly = snapshot.issues.filter(
-    (issue) => inTurnpoint(issue) && BEFORE_BUILDER.includes(issue.state.name) && prsOf(snapshot, issue.identifier).length > 0 && prsOf(snapshot, issue.identifier).every(builderDone),
-  );
+  const finishedEarly = snapshot.issues.filter((issue) => {
+    const prs = prsOf(snapshot, issue.identifier);
+    return inTurnpoint(issue) && BEFORE_BUILDER.includes(issue.state.name) && prs.length > 0 && prs.every(builderDone);
+  });
   const tickets = snapshot.issues.map((issue): Ticket => {
     const ticket = toTicket(issue, snapshot.viewerId);
     return finishedEarly.includes(issue) ? { ...ticket, status: "In Review" } : ticket;
@@ -495,11 +496,17 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
     ...[...new Set(named.filter((id) => foreign.has(id)))].map((id) => `${id} isn't in project ${PROJECT}, so the queue doesn't move, start or comment on it.`),
   ];
   const promote = picks.promote.filter((promotion) => !foreign.has(promotion.id));
-  const unmoved = new Map(
-    picks.promote
+  // The picker's words for a blocker the queue won't move, or one it sees as
+  // In Review while Linear still shows it unstarted, put in what's true.
+  const unmoved = new Map([
+    ...picks.promote
       .filter((promotion) => foreign.has(promotion.id))
-      .map(({ id }) => [`It waits for ${id}, which moves to Ready now.`, `It waits for ${id}, which is in another project, so the queue doesn't move it.`]),
-  );
+      .map(({ id }): [string, string] => [`It waits for ${id}, which moves to Ready now.`, `It waits for ${id}, which is in another project, so the queue doesn't move it.`]),
+    ...finishedEarly.map(({ identifier: id }): [string, string] => [
+      `It waits for ${id}, which is In Review.`,
+      `It waits for ${id}, whose builder has finished its PR, which waits to merge.`,
+    ]),
+  ]);
   let start = picks.start.filter((id) => !foreign.has(id));
   const waits = picks.waits
     .filter((wait) => !foreign.has(wait.id))
@@ -621,7 +628,7 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
   if (plan.running.length === 0) summary("No ticket has a builder running.");
   else summary(`${plan.running.length === 1 ? "1 ticket has" : `${plan.running.length} tickets have`} a builder running:`);
   for (const { id, why } of plan.running) summary(`- ${id}: ${why}.`);
-  for (const note of plan.notes) log(`Note: ${note}`);
+  for (const note of plan.notes) summary(`Note: ${note}`);
 
   for (const { id, uuid, priority, moveToReady, body } of plan.promote) {
     if (dryRun) {
@@ -634,7 +641,8 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
   }
 
   if (plan.start.length === 0) {
-    summary(plan.waits.length === 0 ? "No ticket starts this round, since no ticket is Ready." : "No ticket starts this round. Each Ready ticket's reasons are below.");
+    if (plan.waits.length > 0) summary("No ticket starts this round. Each Ready ticket's reasons are below.");
+    else summary(plan.notes.length === 0 ? "No ticket starts this round, since no ticket is Ready." : "No ticket starts this round.");
   }
   let failed = false;
   let stop = ""; // why nothing else starts this round, once something has gone wrong
