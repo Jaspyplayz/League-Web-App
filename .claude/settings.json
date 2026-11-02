@@ -16,7 +16,12 @@
       "Bash(git -C * push *--force*)",
       "Bash(git -C * push -f*)",
       "Bash(git -C * push * -f*)",
-      "Bash(git -C * push * +*)"
+      "Bash(git -C * push * +*)",
+      "Bash(npm *db:migrate*)",
+      "Bash(*drizzle-kit migrate*)",
+      "Bash(*drizzle-kit push*)",
+      "Bash(*remap-puuids*--apply*)",
+      "Bash(*remap-puuids*--rollback*)"
     ]
   },
   "hooks": {
