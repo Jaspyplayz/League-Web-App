@@ -11,7 +11,9 @@ import { waitTimeFor } from "@/lib/riot/rate-limit-store";
 // src/app/account/actions.ts). So what's left of maxDuration has to cover
 // that lookup at its slowest, plus the sign-in check and saving the cost.
 // This times the real Riot client with Riot not answering and the rate limit
-// full, so a longer timeout, another retry or a longer wait there fails here.
+// full, so a longer Riot timeout or another retry fails here. The waits for a
+// turn, and how long each rate-limit check takes, come from the mock below,
+// so a longer cap on waiting (MAX_WAIT_MS in client.ts) doesn't.
 
 vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
@@ -38,9 +40,9 @@ beforeEach(() => {
         new Promise((_, reject) => init.signal?.addEventListener("abort", () => reject(init.signal?.reason))),
     ),
   );
-  // The shared rate limit is full. Each check takes up to a second (the
-  // store gives up on the database after that) and says to wait a second,
-  // twice, before it lets the request go.
+  // The shared rate limit is full. Each check takes a second (the store gives
+  // up on the database after that) and says to wait a second, twice, before
+  // it lets the request go: two seconds of waiting, the client's cap today.
   let check = 0;
   vi.mocked(waitTimeFor).mockImplementation(
     () => new Promise((resolve) => setTimeout(() => resolve([1000, 1000, 0][check++ % 3]), 1000)),
