@@ -71,13 +71,32 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   { pattern: ".claude/", why: "Claude Code's own setup, which steers every agent here" },
 ];
 
-// Inside JASPERS_PATHS, but Claude merges these after the panel, like
-// PANEL_PATHS. Most redesign PRs update the verify skill's feature notes, so
-// Jasper chose to let them go (2026-11-01). Only Markdown notes directly in the
-// folder: a script could be run by the skill, a subfolder could hold a skill
-// of its own, the README says what counts as a pass, and a CLAUDE, AGENTS or
-// SKILL file would steer agents rather than note a feature.
-export const FEATURE_NOTE = /^\.claude\/skills\/verify-turnpoint-ux\/features\/(?!(?:readme|claude|agents|skill)[^/]*\.md$)[^/]+\.md$/i;
+// Inside JASPERS_PATHS, but Claude merges their Markdown after the panel, like
+// PANEL_PATHS (JAS-146, decision record 0028). Most redesign PRs update the
+// verify skills, so Jasper chose to let them go (2026-11-01). Agents follow
+// them, so they still get the panel and the reviewer, and risky-paths.test.ts
+// keeps each SKILL.md to its name and a description, since one could otherwise
+// grant tools, add hooks or run commands.
+export const PANEL_SKILLS: readonly string[] = ["verify", "verify-turnpoint", "verify-turnpoint-ux", "postmortem"];
+const SKILL_CREDITS = ".claude/skills/THIRD-PARTY-NOTICES.md";
+
+// Markdown directly in a listed skill's folder or its features/ folder. Exact
+// capitals, and no backslash, which Windows reads as a folder break, so a path
+// that could reach another skill stays Jasper's.
+const PANEL_SKILL_FILE = new RegExp(`^\\.claude/skills/(?:${PANEL_SKILLS.join("|")})/(features/)?([^/\\\\]+\\.md)$`);
+
+function isPanelSkillFile(path: string): boolean {
+  const match = PANEL_SKILL_FILE.exec(path);
+  if (!match) return false;
+  const [, features, name] = match;
+  // A CLAUDE or AGENTS file would steer every agent working in the folder.
+  if (/^(claude|agents)/i.test(name)) return false;
+  // Only the skill's own SKILL.md, spelled exactly so: a skill.md beside it
+  // would replace it on Windows or a Mac, and one in features/ could become a
+  // skill of its own.
+  if (/^skill/i.test(name)) return !features && name === "SKILL.md";
+  return true;
+}
 
 export const PANEL_PATHS: readonly RiskyPath[] = [
   // The risky row of docs/workflow.md's tier table.
@@ -144,7 +163,8 @@ type Owner = { why: string; jaspers: boolean };
 // panel pattern that also matches, such as src/db/schema.ts inside src/db/.
 function owner(path: string): Owner | undefined {
   if (NESTED_AGENT_CONFIG.test(path)) return { why: "agent skills or rules below the repo root", jaspers: true };
-  if (FEATURE_NOTE.test(path)) return { why: "the verify skill's feature notes, which agents follow", jaspers: false };
+  if (path === SKILL_CREDITS) return { why: "credits for the copied skills", jaspers: false };
+  if (isPanelSkillFile(path)) return { why: "the verify and postmortem skills, which agents follow", jaspers: false };
   const jaspers = JASPERS_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
   if (jaspers) return { why: jaspers.why, jaspers: true };
   const panel = PANEL_PATHS.find(({ pattern }) => matchesPattern(pattern, path));

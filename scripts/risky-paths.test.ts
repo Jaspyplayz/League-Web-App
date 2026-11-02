@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
-import { FEATURE_NOTE, jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, riskyFiles } from "./risky-paths";
+import { jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, PANEL_SKILLS, riskyFiles } from "./risky-paths";
 
 const RISKY_PATHS = [...JASPERS_PATHS, ...PANEL_PATHS];
 
@@ -52,6 +52,14 @@ function mustBeListed(file: string, source: string): boolean {
 }
 
 const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !/\.test\./.test(file);
+
+// A SKILL.md whose frontmatter is only its folder's name and a one-line
+// description, with no shell command for Claude Code to run as it loads: a !
+// before a backtick at a line's start or after a space, or a block opening ```!.
+function isPlainSkill(folder: string, text: string): boolean {
+  const frontmatter = new RegExp(`^---\\r?\\nname: ${folder}\\r?\\ndescription: [^\\r\\n]+\\r?\\n---\\r?\\n`);
+  return frontmatter.test(text) && !/(?:^|\s)!`|^\s*`{3,}!/m.test(text);
+}
 
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
@@ -171,7 +179,7 @@ describe("riskyFiles", () => {
       ".claude/settings.json",
       ".claude/hooks/check-before-commit.mjs",
       ".claude/agents/reviewer.md",
-      ".claude/skills/verify-turnpoint-ux/SKILL.md",
+      ".claude/skills/code-review-and-quality/SKILL.md",
       ".claude/rules/design.md",
       ".claude/agent-merge.json",
       ".cursor/rules/x.mdc",
@@ -238,28 +246,168 @@ describe("riskyFiles", () => {
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
-  // Most redesign PRs update the verify skill's feature notes, so Jasper chose
-  // to let Claude merge them; the skill itself stays his (JAS-128). Agents
-  // follow the notes, so they still get the panel.
-  it("lets Claude merge the verify skill's feature notes after the panel, and nothing else in .claude/skills/", () => {
-    const notes = [".claude/skills/verify-turnpoint-ux/features/review-path.md", ".claude/skills/verify-turnpoint-ux/Features/x.md"];
-    expect(jaspersFiles(notes)).toEqual([]);
-    expect(riskyFiles(notes)).toEqual(notes.map((path) => ({ path, why: "the verify skill's feature notes, which agents follow" })));
-    const still = [
-      ".claude/skills/verify-turnpoint-ux/SKILL.md",
-      ".claude/skills/verify-turnpoint-ux/scripts/drive.ts",
-      ".claude/skills/verify-turnpoint-ux/features/drive.ts",
-      ".claude/skills/verify-turnpoint-ux/features/.claude/rules/x.md",
-      ".claude/skills/verify-turnpoint-ux/features/deep/SKILL.md",
-      ".claude/skills/verify-turnpoint-ux/features/README.md",
-      ".claude/skills/verify-turnpoint-ux/features/CLAUDE.md",
-      ".claude/skills/verify-turnpoint-ux/features/CLAUDE.local.md",
-      ".claude/skills/verify-turnpoint-ux/features/AGENTS.md",
-      ".claude/skills/verify-turnpoint-ux/features/SKILL.md",
+  // Most redesign PRs update the verify skills, so Jasper chose to let Claude
+  // merge their Markdown, and the postmortem skill's and the skills' credits
+  // (JAS-146). Agents follow them, so they still get the panel and the reviewer.
+  it("lets Claude merge Markdown in the verify and postmortem skills, and the skills' credits, after the panel", () => {
+    const skills = [
+      ".claude/skills/verify/SKILL.md",
+      ".claude/skills/verify/features/match-page.md",
+      ".claude/skills/verify/features/README.md",
+      ".claude/skills/verify-turnpoint/SKILL.md",
       ".claude/skills/verify-turnpoint/features/ask-teaser.md",
-      "src/.claude/skills/verify-turnpoint-ux/features/x.md",
+      ".claude/skills/verify-turnpoint-ux/SKILL.md",
+      ".claude/skills/verify-turnpoint-ux/README.md",
+      ".claude/skills/verify-turnpoint-ux/features/review-path.md",
+      ".claude/skills/postmortem/SKILL.md",
+      ".claude/skills/postmortem/fix-ladder.md",
     ];
-    expect(jaspersFiles(still).map((file) => file.path)).toEqual(still);
+    const credits = ".claude/skills/THIRD-PARTY-NOTICES.md";
+    expect(jaspersFiles([...skills, credits])).toEqual([]);
+    expect(riskyFiles([...skills, credits])).toEqual([
+      ...skills.map((path) => ({ path, why: "the verify and postmortem skills, which agents follow" })),
+      { path: credits, why: "credits for the copied skills" },
+    ]);
+  });
+
+  // A script could be run by the skill, and Claude Code runs no other kind of
+  // file in it, so only Markdown gets the exemption.
+  it("keeps scripts and other files that aren't Markdown in those skills Jasper's", () => {
+    const paths = [
+      ".claude/skills/verify-turnpoint-ux/scripts/drive.ts",
+      ".claude/skills/verify-turnpoint/scripts/target.test.ts",
+      ".claude/skills/verify/features/drive.ts",
+      ".claude/skills/postmortem/log.sh",
+      ".claude/skills/verify/settings.json",
+      ".claude/skills/verify/notes.mdx",
+      ".claude/skills/verify/features/x.mdc",
+    ];
+    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // Claude Code loads a CLAUDE file from any folder it reads, and other tools
+  // load an AGENTS file the same way, so either would steer every agent there.
+  it("keeps CLAUDE and AGENTS files in those skills Jasper's", () => {
+    const paths = [
+      ".claude/skills/verify/CLAUDE.md",
+      ".claude/skills/verify/CLAUDE.local.md",
+      ".claude/skills/postmortem/AGENTS.md",
+      ".claude/skills/verify-turnpoint/claude.md",
+      ".claude/skills/verify-turnpoint-ux/features/CLAUDE.md",
+      ".claude/skills/verify-turnpoint-ux/features/Agents.md",
+    ];
+    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // A .claude/ folder there would load its own skills and rules, and a
+  // SKILL.md one level down could become a skill of its own.
+  it("keeps a .claude/ folder, or a skill nested inside those skills, Jasper's", () => {
+    const paths = [
+      ".claude/skills/verify/.claude/rules/x.md",
+      ".claude/skills/verify-turnpoint-ux/features/.claude/skills/x/SKILL.md",
+      ".claude/skills/verify/nested/SKILL.md",
+      ".claude/skills/verify/features/SKILL.md",
+      ".claude/skills/verify/features/deep/SKILL.md",
+      ".claude/skills/verify/features/deep/notes.md",
+      ".claude/skills/postmortem/references/fix-ladder.md",
+      "src/.claude/skills/verify/SKILL.md",
+    ];
+    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // The reviewer loads code-review-and-quality, and the others below when a
+  // diff needs them; interrogate runs the panel and poteto-mode picks how work
+  // is done. Every file in every other skill folder stays Jasper's too.
+  it("keeps every other skill Jasper's, including the reviewer's, interrogate and poteto-mode", () => {
+    const named = [
+      ".claude/skills/code-review-and-quality/SKILL.md",
+      ".claude/skills/security-and-hardening/SKILL.md",
+      ".claude/skills/supabase-postgres-best-practices/SKILL.md",
+      ".claude/skills/frontend-ui-engineering/SKILL.md",
+      ".claude/skills/test-driven-development/SKILL.md",
+      ".claude/skills/interrogate/SKILL.md",
+      ".claude/skills/poteto-mode/SKILL.md",
+      ".claude/skills/pstack-manifest.txt",
+    ];
+    expect(jaspersFiles(named).map((file) => file.path)).toEqual(named);
+    const others = repoFiles.filter(
+      (file) =>
+        file.startsWith(".claude/skills/") &&
+        file !== ".claude/skills/THIRD-PARTY-NOTICES.md" &&
+        !PANEL_SKILLS.some((skill) => file.startsWith(`.claude/skills/${skill}/`)),
+    );
+    expect(others.length).toBeGreaterThan(100);
+    expect(jaspersFiles(others).map((file) => file.path)).toEqual(others);
+  });
+
+  // A name that starts like a listed one, or the explain-back skill PR 220
+  // deleted, would be a skill nobody has reviewed.
+  it("keeps a brand-new skill folder Jasper's", () => {
+    const paths = [
+      ".claude/skills/new-skill/SKILL.md",
+      ".claude/skills/explain-back/SKILL.md",
+      ".claude/skills/verify-extra/SKILL.md",
+      ".claude/skills/verify-turnpoint-ux2/features/x.md",
+      ".claude/skills/postmortem-old/SKILL.md",
+      ".claude/skills/x.md",
+    ];
+    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
+  });
+
+  // ".." could step into another skill, other capitals on Linux are another
+  // folder (a new skill), and Windows reads a backslash as a folder break. A
+  // skill.md beside the SKILL.md would replace it on Windows or a Mac.
+  it.each([
+    ".claude/skills/verify/../interrogate/SKILL.md",
+    ".claude/skills/verify/features/../../code-review-and-quality/SKILL.md",
+    ".claude/skills/../skills/verify/SKILL.md",
+    ".claude/skills/Verify/SKILL.md",
+    ".claude/skills/VERIFY-TURNPOINT/features/x.md",
+    ".claude/Skills/verify/SKILL.md",
+    ".Claude/skills/verify/SKILL.md",
+    ".claude/skills/verify/Features/x.md",
+    ".claude/skills/verify/SKILL.MD",
+    ".claude/skills/verify/skill.md",
+    ".claude/skills/verify/features/x.MD",
+    ".claude/skills/third-party-notices.md",
+    ".claude/skills/verify/a\\..\\..\\interrogate\\SKILL.md",
+    ".claude/skills/verify/features\\..\\..\\interrogate\\SKILL.md",
+    ".claude/skills/verify\\SKILL.md",
+  ])("keeps %s Jasper's, which tries to step around the exemption", (path) => {
+    expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
+  });
+
+  // A SKILL.md can grant tools without asking (allowed-tools), add hooks for
+  // the rest of the session, run as another agent, or run shell commands as it
+  // loads (!`cmd` or a ```! block), which a script could do too. Its name could
+  // take another skill's, such as the reviewer's. This file is Jasper's, so a
+  // listed skill that wants any of that waits for him.
+  it.each(PANEL_SKILLS)("keeps the %s skill's SKILL.md to its own name and a description, with no command", (skill) => {
+    expect(isPlainSkill(skill, readFileSync(`.claude/skills/${skill}/SKILL.md`, "utf8"))).toBe(true);
+  });
+
+  it.each([
+    ["no description", "---\nname: verify\n---\nBody\n"],
+    ["another skill's name", "---\nname: code-review-and-quality\ndescription: Review.\n---\nBody\n"],
+    ["tools granted", "---\nname: verify\ndescription: Shots.\nallowed-tools: Bash\n---\nBody\n"],
+    ["hooks", "---\nname: verify\ndescription: Shots.\nhooks:\n  Stop: []\n---\nBody\n"],
+    ["a fork into another agent", "---\nname: verify\ndescription: Shots.\ncontext: fork\nagent: reviewer\n---\nBody\n"],
+    ["a description over two lines", "---\nname: verify\ndescription: >\n  Shots.\n---\nBody\n"],
+    ["an inline command", "---\nname: verify\ndescription: Shots.\n---\nBranch: !`git branch`\n"],
+    ["an inline command starting a line", "---\nname: verify\ndescription: Shots.\n---\n!`git branch`\n"],
+    ["a command block", "---\nname: verify\ndescription: Shots.\n---\n```!\ngit status\n```\n"],
+    ["an indented command block", "---\nname: verify\ndescription: Shots.\n---\n  ````!\ngit status\n  ````\n"],
+  ])("refuses a SKILL.md with %s", (_, text) => {
+    expect(isPlainSkill("verify", text)).toBe(false);
+  });
+
+  // The verify skill shows a Markdown image inside inline code, which Claude
+  // Code doesn't run.
+  it.each([
+    ["Windows line endings", "---\r\nname: verify\r\ndescription: Shots.\r\n---\r\nBody\r\n"],
+    ["an image in inline code", "---\nname: verify\ndescription: Shots.\n---\nA line like `![Light](a.png)` places it.\n"],
+  ])("accepts a SKILL.md with %s", (_, text) => {
+    expect(isPlainSkill("verify", text)).toBe(true);
   });
 
   // A new kind of Claude Code config, such as a commands folder, could steer
@@ -277,12 +425,16 @@ describe("riskyFiles", () => {
     expect(both).toEqual([]);
   });
 
-  // A carve-out that matches no file does nothing, so renaming the skill's
-  // folder would quietly send its notes back to Jasper.
-  it("carves out feature notes that exist", () => {
-    const notes = repoFiles.filter((file) => FEATURE_NOTE.test(file));
-    expect(notes.length).toBeGreaterThan(0);
-    expect(jaspersFiles(notes)).toEqual([]);
+  // An exemption that matches no file does nothing, so renaming a skill's
+  // folder or the credits would quietly send them back to Jasper.
+  it("exempts skills and credits that exist", () => {
+    const exempt = repoFiles.filter((file) => file.startsWith(".claude/skills/") && jaspersFiles([file]).length === 0);
+    expect(exempt).toEqual(
+      expect.arrayContaining([
+        ...PANEL_SKILLS.map((skill) => `.claude/skills/${skill}/SKILL.md`),
+        ".claude/skills/THIRD-PARTY-NOTICES.md",
+      ]),
+    );
   });
 
   // A folder renamed without updating the list would quietly stop being risky.
