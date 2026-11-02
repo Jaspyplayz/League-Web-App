@@ -1225,7 +1225,7 @@ describe("Vercel's test mode", () => {
       return lines.filter((line) => line.startsWith("::warning"));
     };
     expect(await warnings(stalled)).toEqual([
-      "::warning title=Queue stalled in test mode::Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.",
+      "::warning title=Queue held in test mode::Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.",
     ]);
     expect(await warnings(stalled, true)).toEqual([]);
     expect(await warnings(snapshot({ issues: [issue("JAS-1", { status: "In Progress" })], statuses }))).toEqual([]);

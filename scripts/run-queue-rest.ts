@@ -473,7 +473,7 @@ export type Plan = {
   /** Notes for the run's summary, such as a blocker in another project left alone. */
   notes: string[];
   /** Why a running builder holds a ticket back in test mode, for the run's warning. */
-  stall?: string;
+  testHold?: string;
   /** On a run by name, the hold it got past, which an automatic run would wait for. */
   automaticRunsWait?: string;
 };
@@ -558,7 +558,7 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   // can't pick out the test's builder, since its own refused push moves
   // Vercel's newest refusal past its start comment. So one dead builder stalls
   // the queue, which costs nothing, where more tests would spend usage.
-  const stall =
+  const testHold =
     vercel.kind === "testing" && running.length > 0
       ? `Vercel refused a deploy at ${utc(vercel.since)}, and ${running[0].id} has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.`
       : undefined;
@@ -566,7 +566,7 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
     vercel.kind === "blocked"
       ? `Vercel blocked the account at ${utc(vercel.since)}, which only Jasper can fix, so nothing starts on its own until a deploy succeeds. A run by name (/run-queue) starts one test.`
       : undefined;
-  const hold = refusalHold(Object.values(snapshot.comments).flat(), now) ?? blockedHold ?? stall;
+  const hold = refusalHold(Object.values(snapshot.comments).flat(), now) ?? blockedHold ?? testHold;
   const hadTicket = start.length > 0;
   if (hold && !byName) {
     waits.push(...start.map((id) => ({ id, why: [hold] })));
@@ -606,7 +606,7 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
     }),
     waits: waits.map(({ id, why }) => ({ id, why, comment: waitComment(issueOf(id), why, snapshot.comments[id] ?? []) })),
     notes,
-    stall: !byName && hadTicket && hold === stall ? stall : undefined,
+    testHold: !byName && hadTicket && hold === testHold ? testHold : undefined,
     automaticRunsWait: byName && hadTicket ? hold : undefined,
   };
 }
@@ -685,7 +685,7 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
   if (plan.vercel.kind === "blocked") {
     log(`::warning title=Vercel account blocked::Vercel blocked the account at ${utc(plan.vercel.since)}, which only Jasper can fix. Nothing starts on its own until a deploy succeeds, and a run by name starts one test.`);
   }
-  if (plan.stall) log(`::warning title=Queue stalled in test mode::${plan.stall}`);
+  if (plan.testHold) log(`::warning title=Queue held in test mode::${plan.testHold}`);
   if (dryRun && plan.automaticRunsWait) summary(`An automatic run would start nothing. ${plan.automaticRunsWait}`);
   if (plan.running.length === 0) summary("No ticket has a builder running.");
   else summary(`${plan.running.length === 1 ? "1 ticket has" : `${plan.running.length} tickets have`} a builder running:`);
