@@ -278,6 +278,21 @@ describe("pickTickets: a ticket out of tries", () => {
     expect(pickTickets(queue({ tickets, outOfTries: ["JAS-1"] })).promote).toEqual([]);
   });
 
+  it("isn't moved to Ready for the ticket it blocks, which says it waits for a ticket out of tries", () => {
+    const tickets = [ticket("JAS-1", { blockedBy: ["JAS-9"] }), ticket("JAS-9", { status: "Todo" })];
+    const picks = pickTickets(queue({ tickets, outOfTries: ["JAS-9"] }));
+    expect(picks.promote).toEqual([]);
+    expect(picks.start).toEqual([]);
+    expect(whyWaits(picks, "JAS-1")).toEqual(["It waits for JAS-9, which the queue has already tried 2 times, which is the limit, so it won't start again unless Jasper gives it another try."]);
+  });
+
+  it("isn't rated up in Ready for the ticket it blocks", () => {
+    const tickets = [ticket("JAS-1", { blockedBy: ["JAS-9"] }), ticket("JAS-9")];
+    const picks = pickTickets(queue({ tickets, outOfTries: ["JAS-9"] }));
+    expect(picks.promote).toEqual([]);
+    expect(whyWaits(picks, "JAS-1")).toEqual(["It waits for JAS-9, which the queue has already tried 2 times, which is the limit, so it won't start again unless Jasper gives it another try."]);
+  });
+
   it("says a builder is running, not that it's out of tries, while one is", () => {
     const picks = pickTickets(queue({ tickets: [ticket("JAS-1")], running: ["JAS-1"], outOfTries: ["JAS-1"] }));
     expect(whyWaits(picks, "JAS-1")).toEqual(["A builder is already running on it."]);

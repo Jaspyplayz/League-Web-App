@@ -208,7 +208,7 @@ export function pickTickets(state: QueueState): Picks {
       why.push(`It can't start, because the queue has already tried it ${TRIES} times, which is the limit. Deleting one of the queue's start comments on it gives it another try, if Jasper wants one.`);
     }
     for (const id of new Set(ticket.blockedBy)) {
-      const blocker = checkBlocker(id, tickets, running);
+      const blocker = checkBlocker(id, tickets, running, outOfTries);
       if (blocker.kind === "waits") why.push(blocker.why);
       if (blocker.kind === "buildable") {
         const moves = promote.has(id) && tickets.get(id)?.status !== "Ready";
@@ -250,11 +250,14 @@ type BlockerCheck =
   | { kind: "buildable"; status: Status; priority: "Urgent" | "High" }
   | { kind: "waits"; why: string };
 
-function checkBlocker(id: string, tickets: Map<string, Ticket>, running: Set<string>): BlockerCheck {
+function checkBlocker(id: string, tickets: Map<string, Ticket>, running: Set<string>, outOfTries: Set<string>): BlockerCheck {
   const blocker = tickets.get(id);
   if (!blocker) return { kind: "waits", why: `It waits for ${id}, which the queue couldn't read.` };
   if (FINISHED.includes(blocker.status)) return { kind: "finished" };
   if (running.has(id)) return { kind: "waits", why: `It waits for ${id}, which has a builder running.` };
+  if (outOfTries.has(id)) {
+    return { kind: "waits", why: `It waits for ${id}, which the queue has already tried ${TRIES} times, which is the limit, so it won't start again unless Jasper gives it another try.` };
+  }
   // A ticket that blocks others is High under Jasper's Priority rule (JAS-29),
   // but an Urgent one stays Urgent.
   const priority = blocker.priority === "Urgent" ? "Urgent" : "High";
@@ -284,7 +287,7 @@ function blockersToPromote(ready: Ticket[], tickets: Map<string, Ticket>, runnin
     const ticket = waiting[i];
     if (ticket.priority === null || "why" in parseTouches(ticket.description) || noPrBuilds(ticket) || outOfTries.has(ticket.id)) continue;
     for (const id of new Set(ticket.blockedBy)) {
-      const blocker = checkBlocker(id, tickets, running);
+      const blocker = checkBlocker(id, tickets, running, outOfTries);
       const current = tickets.get(id);
       if (blocker.kind !== "buildable" || !current || promote.has(id)) continue;
       if (current.status === "Ready" && current.priority === blocker.priority) continue;

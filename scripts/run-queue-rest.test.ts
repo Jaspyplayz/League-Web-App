@@ -700,6 +700,20 @@ describe("a ticket's two tries", () => {
     expect(summaryLines).toContain(`- ${OUT_OF_TRIES}`);
   });
 
+  it("doesn't move an out-of-tries blocker back to Ready for the ticket it blocks", () => {
+    const old = comment("c1", START_LINE, "2026-11-01T06:00:00.000Z");
+    const read = snapshot({
+      issues: [issue("JAS-1", { blockedBy: ["JAS-9"] }), issue("JAS-9", { status: "Todo" })],
+      comments: { "JAS-9": [old, { ...old, id: "c2" }] },
+    });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.promote).toEqual([]);
+    expect(plan.start).toEqual([]);
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-1", ["It waits for JAS-9, which the queue has already tried 2 times, which is the limit, so it won't start again unless Jasper gives it another try."]],
+    ]);
+  });
+
   it("tries the next ticket as Vercel's test, not the one out of tries", () => {
     const old = comment("c1", START_LINE, "2026-11-01T06:00:00.000Z");
     const read = snapshot({ issues: [issue("JAS-1"), issue("JAS-2")], statuses: [refusal("2026-11-02T05:00:00Z")], comments: { "JAS-1": [old, { ...old, id: "c2" }] } });
