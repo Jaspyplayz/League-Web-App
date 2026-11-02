@@ -39,8 +39,9 @@ export const COMMENT_CREATE =
   "mutation CommentCreate($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success comment { id } } }";
 export const COMMENT_UPDATE =
   "mutation CommentUpdate($id: String!, $body: String!) { commentUpdate(id: $id, input: { body: $body }) { success } }";
-export const ISSUE_UPDATE =
-  "mutation IssueUpdate($id: String!, $stateId: String!, $priority: Int!) { issueUpdate(id: $id, input: { stateId: $stateId, priority: $priority }) { success } }";
+export const ISSUE_MOVE =
+  "mutation IssueMove($id: String!, $stateId: String!, $priority: Int!) { issueUpdate(id: $id, input: { stateId: $stateId, priority: $priority }) { success } }";
+export const ISSUE_RATE = "mutation IssueRate($id: String!, $priority: Int!) { issueUpdate(id: $id, input: { priority: $priority }) { success } }";
 
 const STATUSES = ["Backlog", "Todo", "Ready", "In Progress", "In Review", "Done", "Canceled", "Duplicate"] as const satisfies readonly Status[];
 const HasNextPage = z.object({ hasNextPage: z.boolean() });
@@ -470,8 +471,8 @@ export type FireAnswer =
 
 /** Everything a round does outside this file, passed in so the tests can fake Linear and the cloud task. */
 export type Effects = {
-  /** Moves a ticket to Ready and sets its Priority: 1 is Urgent, 2 is High. */
-  updateIssue(uuid: string, priority: number): Promise<void>;
+  /** Sets a ticket's Priority (1 is Urgent, 2 is High), and moves it to Ready if `moveToReady`. */
+  promote(uuid: string, priority: number, moveToReady: boolean): Promise<void>;
   /** Returns the new comment's ID. */
   createComment(issueUuid: string, body: string): Promise<string>;
   updateComment(commentId: string, body: string): Promise<void>;
@@ -525,7 +526,7 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
       summary(moveToReady ? `Would move ${id} to Ready and rate it ${priority}, with a comment.` : `Would rate ${id} ${priority}, with a comment.`);
       continue;
     }
-    await effects.updateIssue(uuid, priority === "Urgent" ? 1 : 2);
+    await effects.promote(uuid, priority === "Urgent" ? 1 : 2, moveToReady);
     await effects.createComment(uuid, body);
     summary(moveToReady ? `Moved ${id} to Ready and rated it ${priority}, with a comment.` : `Rated ${id} ${priority}, with a comment.`);
   }
@@ -621,11 +622,16 @@ export function fireRequest(taskId: string, ticketId: string): { url: string; he
 }
 
 /** The round's writes to Linear. Each throws unless Linear says it worked. */
-export function linearWrites(linear: LinearCall, readyStateId: string): Pick<Effects, "updateIssue" | "createComment" | "updateComment"> {
+export function linearWrites(linear: LinearCall, readyStateId: string): Pick<Effects, "promote" | "createComment" | "updateComment"> {
   return {
-    async updateIssue(uuid, priority) {
-      const answer = linearData("IssueUpdate", z.object({ issueUpdate: Success }), await linear(ISSUE_UPDATE, { id: uuid, stateId: readyStateId, priority }));
-      if (!answer.issueUpdate.success) throw new Error("Linear didn't move the ticket to Ready (IssueUpdate answered success: false).");
+    // A blocker already Ready gets only its Priority, so one a builder moved
+    // on since the queue read it isn't moved back to Ready.
+    async promote(uuid, priority, moveToReady) {
+      const answer = moveToReady
+        ? await linear(ISSUE_MOVE, { id: uuid, stateId: readyStateId, priority })
+        : await linear(ISSUE_RATE, { id: uuid, priority });
+      const { issueUpdate } = linearData("IssueUpdate", z.object({ issueUpdate: Success }), answer);
+      if (!issueUpdate.success) throw new Error("Linear didn't update the ticket (issueUpdate answered success: false).");
     },
     async createComment(issueUuid, body) {
       const { commentCreate } = linearData("CommentCreate", CommentCreated, await linear(COMMENT_CREATE, { issueId: issueUuid, body }));

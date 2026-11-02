@@ -2,10 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { OpenPull } from "./can-merge-action-steps";
 import {
+  COMMENT_CREATE,
   COMMENTS_QUERY,
   CommitStatus,
   fireAnswer,
   fireRequest,
+  ISSUE_MOVE,
+  ISSUE_RATE,
   ISSUES_QUERY,
   LinearIssue,
   linearWrites,
@@ -113,7 +116,7 @@ function recorder(fire: (id: string) => FireAnswer = (id) => ({ kind: "started",
   const lines: string[] = [];
   let comments = 0;
   const effects: Effects = {
-    updateIssue: async (uuid, priority) => void calls.push(`updateIssue ${uuid} ${priority}`),
+    promote: async (uuid, priority, moveToReady) => void calls.push(`promote ${uuid} ${priority}${moveToReady ? " to Ready" : ""}`),
     createComment: async (uuid, body) => {
       calls.push(`createComment ${uuid}: ${body.split("\n")[0]}`);
       return `comment-${++comments}`;
@@ -135,7 +138,7 @@ function dryEffects() {
   const refuse = (): never => {
     throw new Error("a dry run reached Linear or the cloud task");
   };
-  const effects: Effects = { updateIssue: refuse, createComment: refuse, updateComment: refuse, fire: refuse, log: (line) => lines.push(line), summary: (line) => lines.push(line) };
+  const effects: Effects = { promote: refuse, createComment: refuse, updateComment: refuse, fire: refuse, log: (line) => lines.push(line), summary: (line) => lines.push(line) };
   return { effects, lines };
 }
 
@@ -505,7 +508,7 @@ describe("blockers and wait comments", () => {
     const { effects, calls } = recorder();
     await runRound(plan, { dryRun: false }, effects);
     expect(calls).toEqual([
-      "updateIssue uuid-JAS-2 2",
+      "promote uuid-JAS-2 2 to Ready",
       "createComment uuid-JAS-2: Ticket queue: moved this ticket to Ready and rated it High.",
       `createComment uuid-JAS-2: ${START_LINE}`,
       "fire JAS-2",
@@ -580,12 +583,28 @@ describe("Vercel's test mode", () => {
 describe("linearWrites", () => {
   it("moves a blocker to team JAS's Ready status, and throws when Linear says it didn't work", async () => {
     const sent: unknown[] = [];
-    const writes = linearWrites(async (_query, variables) => {
-      sent.push(variables);
+    const writes = linearWrites(async (query, variables) => {
+      sent.push([query, variables]);
       return { data: { issueUpdate: { success: false } } };
     }, "ready-state");
-    await expect(writes.updateIssue("uuid-JAS-2", 2)).rejects.toThrow("success: false");
-    expect(sent).toEqual([{ id: "uuid-JAS-2", stateId: "ready-state", priority: 2 }]);
+    await expect(writes.promote("uuid-JAS-2", 2, true)).rejects.toThrow("success: false");
+    expect(sent).toEqual([[ISSUE_MOVE, { id: "uuid-JAS-2", stateId: "ready-state", priority: 2 }]]);
+  });
+
+  it("rates a blocker that's already Ready without writing its status, so a builder that moved it on isn't moved back", async () => {
+    const sent: unknown[] = [];
+    const linear: LinearCall = async (query, variables) => {
+      if (query === COMMENT_CREATE) return { data: { commentCreate: { success: true, comment: { id: "c1" } } } };
+      sent.push([query, variables]);
+      return { data: { issueUpdate: { success: true } } };
+    };
+    const read = snapshot({ issues: [issue("JAS-1", { blockedBy: ["JAS-2", "JAS-3"] }), issue("JAS-2"), issue("JAS-3", { status: "Todo" })] });
+    const { effects } = recorder();
+    await runRound(planRound(read, AT_0630, RUN), { dryRun: false }, { ...effects, ...linearWrites(linear, "ready-state") });
+    expect(sent).toEqual([
+      [ISSUE_RATE, { id: "uuid-JAS-2", priority: 2 }],
+      [ISSUE_MOVE, { id: "uuid-JAS-3", stateId: "ready-state", priority: 2 }],
+    ]);
   });
 
   it("returns the new comment's ID", async () => {
