@@ -928,6 +928,12 @@ describe("scripts/run-queue.ts", () => {
     ]);
   });
 
+  it("writes each step summary line as its own paragraph, and logs it as one line", () => {
+    const summary = code.slice(code.indexOf("function summary("), code.indexOf("async function linear("));
+    expect(summary).toContain("console.log(line);");
+    expect(summary).toContain("appendFileSync(file, `${line}\\n\\n`);");
+  });
+
   it("never logs a secret or the environment", () => {
     const logging = lines.filter((line) => /console\.|log\(|summary\(/.test(line));
     expect(logging.length).toBeGreaterThan(0);

@@ -36,7 +36,8 @@ const runUrl = server && repository && runId ? `${server}/${repository}/actions/
 function summary(line: string) {
   console.log(line);
   const file = process.env.GITHUB_STEP_SUMMARY;
-  if (file) appendFileSync(file, `${line}\n`);
+  // Markdown joins lines with one line break between them into one paragraph.
+  if (file) appendFileSync(file, `${line}\n\n`);
 }
 
 async function linear(query: string, variables: Record<string, unknown>): Promise<unknown> {
