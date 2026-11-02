@@ -550,18 +550,18 @@ describe("riskyFiles", () => {
     ).toEqual([]);
   });
 
-  // The gates' code is Jasper's by name, so a helper they load under another
-  // name would be on neither list. This resolves what each gate loads, side
-  // effects and dynamic imports included, with the esbuild tsx runs and the
-  // tsconfig the Agent merge workflow gives it. Installed packages come from
-  // the lockfile, which 0032 leaves to the panel.
+  // The gates' code and the queue's are Jasper's by name, so a helper they load
+  // under another name would be on neither list. This resolves what each one
+  // loads, side effects and dynamic imports included, with the esbuild tsx runs
+  // and the tsconfig the Agent merge and Run queue workflows give it. Installed
+  // packages come from the lockfile, which 0032 leaves to the panel.
   it("keeps every file the gates load, other than installed packages, Jasper's", async () => {
     const fromTsx = createRequire(createRequire(import.meta.url).resolve("tsx/package.json"));
     const esbuild = fromTsx("esbuild") as {
       build: (options: object) => Promise<{ metafile: { inputs: Record<string, unknown> } }>;
     };
-    const gates = repoFiles.filter((file) => /^scripts\/can-merge[^/]*\.ts$/.test(file) && !/\.test\.ts$/.test(file));
-    expect(gates).toContain("scripts/can-merge-action.ts");
+    const gates = repoFiles.filter((file) => /^scripts\/(can-merge|run-queue)[^/]*\.ts$/.test(file) && !/\.test\.ts$/.test(file));
+    expect(gates).toEqual(expect.arrayContaining(["scripts/can-merge-action.ts", "scripts/run-queue.ts"]));
     const { metafile } = await esbuild.build({
       entryPoints: gates,
       bundle: true,
