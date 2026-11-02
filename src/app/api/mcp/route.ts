@@ -78,6 +78,14 @@ const handler = createMcpHandler(
   },
   {
     serverInfo: { name: "Turnpoint", version: "1.0.0" },
+    // Nothing here can tell a client that a list changed: mcp-handler gives
+    // the route no way to send to a listen stream. So say no list ever
+    // changes. Left at the SDK's default (true), clients on the 2026-07-28
+    // protocol, Claude Code among them, open a `subscriptions/listen` request
+    // that the server holds open until Vercel stops it at 300 s (JAS-44).
+    // A prompt or resource added here needs `listChanged: false` too;
+    // route.test.ts fails until it has it.
+    capabilities: { tools: { listChanged: false } },
     instructions:
       "Turnpoint analyzes League of Legends games. Start with look_up_player or recent_games, then analyze_game on a matchId. Answers include links to the game's page on Turnpoint; share them.",
   },

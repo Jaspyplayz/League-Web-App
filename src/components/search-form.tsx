@@ -8,10 +8,11 @@ import { noteSearch } from "./saved-players";
 import { SavedPlayersBox, useSavedPlayersBox } from "./saved-players-box";
 
 // What both player searches share, the big one on home and the small one in
-// the header: sending the form, the error it can come back with, and the box
-// of saved players that opens under it. The box shows from clicking into the
-// form until you click or tab out of it, press Escape, search, or pick a
-// player. `errorId` ties the Riot ID box to the error for screen readers.
+// the header: sending the form, the error it can come back with, and when the
+// box of saved players is open, with what it needs. Each form draws the box
+// itself, where it fits that form. The box shows from clicking into the form
+// until you click or tab out of it, press Escape, search, or pick a player.
+// `errorId` ties the Riot ID box to the error for screen readers.
 export function usePlayerSearch(errorId: string, startingRiotId = "") {
   const [state, action, pending] = useActionState(searchPlayer, { error: null });
   // What's typed in the Riot ID box, to narrow the saved players.
@@ -92,22 +93,20 @@ export function usePlayerSearch(errorId: string, startingRiotId = "") {
     "aria-describedby": error ? errorId : undefined,
   };
 
-  const box = boxOpen && (
-    <SavedPlayersBox
-      saved={saved}
-      query={query}
-      onPick={() => {
-        setWanted(false);
-        // Next.js keeps this page's state, so Back shows the form as left here.
-        setQuery(startingRiotId);
-        setErrorDismissed(true);
-      }}
-      // A row that leaves takes keyboard focus with it, so hand it back.
-      onRowGone={() => inputRef.current?.focus()}
-    />
-  );
+  const boxProps: React.ComponentProps<typeof SavedPlayersBox> = {
+    saved,
+    query,
+    onPick: () => {
+      setWanted(false);
+      // Next.js keeps this page's state, so Back shows the form as left here.
+      setQuery(startingRiotId);
+      setErrorDismissed(true);
+    },
+    // A row that leaves takes keyboard focus with it, so hand it back.
+    onRowGone: () => inputRef.current?.focus(),
+  };
 
-  return { error, pending, formProps, riotIdProps, boxOpen, box };
+  return { error, pending, formProps, riotIdProps, boxOpen, boxProps };
 }
 
 // The region choices, shown by their short codes ("NA") with the full name on
@@ -126,7 +125,7 @@ export function RegionOptions() {
 // readers instead of visible labels (JAS-92). `startWith` fills it in, so a
 // player who mistyped a Riot ID can fix one letter instead of typing it again.
 export function SearchForm({ startWith }: { startWith?: { region: Region; riotId: string } }) {
-  const { error, pending, formProps, riotIdProps, boxOpen, box } = usePlayerSearch(
+  const { error, pending, formProps, riotIdProps, boxOpen, boxProps } = usePlayerSearch(
     "search-error",
     startWith?.riotId,
   );
@@ -174,7 +173,11 @@ export function SearchForm({ startWith }: { startWith?: { region: Region; riotId
             {pending ? "Looking up…" : "Search"}
           </button>
         </div>
-        {box && <div className="absolute inset-x-0 top-full z-30">{box}</div>}
+        {boxOpen && (
+          <div className="absolute inset-x-0 top-full z-30">
+            <SavedPlayersBox {...boxProps} />
+          </div>
+        )}
       </div>
       {error && (
         // The "!" mark sits outside the alert, so the alert's text is only the message.

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo } from "react";
+import { readLocalSetting, saveLocalSetting } from "@/lib/local-setting";
 import {
   addRecentPlayer,
   hasPlayer,
@@ -16,10 +17,12 @@ import {
   type SavedPlayer,
 } from "@/lib/saved-players";
 import { StarIcon } from "./icons";
+import { useLocalSetting } from "./use-local-setting";
 
 // The recent and pinned player lists are kept in this browser's localStorage
-// (see src/lib/saved-players.ts). These components run in the browser
-// ("use client") because the server can't see localStorage.
+// (see src/lib/saved-players.ts and src/lib/local-setting.ts). These
+// components run in the browser ("use client") because the server can't see
+// localStorage.
 
 type ListKey = typeof RECENT_PLAYERS_KEY | typeof PINNED_PLAYERS_KEY;
 const MAX: Record<ListKey, number> = {
@@ -27,54 +30,16 @@ const MAX: Record<ListKey, number> = {
   [PINNED_PLAYERS_KEY]: MAX_PINNED_PLAYERS,
 };
 
-// Components showing a list re-render when it changes: in this tab through
-// `listeners`, and in other tabs through the browser's "storage" event.
-const listeners = new Set<() => void>();
-
-function subscribe(onChange: () => void) {
-  listeners.add(onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    listeners.delete(onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
-
-// localStorage can throw, for example when the browser blocks site data, so
-// every read and write is wrapped. The lists are a nice extra; the site works
-// without them.
-function readSaved(key: ListKey): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function read(key: ListKey): SavedPlayer[] {
-  return parseSavedPlayers(readSaved(key), MAX[key]);
-}
-
 // Takes a function from the current list to the new one, so each change
 // starts from what's saved right now (another tab may have changed it).
 export function updateSavedPlayers(key: ListKey, change: (list: SavedPlayer[]) => SavedPlayer[]) {
-  try {
-    localStorage.setItem(key, JSON.stringify(change(read(key))));
-  } catch {
-    // Not saved this time; nothing else to do.
-  }
-  listeners.forEach((onChange) => onChange());
+  const list = parseSavedPlayers(readLocalSetting(key), MAX[key]);
+  saveLocalSetting(key, JSON.stringify(change(list)));
 }
 
+// Empty on the server, filled in by the browser right after the page loads.
 export function useSavedPlayers(key: ListKey): SavedPlayer[] {
-  // useSyncExternalStore reads from outside React (here, localStorage). The
-  // server render has no saved lists, so it shows nothing, and the browser
-  // fills them in right after the page loads.
-  const saved = useSyncExternalStore(
-    subscribe,
-    () => readSaved(key),
-    () => null,
-  );
+  const saved = useLocalSetting(key);
   return useMemo(() => parseSavedPlayers(saved, MAX[key]), [saved, key]);
 }
 

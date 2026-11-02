@@ -6,6 +6,7 @@ import {
   MAX_PINNED_PLAYERS,
   MAX_RECENT_PLAYERS,
   parsePendingSearch,
+  parseSavedPlayerDetails,
   parseSavedPlayers,
   PENDING_SEARCH_MS,
   removePlayer,
@@ -111,6 +112,35 @@ describe("parsePendingSearch", () => {
       expect(parsePendingSearch(saved)).toBeNull();
     },
   );
+});
+
+describe("parseSavedPlayerDetails", () => {
+  const answer = {
+    ranks: { "kr/hide on bush#kr1": { tier: "CHALLENGER", division: "I" }, "euw/g2 caps#1323": null },
+    you: caps,
+  };
+
+  it("reads back the route's answer", () => {
+    expect(parseSavedPlayerDetails(answer)).toEqual(answer);
+  });
+
+  it("reads an answer with nobody signed in and nobody asked about", () => {
+    expect(parseSavedPlayerDetails({ ranks: {}, you: null })).toEqual({ ranks: {}, you: null });
+  });
+
+  it.each([
+    ["nothing", null],
+    ["a list", []],
+    ["no ranks", { you: null }],
+    ["ranks as a list", { ranks: [], you: null }],
+    ["no you", { ranks: {} }],
+    ["a tier Riot doesn't have", { ...answer, ranks: { "kr/hide on bush#kr1": { tier: "UNRANKED", division: "I" } } }],
+    ["a division with no tier", { ...answer, ranks: { "kr/hide on bush#kr1": { division: "I" } } }],
+    ["you in an unknown region", { ...answer, you: { ...caps, region: "mars" } }],
+    ["you with no Riot ID", { ...answer, you: { region: "na" } }],
+  ])("gives null for an answer with %s", (_name, data) => {
+    expect(parseSavedPlayerDetails(data)).toBeNull();
+  });
 });
 
 describe("savedPlayerKey", () => {
