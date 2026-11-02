@@ -1,7 +1,7 @@
 import "server-only";
 
 import * as Sentry from "@sentry/nextjs";
-import { and, count, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { tables, type Db } from "@/db";
 import { loadMatchFacts } from "@/lib/match-facts";
 import { database, loadMatch, readCache } from "@/lib/match-store";
@@ -95,29 +95,42 @@ export async function createRecap(
 }
 
 // Counts this account's tries in the last 24 hours and, if it has one left,
-// saves a new one, in one transaction. The transaction first takes a lock
-// for this account (an "advisory lock", like Ask's reserve() in
-// src/lib/ask-store.ts), so tries sent at the same moment take turns: the
-// second one's count sees the first one's row. One lock per account, not one
-// for the whole site like Ask's, because recaps have no shared budget, so
-// one account sending many at once doesn't hold up anyone else. It's let go
-// when the transaction ends, before Riot or Claude is called.
+// saves a new one, in one transaction. The transaction takes a lock for this
+// account (an "advisory lock", like Ask's reserve() in src/lib/ask-store.ts),
+// so tries sent at the same moment take turns: the second one's count sees
+// the first one's row. One lock per account, not one for the whole site like
+// Ask's, because recaps have no shared budget. It's let go when the
+// transaction ends, before Riot or Claude is called.
 async function reserveTry(db: Db, userId: string): Promise<boolean> {
+  const since = new Date(Date.now() - DAY_MS);
+  // A try waiting for the lock keeps one of the server's few database
+  // connections busy, so an account that's already used its tries is turned
+  // away here, without the lock. The count can only be too low here, never
+  // too high, so this never turns away a try the locked count would allow.
+  if ((await countTries(db, userId, since)) >= RECAPS_PER_DAY) return false;
+
   return db.transaction(async (tx) => {
+    // A try holds the lock for a few milliseconds, so a wait this long means
+    // something's wrong: give up, and the try fails without counting.
+    await tx.execute(sql`set local lock_timeout = '3s'`);
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext('recap-tries'), hashtext(${userId}))`,
     );
-    const [tried] = await tx
-      .select({ n: count() })
-      .from(tables.recapTries)
-      .where(
-        and(
-          eq(tables.recapTries.userId, userId),
-          gte(tables.recapTries.createdAt, new Date(Date.now() - DAY_MS)),
-        ),
-      );
-    if (tried.n >= RECAPS_PER_DAY) return false;
+    // Tries more than a day old no longer count, so they aren't kept.
+    await tx
+      .delete(tables.recapTries)
+      .where(and(eq(tables.recapTries.userId, userId), lt(tables.recapTries.createdAt, since)));
+    if ((await countTries(tx, userId, since)) >= RECAPS_PER_DAY) return false;
     await tx.insert(tables.recapTries).values({ userId });
     return true;
   });
+}
+
+// Takes the database or a transaction.
+async function countTries(db: Pick<Db, "select">, userId: string, since: Date): Promise<number> {
+  const [tried] = await db
+    .select({ n: count() })
+    .from(tables.recapTries)
+    .where(and(eq(tables.recapTries.userId, userId), gte(tables.recapTries.createdAt, since)));
+  return tried.n;
 }

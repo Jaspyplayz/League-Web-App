@@ -452,7 +452,8 @@ export const matchRecaps = pgTable(
 // One row each time a signed-in account asks for a new recap, saved before
 // Riot or Claude is called (see src/lib/recap-store.ts), so tries sent at the
 // same moment and tries that fail all count toward the daily cap. Only the
-// account and the time. Deleting the account deletes its rows.
+// account and the time. An account's tries more than a day old are deleted at
+// its next try, and deleting the account deletes all of them.
 export const recapTries = pgTable(
   "recap_tries",
   {
