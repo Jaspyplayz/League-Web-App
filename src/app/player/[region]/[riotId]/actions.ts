@@ -5,12 +5,19 @@ import { loadBuilds, type BuildsResult } from "@/lib/match-builds";
 import { updateProfile, type UpdateResult } from "@/lib/profile-store";
 import { isMatchIdFor, isRegion } from "@/lib/regions";
 
+// What a PUUID can look like. Riot's are 78 letters, digits, "-" and "_"; the
+// looser length lets the tests' short made-up IDs through and leaves Riot
+// room to change it. Anything else, such as a NUL character Postgres
+// refuses, stops here instead of reaching the database and filing a Sentry
+// error (JAS-214, decision record 0033).
+const PUUID_FORMAT = /^[\w-]{1,100}$/;
+
 // Server Actions are functions the browser can call on the server, here
 // from the Update button and the match panel's Build tab. Anyone can call one
 // with any arguments, so they're checked before use; updateProfile also only
 // refreshes players Turnpoint has already saved, and applies the cooldown.
 export async function updateProfileAction(region: string, puuid: string): Promise<UpdateResult> {
-  if (!isRegion(region) || typeof puuid !== "string") {
+  if (!isRegion(region) || typeof puuid !== "string" || !PUUID_FORMAT.test(puuid)) {
     return { status: "failed", kind: "not-found" };
   }
 
