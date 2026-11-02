@@ -28,9 +28,10 @@ on:
         description: Print what it would do and change nothing
         type: boolean
         default: false
-  # A bonus, not a way in to count on. On 2026-11-02 this repo had never had a
-  # scheduled run, and GitHub can delay or drop one and turns a schedule off
-  # after 60 days with no activity. Without it, a wait that ends with time
+  # A bonus, not a way in to count on. GitHub can delay or drop a scheduled run.
+  # This repo's first, the Agent merge sweep's on 2026-11-02, came about 8.5
+  # hours after it reached main. GitHub also turns a schedule off after 60 days
+  # with no activity. If this one doesn't fire, a wait that ends with time
   # (Vercel's hour, the hourly fire limit's hour, the 2-hour start hold) lasts
   # until the next wake or a person: the merged job below, a push to main, or a
   # run by name. Away from the top of the hour, when GitHub is busiest.

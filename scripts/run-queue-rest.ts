@@ -323,8 +323,10 @@ export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why
     const prs = listOf(working.map((pull) => `PR ${pull.number}`));
     const notDone = `${working.length === 1 ? "isn't" : "aren't"} marked ready or left for Jasper`;
     const startedAt = started.get(id);
-    // In Progress with no PR yet is a builder before its first push. Once
-    // every PR is finished, it takes no slot, even if Linear never moved on.
+    // In Progress with no open PR is a builder before its first push, or one
+    // whose PR merged or closed while Linear still says In Progress. The queue
+    // can't tell those apart, so both keep a slot. With open PRs that are all
+    // finished, it takes no slot, even if Linear never moved on.
     if (issue.state.name === "In Progress" && (open.length === 0 || working.length > 0)) {
       running.push({ id, why: "it's In Progress" });
     } else if (issue.state.name === "In Review" && working.length > 0) {
