@@ -81,7 +81,7 @@ describe("gankLog", () => {
   });
 
   it("flips the lane lead for the enemy jungler", () => {
-    const timeline = frames(15, (minute, id) => (id === 1 ? { gold: 1000 } : {}));
+    const timeline = frames(15, (_minute, id) => (id === 1 ? { gold: 1000 } : {}));
     const { theirs } = log(kills(kill("7:00", 7, 1, [6], SPOTS.topLane)), timeline);
     expect(theirs[0]).toMatchObject({ lane: "top", outcome: "kill", laneLead: -1000 });
   });
