@@ -52,6 +52,9 @@ const eslintConfig = defineConfig([
     // poteto-mode's scripts, copied unchanged from pstack's repo, which checks
     // them with its own Bun tools (decision record 0014).
     ".claude/skills/poteto-mode/scripts/**",
+    // Git-ignored scratch files and downloaded data. Nobody else can see them,
+    // so one with a lint error shouldn't block a commit through the hook.
+    ".cache/**",
   ]),
 ]);
 
