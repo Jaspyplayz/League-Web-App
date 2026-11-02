@@ -8,8 +8,9 @@ import { waitTimeFor } from "@/lib/riot/rate-limit-store";
 // answerQuestion stops itself at ASK_TIME_LIMIT_MS and its cost gets saved
 // first (docs/ask.md, "The time limit"). Its clock starts only after the Ask
 // button has looked the player up on Riot (askAction in
-// src/app/account/actions.ts). So what's left of maxDuration has to cover
-// that lookup at its slowest, plus the sign-in check and saving the cost.
+// src/app/account/actions.ts) and saved the question (reserve() in
+// src/lib/ask-store.ts). So what's left of maxDuration has to cover a slow
+// lookup, plus the sign-in check and saving the question and its cost.
 // This times the real Riot client with Riot not answering and the rate limit
 // full, so a longer Riot timeout or another retry fails here. The 15 s it
 // leaves for the sign-in check and saving is an allowance, not a measurement:
@@ -42,8 +43,8 @@ beforeEach(() => {
         new Promise((_, reject) => init.signal?.addEventListener("abort", () => reject(init.signal?.reason))),
     ),
   );
-  // The shared rate limit is full. Each check takes a second (the store gives
-  // up on the database after that) and says to wait a second, twice, before
+  // The shared rate limit is full. Each check takes about a second (the store
+  // gives up on the database after one) and says to wait a second, twice, before
   // it lets the request go: two seconds of waiting, which assumes the
   // client's cap on waiting (MAX_WAIT_MS) is at least that.
   let check = 0;
@@ -59,7 +60,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("leaves room in the match page's maxDuration for the slowest Riot lookup", async () => {
+it("leaves room in the match page's maxDuration for a Riot lookup that never gets an answer", async () => {
   const start = Date.now();
   const lookup = getAccount("na", { gameName: "Jaspy", tagLine: "CA1" }).catch((error: unknown) => error);
   await vi.runAllTimersAsync();

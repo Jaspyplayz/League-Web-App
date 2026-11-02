@@ -39,8 +39,8 @@ const MAX_ROUNDS = 8;
 // keeps only the 50-cent estimate it was saved with (src/lib/ask-store.ts),
 // however much its rounds cost by then. So the loop stops itself first and
 // returns what it spent. The rest of maxDuration is for what runs outside
-// the loop: the sign-in check and the player's Riot lookup before it (about
-// 40 s when Riot isn't answering), and saving the cost after.
+// the loop: the sign-in check, the player's Riot lookup (about 40 s when Riot
+// isn't answering) and reserve() before it, and saving the cost after.
 // ask-time-limit.test.ts times that lookup and checks it all still fits.
 export const ASK_TIME_LIMIT_MS = 120_000;
 // The longest one try waits for Anthropic. Two tries make a round.
@@ -148,7 +148,6 @@ export async function answerQuestion(
   });
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
-    if (timeLeft() < MIN_TRY_MS) return outOfTime();
     // A round with less than a full try's time left is the last one too, so
     // Claude answers with what it has instead of asking for games there'd be
     // no time to read. A round started with a little more time can still ask
@@ -184,6 +183,11 @@ export async function answerQuestion(
     cost += costMicros(response.model, response.usage);
 
     if (response.stop_reason === "tool_use") {
+      // Reading the games is only worth it if there's time for another round
+      // to send Claude what they say, and a round isn't started with less
+      // than MIN_TRY_MS left. That's the only check before a round: the first
+      // has the whole time limit, and every other one follows the tools.
+      if (timeLeft() < MIN_TRY_MS) return outOfTime();
       // The whole reply goes back, thinking included, as the API requires.
       messages.push({ role: "assistant", content: response.content });
       const calls = response.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
