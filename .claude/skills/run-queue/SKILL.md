@@ -29,17 +29,19 @@ If `gh workflow run` fails in a cloud session, use GitHub's REST API, which work
 gh api -X POST repos/Jaspyplayz/League-Web-App/actions/workflows/run-queue.yml/dispatches -f ref=main -f 'inputs[dry_run]=true'
 ```
 
-Always use `--ref main`. The workflow skips a run started on any other branch, because that branch's copy of the file would run with the queue's secrets.
+Always use `--ref main`. The workflow skips a run started on any other branch, so a branch's copy of the file isn't used by mistake. That check isn't what protects the queue's secrets, since a branch can edit it out. Who can push to the repo is what protects them.
 
 ## Read the result
 
-Find the run, then read its summary or log. The summary lists each running builder and why it counts, each ticket started or that would start, and why each other ticket waits.
+Find the run you started, the newest one started by name, then read its summary or log. The summary lists each running builder and why it counts, each ticket started or that would start, and why each other ticket waits.
 
 ```bash
-gh api "repos/Jaspyplayz/League-Web-App/actions/workflows/run-queue.yml/runs?per_page=3" --jq '.workflow_runs[] | "\(.id) \(.status) \(.conclusion) \(.html_url)"'
+gh api "repos/Jaspyplayz/League-Web-App/actions/workflows/run-queue.yml/runs?event=workflow_dispatch&per_page=1" --jq '.workflow_runs[] | "\(.id) \(.status) \(.conclusion) \(.created_at) \(.html_url)"'
 ```
 
-Open the run's URL, or read its log with `gh run view <id> --log -R Jaspyplayz/League-Web-App` in a local session. Report back what it started (each ticket and its cloud session link) and why the others wait. Don't read a warning as a failure. A start refused for an hourly fire limit (HTTP 429) is a warning. Any other refusal fails the run, since its token or task ID is wrong, the account has no access, or the task is paused, and only Jasper can fix those. Either way nothing starts on any ticket for an hour, and the refusal isn't a try.
+Wait until its status is `completed` before reading the summary. Run the command again every 20 seconds or so, since a run takes about a minute. A new run can take a few seconds to show up, so check that its `created_at` is after you started it.
+
+Open the run's URL, or read its log with `gh run view <id> --log -R Jaspyplayz/League-Web-App` in a local session. Report back what it started (each ticket and its cloud session link) and why the others wait. Don't read a warning as a failure. A start refused for an hourly fire limit (HTTP 429) is a warning. Any other refusal fails the run, since only Jasper can fix it, such as a wrong token or task ID, no access, or a paused task. Either way nothing starts on any ticket for an hour, and the refusal isn't a try. A start with no answer, or a 5xx, is a warning too. Its start comment holds that ticket for 2 hours, since a builder may have started.
 
 ## Stop or restart the queue
 

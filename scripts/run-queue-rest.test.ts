@@ -940,3 +940,18 @@ describe("scripts/run-queue.ts", () => {
     for (const line of logging) expect(line).not.toMatch(/taskToken|linearKey|process\.env|TOKEN|API_KEY/);
   });
 });
+
+describe(".claude/skills/run-queue/SKILL.md", () => {
+  const skill = source(".claude/skills/run-queue/SKILL.md");
+
+  it("finds the run it started, the newest one started by name, and waits for it to finish", () => {
+    const list = skill.split("\n").filter((line) => line.includes("/runs?"));
+    expect(list).toHaveLength(1);
+    expect(list[0]).toContain("runs?event=workflow_dispatch&per_page=1");
+    expect(skill).toContain("Wait until its status is `completed` before reading the summary.");
+  });
+
+  it("doesn't blame a refused start on a usage limit, which the fire docs don't describe", () => {
+    expect(skill).not.toMatch(/usage limit/i);
+  });
+});
