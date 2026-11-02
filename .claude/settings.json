@@ -17,9 +17,9 @@
       "Bash(git -C * push -f*)",
       "Bash(git -C * push * -f*)",
       "Bash(git -C * push * +*)",
-      "Bash(npm *db:migrate*)",
-      "Bash(*drizzle-kit migrate*)",
-      "Bash(*drizzle-kit push*)",
+      "Bash(*db:migrate*)",
+      "Bash(*drizzle-kit*migrate*)",
+      "Bash(*drizzle-kit*push*)",
       "Bash(*remap-puuids*--apply*)",
       "Bash(*remap-puuids*--rollback*)"
     ]
