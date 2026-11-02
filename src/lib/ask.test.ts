@@ -1,8 +1,10 @@
+import { createServer, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { costMicros, HOLD_MICROS } from "@/lib/ask-rules";
 import { recentGamesFor } from "@/lib/mcp/tools";
 import type { Account } from "@/lib/riot/types";
-import { answerQuestion } from "./ask";
+import { answerQuestion, type AskResult } from "./ask";
 
 // A pretend Anthropic client: each test says what each round returns, and
 // `clientOptions` records how the client was set up. APIError is the SDK's
@@ -64,7 +66,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   clientOptions.length = 0;
   create.mockReset();
-  vi.mocked(recentGamesFor).mockResolvedValue({ games: [] } as never);
+  vi.mocked(recentGamesFor).mockReset().mockResolvedValue({ games: [] } as never);
 });
 
 afterEach(() => {
@@ -89,6 +91,46 @@ async function triesAfter(ms: number) {
   await vi.runAllTimersAsync();
   await answer;
   return [before, after];
+}
+
+// A try that Anthropic answers, or fails, after `seconds` of the fake clock.
+// Like the SDK, it fails as a lost connection (an APIError with no status)
+// if the try's signal aborts first.
+function repliesAfter(seconds: number, reply: unknown) {
+  return settlesAfter(seconds, (resolve) => resolve(reply));
+}
+function failsAfter(seconds: number, error: unknown) {
+  return settlesAfter(seconds, (_, reject) => reject(error));
+}
+function settlesAfter(
+  seconds: number,
+  settle: (resolve: (value: unknown) => void, reject: (error: unknown) => void) => void,
+) {
+  return (_request: unknown, options?: { signal?: AbortSignal }) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(() => settle(resolve, reject), seconds * 1000);
+      options?.signal?.addEventListener("abort", () => {
+        clearTimeout(timer);
+        reject(new APIError(undefined));
+      });
+    });
+}
+
+// recent_games, when Riot takes `seconds` to answer.
+function slowGames(seconds: number) {
+  return () => new Promise((resolve) => setTimeout(() => resolve({ games: [] }), seconds * 1000)) as never;
+}
+
+// Asks a question and returns what it came back with after `seconds` of the
+// fake clock, or "still running".
+async function answerAfter(seconds: number): Promise<AskResult | "still running"> {
+  let result = "still running" as AskResult | "still running";
+  const answer = answerQuestion("na", account, "Why do I lose?").then((r) => (result = r));
+  await vi.advanceTimersByTimeAsync(seconds * 1000);
+  const seen = result;
+  await vi.runAllTimersAsync();
+  await answer;
+  return seen;
 }
 
 describe("answerQuestion", () => {
@@ -119,14 +161,28 @@ describe("answerQuestion", () => {
 
   // The SDK's own retry would hide a timed-out try behind the next one, so
   // it's off, and sendRound makes the second try instead.
-  it("turns off the SDK's own retry and gives each try a minute", async () => {
-    create.mockResolvedValueOnce(answers);
+  it("turns off the SDK's own retry", async () => {
+    create.mockResolvedValueOnce(askForGames).mockResolvedValueOnce(answers);
 
     await ask();
 
-    expect(clientOptions).toEqual([{ maxRetries: 0, timeout: 60_000 }]);
-    // Options on a request would override the client's, so there are none.
-    expect(create.mock.calls.every((call) => call.length === 1)).toBe(true);
+    expect(clientOptions).toEqual([expect.objectContaining({ maxRetries: 0 })]);
+    // A request's own options would override the client's, so none of them
+    // sets a retry count or a timeout of its own.
+    for (const [, options] of create.mock.calls) {
+      expect(options).not.toHaveProperty("maxRetries");
+      expect(options).not.toHaveProperty("timeout");
+    }
+  });
+
+  it("cuts a try off after a minute, and counts it as maybe billed", async () => {
+    create.mockImplementationOnce(repliesAfter(90, answers)).mockResolvedValueOnce(answers);
+
+    // Cut off at 60 s, then the half-second pause, then the second try.
+    expect(await answerAfter(61)).toMatchObject({
+      answer: "You die early in most losses.",
+      costMicros: costMicros("claude-sonnet-5-5", usage) + HOLD_MICROS,
+    });
   });
 
   it("waits half a second before the second try", async () => {
@@ -238,4 +294,153 @@ describe("answerQuestion", () => {
     expect(result).toMatchObject({ answer: null, costMicros: HOLD_MICROS });
     expect(result.error).toBeInstanceOf(Error);
   });
+});
+
+// Vercel stops the request at the match page's maxDuration, and then the
+// question keeps only its 50-cent estimate, even if its rounds cost more.
+// So the loop stops itself first, with what the question cost so far, at
+// ASK_TIME_LIMIT_MS (120 s). Each test below reads the result at 120 s, so
+// one that's still running then fails. ask-time-limit.test.ts checks that the
+// page's maxDuration leaves room for what runs outside the loop.
+describe("answerQuestion's time limit", () => {
+  const round = costMicros("claude-sonnet-5-5", usage);
+
+  // The try was cut off, and Anthropic may still bill it.
+  it("cuts a try off at the limit, and adds the estimate", async () => {
+    create
+      .mockImplementationOnce(repliesAfter(50, askForGames))
+      .mockImplementationOnce(repliesAfter(50, askForGames))
+      .mockImplementationOnce(repliesAfter(60, answers));
+
+    expect(await answerAfter(120)).toMatchObject({ answer: null, costMicros: 2 * round + HOLD_MICROS });
+  });
+
+  it("cuts a second try off at the limit too", async () => {
+    create
+      .mockImplementationOnce(repliesAfter(40, askForGames))
+      .mockImplementationOnce(repliesAfter(40, askForGames))
+      .mockImplementationOnce(failsAfter(1, new APIError(undefined)))
+      .mockImplementationOnce(repliesAfter(60, answers));
+
+    // The third round's first try failed at 81 s, so its second try started
+    // at 81.5 s with 38.5 s left.
+    expect(await answerAfter(120)).toMatchObject({ answer: null, costMicros: 2 * round + HOLD_MICROS });
+    expect(create).toHaveBeenCalledTimes(4);
+  });
+
+  it("starts a round with 20 seconds left", async () => {
+    create
+      .mockImplementationOnce(repliesAfter(50, askForGames))
+      .mockImplementationOnce(repliesAfter(50, askForGames))
+      .mockImplementationOnce(repliesAfter(10, answers));
+
+    expect(await answerAfter(120)).toMatchObject({ answer: "You die early in most losses.", costMicros: 3 * round });
+  });
+
+  // The second round started with 70 s left, so it could still ask for
+  // games, and its reply came back with 19 s left, too late to read them.
+  // The question is charged for both rounds with no answer: a gap decision
+  // record 0030 keeps.
+  it("doesn't read the games or start a round with under 20 seconds left", async () => {
+    create.mockImplementationOnce(repliesAfter(50, askForGames)).mockImplementationOnce(repliesAfter(51, askForGames));
+
+    const result = await answerAfter(120);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    // Only the first round's games were read.
+    expect(recentGamesFor).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ answer: null, costMicros: 2 * round });
+    expect(result).toHaveProperty("error", expect.any(Error));
+  });
+
+  it("doesn't make a second try that its pause would leave under 20 seconds for", async () => {
+    const rateLimited = new APIError(429, new Headers({ "retry-after": "10" }));
+    create
+      .mockImplementationOnce(repliesAfter(50, askForGames))
+      .mockImplementationOnce(repliesAfter(40, askForGames))
+      .mockImplementationOnce(failsAfter(1, rateLimited));
+
+    const result = await answerAfter(120);
+
+    // The third try failed at 91 s, and a 10 s pause would leave 19.
+    expect(create).toHaveBeenCalledTimes(3);
+    expect(result).toMatchObject({ answer: null, costMicros: 2 * round, error: rateLimited });
+  });
+
+  // Riot can be slow to answer the tools, which runs out the clock too.
+  it("stops waiting for the tools once there's no time for another round", async () => {
+    create.mockImplementationOnce(repliesAfter(40, askForGames)).mockImplementationOnce(repliesAfter(40, askForGames));
+    vi.mocked(recentGamesFor).mockImplementationOnce(slowGames(10)).mockImplementationOnce(slowGames(60));
+
+    // The second round's tools started at 90 s, and at 100 s a round
+    // would have under 20 s left.
+    const result = await answerAfter(100);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ answer: null, costMicros: 2 * round });
+    expect(result).toHaveProperty("error", expect.any(Error));
+  });
+
+  // Otherwise Claude could ask for games it would have no time to read, and
+  // the question would be paid for with no answer.
+  it("makes a round with under a minute left the last, with no more tools", async () => {
+    create
+      .mockImplementationOnce(repliesAfter(30, askForGames))
+      .mockImplementationOnce(repliesAfter(30, askForGames))
+      .mockImplementationOnce(repliesAfter(1, askForGames))
+      .mockImplementationOnce(repliesAfter(10, answers));
+
+    const result = await answerAfter(120);
+
+    // The third round started at 60 s, with a minute left, and the fourth at
+    // 61 s, with 59.
+    const toolChoices = create.mock.calls.map((call) => call[0].tool_choice.type);
+    expect(toolChoices).toEqual(["auto", "auto", "auto", "none"]);
+    expect(result).toMatchObject({ answer: "You die early in most losses.", costMicros: 4 * round });
+  });
+});
+
+// The time limit rests on aborting a try (tryOnce in ask.ts): the SDK's own
+// `timeout` option stops waiting once Anthropic's reply starts, so a reply
+// that stalls partway would run on. The tests above fake the SDK, so this
+// checks the real one, against a local server, so that an SDK update that
+// changes what an abort does fails here.
+describe("the real Anthropic SDK", () => {
+  const replies = {
+    "sends nothing": () => {},
+    "stalls partway through its reply": (res: ServerResponse) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write('{"id":"msg_');
+    },
+  };
+
+  it.each(Object.keys(replies) as (keyof typeof replies)[])(
+    "stops a try that's aborted while Anthropic %s, as one that may be billed",
+    async (kind) => {
+      vi.useRealTimers();
+      const { default: RealAnthropic } = await vi.importActual<typeof import("@anthropic-ai/sdk")>("@anthropic-ai/sdk");
+      const server = createServer((_req, res) => replies[kind](res));
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      try {
+        const { port } = server.address() as AddressInfo;
+        const client = new RealAnthropic({ apiKey: "test", baseURL: `http://127.0.0.1:${port}`, maxRetries: 0 });
+        const stop = new AbortController();
+        setTimeout(() => stop.abort(), 200);
+        const started = Date.now();
+
+        const error = await client.beta.messages
+          .create({ model: "claude-sonnet-5-5", max_tokens: 10, messages: [{ role: "user", content: "hi" }] }, { signal: stop.signal })
+          .catch((caught: unknown) => caught);
+
+        expect(Date.now() - started).toBeLessThan(2000);
+        expect(error).toBeInstanceOf(Error);
+        // Not a refusal with a status (see turnedDown), so sendRound counts
+        // the try as one that may have been billed.
+        expect(error instanceof RealAnthropic.APIError && error.status !== undefined).toBe(false);
+      } finally {
+        server.closeAllConnections();
+        server.close();
+      }
+    },
+  );
 });

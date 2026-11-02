@@ -17,7 +17,7 @@ import type { Region } from "@/lib/regions";
 import { RiotApiError } from "@/lib/riot/client";
 import type { Account } from "@/lib/riot/types";
 
-// Answers a question about one player's games with Claude, for the Ask tab.
+// Answers a question about one player's games with Claude, for the Ask panel.
 // Claude gets two tools, the same ones the MCP server offers
 // (src/lib/mcp/tools.ts): a list of recent games and the analysis of one
 // game. It decides which to call, reads the results and writes the answer.
@@ -34,7 +34,22 @@ export const ASK_MODEL = "claude-sonnet-5-5";
 // round re-sends the conversation so far, so this also caps the cost.
 const MAX_ROUNDS = 8;
 
-// Without the key, the Ask tab says it isn't available.
+// How long a question may take, from when it starts here. Vercel stops the
+// request at the match page's maxDuration, and a question stopped that way
+// keeps only the 50-cent estimate it was saved with (src/lib/ask-store.ts),
+// however much its rounds cost by then. So the loop stops itself first and
+// returns what it spent. The rest of maxDuration is for what runs outside
+// the loop: the sign-in check, the player's Riot lookup (about 40 s when Riot
+// isn't answering) and reserve() before it, and saving the cost after.
+// ask-time-limit.test.ts times that lookup and checks it all still fits.
+export const ASK_TIME_LIMIT_MS = 120_000;
+// The longest one try waits for Anthropic. Two tries make a round.
+const TRY_TIMEOUT_MS = 60_000;
+// A try isn't started with less time than this left: it would most likely be
+// cut off, and a try cut off partway may still be billed.
+const MIN_TRY_MS = 20_000;
+
+// Without the key, the Ask panel says it isn't available.
 export function askEnabled(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
@@ -91,8 +106,8 @@ const TOOLS: BetaTool[] = [
 ];
 
 export type AskResult = {
-  // Null when Claude refused, ran out of room or rounds, or a round failed.
-  // The cost still counts.
+  // Null when Claude refused, ran out of room, rounds or time, or a round
+  // failed. The cost still counts.
   answer: string | null;
   games: AskGame[];
   model: string;
@@ -100,9 +115,10 @@ export type AskResult = {
   // Anthropic reported for each round, plus HOLD_MICROS for each round in
   // which a try may have been billed without a reply (see sendRound).
   costMicros: number;
-  // Set when a round failed (Anthropic overloaded, a timeout, no network),
-  // for the caller to report. The rounds before it were still paid for, so
-  // their cost is in costMicros rather than lost with the error.
+  // Set when a round failed (Anthropic overloaded, a timeout, no network) or
+  // the question reached ASK_TIME_LIMIT_MS, for the caller to report. The
+  // rounds before it were still paid for, so their cost is in costMicros
+  // rather than lost with the error.
   error?: unknown;
 };
 
@@ -111,11 +127,11 @@ export async function answerQuestion(
   account: Account,
   question: string,
 ): Promise<AskResult> {
-  // A minute per try, and two tries per round (see sendRound). A question
-  // that runs past the page's time limit (maxDuration in the Ask page) is
-  // cut off; it was saved with an estimated cost before it started
-  // (src/lib/ask-store.ts), so it still counts.
-  const client = new Anthropic({ maxRetries: 0, timeout: 60_000 });
+  // No retries from the SDK: sendRound makes the second try itself. tryOnce
+  // stops each try, so the client's timeout is only a backstop.
+  const client = new Anthropic({ maxRetries: 0, timeout: TRY_TIMEOUT_MS });
+  const deadline = Date.now() + ASK_TIME_LIMIT_MS;
+  const timeLeft = () => deadline - Date.now();
   const messages: BetaMessageParam[] = [{ role: "user", content: question }];
   const tools = new ToolRunner(region, account);
   let model = ASK_MODEL;
@@ -126,9 +142,19 @@ export async function answerQuestion(
     model,
     costMicros: cost,
   });
+  const outOfTime = (): AskResult => ({
+    ...result(null),
+    error: new Error("Ask ran out of time before Claude answered"),
+  });
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
-    const sent = await sendRound(client, {
+    // A round with less than a full try's time left is the last one too, so
+    // Claude answers with what it has instead of asking for games there'd be
+    // no time to read. A round started with a little more time can still ask
+    // for games and run out of time before reading them (decision record
+    // 0030); the question is then charged with no answer.
+    const lastRound = round === MAX_ROUNDS || timeLeft() < TRY_TIMEOUT_MS;
+    const sent = await sendRound(client, timeLeft, {
       model: ASK_MODEL,
       max_tokens: 8000,
       // Saves the conversation so far in Anthropic's cache, so the next
@@ -140,7 +166,7 @@ export async function answerQuestion(
       system: SYSTEM,
       tools: TOOLS,
       // On the last round, no more tools: answer with what you've read.
-      tool_choice: { type: round === MAX_ROUNDS ? "none" : "auto" },
+      tool_choice: { type: lastRound ? "none" : "auto" },
       messages,
       // If Claude declines (its safety checks can misfire on game talk like
       // "kill" and "execute"), Anthropic retries on a fallback model it picks.
@@ -157,10 +183,23 @@ export async function answerQuestion(
     cost += costMicros(response.model, response.usage);
 
     if (response.stop_reason === "tool_use") {
+      // Reading the games is only worth it if there's time for another round
+      // to send Claude what they say, and a round isn't started with less
+      // than MIN_TRY_MS left. That's the only check before a round: the first
+      // has the whole time limit, and every other one follows the tools.
+      if (timeLeft() < MIN_TRY_MS) return outOfTime();
       // The whole reply goes back, thinking included, as the API requires.
       messages.push({ role: "assistant", content: response.content });
       const calls = response.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
-      const results = await Promise.all(calls.map((call) => tools.run(call)));
+      // A slow Riot can run out the clock too, so wait for the tools only
+      // while there's still time for another round. Claude isn't called
+      // again, so whatever the tools still do after that (reading Riot,
+      // saving games to the cache) costs no Claude money.
+      const results = await within(
+        timeLeft() - MIN_TRY_MS,
+        Promise.all(calls.map((call) => tools.run(call))),
+      );
+      if (results === undefined) return outOfTime();
       // All results in one message, so Claude keeps calling tools in parallel.
       messages.push({ role: "user", content: results });
       continue;
@@ -180,9 +219,10 @@ export async function answerQuestion(
 // How long to wait before a round's second try: half a second, the SDK's
 // own first pause, unless Anthropic says how long (see pauseBeforeRetry).
 const RETRY_PAUSE_MS = 500;
-// The longest pause Anthropic can ask for that we'll wait out, so a question
-// still fits in the page's time limit. If it asks for longer, the second try
-// will likely be turned down too, which costs nothing.
+// The longest pause Anthropic can ask for that we'll wait out, so one
+// rate-limited round doesn't use up much of the question's time limit. If it
+// asks for longer, the second try will likely be turned down too, which costs
+// nothing.
 const MAX_RETRY_PAUSE_MS = 10_000;
 
 type SentRound =
@@ -203,14 +243,19 @@ type SentRound =
 // `mayBeBilled` says to count the round as HOLD_MICROS, the same estimate as
 // a question still being answered. That also charges a network outage that
 // never reached Anthropic, which errs on the safe side.
+//
+// No try runs past the time limit (`timeLeft`, see ASK_TIME_LIMIT_MS): one
+// that would is cut off there and counted like any timeout, and the second
+// try is skipped when the pause before it would leave less than MIN_TRY_MS.
 async function sendRound(
   client: Anthropic,
+  timeLeft: () => number,
   request: MessageCreateParamsNonStreaming,
 ): Promise<SentRound> {
   let mayBeBilled = false;
   for (let attempt = 1; ; attempt++) {
     try {
-      const response = await client.beta.messages.create(request);
+      const response = await tryOnce(client, request, Math.min(TRY_TIMEOUT_MS, timeLeft()));
       // A success without token counts (an empty reply, or one that isn't
       // JSON) can't be priced, but Anthropic may have run it, so it's a
       // failed try that may have been billed.
@@ -218,9 +263,42 @@ async function sendRound(
       return { ok: true, response, mayBeBilled };
     } catch (error) {
       if (!turnedDown(error)) mayBeBilled = true;
-      if (attempt === 2) return { ok: false, error, mayBeBilled };
-      await new Promise((resolve) => setTimeout(resolve, pauseBeforeRetry(error)));
+      const pause = pauseBeforeRetry(error);
+      if (attempt === 2 || timeLeft() - pause < MIN_TRY_MS) return { ok: false, error, mayBeBilled };
+      await new Promise((resolve) => setTimeout(resolve, pause));
     }
+  }
+}
+
+// One try, stopped after `ms`. The SDK's own `timeout` option only covers
+// the wait for Anthropic's reply to start, so a reply that started and then
+// stalled would run on past the time limit. Aborting stops the whole try. A
+// stopped try fails like a lost connection (see turnedDown), so it counts as
+// one that may have been billed.
+async function tryOnce(
+  client: Anthropic,
+  request: MessageCreateParamsNonStreaming,
+  ms: number,
+): Promise<BetaMessage> {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), ms);
+  try {
+    return await client.beta.messages.create(request, { signal: stop.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// The work's result, or undefined if `ms` passes first.
+async function within<T>(ms: number, work: Promise<T>): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeUp = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), ms);
+  });
+  try {
+    return await Promise.race([work, timeUp]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
