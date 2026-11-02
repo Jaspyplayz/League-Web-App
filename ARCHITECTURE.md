@@ -40,7 +40,7 @@ Every request goes down the same three layers. Each layer only calls the one bel
 |---|---|---|
 | **Pages** | `src/app/` | Read the URL, ask the stores for data, run the analyzer, render HTML. `/api/mcp` is a page too, it just answers AI apps with text instead of HTML. |
 | **Stores** | `src/lib/*-store.ts` | Decide where data comes from: Postgres if it's saved and still fresh, otherwise Riot. Save what Riot returns. |
-| **Riot client** | `src/lib/riot/` | The only code that calls Riot. Waits its turn under the rate limit, adds the key, times out after 8 seconds, retries server errors, and backs off when Riot says "too many requests". |
+| **Riot client** | `src/lib/riot/` | The only code that calls Riot. Waits its turn under the rate limit, adds the key, times out after 8 seconds, retries server errors, network errors and replies whose body won't read, and backs off when Riot says "too many requests". |
 
 The **analyzer** (`src/lib/analyzer/`) sits beside these layers, not under them. It takes match JSON and returns results, with no network or database, which is why it has the most tests.
 
