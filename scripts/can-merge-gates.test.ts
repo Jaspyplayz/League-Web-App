@@ -411,9 +411,9 @@ describe("decide", () => {
     expect(detail(decision, "No files Jasper merges")).toBe(".claude/agent-merge.json (the switch for agent merging)");
   });
 
-  // On 2026-11-01 Jasper chose to let risky PRs merge once the interrogate
-  // panel and the reviewer clear them, except migrations and anything that
-  // defines a check, which stay his (JAS-128).
+  // Risky PRs merge once the interrogate panel and the reviewer clear them
+  // (JAS-128), except migrations and the merge gates, which stay Jasper's
+  // (JAS-191).
   describe("a risky PR", () => {
     const SIGN_IN = ["src/app/sign-in/page.tsx", "docs/sign-in.md"];
     const panel = (sha: string) => `Interrogate panel at ${sha}: 0 to act on`;
@@ -517,6 +517,7 @@ describe("decide", () => {
       ".github/workflows/agent-merge-sweep.yml",
       ".github/workflows/reviewer.yml",
       ".claude/agent-merge.json",
+      ".claude/settings.json",
     ])("still refuses %s with a panel line and a clean verdict at the head, in every tier", (file) => {
       for (const tier of ["tiny. One line.", "normal. One line.", "risky. One line."]) {
         const files = ["src/app/sign-in/page.tsx", file];
@@ -591,7 +592,7 @@ describe("decide", () => {
       expect(failed(decision)).toEqual(["Built by Claude Code"]);
     });
 
-    it("lets Claude merge the verify and postmortem skills' Markdown after the panel", () => {
+    it("lets Claude merge skills after the panel, the verify and postmortem skills included", () => {
       const files = [".claude/skills/verify-turnpoint-ux/features/review-path.md", ".claude/skills/verify/SKILL.md", ".claude/skills/postmortem/SKILL.md"];
       const without = decide(pr({ files }), main());
       expect(failed(without)).toEqual(["Interrogate panel ran"]);

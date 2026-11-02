@@ -20,6 +20,7 @@ import {
   type OpenPull,
 } from "./can-merge-action-steps";
 import { REFUSED_EXIT_CODE } from "./can-merge-gates";
+import { jaspersFiles } from "./risky-paths";
 
 const REPO = "Jaspyplayz/League-Web-App";
 const HEAD = "4d2a4fefeaef178f0565d274999c22b752383437";
@@ -403,11 +404,14 @@ describe(".github/workflows/agent-merge.yml", () => {
     expect(code.map((line) => line.trim())).toContain("timeout-minutes: 10");
   });
 
-  it("runs only main's checkout, node, npm ci and the action script", () => {
+  // .npmrc, package.json and tsconfig.json are on the panel list (decision
+  // record 0032), so the install runs with no .npmrc and no install scripts,
+  // and tsx reads a tsconfig on Jasper's list with no paths to swap a module.
+  it("runs only main's checkout, node, npm ci with no .npmrc or install scripts, and the action script", () => {
     expect(code.filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
       "- uses: actions/checkout@v7",
       "- uses: actions/setup-node@v7",
-      "- run: npm ci",
+      "- run: rm -f .npmrc && npm ci --ignore-scripts",
       "- run: npx tsx scripts/can-merge-action.ts",
     ]);
     expect(code.filter((line) => /^\s*(ref|repository|path|token|cache|fetch-depth|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
@@ -434,12 +438,24 @@ describe(".github/workflows/agent-merge.yml", () => {
       "GH_TOKEN: ${{ github.token }}",
       "GH_REPO: ${{ github.repository }}",
     ]);
-    expect(code.slice(-4).map((line) => line.trim())).toEqual([
+    expect(code.slice(-5).map((line) => line.trim())).toEqual([
       "- run: npx tsx scripts/can-merge-action.ts",
       "env:",
       "GH_TOKEN: ${{ github.token }}",
       "GH_REPO: ${{ github.repository }}",
+      "TSX_TSCONFIG_PATH: scripts/can-merge.tsconfig.json",
     ]);
+  });
+
+  // tsx follows a tsconfig's paths for bare imports, so a paths entry here
+  // could swap zod for a file a PR adds. The test of the switch to this file
+  // is the step list above.
+  it("gives tsx a tsconfig with no paths, on Jasper's list", () => {
+    const config = JSON.parse(source("scripts/can-merge.tsconfig.json")) as { compilerOptions: Record<string, unknown>; extends?: unknown };
+    expect(Object.keys(config)).toEqual(["compilerOptions"]);
+    expect(Object.keys(config.compilerOptions)).not.toContain("paths");
+    expect(Object.keys(config.compilerOptions)).not.toContain("baseUrl");
+    expect(jaspersFiles(["scripts/can-merge.tsconfig.json"])).toHaveLength(1);
   });
 
   it("asks for write access only where merging needs it", () => {

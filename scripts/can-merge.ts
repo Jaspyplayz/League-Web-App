@@ -44,6 +44,9 @@ import {
 } from "./can-merge-rest";
 
 const USAGE = "Usage: npm run can-merge -- <pr number> [--merge]";
+// What a run reads from this checkout, which must be main's: the gates, the
+// lists, and package.json, which defines `npm run can-merge`. That isn't the
+// same question as JASPERS_PATHS, which says who merges a change.
 const GATE_CODE = ["scripts/can-merge*", "scripts/risky-paths*", "package.json"];
 
 function run(command: string, args: string[], input?: string): string {

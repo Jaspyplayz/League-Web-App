@@ -243,8 +243,8 @@ const GATES: { name: string; check: (context: Context) => Result }[] = [
     check: ({ tier }) => (tier.ok ? pass(tier.tier) : fail(tier.why)),
   },
   {
-    // Migrations and anything that defines a check, whatever the tier and
-    // the reviews say (JAS-128).
+    // Migrations and the merge gates, whatever the tier and the reviews say
+    // (JAS-128, JAS-191).
     name: "No files Jasper merges",
     check: ({ pr }) => {
       const jaspers = jaspersFiles(pr.files);

@@ -1,15 +1,16 @@
 // The paths that make a PR risky (issue #158), in two lists (JAS-128, JAS-191):
 //
-// - JASPERS_PATHS: migrations, the schema they come from, and the merge gates'
-//   own code. `npm run can-merge` refuses a PR that touches one, whatever its
-//   tier says. Only Jasper runs `npm run db:migrate`, so code merged before its
-//   migration would break the live site's reads; and an agent could otherwise
-//   loosen a gate and merge that.
+// - JASPERS_PATHS: migrations, the schema they come from, and the merge gates
+//   (their code, Claude's deny rules and the switch). `npm run can-merge`
+//   refuses a PR that touches one, whatever its tier says. Only Jasper runs
+//   `npm run db:migrate`, so code merged before its migration would break the
+//   live site's reads; and an agent could otherwise loosen a gate and merge
+//   that.
 // - PANEL_PATHS: the rest of the risky code, including every other check (CI,
 //   lint, test configs, hooks, the reviewer agent and the skills). Claude
 //   merges a PR that touches one only after the interrogate panel and the
-//   reviewer clear it. Jasper chose this on 2026-11-02, since he doesn't check
-//   these PRs before merging them, so his click only added waiting.
+//   reviewer clear it, since Jasper's click on these checked nothing more
+//   (decision record 0032).
 //
 // The docs link here instead of copying the lists.
 //
@@ -28,21 +29,25 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   // change here with no migration would break the live site's reads.
   { pattern: "src/db/schema.ts", why: "the tables migrations are generated from" },
 
-  // The merge gates' own code. A builder can propose a change here, but only
-  // Jasper merges it. GitHub runs a workflow named .yml or .yaml, so the two
-  // workflow patterns have no extension.
+  // The merge gates. A builder can propose a change here, but only Jasper
+  // merges it. GitHub runs a workflow named .yml or .yaml, so the two workflow
+  // patterns have no extension. scripts/can-merge covers the tsconfig the Agent
+  // merge workflow gives tsx too.
   { pattern: "scripts/can-merge", why: "the merge gates" },
   { pattern: "scripts/risky-paths", why: "these lists" },
   { pattern: ".github/workflows/agent-merge", why: "the workflows that run can-merge with a token that can merge" },
   { pattern: ".github/workflows/reviewer", why: "GitHub's required reviewer check" },
   { pattern: ".claude/agent-merge.json", why: "the switch for agent merging" },
+  // Its deny rules stop a session merging with `gh pr merge` or the REST merge
+  // request, around can-merge, and stop it editing the switch. Local overrides
+  // match too.
+  { pattern: ".claude/settings", why: "Claude's deny rules on merging, and local overrides of them" },
 ];
 
 export const PANEL_PATHS: readonly RiskyPath[] = [
   // Anything else that defines or runs a check, and anything that steers the
   // agents. These were Jasper's until JAS-191.
   { pattern: ".github/", why: "CI, the smoke test and the PR template" },
-  { pattern: ".claude/settings", why: "Claude's deny rules and commit hook, and local overrides of them" },
   { pattern: ".claude/hooks/", why: "the commit hook, and the startup hook that runs commands in every cloud session" },
   { pattern: ".claude/agents/", why: "the reviewer agent, and any agent that could take its name" },
   { pattern: ".cursor/settings.json", why: "Cursor isn't used any more, but its settings could still turn on an AI tool here" },
@@ -67,7 +72,9 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
   { pattern: "e2e/preview-login.ts", why: "the code that sends the preview's secret" },
   { pattern: "e2e/preview-secret.spec.ts", why: "the check that the preview's secret stays on the preview" },
   { pattern: "scripts/preview-login", why: "the test of the check that the preview's secret stays on the preview" },
-  // The Agent merge workflow installs from these before it runs can-merge.
+  // The Agent merge workflow installs from these, with install scripts off and
+  // .npmrc deleted, and runs main's lockfile's dependencies (decision record
+  // 0032).
   { pattern: "package.json", why: "the commands CI runs, and dependencies" },
   { pattern: "package-lock.json", why: "dependencies" },
   { pattern: ".npmrc", why: "how npm ci installs, in every workflow" },
@@ -130,7 +137,7 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
 // turns lint off for every file there (JAS-191).
 const NESTED: readonly { test: RegExp; why: string }[] = [
   { test: /\/\.(claude|cursor)\//i, why: "agent skills or rules below the repo root" },
-  { test: /\/eslint\.config/i, why: "lint for the files in its folder, which ESLint reads in place of the root's" },
+  { test: /\/eslint\.config\.[cm]?[jt]s$/i, why: "lint for the files in its folder, which ESLint reads in place of the root's" },
 ];
 
 // Windows ignores case, so src/DB/schema.ts would land on src/db/schema.ts.

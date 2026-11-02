@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { posix } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
 import { jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, riskyFiles, type RiskyPath } from "./risky-paths";
@@ -54,6 +55,19 @@ function mustBeListed(file: string, source: string): boolean {
 const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !/\.test\./.test(file);
 
 const onPanel = (path: string) => riskyFiles([path]).length === 1 && jaspersFiles([path]).length === 0;
+
+// What's wrong with a workflow's token, comments aside: no top-level
+// permissions line, so it gets the repo's default, or any write access.
+function tokenProblems(workflow: string): string[] {
+  const code = workflow
+    .split("\n")
+    .map((line) => line.replace(/(^|\s)#.*$/, ""))
+    .join("\n");
+  return [
+    !/^permissions:/m.test(code) && "doesn't set its token's permissions",
+    /\bwrite(-all)?\b/.test(code) && "asks for write access",
+  ].filter((problem) => problem !== false);
+}
 
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
@@ -157,6 +171,8 @@ describe("riskyFiles", () => {
         "src/lib/match-store.ts.bak",
         "src/components/theme-store.ts",
         "scripts/shot.ts",
+        "docs/eslint.config.md",
+        "src/lib/eslint.configs.json",
         ".cursor/skills/verify-turnpoint/SKILL.md",
       ]),
     ).toEqual([]);
@@ -177,12 +193,15 @@ describe("riskyFiles", () => {
     "scripts/can-merge-rest.ts",
     "scripts/can-merge-reviewer-check.ts",
     "scripts/can-merge-fixtures/body-245.md",
+    "scripts/can-merge.tsconfig.json",
     "scripts/risky-paths.ts",
     "scripts/risky-paths.test.ts",
     ".github/workflows/agent-merge.yml",
     ".github/workflows/agent-merge-sweep.yml",
     ".github/workflows/reviewer.yml",
     ".claude/agent-merge.json",
+    ".claude/settings.json",
+    ".claude/settings.local.json",
   ])("keeps %s Jasper's to merge", (path) => {
     expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
   });
@@ -199,6 +218,7 @@ describe("riskyFiles", () => {
       ".github/workflows/agent-merge",
       ".github/workflows/reviewer",
       ".claude/agent-merge.json",
+      ".claude/settings",
     ]);
   });
 
@@ -211,6 +231,7 @@ describe("riskyFiles", () => {
     ".github/workflows/Reviewer.yml",
     ".GitHub/Workflows/Agent-Merge.yml",
     ".claude/Agent-Merge.json",
+    ".Claude/Settings.json",
     "Scripts/Can-Merge-Gates.ts",
     "scripts/RISKY-PATHS.ts",
     "Drizzle/0015_x.sql",
@@ -230,8 +251,6 @@ describe("riskyFiles", () => {
     ".github/pull_request_template.md",
     ".github/dependabot.yml",
     ".github/ISSUE_TEMPLATE/feature.md",
-    ".claude/settings.json",
-    ".claude/settings.local.json",
     ".claude/hooks/check-before-commit.mjs",
     ".claude/hooks/cloud-setup.mjs",
     ".claude/agents/reviewer.md",
@@ -344,14 +363,15 @@ describe("riskyFiles", () => {
   });
 
   // Every file in these folders steers agents or runs a check. Of them, only
-  // the merge switch and the workflows that merge or check the reviewer are
-  // Jasper's.
+  // the merge switch, Claude's deny rules and the workflows that merge or check
+  // the reviewer are Jasper's.
   it("flags every file in .claude/ and .github/, and keeps only the gates' files there Jasper's", () => {
     const files = repoFiles.filter((file) => file.startsWith(".claude/") || file.startsWith(".github/"));
     expect(files.length).toBeGreaterThan(100);
     expect(riskyFiles(files).map((file) => file.path)).toEqual(files);
     expect(jaspersFiles(files).map((file) => file.path).sort()).toEqual([
       ".claude/agent-merge.json",
+      ".claude/settings.json",
       ".github/workflows/agent-merge-sweep.yml",
       ".github/workflows/agent-merge.yml",
       ".github/workflows/reviewer.yml",
@@ -373,6 +393,65 @@ describe("riskyFiles", () => {
       list.splice(at, 1);
     }
     expect(jaspersFiles([".github/workflows/ci.yml"])).toEqual([]);
+  });
+
+  // These deny rules keep a session merging only through can-merge: without
+  // them, one could merge a migration or a gate change with `gh pr merge`.
+  // So the file that holds them stays Jasper's (JAS-191's reviewer blocker).
+  it("keeps the deny rules on merging, and the file that holds them, Jasper's", () => {
+    const settings = JSON.parse(readFileSync(".claude/settings.json", "utf8")) as { permissions: { deny: string[] } };
+    expect(settings.permissions.deny).toEqual(
+      expect.arrayContaining(["Edit(.claude/agent-merge.json)", "Bash(gh pr merge)", "Bash(gh pr merge*)", "Bash(gh api *pulls/*/merge*)"]),
+    );
+    expect(jaspersFiles([".claude/settings.json"])).toEqual([
+      { path: ".claude/settings.json", why: "Claude's deny rules on merging, and local overrides of them" },
+    ]);
+  });
+
+  // GitHub counts a check named check or reviewer from any workflow, and a
+  // token that can write could merge a PR without can-merge. So a workflow
+  // Claude merges after the panel sets its token's permissions and asks for no
+  // write access; one that needs it changes this test, which is Jasper's. CI
+  // runs this at the PR's head, so a PR would have to stop CI running it too.
+  it("lets only the merge gates' own workflows ask for write access", () => {
+    const workflows = repoFiles.filter((file) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file) && existsSync(file));
+    expect(workflows.length).toBeGreaterThan(3);
+    const others = workflows.filter((file) => jaspersFiles([file]).length === 0);
+    expect(others).toContain(".github/workflows/ci.yml");
+    expect(others.flatMap((file) => tokenProblems(readFileSync(file, "utf8")).map((problem) => `${file} ${problem}`))).toEqual([]);
+  });
+
+  it.each([
+    ["no permissions line", "name: X\non: push\njobs: {}\n"],
+    ["a write permission", "permissions:\n  contents: write\n"],
+    ["a job's write permission", "permissions: {}\njobs:\n  x:\n    permissions:\n      pull-requests: write\n"],
+    ["write-all", "permissions: write-all\n"],
+    ["a flow-style write", "permissions: { contents: read, actions: write }\n"],
+  ])("would refuse a workflow with %s", (_, text) => {
+    expect(tokenProblems(text)).not.toEqual([]);
+  });
+
+  it("accepts a workflow that reads only, whatever its comments say", () => {
+    expect(tokenProblems("# This job never writes; write access stays with Agent merge.\npermissions:\n  contents: read # no write\n")).toEqual([]);
+  });
+
+  // The gates' code is Jasper's by name, so a helper they import under another
+  // name would be on neither list. This follows their imports from each file.
+  it("keeps every file the gates import Jasper's", () => {
+    const seen = new Set<string>();
+    const queue = repoFiles.filter((file) => /^scripts\/can-merge[^/]*\.ts$/.test(file) && !/\.test\.ts$/.test(file));
+    expect(queue).toContain("scripts/can-merge-gates.ts");
+    while (queue.length > 0) {
+      const file = queue.pop() as string;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      for (const [, relative] of readFileSync(file, "utf8").matchAll(/from\s+["'](\.{1,2}\/[^"']+)["']/g)) {
+        const target = posix.normalize(posix.join(posix.dirname(file), relative));
+        queue.push(/\.[cm]?[jt]s$/.test(target) ? target : `${target}.ts`);
+      }
+    }
+    expect([...seen]).toContain("scripts/risky-paths.ts");
+    expect([...seen].filter((file) => jaspersFiles([file]).length === 0)).toEqual([]);
   });
 
   // A file on Jasper's list can sit in a panel folder, like src/db/schema.ts

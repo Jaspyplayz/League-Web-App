@@ -99,10 +99,20 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - run: npm ci
+      # .npmrc, package.json and tsconfig.json are on the panel list, so Claude
+      # can merge a change to them, but none may change what runs below with
+      # the token (decision record 0032). An .npmrc could set node-options, and
+      # a package.json install script could rewrite the gates on disk, so the
+      # first goes and the second is skipped. The dependencies still come from
+      # main's lockfile.
+      - run: rm -f .npmrc && npm ci --ignore-scripts
       - run: npx tsx scripts/can-merge-action.ts
         env:
           # npm ci above runs without the token in its environment.
           GH_TOKEN: ${{ github.token }}
           # gh fills in can-merge's {owner}/{repo} from this.
           GH_REPO: ${{ github.repository }}
+          # tsx reads this in place of tsconfig.json, here and in the can-merge
+          # run the script starts, so tsconfig.json's paths can't swap a module
+          # the gates import, such as zod.
+          TSX_TSCONFIG_PATH: scripts/can-merge.tsconfig.json
