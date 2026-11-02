@@ -550,6 +550,15 @@ describe("linearWrites", () => {
 describe(".github/workflows/run-queue.yml", () => {
   const code = workflowLines(".github/workflows/run-queue.yml");
   const trimmed = code.map((line) => line.trim());
+  const merged = code.slice(code.indexOf("  merged:"), code.indexOf("  queue:"));
+  const queue = code.slice(code.indexOf("  queue:"));
+  // An `if: >-` and the lines folded into it.
+  const condition = (job: string[]) => {
+    const at = job.findIndex((line) => line.trim() === "if: >-");
+    const rest = job.slice(at + 1);
+    const end = rest.findIndex((line) => !line.startsWith("      "));
+    return rest.slice(0, end).map((line) => line.trim());
+  };
 
   it("wakes when Agent merge finishes, on a push to main, by name with a dry_run input, and hourly", () => {
     const on = code.indexOf("on:");
@@ -571,39 +580,49 @@ describe(".github/workflows/run-queue.yml", () => {
     ]);
   });
 
-  it("runs on a merge or by name with no help from the schedule, and only main's copy", () => {
-    const start = trimmed.indexOf("if: >-");
-    expect(trimmed.slice(start, start + 4)).toEqual([
-      "if: >-",
+  it("runs the queue on a push, by name or on the schedule with no help from the merged job, and only main's copy", () => {
+    expect(condition(queue)).toEqual([
+      "!cancelled() &&",
       "github.ref == 'refs/heads/main' &&",
       "(github.event_name != 'workflow_run' ||",
-      "github.event.workflow_run.conclusion != 'skipped')",
+      "needs.merged.outputs.moved == 'true')",
     ]);
-    expect(code.filter((line) => /\bif:/.test(line))).toHaveLength(1);
-    expect(trimmed.slice(start, start + 4).join(" ")).not.toContain("schedule");
+    expect(queue).toContain("    needs: merged");
+    expect(code.filter((line) => /\bif:/.test(line))).toHaveLength(2);
+    expect(condition(queue).join(" ")).not.toContain("schedule");
   });
 
-  it("asks for nothing by default, and only reading on the job", () => {
+  it("runs the merged job only when Agent merge finished, so a workflow_run starts the queue only when main moved", () => {
+    expect(condition(merged)).toEqual(["github.event_name == 'workflow_run' &&", "github.event.workflow_run.conclusion != 'skipped'"]);
+    expect(merged.map((line) => line.trim())).toContain("moved: ${{ steps.main.outputs.moved }}");
+  });
+
+  it("asks for nothing by default, and only reading on each job", () => {
     expect(code).toContain("permissions: {}");
-    expect(code.filter((line) => /permissions:/.test(line))).toHaveLength(2);
-    const job = code.indexOf("    permissions:");
-    expect(trimmed.slice(job + 1, job + 4)).toEqual(["contents: read", "pull-requests: read", "statuses: read"]);
-    expect(code[job + 4].trim()).toBe("steps:");
+    expect(code.filter((line) => /permissions:/.test(line))).toHaveLength(3);
+    const mergedAt = merged.indexOf("    permissions:");
+    expect(merged.slice(mergedAt + 1, mergedAt + 3).map((line) => line.trim())).toEqual(["contents: read", "outputs:"]);
+    const queueAt = queue.indexOf("    permissions:");
+    expect(queue.slice(queueAt + 1, queueAt + 5).map((line) => line.trim())).toEqual(["contents: read", "pull-requests: read", "statuses: read", "steps:"]);
   });
 
-  it("runs one at a time, and never cancels a running one", () => {
-    const at = trimmed.indexOf("concurrency:");
-    expect(trimmed.slice(at + 1, at + 3)).toEqual(["group: run-queue", "cancel-in-progress: false"]);
+  it("runs one real run at a time on the queue job, with dry runs on their own line, and never cancels a running one", () => {
+    expect(code.filter((line) => /concurrency:/.test(line))).toEqual(["    concurrency:"]);
+    const at = queue.indexOf("    concurrency:");
+    expect(queue.slice(at + 1, at + 3).map((line) => line.trim())).toEqual([
+      "group: ${{ inputs.dry_run && 'run-queue-dry-run' || 'run-queue' }}",
+      "cancel-in-progress: false",
+    ]);
   });
 
-  it("runs only main's checkout, node, npm ci and the queue script", () => {
-    expect(code.filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
+  it("runs only main's checkout, node, npm ci and the queue script in the queue job", () => {
+    expect(queue.filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
       "- uses: actions/checkout@v7",
       "- uses: actions/setup-node@v7",
       "- run: npm ci",
       "- run: npx tsx scripts/run-queue.ts",
     ]);
-    expect(code.filter((line) => /^\s*(ref|repository|path|token|cache|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
+    expect(queue.filter((line) => /^\s*(ref|repository|path|token|cache|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
       "ref: main",
       "persist-credentials: false",
       "package-manager-cache: false",
@@ -620,10 +639,19 @@ describe(".github/workflows/run-queue.yml", () => {
     expect(secrets.every((line) => code.indexOf(line) > lastStep)).toBe(true);
   });
 
-  it("puts nothing from the event into a run: line", () => {
-    const runLines = code.filter((line) => /^\s*(- )?run:/.test(line));
-    expect(runLines).toHaveLength(2);
-    expect(runLines.some((line) => line.includes("${{"))).toBe(false);
+  it("puts nothing from the event into a run: line, so the merged job passes the event's time through env", () => {
+    const script = code.flatMap((line, i) => {
+      if (!/^\s*(- )?run:/.test(line)) return [];
+      if (!line.trim().endsWith("|")) return [line];
+      const indent = line.indexOf("run:");
+      const body = code.slice(i + 1);
+      const end = body.findIndex((next) => next.search(/\S/) <= indent);
+      return [line, ...body.slice(0, end === -1 ? undefined : end)];
+    });
+    expect(script.filter((line) => /^\s*(- )?run:/.test(line))).toHaveLength(3);
+    expect(script.map((line) => line.trim())).toContain('if [[ "$committed" > "$STARTED" ]]; then moved=true; else moved=false; fi');
+    expect(script.some((line) => line.includes("${{"))).toBe(false);
+    expect(merged.map((line) => line.trim())).toContain("STARTED: ${{ github.event.workflow_run.run_started_at }}");
   });
 });
 
