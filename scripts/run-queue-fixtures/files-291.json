@@ -1,0 +1,1 @@
+[{"filename":"docs/adr/0030-rate-limit-checks-run-in-batches.md","status":"added"},{"filename":"src/lib/riot/rate-limit-store.test.ts","status":"added"},{"filename":"src/lib/riot/rate-limit-store.ts","status":"modified"}]

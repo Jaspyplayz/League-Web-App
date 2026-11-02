@@ -1,0 +1,1 @@
+[{"filename":"docs/adr/0030-ask-stops-before-vercel-does.md","status":"added"},{"filename":"docs/ask.md","status":"modified"},{"filename":"src/lib/ask-time-limit.test.ts","status":"added"},{"filename":"src/lib/ask.test.ts","status":"modified"},{"filename":"src/lib/ask.ts","status":"modified"}]

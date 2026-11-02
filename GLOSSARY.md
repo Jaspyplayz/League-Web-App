@@ -275,7 +275,7 @@ How much a ticket matters next to the others: urgent, high, medium or low.
 _Avoid_: Triage (sorting tickets or a review's findings), importance
 
 **Touches line**:
-The files a ticket should change, listed before a builder takes it, so two tickets that share a file don't run together.
+The files a ticket should change, listed before a builder takes it, so two tickets that share a file don't run together. A ticket that changes no files writes None or None., with any reason on its own line and no backtick or / in it.
 _Avoid_: Plan (what the builder writes once it has the ticket)
 
 **Try**:

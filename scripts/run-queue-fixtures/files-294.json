@@ -1,0 +1,1 @@
+[{"filename":".github/workflows/reviewer.yml","status":"modified"},{"filename":"docs/adr/0030-the-reviewer-check-runs-mains-code.md","status":"added"},{"filename":"scripts/can-merge-reviewer-check.test.ts","status":"modified"},{"filename":"scripts/can-merge-reviewer-check.ts","status":"modified"}]

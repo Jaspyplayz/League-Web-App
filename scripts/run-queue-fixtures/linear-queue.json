@@ -1,0 +1,357 @@
+{
+  "data": {
+    "viewer": {
+      "id": "00000000-0000-4000-8000-00000000000a"
+    },
+    "issues": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
+      "nodes": [
+        {
+          "id": "23afe496-3a19-4c83-a029-f8f47462d37c",
+          "identifier": "JAS-144",
+          "title": "JAS-144 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** `.github/workflows/run-queue.yml`, `.github/ISSUE_TEMPLATE/feature.md`, `.claude/skills/run-queue/SKILL.md`, `scripts/run-queue.ts`, `scripts/run-queue-rest.ts`, `scripts/run-queue-rest.test.ts`, `scripts/run-queue-fixtures/`, `docs/workflow.md`, `CLAUDE.md`, `ARCHITECTURE.md`",
+          "createdAt": "2026-11-01T12:55:54.439Z",
+          "priority": 2,
+          "state": {
+            "name": "In Progress"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": null,
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "type": "blocks",
+                "issue": {
+                  "id": "10c0353a-9a1b-4a26-9842-18c1e9069081",
+                  "identifier": "JAS-143"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "a0857ba8-1733-4935-bb4f-fcaa3494c06c",
+          "identifier": "JAS-165",
+          "title": "JAS-165 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** `docs/SETUP.md`, one line, chosen by the builder. It isn't on either risky list or a rule file, so the PR stays tiny and can merge through `can-merge`.",
+          "createdAt": "2026-11-02T03:21:57.826Z",
+          "priority": 2,
+          "state": {
+            "name": "In Progress"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": null,
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "name": "Bug"
+              }
+            ]
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "type": "blocks",
+                "issue": {
+                  "id": "c7d5d86f-8a94-4cf9-b1d5-350b705f0552",
+                  "identifier": "JAS-164"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "65c93597-614d-4772-a870-b4ca03b7ac66",
+          "identifier": "JAS-190",
+          "title": "JAS-190 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** None.\n\nThe output is a Linear document and new tickets.",
+          "createdAt": "2026-11-02T05:12:11.271Z",
+          "priority": 3,
+          "state": {
+            "name": "In Progress"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": null,
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "name": "Improvement"
+              }
+            ]
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        },
+        {
+          "id": "4f1a4e2d-4125-4710-909b-d2ed080b2b36",
+          "identifier": "JAS-159",
+          "title": "JAS-159 (title left out of this saved copy)",
+          "description": "",
+          "createdAt": "2026-11-01T14:15:34.076Z",
+          "priority": 0,
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        },
+        {
+          "id": "547997b5-6c52-4648-83f1-d9ea20b6c673",
+          "identifier": "JAS-40",
+          "title": "JAS-40 (title left out of this saved copy)",
+          "description": "",
+          "createdAt": "2026-10-29T09:25:07.631Z",
+          "priority": 0,
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        },
+        {
+          "id": "54004ffb-d064-4895-8500-2577a2e42283",
+          "identifier": "JAS-39",
+          "title": "JAS-39 (title left out of this saved copy)",
+          "description": "",
+          "createdAt": "2026-10-29T09:25:04.121Z",
+          "priority": 0,
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        },
+        {
+          "id": "0715ad1d-860f-493e-9599-fc0e7d8846e3",
+          "identifier": "JAS-200",
+          "title": "JAS-200 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\nTouches: `.claude/skills/verify-turnpoint-ux/scripts/drive.ts`, `.claude/skills/verify-turnpoint-ux/features/phone-home.md`, `.claude/skills/verify-turnpoint-ux/features/README.md` (its feature list said \"on a Pixel 7\"), `.claude/skills/verify-turnpoint-ux/SKILL.md`",
+          "createdAt": "2026-11-02T06:04:31.389Z",
+          "priority": 4,
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "name": "Improvement"
+              }
+            ]
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        },
+        {
+          "id": "1d26ce79-b50d-44e7-b8ee-2bddb911ca0f",
+          "identifier": "JAS-43",
+          "title": "JAS-43 (title left out of this saved copy)",
+          "description": "",
+          "createdAt": "2026-10-29T09:25:18.854Z",
+          "priority": 0,
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        },
+        {
+          "id": "1b58c8ab-1455-4abf-9cb7-d69baa01756e",
+          "identifier": "JAS-136",
+          "title": "JAS-136 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.",
+          "createdAt": "2026-11-01T09:19:32.308Z",
+          "priority": 0,
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        },
+        {
+          "id": "c2133cfb-fc66-4e0f-bb4e-d37032e7efd7",
+          "identifier": "JAS-146",
+          "title": "JAS-146 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** `scripts/risky-paths.ts`, `scripts/risky-paths.test.ts`, `docs/adr/0025-risky-prs-merge-after-the-panel.md`",
+          "createdAt": "2026-11-01T13:13:20.837Z",
+          "priority": 4,
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        }
+      ]
+    }
+  }
+}

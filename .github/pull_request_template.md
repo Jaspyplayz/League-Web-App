@@ -1,6 +1,6 @@
 **Tier:** tiny, normal or risky, and why.
 **Builder:** Claude Code on Opus 5.5, in a local or cloud session.
-**Ready to merge:** no. As its last step the builder changes this to `yes at <head sha>`; the Agent merge workflow merges only then, and a later push holds it again (docs/workflow.md step 11). A risky PR does this too once the panel and the reviewer clear it. A PR on Jasper's list in `scripts/risky-paths.ts`, or a one-way door, keeps `no: Jasper merges this one by hand.`
+**Ready to merge:** no. As its last step the builder changes this to `yes at <head sha>`; the Agent merge workflow merges only then, and a later push holds it again (docs/workflow.md step 11). A risky PR does this too once the panel and the reviewer clear it. A PR on Jasper's list in `scripts/risky-paths.ts`, or a one-way door, changes it to `no: Jasper merges this one by hand.` instead, also as the last step: the Run queue workflow reads either line as the builder being done.
 Closes #
 
 ## Summary

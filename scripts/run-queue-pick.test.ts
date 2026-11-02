@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CEILING, parseTouches, pickTickets, type Picks, type QueueState, type Status, type Ticket } from "./run-queue-pick";
+import { CEILING, parseTouches, pickTickets, TRIES, type Picks, type QueueState, type Status, type Ticket } from "./run-queue-pick";
 
 // A written-up, Ready, Medium ticket that touches a file of its own, so
 // tickets clash only when a test says so.
@@ -26,7 +26,7 @@ function touching(...files: string[]): string {
 }
 
 function queue(overrides: Partial<QueueState> = {}): QueueState {
-  return { tickets: [], openPrs: [], running: [], vercelRefusing: false, ...overrides };
+  return { tickets: [], openPrs: [], running: [], outOfTries: [], vercelRefusing: false, ...overrides };
 }
 
 function whyWaits(picks: Picks, id: string): string[] | undefined {
@@ -120,6 +120,7 @@ describe("parseTouches", () => {
   // would hold fewer than it changes. Enter in Linear's editor makes a new paragraph.
   it.each([
     ["the next line", "**Touches.** `scripts/a.ts`\n`CLAUDE.md`", "its Touches line runs onto the next line; keep the list on one line"],
+    ["a next line that starts with a word", "**Touches.** `src/a.ts`\nsrc/b.ts and src/c.ts", "its Touches line runs onto the next line; keep the list on one line"],
     [
       "a paragraph that starts with a path",
       "**Touches.** `scripts/a.ts`\n\n`CLAUDE.md`",
@@ -190,11 +191,174 @@ describe("parseTouches", () => {
   it("reads dotfiles and dot folders", () => {
     expect(parseTouches(touching(".nvmrc", ".github/workflows/ci.yml"))).toEqual({ files: [".nvmrc", ".github/workflows/ci.yml"] });
   });
+
+  it.each(["None", "none.", "None.", "NONE", "None.  "])("reads **Touches.** %s as a ticket that changes no files", (line) => {
+    expect(parseTouches(`**Touches.** ${line}`)).toEqual({ files: [] });
+  });
+
+  // The first is JAS-190's description, whose output is a Linear document.
+  it.each([
+    "**Touches.** None.\n\nThe output is a Linear document and new tickets.",
+    "**Touches.** None.\nThe output is a Linear document and new tickets.",
+    "**Touches.** None\n\nIt only writes in Linear.",
+    "**Touches.** None.\n- It only writes in Linear.",
+    "**Touches.** None.\n**Builder.** Claude Code on Opus 5.5.",
+    "**Touches.** None.\n**Builder.** See `docs/workflow.md`.",
+    "**Touches.** None.\n\n**Plan.** See docs/workflow.md.",
+  ])("reads a reason on its own line as no part of the list: %j", (description) => {
+    expect(parseTouches(description)).toEqual({ files: [] });
+  });
+
+  // "None yet" and the rest don't say the ticket changes no files.
+  it.each(["None yet", "None of the old files", "Nonesuch", "No files", "Nothing"])("can't read **Touches.** %s", (line) => {
+    expect(parseTouches(`**Touches.** ${line}`)).toEqual({ why: "its Touches line names no files in backticks" });
+  });
+
+  // Each of these once read as no files, so its ticket would hold nothing and
+  // start beside a builder changing the file it names or isn't sure about.
+  it.each([
+    "None (yet)",
+    "None - TBD",
+    "None, except src/db/schema.ts",
+    "None. Actually it edits src/db/schema.ts",
+    "None - probably src/lib/riot/client.ts",
+    "None (src/db/queries.ts maybe)",
+    "None?",
+    "None (TBD)",
+    "None, not worked out yet",
+    "None/unknown",
+    "None (it only writes in Linear)",
+    "None - it only writes in Linear",
+    "None. The output is a Linear document and new tickets.",
+    "None. It only writes in Linear, then stops. Nothing else changes.",
+    "None. For now.",
+    "None. Not sure.",
+    "None. Also the schema.",
+  ])("can't read **Touches.** %s, since only None or None. says no files", (line) => {
+    expect(parseTouches(`**Touches.** ${line}`)).toEqual({ why: "its Touches line names no files in backticks" });
+  });
+
+  it.each([
+    ["a path", "None. It only changes docs/runbook"],
+    ["a question", "None. Is that right?"],
+    ["a file extension", "None. It only changes runbook.md"],
+    ["tbd", "None. The rest is TBD."],
+    ["yet", "None. Not worked out yet."],
+    ["maybe", "None. Maybe later."],
+    ["probably", "None. It probably stays in Linear."],
+    ["unknown", "None. The rest is unknown."],
+    ["except", "None. Nothing changes except the schema."],
+  ])("can't read a None. sentence with %s in it", (_, line) => {
+    expect(parseTouches(`**Touches.** ${line}`)).toEqual({ why: "its Touches line names no files in backticks" });
+  });
+
+  it("reads the paths on a line that says None and names them anyway, since holding them is the safe mistake", () => {
+    expect(parseTouches("**Touches.** None. Maybe `src/a.ts`.")).toEqual({ files: ["src/a.ts"] });
+  });
+
+  it.each([
+    ["**Touches.** None,", 'its Touches line ends with ",", so the list may go on past it; put every path on that line'],
+    ["**Touches.** None\n`src/a.ts`", "its Touches line runs onto the next line; keep the list on one line"],
+    ["**Touches.** None.\n- `src/a.ts`", "its Touches line runs onto the next line; keep the list on one line"],
+    ["**Touches.** None\n\n`src/a.ts`", "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word"],
+  ])("refuses a None line whose list may carry on: %j", (description, why) => {
+    expect(parseTouches(description)).toEqual({ why });
+  });
+
+  // A reason that names a file may mean the ticket changes it, so the ticket
+  // would hold nothing and start beside a builder changing that file.
+  it.each([
+    "**Touches.** None.\nAlso `src/db/schema.ts`.",
+    "**Touches.** None\nsrc/db/schema.ts",
+    "**Touches.** None\n- src/db/schema.ts",
+    "**Touches.** None.\n\nAlso `src/db/schema.ts`.",
+    "**Touches.** None.\n\nIt changes src/db/schema.ts.",
+    "**Touches.** None.\nAlso `package.json`.",
+  ])("refuses a None line whose reason names a path: %j", (description) => {
+    expect(parseTouches(description)).toEqual({
+      why: "the line after its Touches None names a path, so the ticket may change files; write the reason without one",
+    });
+  });
+});
+
+describe("pickTickets: a ticket out of tries", () => {
+  it("is two tries, as decision record 0026 says", () => {
+    expect(TRIES).toBe(2);
+  });
+
+  it("doesn't start, and says why", () => {
+    const picks = pickTickets(queue({ tickets: [ticket("JAS-1")], outOfTries: ["JAS-1"] }));
+    expect(picks.start).toEqual([]);
+    expect(whyWaits(picks, "JAS-1")).toEqual([
+      "It can't start, because the queue has already tried it 2 times, which is the limit. Deleting one of the queue's start comments on it gives it another try, if Jasper wants one.",
+    ]);
+  });
+
+  it("takes no slot from the tickets after it", () => {
+    const tickets = ["JAS-1", "JAS-2", "JAS-3", "JAS-4", "JAS-5"].map((id) => ticket(id));
+    expect(pickTickets(queue({ tickets, outOfTries: ["JAS-1"] })).start).toEqual(["JAS-2", "JAS-3", "JAS-4", "JAS-5"]);
+  });
+
+  it("holds no files from the tickets after it", () => {
+    const tickets = [ticket("JAS-1", { description: touching("src/shared.ts") }), ticket("JAS-2", { description: touching("src/shared.ts") })];
+    expect(pickTickets(queue({ tickets, outOfTries: ["JAS-1"] })).start).toEqual(["JAS-2"]);
+  });
+
+  it("doesn't pull its blockers into the queue, since it can't start once they're done", () => {
+    const tickets = [ticket("JAS-1", { blockedBy: ["JAS-9"] }), ticket("JAS-9", { status: "Todo", description: `${CRITERIA}\n\n${touching("src/JAS-9.ts")}` })];
+    expect(pickTickets(queue({ tickets, outOfTries: ["JAS-1"] })).promote).toEqual([]);
+  });
+
+  it("isn't moved to Ready for the ticket it blocks, which says it waits for a ticket out of tries", () => {
+    const tickets = [ticket("JAS-1", { blockedBy: ["JAS-9"] }), ticket("JAS-9", { status: "Todo" })];
+    const picks = pickTickets(queue({ tickets, outOfTries: ["JAS-9"] }));
+    expect(picks.promote).toEqual([]);
+    expect(picks.start).toEqual([]);
+    expect(whyWaits(picks, "JAS-1")).toEqual(["It waits for JAS-9, which the queue has already tried 2 times, which is the limit, so it won't start again unless Jasper gives it another try."]);
+  });
+
+  it("isn't rated up in Ready for the ticket it blocks", () => {
+    const tickets = [ticket("JAS-1", { blockedBy: ["JAS-9"] }), ticket("JAS-9")];
+    const picks = pickTickets(queue({ tickets, outOfTries: ["JAS-9"] }));
+    expect(picks.promote).toEqual([]);
+    expect(whyWaits(picks, "JAS-1")).toEqual(["It waits for JAS-9, which the queue has already tried 2 times, which is the limit, so it won't start again unless Jasper gives it another try."]);
+  });
+
+  it("says a builder is running, not that it's out of tries, while one is", () => {
+    const picks = pickTickets(queue({ tickets: [ticket("JAS-1")], running: ["JAS-1"], outOfTries: ["JAS-1"] }));
+    expect(whyWaits(picks, "JAS-1")).toEqual(["A builder is already running on it."]);
+  });
 });
 
 describe("pickTickets: what can start", () => {
   it("starts a Ready ticket with a Priority, a Touches line and no blockers", () => {
     expect(pickTickets(queue({ tickets: [ticket("JAS-1")] }))).toEqual({ start: ["JAS-1"], promote: [], waits: [] });
+  });
+
+  it("starts a Ready ticket that changes no files, and it holds nothing for the tickets after it", () => {
+    const tickets = [ticket("JAS-1", { description: "**Touches.** None." }), ticket("JAS-2")];
+    expect(pickTickets(queue({ tickets }))).toEqual({ start: ["JAS-1", "JAS-2"], promote: [], waits: [] });
+  });
+
+  it("starts tickets beside a running builder whose ticket changes no files", () => {
+    const tickets = [ticket("JAS-1", { status: "In Progress", description: "**Touches.** None.\n\nThe output is a Linear document." }), ticket("JAS-2")];
+    expect(pickTickets(queue({ tickets, running: ["JAS-1"] })).start).toEqual(["JAS-2"]);
+  });
+
+  it("still starts nothing beside a running builder whose Touches line it can't read", () => {
+    const tickets = [ticket("JAS-1", { status: "In Progress", description: "**Touches.** None yet." }), ticket("JAS-2")];
+    const picks = pickTickets(queue({ tickets, running: ["JAS-1"] }));
+    expect(picks.start).toEqual([]);
+    expect(whyWaits(picks, "JAS-2")).toEqual([
+      "Nothing starts while JAS-1 has a builder running, because its Touches line names no files in backticks, so that builder could be changing any file.",
+    ]);
+  });
+
+  it("moves a Todo blocker that changes no files to Ready", () => {
+    const tickets = [ticket("JAS-1", { blockedBy: ["JAS-9"] }), ticket("JAS-9", { status: "Todo", description: `${CRITERIA}\n\n**Touches.** None.` })];
+    const picks = pickTickets(queue({ tickets }));
+    expect(picks.promote).toEqual([{ id: "JAS-9", priority: "High" }]);
+    expect(picks.start).toEqual(["JAS-9"]);
   });
 
   // Only Ready is the ticket queue, so other tickets don't get a comment either.

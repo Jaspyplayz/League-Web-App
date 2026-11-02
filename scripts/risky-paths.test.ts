@@ -88,6 +88,9 @@ function lockProblems(path: string, entry: LockEntry): string[] {
 // reads text, not YAML, so it also refuses a YAML escape or a quoted line that
 // runs on, either of which could spell write. A trailing comment or a run step
 // that says write is refused too, which only sends that workflow to Jasper.
+// A bare carriage return can end a YAML comment where this reads one line, and
+// so may NEL, LS or PS, so text after one could hide from this test and the
+// secrets test. Those are refused in the raw text, comment lines included.
 function tokenProblems(workflow: string): string[] {
   const code = workflow
     .split("\n")
@@ -97,6 +100,32 @@ function tokenProblems(workflow: string): string[] {
     !/^permissions:/m.test(code) && "doesn't set its token's permissions",
     /\bwrite(-all)?\b/i.test(code) && "asks for write access",
     /\\[xuU]|\\\s*$/m.test(code) && "has a YAML escape or a line that runs on",
+    /\r(?!\n)|[\u0085\u{2028}\u{2029}]/u.test(workflow) && "has a line ending this test can't read",
+  ].filter((problem) => problem !== false);
+}
+
+// What could reach the two secrets in the queue's environment: a deployment
+// environment, or the name of either secret, which GitHub reads in any case.
+// The environment's only rule is that a run comes from main, so a workflow
+// Claude can merge would pass it. It reads text, not YAML, so it refuses the
+// word itself, not only an `environment:` key. A quoted key, or a YAML anchor
+// used as a key, would get past a check for that. Reading a deployment's
+// environment, as `github.event.deployment.environment`, can't reach them.
+// `secrets: inherit` hands a called workflow every secret without naming one,
+// so `inherit` is refused as a word too, since an anchor, a folded block or a
+// tag can put it there. A workflow in another repo can set `environment` where
+// this test can't read it, so naming one is refused the same way, whatever key
+// it's under. A call to this repo's own workflow is read like any other.
+function secretProblems(workflow: string): string[] {
+  const code = workflow
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"))
+    .join("\n");
+  return [
+    /(?<![.\w-])environment(?![\w-])/i.test(code) && "asks for a deployment environment",
+    /LINEAR_API_KEY|RUN_QUEUE_TASK_TOKEN/i.test(code) && "names one of the queue's secrets",
+    /(?<![.\w-])inherit(?![\w-])/i.test(code) && "passes every secret to a called workflow",
+    /[\w.-]+\/[\w.-]+\/\.github\/workflows\//i.test(code) && "names a workflow in another repo",
   ].filter((problem) => problem !== false);
 }
 
@@ -235,6 +264,9 @@ describe("riskyFiles", () => {
     ".claude/settings.local.json",
     "scripts/package.json",
     "package-lock.json",
+    "scripts/run-queue-pick.ts",
+    "scripts/run-queue.ts",
+    ".github/workflows/run-queue.yml",
     "scripts/node_modules/zod/index.js",
     "scripts/node_modules/zod/package.json",
     "node_modules/zod/index.js",
@@ -245,7 +277,7 @@ describe("riskyFiles", () => {
 
   // Jasper chose exactly these on 2026-11-02 (decision record 0032), so a
   // change to his list shows up here as well as in a new record.
-  it("keeps Jasper's list to migrations and the gates' own code", () => {
+  it("keeps Jasper's list to migrations, the gates' own code and the ticket queue", () => {
     expect(JASPERS_PATHS.map(({ pattern }) => pattern)).toEqual([
       "drizzle/",
       "drizzle.config.ts",
@@ -258,6 +290,8 @@ describe("riskyFiles", () => {
       ".claude/settings",
       "scripts/package.json",
       "package-lock.json",
+      "scripts/run-queue",
+      ".github/workflows/run-queue",
     ]);
   });
 
@@ -319,7 +353,6 @@ describe("riskyFiles", () => {
     ".npmrc",
     ".nvmrc",
     ".mcp.json",
-    "scripts/run-queue-pick.ts",
     "src/lib/.claude/rules/x.md",
   ])("lets Claude merge %s after the panel", (path) => {
     expect(onPanel(path)).toBe(true);
@@ -405,7 +438,7 @@ describe("riskyFiles", () => {
   // Every file in these folders steers agents or runs a check. Of them, only
   // the merge switch, Claude's deny rules and the workflows that merge or check
   // the reviewer are Jasper's.
-  it("flags every file in .claude/ and .github/, and keeps only the gates' files there Jasper's", () => {
+  it("flags every file in .claude/ and .github/, and keeps only the gates' and the queue's files there Jasper's", () => {
     const files = repoFiles.filter((file) => file.startsWith(".claude/") || file.startsWith(".github/"));
     expect(files.length).toBeGreaterThan(100);
     expect(riskyFiles(files).map((file) => file.path)).toEqual(files);
@@ -415,6 +448,7 @@ describe("riskyFiles", () => {
       ".github/workflows/agent-merge-sweep.yml",
       ".github/workflows/agent-merge.yml",
       ".github/workflows/reviewer.yml",
+      ".github/workflows/run-queue.yml",
     ]);
   });
 
@@ -471,6 +505,10 @@ describe("riskyFiles", () => {
     ["a write spelled with a YAML escape", 'permissions:\n  pull-requests: "\\x77rite"\n'],
     ["a write split over a quoted line that runs on", 'permissions:\n  pull-requests: "wr\\\n    ite"\n'],
     ["Write in capitals", "permissions:\n  contents: Write\n"],
+    ["a bare carriage return after a comment", "permissions: {}\njobs:\n  x:\n    # note\r    environment: run-queue\n"],
+    ["a next-line character after a comment", "permissions: {}\n# note\u0085secrets: inherit\n"],
+    ["a line separator after a comment", "permissions: {}\n# note\u2028secrets: inherit\n"],
+    ["a paragraph separator after a comment", "permissions: {}\n# note\u2029secrets: inherit\n"],
   ])("would refuse a workflow with %s", (_, text) => {
     expect(tokenProblems(text)).not.toEqual([]);
   });
@@ -479,18 +517,99 @@ describe("riskyFiles", () => {
     expect(tokenProblems("# This job never writes; write access stays with Agent merge.\npermissions:\n  contents: read\n  # no write here\n")).toEqual([]);
   });
 
-  // The gates' code is Jasper's by name, so a helper they load under another
-  // name would be on neither list. This resolves what each gate loads, side
-  // effects and dynamic imports included, with the esbuild tsx runs and the
-  // tsconfig the Agent merge workflow gives it. Installed packages come from
-  // the lockfile, which 0032 leaves to the panel.
+  it("accepts a workflow with Windows line endings", () => {
+    expect(tokenProblems("# A comment.\r\npermissions:\r\n  contents: read\r\n")).toEqual([]);
+  });
+
+  // The two secrets live in the run-queue environment, whose only rule is that a
+  // run comes from main. A workflow Claude merges reaches main, and could ask
+  // for that environment and send the secrets anywhere. The queue's own workflow
+  // is on Jasper's list, so it isn't read here. One that needs an environment
+  // changes this test, which is Jasper's.
+  it("lets only workflows on Jasper's list ask for a deployment environment or name the queue's secrets", () => {
+    const workflows = repoFiles.filter((file) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file) && existsSync(file));
+    const others = workflows.filter((file) => jaspersFiles([file]).length === 0);
+    expect(others).toContain(".github/workflows/smoke.yml");
+    expect(jaspersFiles([".github/workflows/run-queue.yml"])).toHaveLength(1);
+    expect(others.flatMap((file) => secretProblems(readFileSync(file, "utf8")).map((problem) => `${file} ${problem}`))).toEqual([]);
+  });
+
+  it.each([
+    ["an environment key", "jobs:\n  x:\n    environment: run-queue\n"],
+    ["a double-quoted key", 'jobs:\n  x:\n    "environment": run-queue\n'],
+    ["a single-quoted key", "jobs:\n  x:\n    'environment': run-queue\n"],
+    ["a space before the colon", "jobs:\n  x:\n    environment : run-queue\n"],
+    ["a flow-style key", "jobs: { x: { environment: run-queue } }\n"],
+    ["a flow-style quoted key", 'jobs: {"x":{"environment":run-queue}}\n'],
+    ["an explicit key", "jobs:\n  x:\n    ? environment\n    : run-queue\n"],
+    ["a key from a YAML anchor", "env: { KEY: &key environment }\njobs:\n  x:\n    *key : run-queue\n"],
+    ["a name and url", "jobs:\n  x:\n    environment:\n      name: run-queue\n      url: https://example.com\n"],
+    ["the Linear key", "env:\n  KEY: ${{ secrets.LINEAR_API_KEY }}\n"],
+    ["the task token by index", "env:\n  KEY: ${{ secrets['RUN_QUEUE_TASK_TOKEN'] }}\n"],
+    ["a secret in small letters, which GitHub reads the same", "env:\n  KEY: ${{ secrets.linear_api_key }}\n"],
+    ["a call that passes every secret on", "jobs:\n  x:\n    uses: octo/repo/.github/workflows/y.yml@main\n    secrets: inherit\n"],
+    ["a quoted secrets key and value", 'jobs:\n  x:\n    "secrets": "inherit"\n'],
+    ["inherit from a YAML anchor", "env: { X: &i inherit }\njobs:\n  x:\n    uses: ./.github/workflows/y.yml\n    secrets: *i\n"],
+    ["inherit in a folded block", "jobs:\n  x:\n    uses: ./.github/workflows/y.yml\n    secrets: >-\n      inherit\n"],
+    ["inherit with a YAML tag", "jobs:\n  x:\n    uses: ./.github/workflows/y.yml\n    secrets: !!str inherit\n"],
+    ["a call to another repo's workflow", "jobs:\n  x:\n    uses: octo/repo/.github/workflows/y.yml@main\n"],
+    ["a quoted call to another repo's workflow", 'jobs:\n  x:\n    uses: "octo/repo/.github/workflows/y.yml@main"\n'],
+    ["a flow-style call to another repo's workflow", "jobs: { x: { uses: octo/repo/.github/workflows/y.yml@main } }\n"],
+    ["another repo's workflow from a YAML anchor", "env: { X: &u octo/repo/.github/workflows/y.yml@main }\njobs:\n  x:\n    uses: *u\n"],
+    ["another repo's workflow in a folded block", "jobs:\n  x:\n    uses: >-\n      octo/repo/.github/workflows/y.yml@main\n"],
+  ])("would refuse a workflow with %s", (_, text) => {
+    expect(secretProblems(text)).not.toEqual([]);
+  });
+
+  it("accepts a call to this repo's own workflow, an action, and other words holding inherit", () => {
+    expect(
+      secretProblems(
+        [
+          "jobs:",
+          "  x:",
+          "    uses: ./.github/workflows/y.yml",
+          "  y:",
+          "    steps:",
+          "      - uses: actions/checkout@v7",
+          "      - uses: octo/repo/path/to/action@v1",
+          "        env:",
+          "          NOTE: inherited values",
+          "# secrets: inherit, from octo/repo/.github/workflows/y.yml@main, in a comment",
+        ].join("\n"),
+      ),
+    ).toEqual([]);
+  });
+
+  it("leaves a YAML escape that spells environment to the token check beside it", () => {
+    const escaped = 'permissions: {}\njobs:\n  x:\n    "envir\\x6fnment": run-queue\n';
+    expect(secretProblems(escaped)).toEqual([]);
+    expect(tokenProblems(escaped)).toEqual(["has a YAML escape or a line that runs on"]);
+  });
+
+  it("accepts reading a deployment's environment, as smoke.yml does, and a comment that says the word", () => {
+    expect(
+      secretProblems(
+        [
+          "# Runs after a deploy, in no environment.",
+          "if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview'",
+          "BASE_URL: ${{ github.event.deployment_status.environment_url }}",
+        ].join("\n"),
+      ),
+    ).toEqual([]);
+  });
+
+  // The gates' code and the queue's are Jasper's by name, so a helper they load
+  // under another name would be on neither list. This resolves what each one
+  // loads, side effects and dynamic imports included, with the esbuild tsx runs
+  // and the tsconfig the Agent merge and Run queue workflows give it. Installed
+  // packages come from the lockfile, which 0032 leaves to the panel.
   it("keeps every file the gates load, other than installed packages, Jasper's", async () => {
     const fromTsx = createRequire(createRequire(import.meta.url).resolve("tsx/package.json"));
     const esbuild = fromTsx("esbuild") as {
       build: (options: object) => Promise<{ metafile: { inputs: Record<string, unknown> } }>;
     };
-    const gates = repoFiles.filter((file) => /^scripts\/can-merge[^/]*\.ts$/.test(file) && !/\.test\.ts$/.test(file));
-    expect(gates).toContain("scripts/can-merge-action.ts");
+    const gates = repoFiles.filter((file) => /^scripts\/(can-merge|run-queue)[^/]*\.ts$/.test(file) && !/\.test\.ts$/.test(file));
+    expect(gates).toEqual(expect.arrayContaining(["scripts/can-merge-action.ts", "scripts/run-queue.ts"]));
     const { metafile } = await esbuild.build({
       entryPoints: gates,
       bundle: true,
@@ -508,11 +627,12 @@ describe("riskyFiles", () => {
     expect(loaded.filter((file) => !file.startsWith("node_modules/") && jaspersFiles([file]).length === 0)).toEqual([]);
   });
 
-  // npx runs package.json's own bin ahead of node_modules/.bin, a package name
-  // with exports, imports or workspaces can stand in for one the gates import,
-  // and a dependency from a file, a Git host or another registry skips npm's
-  // checks. The Agent merge workflow refuses the first group at run time; this
-  // stops a PR bringing any of them in. The lockfile half catches an entry
+  // npx runs package.json's own bin, or a file in its directories.bin, ahead of
+  // node_modules/.bin, a package name with exports, imports or workspaces can
+  // stand in for one the gates import, and a dependency from a file, a Git host
+  // or another registry skips npm's checks. The Agent merge workflow refuses the
+  // first group, apart from directories, at run time; this stops a PR bringing
+  // any of them in. The lockfile half catches an entry
   // edited by hand or by mistake, not one written to get past it: review found
   // four ways round it, so the lockfile itself stays Jasper's (decision record
   // 0032).
@@ -522,7 +642,7 @@ describe("riskyFiles", () => {
       devDependencies?: Record<string, string>;
       optionalDependencies?: Record<string, string>;
     };
-    expect(["bin", "exports", "imports", "workspaces"].filter((key) => key in pkg)).toEqual([]);
+    expect(["bin", "directories", "exports", "imports", "workspaces"].filter((key) => key in pkg)).toEqual([]);
     const specs = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
     expect(Object.entries(specs).filter(([, spec]) => !/^[\^~]?\d+(\.\d+){0,2}(-[\w.]+)?$/.test(spec))).toEqual([]);
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as { packages: Record<string, LockEntry> };

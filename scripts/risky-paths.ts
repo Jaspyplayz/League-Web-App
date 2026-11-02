@@ -1,8 +1,8 @@
 // The paths that make a PR risky (issue #158), in two lists (JAS-128, JAS-191):
 //
-// - JASPERS_PATHS: migrations, the schema they come from, and the merge gates
-//   (their code, Claude's deny rules, the switch, the lockfile, and the
-//   package files Node would load in place of the gates' imports). `npm run can-merge`
+// - JASPERS_PATHS: migrations, the schema they come from, the ticket queue, and
+//   the merge gates (their code, Claude's deny rules, the switch, the lockfile,
+//   and the package files Node would load in place of the gates' imports). `npm run can-merge`
 //   refuses a PR that touches one, whatever its tier says. Only Jasper runs
 //   `npm run db:migrate`, so code merged before its migration would break the
 //   live site's reads; and an agent could otherwise loosen a gate and merge
@@ -53,6 +53,13 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   // gates have a lockfile of their own (JAS-252). npm ci refuses a package.json
   // that doesn't match it, so package.json alone can't change what's installed.
   { pattern: "package-lock.json", why: "the dependencies the merge gates run with" },
+
+  // /run-queue picks tickets and starts builders with nobody watching (JAS-143,
+  // decision record 0026), holding the Linear key and the task token. A change
+  // here could send those anywhere, which the job's own guards can't stop, so
+  // Jasper chose to keep it on his list (decision record 0032).
+  { pattern: "scripts/run-queue", why: "the ticket queue, which decides what builders run unattended" },
+  { pattern: ".github/workflows/run-queue", why: "the workflow that holds the Linear key and the task token" },
 ];
 
 export const PANEL_PATHS: readonly RiskyPath[] = [
@@ -91,9 +98,6 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
   { pattern: ".npmrc", why: "how npm ci installs, in every workflow" },
   { pattern: ".nvmrc", why: "the Node version CI uses" },
   { pattern: ".mcp.json", why: "tools every agent here would load" },
-  // /run-queue picks tickets and starts builders with nobody watching
-  // (JAS-143, decision record 0026).
-  { pattern: "scripts/run-queue", why: "the ticket queue, which decides what builders run unattended" },
 
   // The risky row of docs/workflow.md's tier table.
   { pattern: "src/db/", why: "the database client and queries" },

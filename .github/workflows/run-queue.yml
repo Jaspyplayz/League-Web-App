@@ -1,0 +1,179 @@
+name: Run queue
+run-name: Run queue${{ inputs.dry_run && ' (dry run)' || '' }}
+
+# The ticket queue (JAS-144, decision record 0026). Each run reads Linear and
+# GitHub, asks scripts/run-queue-pick.ts which Ready tickets get a builder, and
+# starts one cloud builder per picked ticket through the cloud task's API
+# trigger. It uses no Claude itself, so a run with nothing to start costs no
+# usage. scripts/run-queue.ts does the work.
+#
+# To stop the queue, switch this workflow off: Actions, Run queue, the "..."
+# menu, Disable workflow (or `gh workflow disable run-queue.yml`). Nothing else
+# starts builders from Ready, and builders already running carry on.
+on:
+  # A PR Agent merge merged. Its merges use github.token, so GitHub starts no
+  # workflow for them, and this runs when an Agent merge run finishes instead.
+  # Most of those runs merge nothing, so the merged job below checks first.
+  workflow_run:
+    workflows: [Agent merge]
+    types: [completed]
+  # Jasper's own merges, from GitHub's page or a local can-merge, push to main
+  # with his token, which does start workflows.
+  push:
+    branches: [main]
+  # /run-queue (.claude/skills/run-queue/SKILL.md), or the Actions tab.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print what it would do and change nothing
+        type: boolean
+        default: false
+  # A bonus, not a way in to count on. GitHub can delay or drop a scheduled run.
+  # This repo's first, the Agent merge sweep's on 2026-11-02, came about 8.5
+  # hours after it reached main. GitHub also turns a schedule off after 60 days
+  # with no activity. If this one doesn't fire, a wait that ends with time
+  # (Vercel's hour, the hourly fire limit's hour, the 2-hour start hold) lasts
+  # until the next wake or a person: the merged job below, a push to main, or a
+  # run by name. Away from the top of the hour, when GitHub is busiest.
+  schedule:
+    - cron: "41 * * * *"
+
+# Nothing by default; each job asks for only what reading needs.
+permissions: {}
+
+jobs:
+  # Agent merge runs about 40 times an hour on a busy day and merges in few of
+  # those runs. A whole round reads GitHub about 17 times, and github.token's
+  # budget of 1,000 calls an hour is shared with Agent merge, so the queue
+  # runs only when main moved after that Agent merge run started, or when its
+  # last real run is over 15 minutes old. The second is what ends a timed wait
+  # when nothing merges, as while Vercel refuses deploys. It costs one more call
+  # here per wake, and about 4 rounds an hour at most. This job has no
+  # concurrency group, so a run that merged nothing never takes the queue's
+  # place in line.
+  merged:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # main's newest commit
+      deployments: read # when the queue job last ran
+    outputs:
+      wake: ${{ steps.main.outputs.wake }}
+    steps:
+      # All the times are in the same ISO 8601 form, so comparing them as text
+      # compares the times. A run of the queue job in the run-queue environment
+      # makes a deployment there, and a skipped one doesn't, so the newest is its
+      # last real run. A dry run counts too, which delays a wake by 15 minutes at
+      # most. With none yet, this doesn't wake it: a push or a run by name makes
+      # the first one, and if the job never made one, the queue would run on
+      # every wake.
+      - id: main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          STARTED: ${{ github.event.workflow_run.run_started_at }}
+        run: |
+          committed=$(gh api "repos/$GH_REPO/commits/main" --jq .commit.committer.date)
+          if [[ "$committed" > "$STARTED" ]]; then
+            wake=true
+            echo "main's newest commit is from $committed, after Agent merge started at $STARTED, so wake=$wake."
+          else
+            last=$(gh api "repos/$GH_REPO/deployments?environment=run-queue&per_page=1" --jq '.[0].created_at // ""')
+            if [[ -n "$last" && "$last" < "$(date -u -d '15 minutes ago' +%FT%TZ)" ]]; then wake=true; else wake=false; fi
+            echo "main hasn't moved since Agent merge started at $STARTED, and the queue's last run is ${last:-none yet}, so wake=$wake."
+          fi
+          echo "wake=$wake" >> "$GITHUB_OUTPUT"
+
+  queue:
+    needs: merged
+    # Runs after the merged job, or without it for every other way in.
+    # Only on main's ref: a run by name on another branch would use that
+    # branch's copy of this file. That stops a mistake, not an attacker,
+    # since a branch can edit this line out. The environment below is what
+    # keeps the two secrets on main.
+    if: >-
+      !cancelled() &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name != 'workflow_run' ||
+      needs.merged.outputs.wake == 'true')
+    runs-on: ubuntu-latest
+    # The two secrets are this environment's, not the repo's, and Jasper
+    # limits the environment to main, so a workflow pushed on any other
+    # branch can't read them, even one that edits this file.
+    environment: run-queue
+    # A run takes about a minute. A hung one would hold the queue for GitHub's
+    # default of six hours.
+    timeout-minutes: 10
+    # One real run at a time, so two runs can't both pick a ticket before
+    # either one's start comment is on it. A new run never cancels a running
+    # one, which may be between its comment and its fire; a waiting one is
+    # replaced by the newest, which reads the latest state anyway. Dry runs
+    # write nothing, so they have their own line and never replace a real run.
+    concurrency:
+      group: ${{ inputs.dry_run && 'run-queue-dry-run' || 'run-queue' }}
+      cancel-in-progress: false
+    # Read-only. Every write goes to Linear or the cloud task, with the two
+    # secrets below. A public repo lets any token read these, but naming them
+    # keeps this working if the repo goes private.
+    permissions:
+      contents: read # check out main
+      pull-requests: read # open PRs and the files each changes
+      statuses: read # Vercel's deploy status on main and each open PR
+    steps:
+      # The token is only for this one fetch of main, and
+      # persist-credentials: false removes it from .git/config afterwards.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      # No npm cache, so nothing another workflow saved can change the code
+      # that runs with the secrets below.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      # Claude can merge package.json, .npmrc and tsconfig.json after the panel,
+      # so these steps stop the ones found so far from changing which code runs
+      # below with the secrets, as the Agent merge job does (decision record
+      # 0032). A package scope with exports, imports or workspaces, or a
+      # node_modules/ folder beside the scripts, can stand in for zod. This is
+      # Agent merge's check word for word, so it also refuses a bin, which npx
+      # would run there.
+      - name: Refuse files that would change what the queue loads
+        run: |
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const fields = ["bin", "exports", "imports", "workspaces"].filter((key) => key in require("./package.json"));
+            const tracked = execFileSync("git", ["ls-files", "scripts/node_modules", "scripts/package.json"], { encoding: "utf8" }).trim();
+            if (fields.length > 0 || tracked !== "") {
+              console.error(`package.json fields: ${fields.join(", ") || "none"}; under scripts/: ${tracked || "nothing"}`);
+              process.exit(1);
+            }
+          '
+      # An .npmrc could set node-options, npm-shrinkwrap.json would replace the
+      # lockfile, and an install script could rewrite the queue's code on disk.
+      # The dependencies come from main's lockfile, which stays Jasper's. This
+      # runs without the secrets in its environment.
+      - run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts
+      # By its path, not npx: npm 11 runs a file from package.json's bin or
+      # directories.bin ahead of node_modules/.bin, and Claude can merge
+      # package.json.
+      - run: ./node_modules/.bin/tsx scripts/run-queue.ts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          # tsx reads this in place of tsconfig.json, so tsconfig.json's paths
+          # can't swap a module the queue imports, such as zod.
+          TSX_TSCONFIG_PATH: scripts/can-merge.tsconfig.json
+          # Not a secret: firing it also needs the token. The task is
+          # "Ticket queue builder" at claude.ai/code/routines; a new task
+          # means a new ID here.
+          RUN_QUEUE_TASK_ID: trig_01Fsa3wuXbvBFWKyb1WyYHoY
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          # A dry run never gets the token, so it can't start a builder even
+          # if the script had a bug.
+          RUN_QUEUE_TASK_TOKEN: ${{ !inputs.dry_run && secrets.RUN_QUEUE_TASK_TOKEN || '' }}
