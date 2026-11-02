@@ -120,8 +120,6 @@ describe("the reviewer check GitHub requires", () => {
     expect(code).toBe(1);
   });
 
-  // The workflow checks out main. A fork's commits are on none of main's
-  // branches, only on GitHub's pull ref, so the script fetches the head itself.
   it("fetches a head commit the checkout doesn't have, as a fork's is", () => {
     const checkout = join(events, "checkout");
     execFileSync("git", ["clone", "--quiet", "--no-local", "--single-branch", "--branch", "main", repo, checkout]);
@@ -130,8 +128,6 @@ describe("the reviewer check GitHub requires", () => {
     expect(code).toBe(0);
   });
 
-  // The commit names reach git as arguments, so anything but a full hex name
-  // stops the check before git runs.
   it("fails an event whose head isn't a full commit name", () => {
     const { code, out } = check(body("normal. A habit card."), "--output=/dev/null");
     expect(out).not.toContain("PASS");
@@ -140,14 +136,10 @@ describe("the reviewer check GitHub requires", () => {
   });
 });
 
-// The check gates every merge into main, so what it runs must be main's, never
-// the PR's (JAS-43). These pin every line that decides which code runs and
-// what reaches it, so a change there has to change this test too.
 describe(WORKFLOW, () => {
   // Windows checkouts end lines with \r\n.
   const workflow = () => readFileSync(WORKFLOW, "utf8").replace(/\r\n/g, "\n");
-  // The lines without blank lines or comments, so a test pins what runs.
-  const code = () =>
+  const workflowLines = () =>
     workflow()
       .split("\n")
       .filter((line) => line.trim() !== "" && !line.trim().startsWith("#"))
@@ -158,12 +150,8 @@ describe(WORKFLOW, () => {
     expect(workflow()).toMatch(/^jobs:\n {2}reviewer:$/m);
   });
 
-  // pull_request_target runs main's copy of this file, so a PR can't change
-  // it. pull_request runs the PR's copy, which GitHub keeps apart from main's
-  // run (PR 278). Both run on edits, so a new verdict line passes the check,
-  // and on pushes, so a new commit checks it again.
   it("runs main's copy of the workflow on every PR into main, edit and push", () => {
-    const lines = code();
+    const lines = workflowLines();
     const on = lines.indexOf("on:");
     const end = lines.findIndex((line, i) => i > on && !line.startsWith(" "));
     const types = "types: [opened, edited, synchronize, reopened, ready_for_review]";
@@ -178,15 +166,13 @@ describe(WORKFLOW, () => {
   });
 
   it("runs only main's checkout, node, npm ci and the check script", () => {
-    expect(code().filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
+    expect(workflowLines().filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
       "- uses: actions/checkout@v7",
       "- uses: actions/setup-node@v7",
       "- run: npm ci",
       "- run: npx tsx scripts/can-merge-reviewer-check.ts",
     ]);
-    // The whole history, so the PR's base commit is here; without it the
-    // check can't list the PR's files and fails every PR.
-    expect(code().filter((line) => /^\s*(ref|repository|path|token|cache|fetch-depth|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
+    expect(workflowLines().filter((line) => /^\s*(ref|repository|path|token|cache|fetch-depth|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
       "ref: main",
       "fetch-depth: 0",
       "persist-credentials: false",
@@ -194,19 +180,18 @@ describe(WORKFLOW, () => {
     ]);
   });
 
-  // Text from the PR inside a run step would run as shell code, and the two
-  // triggers' runs would cancel each other in one group.
+  // Text from the PR inside a run step would run as shell code.
   it("reads the event only in its concurrency group, one per trigger", () => {
-    expect(workflow()).not.toMatch(/github\.event\.pull_request\.(body|title|head)/);
-    expect(code().filter((line) => /github\b|\$\{\{/.test(line)).map((line) => line.trim())).toEqual([
+    expect(workflowLines().filter((line) => /github\b|\$\{\{/.test(line)).map((line) => line.trim())).toEqual([
       "group: reviewer-${{ github.event_name }}-${{ github.event.pull_request.number }}",
     ]);
   });
 
   it("only reads the repo", () => {
-    const lines = code();
+    const lines = workflowLines();
     const start = lines.indexOf("permissions:");
-    expect(lines.slice(start + 1, start + 2)).toEqual(["  contents: read"]);
+    const end = lines.findIndex((line, i) => i > start && !line.startsWith(" "));
+    expect(lines.slice(start + 1, end)).toEqual(["  contents: read"]);
     expect(lines.filter((line) => /permissions:/.test(line))).toHaveLength(1);
   });
 

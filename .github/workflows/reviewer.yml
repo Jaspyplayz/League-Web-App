@@ -8,20 +8,17 @@ name: Reviewer
 # passes it, and a push reruns it, so a big new commit needs a new review.
 #
 # The check runs main's copy of the script and its packages, never the PR's,
-# so a PR can't change what judges it (JAS-43, decision record 0030). It only
-# reads the PR: its description from the event file, and its commits through
-# git diff.
+# so a PR can't change what judges it (JAS-43, decision record 0030).
 on:
   # GitHub runs this trigger from main's copy of this file, whatever the PR
   # changes, so even a PR that edits this file gets main's check.
   pull_request_target:
     branches: [main]
     types: [opened, edited, synchronize, reopened, ready_for_review]
-  # This trigger runs the PR's own copy of this file. It gave the PR that added
-  # pull_request_target a check, since main had no copy with that trigger yet,
-  # and it still starts Agent merge on the PR's branch. It can't loosen the
-  # check: GitHub keeps the newest run of each workflow and event apart, and
-  # the ruleset needs every one of them to pass (PR 278).
+  # This trigger runs the PR's own copy of this file, so it isn't the guard.
+  # It stays so Agent merge, which starts when a Reviewer run on a claude/
+  # branch finishes, still starts. Decision record 0030 says why a PR's edited
+  # copy can't outvote main's run, and what's still to confirm.
   pull_request:
     branches: [main]
     types: [opened, edited, synchronize, reopened, ready_for_review]
@@ -29,8 +26,8 @@ on:
 permissions:
   contents: read
 
-# A newer edit or push replaces a run still in progress. Each trigger has its
-# own group, so the two runs for one edit or push don't cancel each other.
+# Each trigger has its own group, so the two runs for one edit or push don't
+# cancel each other.
 concurrency:
   group: reviewer-${{ github.event_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -39,10 +36,7 @@ jobs:
   reviewer:
     runs-on: ubuntu-latest
     steps:
-      # Main, never the PR's head, so the script and package.json below are
-      # main's. The whole history, so the PR's base commit and origin/main are
-      # here, and the PR's commits too unless it's from a fork; the script
-      # fetches a fork's head itself. No token is left in .git/config.
+      # The whole history, so the PR's base commit and origin/main are here.
       - uses: actions/checkout@v7
         with:
           ref: main
