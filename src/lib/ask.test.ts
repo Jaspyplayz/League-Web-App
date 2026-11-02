@@ -1,8 +1,9 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { costMicros, HOLD_MICROS } from "@/lib/ask-rules";
 import { recentGamesFor } from "@/lib/mcp/tools";
 import type { Account } from "@/lib/riot/types";
-import { answerQuestion } from "./ask";
+import { answerQuestion, ASK_TIME_LIMIT_MS } from "./ask";
 
 // A pretend Anthropic client: each test says what each round returns, and
 // `clientOptions` records how the client was set up. APIError is the SDK's
@@ -91,6 +92,32 @@ async function triesAfter(ms: number) {
   return [before, after];
 }
 
+// A reply from Anthropic, or a tool's result, that takes `seconds` of the
+// fake clock to come back.
+function after<T>(seconds: number, reply: T) {
+  return () => new Promise<T>((resolve) => setTimeout(() => resolve(reply), seconds * 1000));
+}
+function failsAfter(seconds: number, error: unknown) {
+  return () => new Promise((_, reject) => setTimeout(() => reject(error), seconds * 1000));
+}
+
+// Asks a question and returns what it came back with after `seconds` of the
+// fake clock, or "still running".
+async function answerAfter(seconds: number) {
+  let result: Awaited<ReturnType<typeof answerQuestion>> | "still running" = "still running";
+  const answer = answerQuestion("na", account, "Why do I lose?").then((r) => (result = r));
+  await vi.advanceTimersByTimeAsync(seconds * 1000);
+  const seen = result;
+  await vi.runAllTimersAsync();
+  await answer;
+  return seen;
+}
+
+// The `timeout` each try was sent with, in seconds.
+function tryTimeouts() {
+  return create.mock.calls.map((call) => (call[1] as { timeout: number }).timeout / 1000);
+}
+
 describe("answerQuestion", () => {
   it("adds up every round's cost and returns the answer", async () => {
     create.mockResolvedValueOnce(askForGames).mockResolvedValueOnce(answers);
@@ -120,13 +147,14 @@ describe("answerQuestion", () => {
   // The SDK's own retry would hide a timed-out try behind the next one, so
   // it's off, and sendRound makes the second try instead.
   it("turns off the SDK's own retry and gives each try a minute", async () => {
-    create.mockResolvedValueOnce(answers);
+    create.mockResolvedValueOnce(askForGames).mockResolvedValueOnce(answers);
 
     await ask();
 
-    expect(clientOptions).toEqual([{ maxRetries: 0, timeout: 60_000 }]);
-    // Options on a request would override the client's, so there are none.
-    expect(create.mock.calls.every((call) => call.length === 1)).toBe(true);
+    expect(clientOptions).toEqual([{ maxRetries: 0 }]);
+    // Only the timeout is set on each request, so the client's maxRetries
+    // still holds.
+    expect(create.mock.calls.map((call) => call[1])).toEqual([{ timeout: 60_000 }, { timeout: 60_000 }]);
   });
 
   it("waits half a second before the second try", async () => {
@@ -237,5 +265,87 @@ describe("answerQuestion", () => {
     expect(create).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ answer: null, costMicros: HOLD_MICROS });
     expect(result.error).toBeInstanceOf(Error);
+  });
+});
+
+// Vercel stops the request at the match page's maxDuration, and then the
+// question keeps only its 50-cent estimate, even if its rounds cost more.
+// So the loop stops itself first, with what the question cost so far, at
+// ASK_TIME_LIMIT_MS (150 s). Each test below reads the result at 150 s.
+describe("answerQuestion's time limit", () => {
+  const round = costMicros("claude-sonnet-5-5", usage);
+
+  it("stops in time for the match page to save what the question cost", () => {
+    const page = readFileSync("src/app/player/[region]/[riotId]/match/[matchId]/page.tsx", "utf8");
+    const maxDuration = Number(/export const maxDuration = (\d+);/.exec(page)?.[1]);
+    // The rest is for looking the player up before Claude is called (a slow
+    // Riot call alone can take 26 s) and saving the cost after.
+    expect(ASK_TIME_LIMIT_MS + 30_000).toBeLessThanOrEqual(maxDuration * 1000);
+  });
+
+  it("gives a try only the time left before the limit", async () => {
+    create
+      .mockImplementationOnce(after(50, askForGames))
+      .mockImplementationOnce(after(50, askForGames))
+      .mockImplementationOnce(after(40, answers));
+
+    const result = await answerAfter(150);
+
+    expect(tryTimeouts()).toEqual([60, 60, 50]);
+    expect(result).toMatchObject({ answer: "You die early in most losses.", costMicros: 3 * round });
+  });
+
+  // The try was cut off by its timeout, and Anthropic may still bill it.
+  it("adds the estimate for a try the limit cut off", async () => {
+    create
+      .mockImplementationOnce(after(60, askForGames))
+      .mockImplementationOnce(after(60, askForGames))
+      .mockImplementationOnce(failsAfter(30, new APIError(undefined)));
+
+    const result = await answerAfter(150);
+
+    expect(tryTimeouts()).toEqual([60, 60, 30]);
+    expect(result).toMatchObject({ answer: null, costMicros: 2 * round + HOLD_MICROS });
+  });
+
+  it("doesn't start a round with under 20 seconds left", async () => {
+    create
+      .mockImplementationOnce(after(60, askForGames))
+      .mockImplementationOnce(after(60, askForGames))
+      .mockImplementationOnce(after(15, askForGames));
+
+    const result = await answerAfter(150);
+
+    expect(create).toHaveBeenCalledTimes(3);
+    expect(result).toMatchObject({ answer: null, costMicros: 3 * round });
+    expect(result).toHaveProperty("error", expect.any(Error));
+  });
+
+  it("doesn't make a second try that its pause would leave under 20 seconds for", async () => {
+    const rateLimited = new APIError(429, new Headers({ "retry-after": "10" }));
+    create
+      .mockImplementationOnce(after(60, askForGames))
+      .mockImplementationOnce(after(60, askForGames))
+      .mockImplementationOnce(failsAfter(5, rateLimited));
+
+    const result = await answerAfter(150);
+
+    // The third try failed at 125 s, and a 10 s pause would leave 15.
+    expect(create).toHaveBeenCalledTimes(3);
+    expect(result).toMatchObject({ answer: null, costMicros: 2 * round, error: rateLimited });
+  });
+
+  // Riot can be slow to answer the tools, which runs out the clock too.
+  it("stops waiting for the tools at the limit", async () => {
+    create.mockImplementationOnce(after(50, askForGames)).mockImplementationOnce(after(50, askForGames));
+    vi.mocked(recentGamesFor)
+      .mockImplementationOnce(after(10, { games: [] }) as never)
+      .mockImplementationOnce(after(60, { games: [] }) as never);
+
+    const result = await answerAfter(150);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ answer: null, costMicros: 2 * round });
+    expect(result).toHaveProperty("error", expect.any(Error));
   });
 });

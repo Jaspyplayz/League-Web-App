@@ -17,16 +17,26 @@ The panel puts the game it sits beside first: its first two example questions na
 
 ### Why the question is saved before Claude answers
 
-An answer takes up to a few minutes. If the question were saved only at the end, ten questions sent at the same moment would all pass the check while none of them was counted yet, and could spend far past the caps. So `reserve()` in `ask-store.ts` runs one short transaction: it takes a lock the whole site shares (`pg_advisory_xact_lock`), checks the limits, and saves the question with a 50-cent estimate (`HOLD_MICROS`). The next question waits for that lock, so its check sees the first one. The lock is let go before Claude is called. When the answer is in, `settle()` swaps the estimate for the cost.
+An answer can take a couple of minutes. If the question were saved only at the end, ten questions sent at the same moment would all pass the check while none of them was counted yet, and could spend far past the caps. So `reserve()` in `ask-store.ts` runs one short transaction: it takes a lock the whole site shares (`pg_advisory_xact_lock`), checks the limits, and saves the question with a 50-cent estimate (`HOLD_MICROS`). The next question waits for that lock, so its check sees the first one. The lock is let go before Claude is called. When the answer is in, `settle()` swaps the estimate for the cost.
 
 Each round gets two tries. `sendRound` in `ask.ts` makes the second try itself, instead of leaving it to Anthropic's SDK, so it can see what happened to both. It waits half a second between them, or as long as Anthropic's `retry-after` header asks (it sends one when we're rate limited), up to 10 seconds.
 
 - A try Anthropic turned down before running it (any 4xx answer, like rate limited or a bad request, or 529 overloaded) isn't billed.
 - A try that timed out, lost its connection, was cut off partway, came back empty or unreadable, or got another 5xx (like 500 or 504) may still have been run, and Anthropic bills a request that was on its way to succeeding even if we stopped waiting. We can't tell, so that round adds the 50-cent estimate, once. A network outage that never reached Anthropic is charged the same way, which errs on the safe side.
 
-If both tries of a round fail, `answerQuestion` stops and returns what the question cost so far, and that is what's charged. A question whose first round Anthropic turned down on both tries cost nothing, so it's deleted and doesn't count. If the server is stopped mid-answer (the page's 3-minute limit), the estimate saved at the start stays, even if the question had cost more by then.
+If both tries of a round fail, `answerQuestion` stops and returns what the question cost so far, and that is what's charged. A question whose first round Anthropic turned down on both tries cost nothing, so it's deleted and doesn't count.
 
-The reasons and the options considered are in [decision record 0005](adr/0005-ask-budget.md).
+### The time limit
+
+Vercel stops the request at the match page's 3-minute limit (`maxDuration`), and a question stopped that way keeps only the estimate saved at the start, even if it had cost more by then. So `answerQuestion` stops itself first, 150 seconds after it starts (`ASK_TIME_LIMIT_MS` in `ask.ts`), and returns what the question cost so far, which is what's charged; the player sees "Couldn't finish answering". To end by then:
+
+- No try waits for Anthropic past the limit. One that would is cut off there and adds the 50-cent estimate, like any timeout.
+- A round isn't started with under 20 seconds left, and a second try isn't made when the pause before it would leave less.
+- The tools' results are waited for only until the limit, since a slow Riot can run out the clock too.
+
+The other 30 seconds are for looking the player up before and saving the cost after, and a test in `ask.test.ts` fails if the match page's limit no longer leaves them. If the server stops for another reason, such as a crash, the estimate saved at the start still stays.
+
+The reasons and the options considered are in decision records [0005](adr/0005-ask-budget.md) and [0029](adr/0029-ask-stops-before-vercel-does.md), which added the time limit.
 
 The prompt follows the recap rules: use only what the tools returned, say how many games the answer rests on, describe instead of telling the player what to do, plain text.
 

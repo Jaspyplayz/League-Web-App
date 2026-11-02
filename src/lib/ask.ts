@@ -34,6 +34,20 @@ export const ASK_MODEL = "claude-sonnet-5-5";
 // round re-sends the conversation so far, so this also caps the cost.
 const MAX_ROUNDS = 8;
 
+// How long a question may take, from when it starts here. Vercel stops the
+// request at the match page's maxDuration (180 s), and a question stopped
+// that way keeps only the 50-cent estimate it was saved with
+// (src/lib/ask-store.ts), however much its rounds cost by then. So the loop
+// stops itself first and returns what it spent. The other 30 s are for
+// looking the player up before and saving the cost after; a test checks
+// they still fit.
+export const ASK_TIME_LIMIT_MS = 150_000;
+// The longest one try waits for Anthropic. Two tries make a round.
+const TRY_TIMEOUT_MS = 60_000;
+// A try isn't started with less time than this left: it would most likely be
+// cut off, and a try cut off partway may still be billed.
+const MIN_TRY_MS = 20_000;
+
 // Without the key, the Ask tab says it isn't available.
 export function askEnabled(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
@@ -91,8 +105,8 @@ const TOOLS: BetaTool[] = [
 ];
 
 export type AskResult = {
-  // Null when Claude refused, ran out of room or rounds, or a round failed.
-  // The cost still counts.
+  // Null when Claude refused, ran out of room, rounds or time, or a round
+  // failed. The cost still counts.
   answer: string | null;
   games: AskGame[];
   model: string;
@@ -100,9 +114,10 @@ export type AskResult = {
   // Anthropic reported for each round, plus HOLD_MICROS for each round in
   // which a try may have been billed without a reply (see sendRound).
   costMicros: number;
-  // Set when a round failed (Anthropic overloaded, a timeout, no network),
-  // for the caller to report. The rounds before it were still paid for, so
-  // their cost is in costMicros rather than lost with the error.
+  // Set when a round failed (Anthropic overloaded, a timeout, no network) or
+  // the question reached ASK_TIME_LIMIT_MS, for the caller to report. The
+  // rounds before it were still paid for, so their cost is in costMicros
+  // rather than lost with the error.
   error?: unknown;
 };
 
@@ -111,11 +126,9 @@ export async function answerQuestion(
   account: Account,
   question: string,
 ): Promise<AskResult> {
-  // A minute per try, and two tries per round (see sendRound). A question
-  // that runs past the page's time limit (maxDuration in the Ask page) is
-  // cut off; it was saved with an estimated cost before it started
-  // (src/lib/ask-store.ts), so it still counts.
-  const client = new Anthropic({ maxRetries: 0, timeout: 60_000 });
+  // No retries from the SDK: sendRound makes the second try itself.
+  const client = new Anthropic({ maxRetries: 0 });
+  const deadline = Date.now() + ASK_TIME_LIMIT_MS;
   const messages: BetaMessageParam[] = [{ role: "user", content: question }];
   const tools = new ToolRunner(region, account);
   let model = ASK_MODEL;
@@ -126,9 +139,14 @@ export async function answerQuestion(
     model,
     costMicros: cost,
   });
+  const outOfTime = (): AskResult => ({
+    ...result(null),
+    error: new Error("Ask ran out of time before Claude answered"),
+  });
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
-    const sent = await sendRound(client, {
+    if (deadline - Date.now() < MIN_TRY_MS) return outOfTime();
+    const sent = await sendRound(client, deadline, {
       model: ASK_MODEL,
       max_tokens: 8000,
       // Saves the conversation so far in Anthropic's cache, so the next
@@ -160,7 +178,10 @@ export async function answerQuestion(
       // The whole reply goes back, thinking included, as the API requires.
       messages.push({ role: "assistant", content: response.content });
       const calls = response.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
-      const results = await Promise.all(calls.map((call) => tools.run(call)));
+      // A slow Riot can run out the clock too, so stop waiting at the limit.
+      // The tools only read, so leaving them to finish costs nothing.
+      const results = await beforeDeadline(Promise.all(calls.map((call) => tools.run(call))), deadline);
+      if (results === undefined) return outOfTime();
       // All results in one message, so Claude keeps calling tools in parallel.
       messages.push({ role: "user", content: results });
       continue;
@@ -203,14 +224,20 @@ type SentRound =
 // `mayBeBilled` says to count the round as HOLD_MICROS, the same estimate as
 // a question still being answered. That also charges a network outage that
 // never reached Anthropic, which errs on the safe side.
+//
+// No try waits past `deadline` (see ASK_TIME_LIMIT_MS): one that would is
+// cut off there and counted like any timeout, and the second try is skipped
+// when the pause before it would leave less than MIN_TRY_MS.
 async function sendRound(
   client: Anthropic,
+  deadline: number,
   request: MessageCreateParamsNonStreaming,
 ): Promise<SentRound> {
   let mayBeBilled = false;
   for (let attempt = 1; ; attempt++) {
     try {
-      const response = await client.beta.messages.create(request);
+      const timeout = Math.min(TRY_TIMEOUT_MS, deadline - Date.now());
+      const response = await client.beta.messages.create(request, { timeout });
       // A success without token counts (an empty reply, or one that isn't
       // JSON) can't be priced, but Anthropic may have run it, so it's a
       // failed try that may have been billed.
@@ -218,9 +245,25 @@ async function sendRound(
       return { ok: true, response, mayBeBilled };
     } catch (error) {
       if (!turnedDown(error)) mayBeBilled = true;
-      if (attempt === 2) return { ok: false, error, mayBeBilled };
-      await new Promise((resolve) => setTimeout(resolve, pauseBeforeRetry(error)));
+      const pause = pauseBeforeRetry(error);
+      if (attempt === 2 || deadline - Date.now() - pause < MIN_TRY_MS) {
+        return { ok: false, error, mayBeBilled };
+      }
+      await new Promise((resolve) => setTimeout(resolve, pause));
     }
+  }
+}
+
+// The work's result, or undefined if `deadline` comes first.
+async function beforeDeadline<T>(work: Promise<T>, deadline: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeUp = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), deadline - Date.now());
+  });
+  try {
+    return await Promise.race([work, timeUp]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
