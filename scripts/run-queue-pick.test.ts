@@ -120,6 +120,7 @@ describe("parseTouches", () => {
   // would hold fewer than it changes. Enter in Linear's editor makes a new paragraph.
   it.each([
     ["the next line", "**Touches.** `scripts/a.ts`\n`CLAUDE.md`", "its Touches line runs onto the next line; keep the list on one line"],
+    ["a next line that starts with a word", "**Touches.** `src/a.ts`\nsrc/b.ts and src/c.ts", "its Touches line runs onto the next line; keep the list on one line"],
     [
       "a paragraph that starts with a path",
       "**Touches.** `scripts/a.ts`\n\n`CLAUDE.md`",
@@ -202,6 +203,8 @@ describe("parseTouches", () => {
     "**Touches.** None\n\nIt only writes in Linear.",
     "**Touches.** None.\n- It only writes in Linear.",
     "**Touches.** None.\n**Builder.** Claude Code on Opus 5.5.",
+    "**Touches.** None.\n**Builder.** See `docs/workflow.md`.",
+    "**Touches.** None.\n\n**Plan.** See docs/workflow.md.",
   ])("reads a reason on its own line as no part of the list: %j", (description) => {
     expect(parseTouches(description)).toEqual({ files: [] });
   });
@@ -260,6 +263,20 @@ describe("parseTouches", () => {
     ["**Touches.** None\n\n`src/a.ts`", "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word"],
   ])("refuses a None line whose list may carry on: %j", (description, why) => {
     expect(parseTouches(description)).toEqual({ why });
+  });
+
+  // A reason that names a file may mean the ticket changes it, so the ticket
+  // would hold nothing and start beside a builder changing that file.
+  it.each([
+    "**Touches.** None.\nAlso `src/db/schema.ts`.",
+    "**Touches.** None\nsrc/db/schema.ts",
+    "**Touches.** None\n- src/db/schema.ts",
+    "**Touches.** None.\n\nAlso `src/db/schema.ts`.",
+    "**Touches.** None.\n\nIt changes src/db/schema.ts.",
+  ])("refuses a None line whose reason names a path: %j", (description) => {
+    expect(parseTouches(description)).toEqual({
+      why: "the line after its Touches None names a path, so the ticket may change files; write the reason without one",
+    });
   });
 });
 

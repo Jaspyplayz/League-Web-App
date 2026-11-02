@@ -116,6 +116,11 @@ export function parseTouches(description: string): Touches {
   if (STARTS_WITH_PATH.test(nextParagraph)) {
     return { why: "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word" };
   }
+  // A reason that names a file may mean the ticket changes it. Another label's
+  // paths are its own. A bare file name with neither mark isn't caught.
+  if (saysNone(list) && !nextParagraph.startsWith("**") && /[`/]/.test(nextParagraph)) {
+    return { why: "the line after its Touches None names a path, so the ticket may change files; write the reason without one" };
+  }
   if ((list.match(/`/g) ?? []).length % 2 === 1) return { why: "its Touches line has a backtick with no partner" };
   if (saysNone(list)) return { files: [] };
   const files = [...list.matchAll(/`([^`]*)`/g)].map((match) => match[1].trim());
