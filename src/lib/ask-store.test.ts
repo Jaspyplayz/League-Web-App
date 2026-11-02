@@ -22,14 +22,17 @@ vi.mock("@/lib/ask", () => ({ answerQuestion: vi.fn(), ASK_MODEL: "claude-sonnet
 // a different one, shows up.
 // `used` is what the limit checks read; the two arrays are the rows saved in
 // ask_questions and ask_spend; `steps` records the order things happen in;
-// `reads` which table each limit check read, its filter's SQL and the values
-// that filter compared against; `locks` the SQL each lock ran.
+// `reads` which table each limit check read, the SQL of what it asked
+// Postgres to count or add up, its filter's SQL and the values that filter
+// compared against; `locks` the SQL each lock ran.
+// The fake answers each check with the totals in `used` whatever it asked
+// for, so `fields` is what shows the code adds up the right column.
 type Row = Record<string, unknown>;
 let used: { askedToday: number; accountSpent: number; siteSpent: number };
 let questions: Row[];
 let spend: Row[];
 let steps: string[];
-let reads: { table: string; counts: boolean; sql: string; params: unknown[] }[];
+let reads: { table: string; fields: Record<string, string>; sql: string; params: unknown[] }[];
 let locks: string[];
 let transactions: number;
 
@@ -48,13 +51,13 @@ function fake(prefix: string) {
       steps.push(`${prefix}lock`);
       locks.push(sqlOf(query));
     },
-    select: (fields: Row) => ({
+    select: (fields: Record<string, SQL>) => ({
       from: (table: unknown) => ({
         where: async (filter: SQL) => {
           steps.push(`${prefix}check`);
           reads.push({
             table: tableName(table),
-            counts: "n" in fields,
+            fields: Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, sqlOf(field)])),
             sql: sqlOf(filter),
             params: paramsOf(filter),
           });
@@ -198,7 +201,7 @@ describe("ask", () => {
     });
   });
 
-  it("counts this account's last 24 hours, its month, and the whole site's month", async () => {
+  it("counts this account's last 24 hours and adds up its month and the whole site's month", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-21T12:00:00Z"));
     claudeReturns({ answer: "You die early.", costMicros: 120_000 });
@@ -213,17 +216,22 @@ describe("ask", () => {
       '("ask_questions"."user_id" = $1 and "ask_questions"."created_at" >= $2)';
     expect(reads).toEqual(
       expect.arrayContaining([
-        { table: "ask_questions", counts: true, sql: sinceForAccount, params: ["user-1", dayAgo] },
         {
           table: "ask_questions",
-          counts: false,
+          fields: { n: "count(*)" },
+          sql: sinceForAccount,
+          params: ["user-1", dayAgo],
+        },
+        {
+          table: "ask_questions",
+          fields: { spent: 'sum("ask_questions"."cost_micros")' },
           sql: sinceForAccount,
           params: ["user-1", monthStart],
         },
         // The site's total is everyone's, so it isn't filtered by account.
         {
           table: "ask_spend",
-          counts: false,
+          fields: { spent: 'sum("ask_spend"."cost_micros")' },
           sql: '"ask_spend"."created_at" >= $1',
           params: [monthStart],
         },
@@ -304,6 +312,9 @@ describe("ask", () => {
   });
 
   it("still counts the question when something fails after it was saved", async () => {
+    // The 10th question today, so none are left after it. This also pins
+    // QUESTIONS_PER_DAY at 10: at 11 one would be left, and at 9 or fewer
+    // the question would be turned away before it was saved.
     used.askedToday = 9;
     vi.mocked(answerQuestion).mockRejectedValue(new Error("database blip"));
 

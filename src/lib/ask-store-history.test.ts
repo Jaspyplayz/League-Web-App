@@ -1,4 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readQuestions } from "./ask-store";
 
@@ -7,19 +9,28 @@ vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/ask", () => ({ answerQuestion: vi.fn(), ASK_MODEL: "claude-sonnet-5-5" }));
 
 // The query chain readQuestions runs, ending in `limit`, which answers with
-// the rows or throws. ask-store.test.ts covers asking; this file covers
-// reading the history back.
+// the rows or throws. `where` keeps the filter it was given. ask-store.test.ts
+// covers asking; this file covers reading the history back.
 const limit = vi.fn();
-const chain = { from: () => chain, where: () => chain, orderBy: () => chain, limit };
+let filter: SQL | undefined;
+const chain = {
+  from: () => chain,
+  where: (condition: SQL) => {
+    filter = condition;
+    return chain;
+  },
+  orderBy: () => chain,
+  limit,
+};
 let db: { select: () => typeof chain } | null;
 vi.mock("@/lib/match-store", () => ({ database: () => db }));
 
-const askedAt = new Date("2026-10-30T12:00:00Z");
-const row = { id: "q-1", question: "Why do I lose?", answer: "You die early.", games: [], askedAt };
+const row = { id: "q-1", question: "Why do I lose?", answer: "You die early.", games: [] };
 
 beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "postgres://test");
   db = { select: () => chain };
+  filter = undefined;
   limit.mockReset();
   vi.mocked(Sentry.captureException).mockClear();
 });
@@ -32,6 +43,18 @@ describe("readQuestions", () => {
   it("returns the answered questions", async () => {
     limit.mockResolvedValue([row]);
     expect(await readQuestions("user-1", "player-1")).toEqual({ ok: true, questions: [row] });
+  });
+
+  // A filter lost here would show one account the questions another asked,
+  // or questions about a different player, or ones with no answer yet.
+  it("reads only this account's answered questions about this player", async () => {
+    limit.mockResolvedValue([]);
+    await readQuestions("user-1", "player-1");
+    const query = new PgDialect().sqlToQuery(filter!);
+    expect(query.sql).toBe(
+      '("ask_questions"."user_id" = $1 and "ask_questions"."puuid" = $2 and "ask_questions"."answer" is not null)',
+    );
+    expect(query.params).toEqual(["user-1", "player-1"]);
   });
 
   it("returns no questions when none were asked", async () => {
