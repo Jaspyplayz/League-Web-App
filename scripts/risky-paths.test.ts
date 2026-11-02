@@ -107,7 +107,11 @@ function tokenProblems(workflow: string): string[] {
 // word itself, not only an `environment:` key. A quoted key, or a YAML anchor
 // used as a key, would get past a check for that. Reading a deployment's
 // environment, as `github.event.deployment.environment`, can't reach them.
-// `secrets: inherit` hands a called workflow every secret without naming one.
+// `secrets: inherit` hands a called workflow every secret without naming one,
+// so `inherit` is refused as a word too, since an anchor, a folded block or a
+// tag can put it there. A workflow in another repo can set `environment` where
+// this test can't read it, so naming one is refused the same way, whatever key
+// it's under. A call to this repo's own workflow is read like any other.
 function secretProblems(workflow: string): string[] {
   const code = workflow
     .split("\n")
@@ -116,7 +120,8 @@ function secretProblems(workflow: string): string[] {
   return [
     /(?<![.\w-])environment(?![\w-])/i.test(code) && "asks for a deployment environment",
     /LINEAR_API_KEY|RUN_QUEUE_TASK_TOKEN/i.test(code) && "names one of the queue's secrets",
-    /\bsecrets\b["']?\s*:\s*["']?inherit\b/i.test(code) && "passes every secret to a called workflow",
+    /(?<![.\w-])inherit(?![\w-])/i.test(code) && "passes every secret to a called workflow",
+    /[\w.-]+\/[\w.-]+\/\.github\/workflows\//i.test(code) && "names a workflow in another repo",
   ].filter((problem) => problem !== false);
 }
 
@@ -532,8 +537,35 @@ describe("riskyFiles", () => {
     ["a secret in small letters, which GitHub reads the same", "env:\n  KEY: ${{ secrets.linear_api_key }}\n"],
     ["a call that passes every secret on", "jobs:\n  x:\n    uses: octo/repo/.github/workflows/y.yml@main\n    secrets: inherit\n"],
     ["a quoted secrets key and value", 'jobs:\n  x:\n    "secrets": "inherit"\n'],
+    ["inherit from a YAML anchor", "env: { X: &i inherit }\njobs:\n  x:\n    uses: ./.github/workflows/y.yml\n    secrets: *i\n"],
+    ["inherit in a folded block", "jobs:\n  x:\n    uses: ./.github/workflows/y.yml\n    secrets: >-\n      inherit\n"],
+    ["inherit with a YAML tag", "jobs:\n  x:\n    uses: ./.github/workflows/y.yml\n    secrets: !!str inherit\n"],
+    ["a call to another repo's workflow", "jobs:\n  x:\n    uses: octo/repo/.github/workflows/y.yml@main\n"],
+    ["a quoted call to another repo's workflow", 'jobs:\n  x:\n    uses: "octo/repo/.github/workflows/y.yml@main"\n'],
+    ["a flow-style call to another repo's workflow", "jobs: { x: { uses: octo/repo/.github/workflows/y.yml@main } }\n"],
+    ["another repo's workflow from a YAML anchor", "env: { X: &u octo/repo/.github/workflows/y.yml@main }\njobs:\n  x:\n    uses: *u\n"],
+    ["another repo's workflow in a folded block", "jobs:\n  x:\n    uses: >-\n      octo/repo/.github/workflows/y.yml@main\n"],
   ])("would refuse a workflow with %s", (_, text) => {
     expect(secretProblems(text)).not.toEqual([]);
+  });
+
+  it("accepts a call to this repo's own workflow, an action, and other words holding inherit", () => {
+    expect(
+      secretProblems(
+        [
+          "jobs:",
+          "  x:",
+          "    uses: ./.github/workflows/y.yml",
+          "  y:",
+          "    steps:",
+          "      - uses: actions/checkout@v7",
+          "      - uses: octo/repo/path/to/action@v1",
+          "        env:",
+          "          NOTE: inherited values",
+          "# secrets: inherit, from octo/repo/.github/workflows/y.yml@main, in a comment",
+        ].join("\n"),
+      ),
+    ).toEqual([]);
   });
 
   it("leaves a YAML escape that spells environment to the token check beside it", () => {
