@@ -1,0 +1,15 @@
+name: Probe events
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+  pull_request_review:
+    types: [submitted]
+permissions: {}
+jobs:
+  reviewer:
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "$EVENT" = pull_request_review
+        env:
+          EVENT: ${{ github.event_name }}
