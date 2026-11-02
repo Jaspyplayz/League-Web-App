@@ -1,4 +1,4 @@
-import { isValidElement, type ReactElement, type ReactNode } from "react";
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { Switch } from "./switch";
@@ -9,14 +9,9 @@ function speeds(onChange = vi.fn()) {
   return Switch({ label: "Playback speed", options: SPEEDS, value: 30, onChange, look: "solid", className: "bg-panel" });
 }
 
-// There's no browser in these tests, so this walks what the switch returns to
-// find its buttons.
 type ButtonProps = { onClick: () => void; "aria-pressed": boolean; children: string };
-function buttons(node: ReactNode): ReactElement<ButtonProps>[] {
-  if (Array.isArray(node)) return node.flatMap(buttons);
-  if (!isValidElement<{ children?: ReactNode }>(node)) return [];
-  if (node.type === "button") return [node as ReactElement<ButtonProps>];
-  return buttons(node.props.children);
+function buttons(strip: ReactElement<{ children: ReactElement<ButtonProps>[] }>) {
+  return strip.props.children;
 }
 
 describe("the switch", () => {

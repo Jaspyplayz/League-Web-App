@@ -300,14 +300,13 @@ export function StepButtons({
         <StepButton
           key={step.label}
           label={step.label}
+          icon={step.icon}
           unavailable={step.off}
           onClick={() => {
             if (!step.off) onSelect(step.to);
           }}
           className="min-h-11 bg-raised hover:bg-select aria-disabled:text-quiet aria-disabled:hover:bg-raised"
-        >
-          <path d={step.icon} />
-        </StepButton>
+        />
       ))}
     </div>
   );

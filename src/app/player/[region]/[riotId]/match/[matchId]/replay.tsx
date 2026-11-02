@@ -75,6 +75,9 @@ type Props = {
   tempoDocsHref: string;
 };
 
+// The previous and next buttons, in the panel's fill on the raised play bar.
+const STEP_BUTTON = "size-10 bg-panel text-main hover:bg-divider disabled:opacity-40 disabled:hover:bg-panel";
+
 // Playback moves the clock every TICK_MS, by `speed` seconds of game time
 // per real second: at 30x a 30-minute game plays in a minute.
 const TICK_MS = 100;
@@ -389,11 +392,11 @@ export function Replay({
             <div className="flex items-center gap-1.5">
               <StepButton
                 label={`Previous ${stopName}`}
+                icon="M15 6l-6 6 6 6"
                 disabled={previousStop === undefined}
                 onClick={() => moveTo(previousStop ?? 0)}
-              >
-                <path d="M15 6l-6 6 6 6" />
-              </StepButton>
+                className={STEP_BUTTON}
+              />
               <button
                 type="button"
                 aria-label={playing ? "Pause" : "Play"}
@@ -411,11 +414,11 @@ export function Replay({
               </button>
               <StepButton
                 label={`Next ${stopName}`}
+                icon="M9 6l6 6-6 6"
                 disabled={nextStop === undefined}
                 onClick={() => moveTo(nextStop ?? end)}
-              >
-                <path d="M9 6l6 6-6 6" />
-              </StepButton>
+                className={STEP_BUTTON}
+              />
               <span className="ml-1.5 whitespace-nowrap text-sm tabular-nums text-main">
                 {formatClock(t)} <span className="text-quiet">/ {formatClock(end)}</span>
               </span>

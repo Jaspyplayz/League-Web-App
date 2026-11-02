@@ -1,26 +1,20 @@
-import type { ReactNode } from "react";
-
-// An icon button: the replay's previous and next, and Game review's first,
-// previous, next and last. `children` is the icon's SVG path, drawn in a 24
-// by 24 box. `className` sets its size and fill, one step off what it sits
-// on; the default is the replay's, on its raised play bar.
 export function StepButton({
   label,
+  icon,
   disabled = false,
   unavailable,
   onClick,
-  className = "size-10 bg-panel text-main hover:bg-divider disabled:opacity-40 disabled:hover:bg-panel",
-  children,
+  className,
 }: {
   label: string;
-  // A disabled button leaves the tab order. An unavailable one stays in it
-  // and is only marked as unavailable, so stepping onto the last play doesn't
-  // lose your keyboard focus.
+  // The icon's SVG path, drawn in a 24 by 24 box.
+  icon: string;
+  // A disabled button leaves the tab order. An unavailable one stays in it,
+  // marked only with aria-disabled.
   disabled?: boolean;
   unavailable?: boolean;
   onClick: () => void;
-  className?: string;
-  children: ReactNode;
+  className: string;
 }) {
   return (
     <button
@@ -43,7 +37,7 @@ export function StepButton({
         strokeLinejoin="round"
         aria-hidden="true"
       >
-        {children}
+        <path d={icon} />
       </svg>
     </button>
   );

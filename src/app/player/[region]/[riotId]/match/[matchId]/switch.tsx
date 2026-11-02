@@ -1,10 +1,3 @@
-// Pressed buttons in a strip, for choosing what the match page shows: the
-// board's stat and gold, the replay's plays and its speed. `className` gives
-// the strip its fill, one step off what it sits on.
-
-// How the pressed button stands out. The board's lifts it to the panel's
-// fill; the replay's fills it with the text colour, as the Review board's
-// main buttons are.
 const LOOKS = {
   lifted: {
     strip: "flex gap-0.5 p-0.5",
