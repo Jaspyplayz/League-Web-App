@@ -541,7 +541,7 @@ describe("decide", () => {
       "e2e/preview-login.ts",
       "src/app/themes.test.ts",
       "npm-shrinkwrap.json",
-      "scripts/run-queue-pick.ts",
+      "vercel.json",
     ])("merges %s with a panel line and a clean verdict at the head, in every tier", (file) => {
       for (const tier of ["tiny. One line.", "normal. One line.", "risky. One line."]) {
         const files = ["src/app/sign-in/page.tsx", file];

@@ -235,6 +235,9 @@ describe("riskyFiles", () => {
     ".claude/settings.local.json",
     "scripts/package.json",
     "package-lock.json",
+    "scripts/run-queue-pick.ts",
+    "scripts/run-queue.ts",
+    ".github/workflows/run-queue.yml",
     "scripts/node_modules/zod/index.js",
     "scripts/node_modules/zod/package.json",
     "node_modules/zod/index.js",
@@ -245,7 +248,7 @@ describe("riskyFiles", () => {
 
   // Jasper chose exactly these on 2026-11-02 (decision record 0032), so a
   // change to his list shows up here as well as in a new record.
-  it("keeps Jasper's list to migrations and the gates' own code", () => {
+  it("keeps Jasper's list to migrations, the gates' own code and the ticket queue", () => {
     expect(JASPERS_PATHS.map(({ pattern }) => pattern)).toEqual([
       "drizzle/",
       "drizzle.config.ts",
@@ -258,6 +261,8 @@ describe("riskyFiles", () => {
       ".claude/settings",
       "scripts/package.json",
       "package-lock.json",
+      "scripts/run-queue",
+      ".github/workflows/run-queue",
     ]);
   });
 
@@ -319,7 +324,6 @@ describe("riskyFiles", () => {
     ".npmrc",
     ".nvmrc",
     ".mcp.json",
-    "scripts/run-queue-pick.ts",
     "src/lib/.claude/rules/x.md",
   ])("lets Claude merge %s after the panel", (path) => {
     expect(onPanel(path)).toBe(true);
@@ -405,7 +409,7 @@ describe("riskyFiles", () => {
   // Every file in these folders steers agents or runs a check. Of them, only
   // the merge switch, Claude's deny rules and the workflows that merge or check
   // the reviewer are Jasper's.
-  it("flags every file in .claude/ and .github/, and keeps only the gates' files there Jasper's", () => {
+  it("flags every file in .claude/ and .github/, and keeps only the gates' and the queue's files there Jasper's", () => {
     const files = repoFiles.filter((file) => file.startsWith(".claude/") || file.startsWith(".github/"));
     expect(files.length).toBeGreaterThan(100);
     expect(riskyFiles(files).map((file) => file.path)).toEqual(files);
@@ -415,6 +419,7 @@ describe("riskyFiles", () => {
       ".github/workflows/agent-merge-sweep.yml",
       ".github/workflows/agent-merge.yml",
       ".github/workflows/reviewer.yml",
+      ".github/workflows/run-queue.yml",
     ]);
   });
 

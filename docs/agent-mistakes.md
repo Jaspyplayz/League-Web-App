@@ -75,7 +75,7 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Lint and typecheck pass before Claude commits | The commit hook, `.claude/hooks/check-before-commit.mjs` |
 | No PR merges before the reviewer clears it (its head, or an earlier commit with only small changes since) | GitHub's required `reviewer` check |
 | The reviewer's re-review line has the shape the check reads | `scripts/can-merge-gates.ts`, test `names a verdict line it can't read` |
-| A PR that touches Jasper's list (migrations, anything that defines a check) is Jasper's to merge | `npm run can-merge`, gate "No files Jasper merges" (`jaspersFiles` in `scripts/risky-paths.ts`) |
+| A PR that touches Jasper's list (migrations, the ticket queue, the merge gates) is Jasper's to merge | `npm run can-merge`, gate "No files Jasper merges" (`jaspersFiles` in `scripts/risky-paths.ts`) |
 | A risky PR merges only after the interrogate panel ran on one of its commits | `npm run can-merge`, gate "Interrogate panel ran", and its tests in `scripts/can-merge-gates.test.ts` |
 | A one-way door is Jasper's to merge | `npm run can-merge`, gate "Two-way door", reads what the PR says. For a one-way door labelled two-way, nothing yet but the reviewer (`.claude/agents/reviewer.md`, check 8); JAS-69 would compare the line with the diff |
 | The Agent merge workflow merges only a PR whose builder wrote `**Ready to merge:** yes at <head sha>` | `readyToMerge` in `scripts/can-merge-action-steps.ts` and its tests |
@@ -87,4 +87,3 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Every agent mistake gets an entry | Nothing yet: the `postmortem` skill and step 10 of `docs/workflow.md`; check 5 of [the wellness check](wellness.md#check-5-agent-mistakes) looks for missed ones twice a month |
 | A cloud session tries a criterion, screenshot or review on the preview before leaving it to a local session | Nothing yet: `AGENTS.md`, Cloud sessions; `npm run can-merge` refuses an unticked criterion at merge time |
 | Jasper's Dev Log why and what-I-learned lines are never listed as his to-do | Nothing yet: a line in Jasper's `~/.claude/CLAUDE.md` |
-| The verify and postmortem skills' files that Claude merges are plain files, and each `SKILL.md` has only its name and a one-line description, with no shell command | `scripts/risky-paths.test.ts` ([0028](adr/0028-the-verify-and-postmortem-skills-merge-after-the-panel.md)) |

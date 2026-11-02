@@ -117,12 +117,35 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      # npm ci runs without the secrets in its environment.
-      - run: npm ci
+      # Claude can merge package.json, .npmrc and tsconfig.json after the panel,
+      # so these steps stop the ones found so far from changing which code runs
+      # below with the secrets, as the Agent merge job does (decision record
+      # 0032). npx runs package.json's own bin ahead of node_modules/.bin, and a
+      # package scope with exports, imports or workspaces, or a node_modules/
+      # folder beside the scripts, can stand in for zod.
+      - name: Refuse files that would change what the queue loads
+        run: |
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const fields = ["bin", "exports", "imports", "workspaces"].filter((key) => key in require("./package.json"));
+            const tracked = execFileSync("git", ["ls-files", "scripts/node_modules", "scripts/package.json"], { encoding: "utf8" }).trim();
+            if (fields.length > 0 || tracked !== "") {
+              console.error(`package.json fields: ${fields.join(", ") || "none"}; under scripts/: ${tracked || "nothing"}`);
+              process.exit(1);
+            }
+          '
+      # An .npmrc could set node-options, npm-shrinkwrap.json would replace the
+      # lockfile, and an install script could rewrite the queue's code on disk.
+      # The dependencies come from main's lockfile, which stays Jasper's. This
+      # runs without the secrets in its environment.
+      - run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts
       - run: npx tsx scripts/run-queue.ts
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          # tsx reads this in place of tsconfig.json, so tsconfig.json's paths
+          # can't swap a module the queue imports, such as zod.
+          TSX_TSCONFIG_PATH: scripts/can-merge.tsconfig.json
           # Not a secret: firing it also needs the token. The task is
           # "Ticket queue builder" at claude.ai/code/routines; a new task
           # means a new ID here.

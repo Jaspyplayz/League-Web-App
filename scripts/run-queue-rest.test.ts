@@ -1018,7 +1018,7 @@ describe(".github/workflows/run-queue.yml", () => {
     expect(queue.filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
       "- uses: actions/checkout@v7",
       "- uses: actions/setup-node@v7",
-      "- run: npm ci",
+      "- run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts",
       "- run: npx tsx scripts/run-queue.ts",
     ]);
     expect(queue.filter((line) => /^\s*(ref|repository|path|token|cache|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
@@ -1026,6 +1026,24 @@ describe(".github/workflows/run-queue.yml", () => {
       "persist-credentials: false",
       "package-manager-cache: false",
     ]);
+  });
+
+  // Claude can merge package.json, .npmrc and tsconfig.json after the panel, and
+  // this job holds both secrets, so it needs Agent merge's guards (decision
+  // record 0032). A merged config file could otherwise run code beside them.
+  it("refuses the files that would change what the queue loads, with Agent merge's own check", () => {
+    const guard = (path: string) => {
+      const text = source(path);
+      const start = text.indexOf("node -e '");
+      expect(start).toBeGreaterThan(-1);
+      return text.slice(start, text.indexOf("          '\n", start));
+    };
+    expect(guard(".github/workflows/run-queue.yml")).toBe(guard(".github/workflows/agent-merge.yml"));
+    const steps = queue.map((line) => line.trim());
+    const refuse = steps.indexOf("- name: Refuse files that would change what the queue loads");
+    expect(refuse).toBeGreaterThan(-1);
+    expect(refuse).toBeLessThan(steps.indexOf("- run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts"));
+    expect(steps).toContain("TSX_TSCONFIG_PATH: scripts/can-merge.tsconfig.json");
   });
 
   it("runs the queue job in the run-queue environment, which holds the two secrets, and the merged job in none", () => {
@@ -1052,7 +1070,7 @@ describe(".github/workflows/run-queue.yml", () => {
       const end = body.findIndex((next) => next.search(/\S/) <= indent);
       return [line, ...body.slice(0, end === -1 ? undefined : end)];
     });
-    expect(script.filter((line) => /^\s*(- )?run:/.test(line))).toHaveLength(3);
+    expect(script.filter((line) => /^\s*(- )?run:/.test(line))).toHaveLength(4);
     expect(script.map((line) => line.trim())).toContain('if [[ "$committed" > "$STARTED" ]]; then moved=true; else moved=false; fi');
     expect(script.some((line) => line.includes("${{"))).toBe(false);
     expect(merged.map((line) => line.trim())).toContain("STARTED: ${{ github.event.workflow_run.run_started_at }}");
