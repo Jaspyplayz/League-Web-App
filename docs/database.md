@@ -65,7 +65,7 @@ The deny rules in [`.claude/settings.json`](../.claude/settings.json) refuse the
 
 Every rule starts with `*`, so it matches its words anywhere in a command, `bash -c "…"` included. Claude Code checks each part of a command split by `&&`, `;` or `|` on its own, so `npx drizzle-kit generate && git push` still runs. It also looks past `NAME=value`, `env` or `timeout` in front of a command, so a `DATABASE_URL_DIRECT` set on the command line is refused too.
 
-The rules catch mistakes and aren't a security boundary. A command that builds the words from pieces gets past them, and so does code that opens the database itself, such as `psql` given the live address. `scripts/deny-rules.test.ts` fails if a `package.json` script that runs `drizzle-kit migrate` or `push` isn't refused, so a new script name can't slip past.
+The rules catch mistakes and aren't a security boundary. A command that builds the words from pieces gets past them, and so does code that opens the database itself, such as `psql` given the live address. A database tool outside Bash, such as the Supabase connector, isn't covered either. `scripts/deny-rules.test.ts` fails if a `package.json` script that runs `drizzle-kit migrate` or `push` isn't refused, whether it runs it itself, through another script or from a `pre` or `post` hook, so a new script name can't slip past.
 
 The cost is that a Bash command that only mentions the words is refused as well, such as `grep "drizzle-kit push" docs` or `git commit -m "… db:migrate"`. Use the Grep tool, or write the message to a file and run `git commit -F <file>`.
 
@@ -172,7 +172,7 @@ npm run remap-puuids -- --rollback .cache/puuid-remap/backup-<time>.jsonl  # put
 ```sh
 docker run -d --rm --name remap-pg -e POSTGRES_PASSWORD=local -p 127.0.0.1:55432:5432 postgres:17
 docker exec remap-pg psql -U postgres -c "create schema auth; create table auth.users (id uuid primary key);"
-for f in drizzle/*.sql; do docker exec -i remap-pg psql -q -U postgres -v ON_ERROR_STOP=1 < "$f" || break; done
+(for f in drizzle/*.sql; do docker exec -i remap-pg psql -q -U postgres -v ON_ERROR_STOP=1 < "$f" || { echo "stopped at $f"; exit 1; }; done)
 REMAP_TEST_DATABASE_URL=postgres://postgres:local@127.0.0.1:55432/postgres npx vitest run scripts/remap-puuids-db.test.ts
 docker stop remap-pg
 ```

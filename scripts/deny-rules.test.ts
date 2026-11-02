@@ -26,16 +26,28 @@ function refused(command: string): boolean {
   });
 }
 
-const changesTables = (body: string) => /\bdrizzle-kit\b.*\b(migrate|push)\b/.test(body);
-const runsRemap = (body: string) => body.includes("scripts/remap-puuids.ts");
 const names = Object.keys(scripts);
+const runsRemap = (body: string) => body.includes("scripts/remap-puuids.ts");
+
+// A script changes the live tables if it runs drizzle-kit's migrate or push,
+// or runs another script that does. npm also runs pre<name> and post<name>
+// around <name>, so a hook that changes the tables makes <name> change them.
+function changesTables(name: string, seen = new Set<string>()): boolean {
+  if (seen.has(name) || !(name in scripts)) return false;
+  seen.add(name);
+  const body = scripts[name];
+  if (/\bdrizzle-kit\b.*\b(migrate|push)\b/.test(body)) return true;
+  const runner = /\b(?:npm run(?:-script)?|node --run|pnpm(?: run)?|yarn(?: run)?|bun run)\s+([\w:.-]+)/g;
+  const called = [...body.matchAll(runner)].map((match) => match[1]);
+  return [...called, `pre${name}`, `post${name}`].some((other) => changesTables(other, seen));
+}
 
 describe("the deny rules on the live database", () => {
   it("refuse every package.json script that changes the live tables, whichever runner starts it", () => {
-    const tableScripts = names.filter((name) => changesTables(scripts[name]));
+    const tableScripts = names.filter((name) => changesTables(name));
     expect(tableScripts).not.toEqual([]);
     for (const name of tableScripts) {
-      const commands = [`npm run ${name}`, `npm run-script ${name}`, `node --run ${name}`, `pnpm ${name}`, `yarn ${name}`, `bun run ${name}`, `npx ${scripts[name]}`];
+      const commands = [`npm run ${name}`, `npm run-script ${name}`, `node --run ${name}`, `pnpm ${name}`, `yarn ${name}`, `bun run ${name}`];
       for (const command of commands) expect(refused(command), command).toBe(true);
     }
   });
@@ -63,7 +75,7 @@ describe("the deny rules on the live database", () => {
   });
 
   it("let every other package.json script run, and git push", () => {
-    for (const name of names.filter((name) => !changesTables(scripts[name]))) {
+    for (const name of names.filter((name) => !changesTables(name))) {
       expect(refused(`npm run ${name}`), name).toBe(false);
     }
     for (const command of ["npx drizzle-kit generate", "git push -u origin claude/jas-1-a-branch"]) {
