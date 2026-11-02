@@ -100,6 +100,24 @@ function tokenProblems(workflow: string): string[] {
   ].filter((problem) => problem !== false);
 }
 
+// What could reach the two secrets in the queue's environment: a deployment
+// environment, or the name of either secret, which GitHub reads in any case.
+// The environment's only rule is that a run comes from main, so a workflow
+// Claude can merge would pass it. It reads text, not YAML, so it refuses the
+// word itself, not only an `environment:` key. A quoted key, or a YAML anchor
+// used as a key, would get past a check for that. Reading a deployment's
+// environment, as `github.event.deployment.environment`, can't reach them.
+function secretProblems(workflow: string): string[] {
+  const code = workflow
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"))
+    .join("\n");
+  return [
+    /(?<![.\w-])environment(?![\w-])/i.test(code) && "asks for a deployment environment",
+    /LINEAR_API_KEY|RUN_QUEUE_TASK_TOKEN/i.test(code) && "names one of the queue's secrets",
+  ].filter((problem) => problem !== false);
+}
+
 describe("riskyFiles", () => {
   it("flags files in risky folders and risky files, with the reason", () => {
     expect(
@@ -482,6 +500,54 @@ describe("riskyFiles", () => {
 
   it("accepts a workflow that reads only, whatever its comment lines say", () => {
     expect(tokenProblems("# This job never writes; write access stays with Agent merge.\npermissions:\n  contents: read\n  # no write here\n")).toEqual([]);
+  });
+
+  // The two secrets live in the run-queue environment, whose only rule is that a
+  // run comes from main. A workflow Claude merges reaches main, and could ask
+  // for that environment and send the secrets anywhere. The queue's own workflow
+  // is on Jasper's list, so it isn't read here. One that needs an environment
+  // changes this test, which is Jasper's.
+  it("lets only workflows on Jasper's list ask for a deployment environment or name the queue's secrets", () => {
+    const workflows = repoFiles.filter((file) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file) && existsSync(file));
+    const others = workflows.filter((file) => jaspersFiles([file]).length === 0);
+    expect(others).toContain(".github/workflows/smoke.yml");
+    expect(jaspersFiles([".github/workflows/run-queue.yml"])).toHaveLength(1);
+    expect(others.flatMap((file) => secretProblems(readFileSync(file, "utf8")).map((problem) => `${file} ${problem}`))).toEqual([]);
+  });
+
+  it.each([
+    ["an environment key", "jobs:\n  x:\n    environment: run-queue\n"],
+    ["a double-quoted key", 'jobs:\n  x:\n    "environment": run-queue\n'],
+    ["a single-quoted key", "jobs:\n  x:\n    'environment': run-queue\n"],
+    ["a space before the colon", "jobs:\n  x:\n    environment : run-queue\n"],
+    ["a flow-style key", "jobs: { x: { environment: run-queue } }\n"],
+    ["a flow-style quoted key", 'jobs: {"x":{"environment":run-queue}}\n'],
+    ["an explicit key", "jobs:\n  x:\n    ? environment\n    : run-queue\n"],
+    ["a key from a YAML anchor", "env: { KEY: &key environment }\njobs:\n  x:\n    *key : run-queue\n"],
+    ["a name and url", "jobs:\n  x:\n    environment:\n      name: run-queue\n      url: https://example.com\n"],
+    ["the Linear key", "env:\n  KEY: ${{ secrets.LINEAR_API_KEY }}\n"],
+    ["the task token by index", "env:\n  KEY: ${{ secrets['RUN_QUEUE_TASK_TOKEN'] }}\n"],
+    ["a secret in small letters, which GitHub reads the same", "env:\n  KEY: ${{ secrets.linear_api_key }}\n"],
+  ])("would refuse a workflow with %s", (_, text) => {
+    expect(secretProblems(text)).not.toEqual([]);
+  });
+
+  it("leaves a YAML escape that spells environment to the token check beside it", () => {
+    const escaped = 'permissions: {}\njobs:\n  x:\n    "envir\\x6fnment": run-queue\n';
+    expect(secretProblems(escaped)).toEqual([]);
+    expect(tokenProblems(escaped)).toEqual(["has a YAML escape or a line that runs on"]);
+  });
+
+  it("accepts reading a deployment's environment, as smoke.yml does, and a comment that says the word", () => {
+    expect(
+      secretProblems(
+        [
+          "# Runs after a deploy, in no environment.",
+          "if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview'",
+          "BASE_URL: ${{ github.event.deployment_status.environment_url }}",
+        ].join("\n"),
+      ),
+    ).toEqual([]);
   });
 
   // The gates' code is Jasper's by name, so a helper they load under another
