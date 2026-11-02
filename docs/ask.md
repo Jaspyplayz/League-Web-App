@@ -28,13 +28,13 @@ If both tries of a round fail, `answerQuestion` stops and returns what the quest
 
 ### The time limit
 
-Vercel stops the request at the match page's 3-minute limit (`maxDuration`), and a question stopped that way keeps only the estimate saved at the start, even if it had cost more by then. So `answerQuestion` stops itself first, 150 seconds after it starts (`ASK_TIME_LIMIT_MS` in `ask.ts`), and returns what the question cost so far, which is what's charged; the player sees "Couldn't finish answering". To end by then:
+Vercel stops the request at the match page's 3-minute limit (`maxDuration`), and a question stopped that way keeps only the estimate saved at the start, even if it had cost more by then. So `answerQuestion` stops itself first, 120 seconds after it starts (`ASK_TIME_LIMIT_MS` in `ask.ts`), and returns what the question cost so far, which is what's charged; the player sees "Couldn't finish answering". To end by then:
 
-- No try waits for Anthropic past the limit. One that would is cut off there and adds the 50-cent estimate, like any timeout.
+- No try runs past the limit. Each try is aborted after a minute or at the limit, whichever comes first. One that's cut off adds the 50-cent estimate, like any timeout. An abort is used rather than the SDK's `timeout` option, which only covers the wait for Anthropic's reply to start, not a reply that starts and then stalls.
 - A round isn't started with under 20 seconds left, and a second try isn't made when the pause before it would leave less.
 - The tools' results are waited for only until the limit, since a slow Riot can run out the clock too.
 
-The other 30 seconds are for looking the player up before and saving the cost after, and a test in `ask.test.ts` fails if the match page's limit no longer leaves them. If the server stops for another reason, such as a crash, the estimate saved at the start still stays.
+The other 60 seconds are for what runs outside `answerQuestion`: the sign-in check and the player's Riot lookup before it (about 31 seconds at worst, when Riot is failing), and saving the cost after. A test in `ask.test.ts` fails if the match page's limit no longer leaves them. If the server stops for another reason, such as a crash, the estimate saved at the start still stays.
 
 The reasons and the options considered are in decision records [0005](adr/0005-ask-budget.md) and [0029](adr/0029-ask-stops-before-vercel-does.md), which added the time limit.
 

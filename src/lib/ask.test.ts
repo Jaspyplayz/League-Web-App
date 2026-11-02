@@ -92,13 +92,32 @@ async function triesAfter(ms: number) {
   return [before, after];
 }
 
-// A reply from Anthropic, or a tool's result, that takes `seconds` of the
-// fake clock to come back.
-function after<T>(seconds: number, reply: T) {
-  return () => new Promise<T>((resolve) => setTimeout(() => resolve(reply), seconds * 1000));
+// A try that Anthropic answers, or fails, after `seconds` of the fake clock.
+// Like the SDK, it fails as a lost connection (an APIError with no status)
+// if the try's signal aborts first.
+function after(seconds: number, reply: unknown) {
+  return settlesAfter(seconds, (resolve) => resolve(reply));
 }
 function failsAfter(seconds: number, error: unknown) {
-  return () => new Promise((_, reject) => setTimeout(() => reject(error), seconds * 1000));
+  return settlesAfter(seconds, (_, reject) => reject(error));
+}
+function settlesAfter(
+  seconds: number,
+  settle: (resolve: (value: unknown) => void, reject: (error: unknown) => void) => void,
+) {
+  return (_request: unknown, options?: { signal?: AbortSignal }) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(() => settle(resolve, reject), seconds * 1000);
+      options?.signal?.addEventListener("abort", () => {
+        clearTimeout(timer);
+        reject(new APIError(undefined));
+      });
+    });
+}
+
+// recent_games, when Riot takes `seconds` to answer.
+function slowGames(seconds: number) {
+  return () => new Promise((resolve) => setTimeout(() => resolve({ games: [] }), seconds * 1000)) as never;
 }
 
 // Asks a question and returns what it came back with after `seconds` of the
@@ -111,11 +130,6 @@ async function answerAfter(seconds: number) {
   await vi.runAllTimersAsync();
   await answer;
   return seen;
-}
-
-// The `timeout` each try was sent with, in seconds.
-function tryTimeouts() {
-  return create.mock.calls.map((call) => (call[1] as { timeout: number }).timeout / 1000);
 }
 
 describe("answerQuestion", () => {
@@ -146,15 +160,25 @@ describe("answerQuestion", () => {
 
   // The SDK's own retry would hide a timed-out try behind the next one, so
   // it's off, and sendRound makes the second try instead.
-  it("turns off the SDK's own retry and gives each try a minute", async () => {
+  it("turns off the SDK's own retry", async () => {
     create.mockResolvedValueOnce(askForGames).mockResolvedValueOnce(answers);
 
     await ask();
 
-    expect(clientOptions).toEqual([{ maxRetries: 0 }]);
-    // Only the timeout is set on each request, so the client's maxRetries
-    // still holds.
-    expect(create.mock.calls.map((call) => call[1])).toEqual([{ timeout: 60_000 }, { timeout: 60_000 }]);
+    expect(clientOptions).toEqual([{ maxRetries: 0, timeout: 60_000 }]);
+    // Only a signal is set on each request, so the client's maxRetries still
+    // holds.
+    expect(create.mock.calls.map((call) => Object.keys(call[1]))).toEqual([["signal"], ["signal"]]);
+  });
+
+  it("cuts a try off after a minute, and counts it as maybe billed", async () => {
+    create.mockImplementationOnce(after(90, answers)).mockResolvedValueOnce(answers);
+
+    // Cut off at 60 s, then the half-second pause, then the second try.
+    expect(await answerAfter(61)).toMatchObject({
+      answer: "You die early in most losses.",
+      costMicros: costMicros("claude-sonnet-5-5", usage) + HOLD_MICROS,
+    });
   });
 
   it("waits half a second before the second try", async () => {
@@ -271,78 +295,82 @@ describe("answerQuestion", () => {
 // Vercel stops the request at the match page's maxDuration, and then the
 // question keeps only its 50-cent estimate, even if its rounds cost more.
 // So the loop stops itself first, with what the question cost so far, at
-// ASK_TIME_LIMIT_MS (150 s). Each test below reads the result at 150 s.
+// ASK_TIME_LIMIT_MS (120 s). Each test below reads the result at 120 s, so
+// one that's still running then fails.
 describe("answerQuestion's time limit", () => {
   const round = costMicros("claude-sonnet-5-5", usage);
 
   it("stops in time for the match page to save what the question cost", () => {
     const page = readFileSync("src/app/player/[region]/[riotId]/match/[matchId]/page.tsx", "utf8");
     const maxDuration = Number(/export const maxDuration = (\d+);/.exec(page)?.[1]);
-    // The rest is for looking the player up before Claude is called (a slow
-    // Riot call alone can take 26 s) and saving the cost after.
-    expect(ASK_TIME_LIMIT_MS + 30_000).toBeLessThanOrEqual(maxDuration * 1000);
+    // The rest is for what runs outside answerQuestion: the sign-in check
+    // and the player's Riot lookup before it (three tries of up to 10 s
+    // each, plus pauses, when Riot is failing), and saving the cost after.
+    expect(ASK_TIME_LIMIT_MS + 60_000).toBeLessThanOrEqual(maxDuration * 1000);
   });
 
-  it("gives a try only the time left before the limit", async () => {
+  // The try was cut off, and Anthropic may still bill it.
+  it("cuts a try off at the limit, and adds the estimate", async () => {
     create
       .mockImplementationOnce(after(50, askForGames))
       .mockImplementationOnce(after(50, askForGames))
-      .mockImplementationOnce(after(40, answers));
+      .mockImplementationOnce(after(60, answers));
 
-    const result = await answerAfter(150);
-
-    expect(tryTimeouts()).toEqual([60, 60, 50]);
-    expect(result).toMatchObject({ answer: "You die early in most losses.", costMicros: 3 * round });
+    expect(await answerAfter(120)).toMatchObject({ answer: null, costMicros: 2 * round + HOLD_MICROS });
   });
 
-  // The try was cut off by its timeout, and Anthropic may still bill it.
-  it("adds the estimate for a try the limit cut off", async () => {
+  it("cuts a second try off at the limit too", async () => {
     create
-      .mockImplementationOnce(after(60, askForGames))
-      .mockImplementationOnce(after(60, askForGames))
-      .mockImplementationOnce(failsAfter(30, new APIError(undefined)));
+      .mockImplementationOnce(after(40, askForGames))
+      .mockImplementationOnce(after(40, askForGames))
+      .mockImplementationOnce(failsAfter(1, new APIError(undefined)))
+      .mockImplementationOnce(after(60, answers));
 
-    const result = await answerAfter(150);
+    // The third round's first try failed at 81 s, so its second try started
+    // at 81.5 s with 38.5 s left.
+    expect(await answerAfter(120)).toMatchObject({ answer: null, costMicros: 2 * round + HOLD_MICROS });
+    expect(create).toHaveBeenCalledTimes(4);
+  });
 
-    expect(tryTimeouts()).toEqual([60, 60, 30]);
-    expect(result).toMatchObject({ answer: null, costMicros: 2 * round + HOLD_MICROS });
+  it("starts a round with 20 seconds left", async () => {
+    create
+      .mockImplementationOnce(after(50, askForGames))
+      .mockImplementationOnce(after(50, askForGames))
+      .mockImplementationOnce(after(10, answers));
+
+    expect(await answerAfter(120)).toMatchObject({ answer: "You die early in most losses.", costMicros: 3 * round });
   });
 
   it("doesn't start a round with under 20 seconds left", async () => {
-    create
-      .mockImplementationOnce(after(60, askForGames))
-      .mockImplementationOnce(after(60, askForGames))
-      .mockImplementationOnce(after(15, askForGames));
+    create.mockImplementationOnce(after(50, askForGames)).mockImplementationOnce(after(51, askForGames));
 
-    const result = await answerAfter(150);
+    const result = await answerAfter(120);
 
-    expect(create).toHaveBeenCalledTimes(3);
-    expect(result).toMatchObject({ answer: null, costMicros: 3 * round });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ answer: null, costMicros: 2 * round });
     expect(result).toHaveProperty("error", expect.any(Error));
   });
 
   it("doesn't make a second try that its pause would leave under 20 seconds for", async () => {
     const rateLimited = new APIError(429, new Headers({ "retry-after": "10" }));
     create
-      .mockImplementationOnce(after(60, askForGames))
-      .mockImplementationOnce(after(60, askForGames))
-      .mockImplementationOnce(failsAfter(5, rateLimited));
+      .mockImplementationOnce(after(50, askForGames))
+      .mockImplementationOnce(after(40, askForGames))
+      .mockImplementationOnce(failsAfter(1, rateLimited));
 
-    const result = await answerAfter(150);
+    const result = await answerAfter(120);
 
-    // The third try failed at 125 s, and a 10 s pause would leave 15.
+    // The third try failed at 91 s, and a 10 s pause would leave 19.
     expect(create).toHaveBeenCalledTimes(3);
     expect(result).toMatchObject({ answer: null, costMicros: 2 * round, error: rateLimited });
   });
 
   // Riot can be slow to answer the tools, which runs out the clock too.
   it("stops waiting for the tools at the limit", async () => {
-    create.mockImplementationOnce(after(50, askForGames)).mockImplementationOnce(after(50, askForGames));
-    vi.mocked(recentGamesFor)
-      .mockImplementationOnce(after(10, { games: [] }) as never)
-      .mockImplementationOnce(after(60, { games: [] }) as never);
+    create.mockImplementationOnce(after(40, askForGames)).mockImplementationOnce(after(40, askForGames));
+    vi.mocked(recentGamesFor).mockImplementationOnce(slowGames(10)).mockImplementationOnce(slowGames(60));
 
-    const result = await answerAfter(150);
+    const result = await answerAfter(120);
 
     expect(create).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ answer: null, costMicros: 2 * round });
