@@ -1,7 +1,8 @@
 // The paths that make a PR risky (issue #158), in two lists (JAS-128):
 //
-// - JASPERS_PATHS: migrations, the schema they come from, and anything that
-//   defines or runs a check, apart from the smoke test's specs in e2e/.
+// - JASPERS_PATHS: migrations, the schema they come from, anything that
+//   defines or runs a check, apart from the smoke test's specs in e2e/, and
+//   the ticket queue's code, which decides what builders run unattended.
 //   `npm run can-merge` refuses a PR that touches one, whatever its tier
 //   says, since an agent could otherwise loosen its own gate and merge that.
 // - PANEL_PATHS: the rest of the risky code. Claude merges a PR that touches
@@ -60,6 +61,10 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   { pattern: ".claude/agent-merge.json", why: "the switch for agent merging" },
   { pattern: "scripts/can-merge", why: "the merge gates" },
   { pattern: "scripts/risky-paths", why: "these lists" },
+
+  // /run-queue picks tickets and starts builders with nobody watching
+  // (JAS-143, decision record 0026).
+  { pattern: "scripts/run-queue", why: "the ticket queue, which decides what builders run unattended" },
 
   // Last, so the reasons above come first: any other Claude Code file, such
   // as a new commands folder, could steer agents too.
