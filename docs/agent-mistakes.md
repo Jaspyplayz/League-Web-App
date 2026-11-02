@@ -37,7 +37,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [Description quotes a field line](agent-mistakes/description-quotes-a-field-line.md) | 1 | none yet |
 | [A check left to a local session that the cloud could run](agent-mistakes/check-left-for-a-local-session.md) | 1 | CLAUDE.md line |
 | [Merge Danger understated on a risky path](agent-mistakes/merge-danger-understated.md) | 3 | none yet |
-| [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 6 | check |
+| [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 7 | check |
 | [Automation that merges before the builder is done](agent-mistakes/merge-before-the-builder-is-done.md) | 1 | design |
 | [A new way to start a check that the merge gates trust](agent-mistakes/new-trigger-feeds-the-gates.md) | 1 | check |
 | [A throwing read moved onto a page that didn't expect it](agent-mistakes/throwing-read-moved-to-a-busier-page.md) | 1 | check |
