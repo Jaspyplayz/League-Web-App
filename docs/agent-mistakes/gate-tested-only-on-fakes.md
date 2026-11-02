@@ -49,3 +49,11 @@ A gate's tests build its inputs by hand, so they pass for the cases the builder 
 - **Root cause:** the builder made the gates fail closed on what the reader saw, but kept the old "missing" answer for a heading it couldn't see, and every test of a hidden heading used a normal PR, where missing already fails.
 - **Rung:** check
 - **Fix:** [PR 223](https://github.com/Jaspyplayz/League-Web-App/pull/223): a heading that looks right in the raw body but isn't seen fails the gate, and the test `reads a blockers verdict on a tiny PR when the heading is hidden from the gate by %s` fails on f50720e's gate code.
+
+## 2026-11-01
+
+- **What happened:** the first JAS-142 commit taught the check on the preview's secret to read each redirect hop from Playwright's `request` event, and decision record 0006 said every redirect was caught as its hop started. A keepalive fetch's redirect fires no such event, so the other site got the secret and the test passed. It should have said what it hadn't tried, or tried it.
+- **Evidence:** the reviewer on JAS-142's branch, at 6ec5eae, blocker 1: 10 of 10 tests passed through `e2e/fixtures.ts` while the other site logged `secret=true`, and rerun by hand it was 25 of 25.
+- **Root cause:** the builder tried six redirect shapes in a real browser, all caught, and wrote the result as true of every redirect. The real-browser run stayed in a temp folder, and the repo's tests fed the check made-up requests that hold the same belief, so nothing could show it false.
+- **Rung:** check
+- **Fix:** commit 208756f on JAS-142's branch: the check also watches Chrome's own reports, and the real-browser test `the check on redirects > catches a keepalive fetch's redirect` in `e2e/preview-secret.spec.ts` fails when that watch is removed. The one shape still missed, a keepalive whose page leaves at once, is listed in decision record 0006.
