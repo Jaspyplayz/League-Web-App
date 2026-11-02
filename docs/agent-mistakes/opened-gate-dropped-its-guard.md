@@ -16,7 +16,7 @@ A gate that refuses a whole group of PRs also does jobs nobody wrote down for it
 - **Evidence:** the reviewer agent's report at `50d75be` on [PR 251](https://github.com/Jaspyplayz/League-Web-App/pull/251), blocker 2; the list's own reason for the file at `50d75be` was "the check that every colour has a light value".
 - **Root cause:** Claude sorted the old list by the ticket's named groups, and that file sat beside `globals.css` under "the look's foundations". Nothing asked of each entry whether its own reason called it a check.
 - **Rung:** check
-- **Fix:** `src/app/themes.test.ts` is on `JASPERS_PATHS`, pinned by the tests "keeps migrations and every check-defining path Jasper's to merge" and "still refuses %s with a panel line and a clean verdict at the head, in every tier". Putting it back on the panel list turned both red.
+- **Fix:** `src/app/themes.test.ts` is on `JASPERS_PATHS`, pinned by the tests "keeps migrations and every check-defining path Jasper's to merge" and "still refuses %s with a panel line and a clean verdict at the head, in every tier". Putting it back on the panel list turned both red. On 2026-11-02 Jasper chose to let every check but the merge gates merge after the panel (JAS-191, decision record 0032), so it's on the panel list again on purpose, and the first test is gone.
 
 ## 2026-11-01
 

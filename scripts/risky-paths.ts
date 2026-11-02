@@ -1,14 +1,17 @@
-// The paths that make a PR risky (issue #158), in two lists (JAS-128):
+// The paths that make a PR risky (issue #158), in two lists (JAS-128, JAS-191):
 //
-// - JASPERS_PATHS: migrations, the schema they come from, anything that
-//   defines or runs a check, apart from the smoke test's specs in e2e/, and
-//   the ticket queue's code, which decides what builders run unattended.
-//   `npm run can-merge` refuses a PR that touches one, whatever its tier
-//   says, since an agent could otherwise loosen its own gate and merge that.
-// - PANEL_PATHS: the rest of the risky code. Claude merges a PR that touches
-//   one only after the interrogate panel and the reviewer clear it.
-// - PANEL_SKILLS: four skills whose Markdown is carved out of Jasper's
-//   .claude/skills/ entry and merged like PANEL_PATHS (JAS-146).
+// - JASPERS_PATHS: migrations, the schema they come from, and the merge gates
+//   (their code, Claude's deny rules, the switch, the lockfile, and the
+//   package files Node would load in place of the gates' imports). `npm run can-merge`
+//   refuses a PR that touches one, whatever its tier says. Only Jasper runs
+//   `npm run db:migrate`, so code merged before its migration would break the
+//   live site's reads; and an agent could otherwise loosen a gate and merge
+//   that.
+// - PANEL_PATHS: the rest of the risky code, including every other check (CI,
+//   lint, test configs, hooks, the reviewer agent and the skills). Claude
+//   merges a PR that touches one only after the interrogate panel and the
+//   reviewer clear it, since Jasper's click on these checked nothing more
+//   (decision record 0032).
 //
 // The docs link here instead of copying the lists.
 //
@@ -27,17 +30,44 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   // change here with no migration would break the live site's reads.
   { pattern: "src/db/schema.ts", why: "the tables migrations are generated from" },
 
-  // Anything that defines or runs a check, since loosening one is risky.
+  // The merge gates. A builder can propose a change here, but only Jasper
+  // merges it. GitHub runs a workflow named .yml or .yaml, so the two workflow
+  // patterns have no extension. scripts/can-merge covers the tsconfig the Agent
+  // merge workflow gives tsx too.
+  { pattern: "scripts/can-merge", why: "the merge gates" },
+  { pattern: "scripts/risky-paths", why: "these lists" },
+  { pattern: ".github/workflows/agent-merge", why: "the workflows that run can-merge with a token that can merge" },
+  { pattern: ".github/workflows/reviewer", why: "GitHub's required reviewer check" },
+  { pattern: ".claude/agent-merge.json", why: "the switch for agent merging" },
+  // Its deny rules stop a session merging around can-merge with `gh pr merge`
+  // or the REST merge request, or editing the switch, by mistake. They aren't
+  // a security boundary (docs/workflow.md), but a PR shouldn't drop them
+  // unseen. Local overrides match too.
+  { pattern: ".claude/settings", why: "Claude's deny rules on merging, and local overrides of them" },
+  // Node reads the package.json nearest each gate, so one here with a name and
+  // exports would stand in for a package the gates import, such as zod.
+  { pattern: "scripts/package.json", why: "a package scope the gates would load in place of an installed package" },
+  // It decides which tsx, esbuild and zod the Agent merge job runs with its
+  // token, and an entry can install another package under any name in ways a
+  // test kept missing (decision record 0032), so it stays Jasper's until the
+  // gates have a lockfile of their own (JAS-252). npm ci refuses a package.json
+  // that doesn't match it, so package.json alone can't change what's installed.
+  { pattern: "package-lock.json", why: "the dependencies the merge gates run with" },
+];
+
+export const PANEL_PATHS: readonly RiskyPath[] = [
+  // Anything else that defines or runs a check, and anything that steers the
+  // agents. These were Jasper's until JAS-191.
   { pattern: ".github/", why: "CI, the smoke test and the PR template" },
-  { pattern: ".claude/settings", why: "Claude's deny rules and commit hook, and local overrides of them" },
   { pattern: ".claude/hooks/", why: "the commit hook, and the startup hook that runs commands in every cloud session" },
   { pattern: ".claude/agents/", why: "the reviewer agent, and any agent that could take its name" },
   { pattern: ".cursor/settings.json", why: "Cursor isn't used any more, but its settings could still turn on an AI tool here" },
   { pattern: ".cursor/rules/", why: "Cursor isn't used any more, but a rule here could still give an AI tool instructions" },
-  { pattern: ".claude/skills/", why: "skills the reviewer loads" },
+  { pattern: ".claude/skills/", why: "skills the reviewer loads, and skills agents follow" },
   { pattern: ".claude/rules/", why: "rules the reviewer checks against" },
   // The configs match without an extension, because each tool loads other file
-  // names first: an eslint.config.js would replace the .mjs.
+  // names first: an eslint.config.js would replace the .mjs. ESLint also reads
+  // the eslint.config nearest each file, which PANEL_ANYWHERE below covers.
   { pattern: "eslint.config", why: "lint" },
   { pattern: "eslint-rules/", why: "lint" },
   { pattern: "tsconfig", why: "the type check" },
@@ -53,59 +83,18 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   { pattern: "e2e/preview-login.ts", why: "the code that sends the preview's secret" },
   { pattern: "e2e/preview-secret.spec.ts", why: "the check that the preview's secret stays on the preview" },
   { pattern: "scripts/preview-login", why: "the test of the check that the preview's secret stays on the preview" },
+  // The Agent merge workflow refuses a package.json with a bin, exports,
+  // imports or workspaces, deletes .npmrc and npm-shrinkwrap.json, and installs
+  // with scripts off (decision record 0032).
   { pattern: "package.json", why: "the commands CI runs, and dependencies" },
-  { pattern: "package-lock.json", why: "dependencies" },
+  { pattern: "npm-shrinkwrap.json", why: "dependencies, in place of the lockfile" },
   { pattern: ".npmrc", why: "how npm ci installs, in every workflow" },
   { pattern: ".nvmrc", why: "the Node version CI uses" },
   { pattern: ".mcp.json", why: "tools every agent here would load" },
-
-  // The merge rules themselves.
-  { pattern: ".claude/agent-merge.json", why: "the switch for agent merging" },
-  { pattern: "scripts/can-merge", why: "the merge gates" },
-  { pattern: "scripts/risky-paths", why: "these lists" },
-
   // /run-queue picks tickets and starts builders with nobody watching
   // (JAS-143, decision record 0026).
   { pattern: "scripts/run-queue", why: "the ticket queue, which decides what builders run unattended" },
 
-  // Last, so the reasons above come first: any other Claude Code file, such
-  // as a new commands folder, could steer agents too.
-  { pattern: ".claude/", why: "Claude Code's own setup, which steers every agent here" },
-];
-
-// Carved out of the .claude/skills/ entry above, so Claude merges them after the
-// panel, like PANEL_PATHS (JAS-146, decision record 0028): the Markdown in
-// these skills, and the skills' credits and notes on how they fit this repo.
-// Most redesign PRs update the verify skills, so Jasper chose to let them go
-// (2026-11-01). Agents follow them, so they still get the panel and the
-// reviewer. risky-paths.test.ts keeps each of these files a plain file, not a
-// symlink, and each SKILL.md to its name and a description, since one could
-// otherwise grant tools, add hooks or run commands.
-export const PANEL_SKILLS: readonly string[] = ["verify", "verify-turnpoint", "verify-turnpoint-ux", "postmortem"];
-const SKILL_CREDITS = ".claude/skills/THIRD-PARTY-NOTICES.md";
-
-// A note's name is lower-case words joined by hyphens, like match-page.md, so a
-// name a Windows or Mac file system could fold into CLAUDE.md or SKILL.md
-// (capitals, other alphabets, invisible characters) stays Jasper's. So does a
-// name that another AI tool loads by itself, or a SKILL file, which could make
-// features/ a skill of its own.
-function isNoteName(name: string): boolean {
-  if (name === "README.md") return true;
-  return /^[a-z0-9][a-z0-9-]*\.md$/.test(name) && !/^(claude|agent|skill|gemini)/.test(name);
-}
-
-// A file directly in a listed skill's folder, or in its features/ folder.
-function skillOnPanel(path: string): string | undefined {
-  if (path === SKILL_CREDITS) return "credits for the copied skills, and how they fit this repo";
-  const [claude, skills, folder, ...rest] = path.split("/");
-  if (claude !== ".claude" || skills !== "skills" || !PANEL_SKILLS.includes(folder)) return undefined;
-  const onPanel =
-    (rest.length === 1 && (rest[0] === "SKILL.md" || isNoteName(rest[0]))) ||
-    (rest.length === 2 && rest[0] === "features" && isNoteName(rest[1]));
-  return onPanel ? "the verify and postmortem skills, which agents follow" : undefined;
-}
-
-export const PANEL_PATHS: readonly RiskyPath[] = [
   // The risky row of docs/workflow.md's tier table.
   { pattern: "src/db/", why: "the database client and queries" },
   { pattern: "src/lib/*-store.ts", why: "database reads and writes, including deletes" },
@@ -140,14 +129,35 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
   { pattern: "src/app/privacy/", why: "Riot reviews it for production keys" },
   { pattern: "src/app/terms/", why: "Riot reviews it for production keys" },
 
-  // The smoke test's specs, which Jasper chose to let go. They're tests like
-  // any other, which the reviewer and the panel read; what decides whether and
-  // how they run (playwright.config.ts, .github/) stays on Jasper's list.
+  // The smoke test's specs. The three files above that hold or guard the
+  // preview's secret come first, so they keep their own reasons.
   { pattern: "e2e/", why: "the smoke test and accessibility scan" },
 
   // The look's foundation (JAS-94). Page restyles that only use the tokens
   // stay off this list.
   { pattern: "src/app/globals.css", why: "the palette in both themes, the corners and the fonts" },
+
+  // Last, so the reasons above come first: any other Claude Code file, such
+  // as a new commands folder, could steer agents too.
+  { pattern: ".claude/", why: "Claude Code's own setup, which steers every agent here" },
+];
+
+// Files a tool reads in any folder, not only the root (JAS-191).
+type Anywhere = { test: RegExp; why: string };
+
+// Node looks for a package in node_modules/ beside the importing file first, so
+// a committed scripts/node_modules/zod would replace the zod the gates import.
+// Nothing here commits node_modules/.
+const JASPERS_ANYWHERE: readonly Anywhere[] = [
+  { test: /(^|\/)node_modules\//i, why: "a package folder Node would load in place of an installed one" },
+];
+
+// Claude Code and Cursor load skills and rules from a .claude/ or .cursor/
+// folder in any folder, and ESLint 10 reads the eslint.config nearest each
+// file, so a one-line one in src/lib/x/ turns lint off for every file there.
+const PANEL_ANYWHERE: readonly Anywhere[] = [
+  { test: /\/\.(claude|cursor)\//i, why: "agent skills or rules below the repo root" },
+  { test: /\/eslint\.config\.[cm]?[jt]s$/i, why: "lint for the files in its folder, which ESLint reads in place of the root's" },
 ];
 
 // Windows ignores case, so src/DB/schema.ts would land on src/db/schema.ts.
@@ -160,23 +170,15 @@ export function matchesPattern(pattern: string, path: string): boolean {
   return lowerPath.length >= head.length + tail.length && lowerPath.startsWith(head) && lowerPath.endsWith(tail);
 }
 
-// Claude Code and Cursor also load skills and rules from a .claude/ or
-// .cursor/ folder below the root.
-const NESTED_AGENT_CONFIG = /\/\.(claude|cursor)\//i;
-
 type Owner = { why: string; jaspers: boolean };
 
-// In this order, so a mistake lands on Jasper's side: his list wins over a
-// panel pattern that also matches, such as src/db/schema.ts inside src/db/.
+// Jasper's list first, so a mistake lands on his side: his list wins over a
+// panel pattern that also matches, such as src/db/schema.ts inside src/db/, or
+// .claude/agent-merge.json inside .claude/.
 function owner(path: string): Owner | undefined {
-  if (NESTED_AGENT_CONFIG.test(path)) return { why: "agent skills or rules below the repo root", jaspers: true };
-  const matches = JASPERS_PATHS.filter(({ pattern }) => matchesPattern(pattern, path));
-  // Only where .claude/skills/ and the .claude/ catch-all are the entries that
-  // match, so a narrower entry added to Jasper's list, anywhere in it, wins.
-  const carvedOut = matches.every(({ pattern }) => pattern === ".claude/skills/" || pattern === ".claude/") ? skillOnPanel(path) : undefined;
-  if (carvedOut) return { why: carvedOut, jaspers: false };
-  if (matches.length > 0) return { why: matches[0].why, jaspers: true };
-  const panel = PANEL_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
+  const jaspers = JASPERS_PATHS.find(({ pattern }) => matchesPattern(pattern, path)) ?? JASPERS_ANYWHERE.find(({ test }) => test.test(path));
+  if (jaspers) return { why: jaspers.why, jaspers: true };
+  const panel = PANEL_PATHS.find(({ pattern }) => matchesPattern(pattern, path)) ?? PANEL_ANYWHERE.find(({ test }) => test.test(path));
   return panel ? { why: panel.why, jaspers: false } : undefined;
 }
 

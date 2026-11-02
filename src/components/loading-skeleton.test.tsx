@@ -4,7 +4,7 @@ import { InsightsSkeleton, MatchSkeleton } from "./loading-skeleton";
 
 describe("loading skeletons", () => {
   it("draws the match in layout A's shape, with what's already known for real", () => {
-    const html = renderToStaticMarkup(<MatchSkeleton back={<a href="/back">Back</a>} />);
+    const html = renderToStaticMarkup(<MatchSkeleton back={<span>Back</span>} />);
     expect(html).toContain('role="status"');
     expect(html).toContain("Analyzing the game");
     expect(html).toContain("bg-divider");

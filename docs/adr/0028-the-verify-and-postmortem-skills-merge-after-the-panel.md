@@ -1,6 +1,6 @@
 # 0028: The verify and postmortem skills' Markdown merges after the panel
 
-Status: draft until Jasper merges JAS-146's PR, which he merges by hand, since it changes `scripts/risky-paths.ts`. It changes [0025](0025-risky-prs-merge-after-the-panel.md)'s `FEATURE_NOTE` and answers its open question 1; that record stays as it was written.
+Status: draft until Jasper merges JAS-146's PR, which he merges by hand, since it changes `scripts/risky-paths.ts`. It changes [0025](0025-risky-prs-merge-after-the-panel.md)'s `FEATURE_NOTE` and answers its open question 1; that record stays as it was written. Amended by [0032](0032-claude-merges-all-but-migrations-and-the-gates.md), which removes `PANEL_SKILLS`, since all of `.claude/skills/` is on the panel list.
 
 ## Context
 

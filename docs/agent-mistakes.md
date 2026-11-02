@@ -58,6 +58,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A refusal retried on every run](agent-mistakes/refusal-retried-every-run.md) | 1 | none yet |
 | [Private text saved in a public fixture](agent-mistakes/private-text-in-a-public-fixture.md) | 1 | none yet |
 | [Prose passed inside a quoted shell string](agent-mistakes/prose-through-a-shell-string.md) | 1 | none yet |
+| [A page checked only the way an ordinary browser loads it](agent-mistakes/page-checked-one-way-it-loads.md) | 1 | check |
 
 ## Rules and what enforces them
 

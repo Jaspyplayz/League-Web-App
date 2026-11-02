@@ -1,6 +1,6 @@
 # 0025: Risky PRs merge after the panel, except migrations, checks and one-way doors
 
-Status: draft until Jasper merges JAS-128's PR, which he merges by hand, since it changes `scripts/can-merge*` and `scripts/risky-paths.ts`. It changes rule 6 and rule 7 of [0008](0008-agents-merge-two-way-doors.md)'s gate list, the database code [0009](0009-can-merge-covers-database-code-and-tiny-code.md) refused, and [0022](0022-the-review-board-look-arrives-by-expand-and-contract.md)'s "Jasper merges changes to the palette"; those records stay as they were written. Amended by [0028](0028-the-verify-and-postmortem-skills-merge-after-the-panel.md), which replaces `FEATURE_NOTE` with the verify and postmortem skills' Markdown.
+Status: draft until Jasper merges JAS-128's PR, which he merges by hand, since it changes `scripts/can-merge*` and `scripts/risky-paths.ts`. It changes rule 6 and rule 7 of [0008](0008-agents-merge-two-way-doors.md)'s gate list, the database code [0009](0009-can-merge-covers-database-code-and-tiny-code.md) refused, and [0022](0022-the-review-board-look-arrives-by-expand-and-contract.md)'s "Jasper merges changes to the palette"; those records stay as they were written. Amended by [0028](0028-the-verify-and-postmortem-skills-merge-after-the-panel.md), which replaces `FEATURE_NOTE` with the verify and postmortem skills' Markdown. Amended by [0032](0032-claude-merges-all-but-migrations-and-the-gates.md), which keeps only migrations and the merge gates on Jasper's list.
 
 ## Context
 

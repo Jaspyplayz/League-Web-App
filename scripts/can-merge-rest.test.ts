@@ -93,11 +93,35 @@ describe("toPrSnapshot", () => {
     const pr = toPrSnapshot(
       answers({
         checkRuns: [...CHECKS_195.checkRuns, again],
-        workflowRuns: [...CHECKS_195.workflowRuns, { name: "Reviewer", check_suite_id: 2 }],
+        workflowRuns: [...CHECKS_195.workflowRuns, { name: "Reviewer", event: "pull_request", check_suite_id: 2 }],
       }),
       FILES,
     );
     expect(gate(decide(pr, MAIN, NO_HISTORY), "Checks pass at the head commit")?.pass).toBe(passes);
+  });
+
+  // reviewer.yml runs main's copy on pull_request_target and the PR's own copy
+  // on pull_request. GitHub needs both to pass, so a newer passing run from the
+  // PR's copy can't hide main's failed one.
+  it("refuses when main's reviewer run failed and the PR's own passed later", () => {
+    const reviewer = CHECKS_195.checkRuns.find((run) => run.name === "reviewer")!;
+    const mains = { ...reviewer, conclusion: "failure", started_at: "2026-10-29T05:00:00Z", check_suite: { id: 2 } };
+    const prs = { ...reviewer, conclusion: "success", started_at: "2026-10-29T05:00:02Z", check_suite: { id: 3 } };
+    const pr = toPrSnapshot(
+      answers({
+        checkRuns: [...CHECKS_195.checkRuns, mains, prs],
+        workflowRuns: [
+          ...CHECKS_195.workflowRuns,
+          { name: "Reviewer", event: "pull_request_target", check_suite_id: 2 },
+          { name: "Reviewer", event: "pull_request", check_suite_id: 3 },
+        ],
+      }),
+      FILES,
+    );
+    expect(gate(decide(pr, MAIN, NO_HISTORY), "Checks pass at the head commit")).toMatchObject({
+      pass: false,
+      detail: "reviewer failed",
+    });
   });
 
   it("reads a draft", () => {
@@ -174,7 +198,7 @@ describe("toChecks", () => {
     started_at: string | null = STARTED,
     workflow = "Smoke test",
   ): CheckRun => ({ name: "smoke", status, conclusion, started_at, check_suite: { id: SUITES[workflow] } });
-  const workflowRuns = Object.entries(SUITES).map(([name, check_suite_id]) => ({ name, check_suite_id }));
+  const workflowRuns = Object.entries(SUITES).map(([name, check_suite_id]) => ({ name, event: "deployment_status", check_suite_id }));
   const status = (state: string) => ({ context: "Vercel", state, target_url: VERCEL });
   const states = (checkRuns: CheckRun[], statuses: ReturnType<typeof status>[] = []) =>
     toChecks({ checkRuns, workflowRuns, statuses }).map((check) => check.state);
@@ -205,7 +229,7 @@ describe("toChecks", () => {
   });
 
   it("gives a check run whose workflow run has no name no workflow", () => {
-    const parsed = WorkflowRunPage.parse({ total_count: 1, workflow_runs: [{ name: null, check_suite_id: 1 }] });
+    const parsed = WorkflowRunPage.parse({ total_count: 1, workflow_runs: [{ name: null, event: "deployment_status", check_suite_id: 1 }] });
     const checks = toChecks({ checkRuns: [run("completed", "success")], workflowRuns: parsed.workflow_runs, statuses: [] });
     expect(checks[0]).toMatchObject({ workflow: "" });
   });
@@ -231,6 +255,15 @@ describe("toChecks", () => {
     ],
   ])("keeps the latest run of each check when %s", (_, checkRuns, expected) => {
     expect(states(checkRuns)).toEqual(expected);
+  });
+
+  it("keeps the latest run of each event when one workflow runs on two", () => {
+    const otherEvent = { name: "Smoke test", event: "pull_request", check_suite_id: 3 };
+    const checkRuns = [{ ...run("completed", "failure"), check_suite: { id: 3 } }, run("completed", "success", RAN_AGAIN)];
+    expect(toChecks({ checkRuns, workflowRuns: [...workflowRuns, otherEvent], statuses: [] }).map((check) => check.state)).toEqual([
+      "failure",
+      "success",
+    ]);
   });
 });
 

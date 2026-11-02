@@ -67,7 +67,10 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   api/cron/season-sync/ the daily job that saves "This is me"
                   players' new games (docs/database.md);
                   api/saved-players/ what the box under the search reads: ranks and your own row;
-                  robots.ts keeps crawlers off player pages and the API
+                  robots.ts keeps crawlers off player pages and the API;
+                  [...unmatched]/ takes every address no other route matches
+                  and shows not-found.tsx with a 404, so its searches reach a
+                  server (it also makes lint read every "/..." link as a page)
 src/components/   React components; ui/ holds small shared pieces, ask/ the Ask panel
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (retries; rate-limit.ts counts requests, shared
@@ -155,7 +158,7 @@ The save happens with Next.js's `after()`, so the visitor never waits for the da
 |---|---|---|
 | Finished matches and timelines | Forever | A game never changes once it's over. |
 | A player's profile (rank, latest match IDs) | 1 day, or until someone clicks Update | Rank changes, but not every minute. Update has a 2 minute cooldown so nobody can spend the rate limit by clicking. |
-| AI recaps | Forever | The match doesn't change, so neither does the recap. Capped at 20 new ones per account per day. |
+| AI recaps | Forever | The match doesn't change, so neither does the recap. Capped at 20 tries per account per day, failed ones included. |
 | Analysis results | Not stored | Recomputed on every visit, so improving the analyzer never means refetching anything. |
 
 The rules live in `src/db/freshness.ts`.
