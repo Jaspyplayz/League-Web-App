@@ -1,6 +1,6 @@
-# 0030: Each server takes Riot rate-limit turns in batches
+# 0031: Each server takes Riot rate-limit turns in batches
 
-Status: accepted. The shared count it batches is described in [ARCHITECTURE.md](../../ARCHITECTURE.md#staying-inside-riots-rate-limit).
+Status: accepted. The shared count it batches is described in [ARCHITECTURE.md](../../ARCHITECTURE.md#staying-inside-riots-rate-limit). Other open PRs were writing records 0029 and 0030 at the same time, so this number may need to move when it merges.
 
 ## Context
 
@@ -32,8 +32,8 @@ Each request still waits at most a second before it goes ahead, counted from whe
 - A burst on one server costs one transaction instead of one per request, and the page's other queries no longer wait behind a queue of them for the 5 database connections.
 - A check stuck on a dead connection doesn't hold its host up past a second. If it died holding the row's lock, each later check waits a second for that lock and then gives its connection back, so at most two or three stay open instead of one more every second.
 - A check whose connection never answers keeps that connection until the socket gives up, and no setting inside Postgres can end it. Later checks use the pool's other connections. If they're all dead, the page's own queries hang too, so that's for the pool's settings in `src/db/index.ts` to fix, not the rate limiter.
-- A request that ran out of time and went ahead is still counted when its check finishes, but only if the window has room. If it doesn't, nothing counts that request, as before. Riot's own "too many requests" answer and the client's back-off still catch that, and the Sentry report shows it happened.
+- A request that ran out of time and went ahead is still counted when its check finishes, but only if the window has room and the check got the row's lock within its second. Otherwise nothing counts that request, as before: the window was full, or the check gave up on the lock and was reported. Riot's own "too many requests" answer and the client's back-off still catch that, and the Sentry report shows it happened.
 - One Sentry event can now stand for several requests. Its `requests` field says how many.
-- The batch lives in each server's memory, so servers still take turns on the row between them. Several servers bursting at once would queue again, one batch each.
+- The batch lives in each server's memory, so servers still take turns on the row between them. Several servers bursting at once queue again, one batch each, and a check still waiting for the lock after a second fails without counting its requests. At Sentry's p95 of 84 ms a statement, that takes about four servers' checks queued on one row at once. A longer `lock_timeout` would count them late, but checks stuck behind a dead connection would then hold four of the pool's five connections, so the page's other queries come first.
 - Sentry gives each batch's spans and reports to the request that started the run of checks, so a later batch's can appear under a page that has already finished.
 - Each check sends one more statement (`set local lock_timeout`) than an ask did before.
