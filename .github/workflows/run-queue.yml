@@ -30,8 +30,10 @@ on:
         default: false
   # A bonus, not a way in to count on. On 2026-11-02 this repo had never had a
   # scheduled run, and GitHub can delay or drop one and turns a schedule off
-  # after 60 days with no activity. Away from the top of the hour, when GitHub
-  # is busiest.
+  # after 60 days with no activity. Without it, a wait that ends with time
+  # (Vercel's hour, the hourly fire limit's hour, the 2-hour start hold) lasts
+  # until the next wake or a person: the merged job below, a push to main, or a
+  # run by name. Away from the top of the hour, when GitHub is busiest.
   schedule:
     - cron: "41 * * * *"
 
@@ -42,9 +44,12 @@ jobs:
   # Agent merge runs about 40 times an hour on a busy day and merges in few of
   # those runs. A whole round reads GitHub about 17 times, and github.token's
   # budget of 1,000 calls an hour is shared with Agent merge, so the queue
-  # runs only when main moved after that Agent merge run started. This job
-  # has no concurrency group, so a run that merged nothing never takes the
-  # queue's place in line.
+  # runs only when main moved after that Agent merge run started, or when its
+  # last real run is over 15 minutes old. The second is what ends a timed wait
+  # when nothing merges, as while Vercel refuses deploys. It costs one more call
+  # here per wake, and about 4 rounds an hour at most. This job has no
+  # concurrency group, so a run that merged nothing never takes the queue's
+  # place in line.
   merged:
     if: >-
       github.event_name == 'workflow_run' &&
@@ -53,11 +58,17 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read # main's newest commit
+      deployments: read # when the queue job last ran
     outputs:
-      moved: ${{ steps.main.outputs.moved }}
+      wake: ${{ steps.main.outputs.wake }}
     steps:
-      # Both times are GitHub's own, in the same ISO 8601 form, so comparing
-      # them as text compares the times.
+      # All the times are in the same ISO 8601 form, so comparing them as text
+      # compares the times. A run of the queue job in the run-queue environment
+      # makes a deployment there, and a skipped one doesn't, so the newest is its
+      # last real run. A dry run counts too, which delays a wake by 15 minutes at
+      # most. With none yet, this doesn't wake it: a push or a run by name makes
+      # the first one, and if the job never made one, the queue would run on
+      # every wake.
       - id: main
         env:
           GH_TOKEN: ${{ github.token }}
@@ -65,9 +76,15 @@ jobs:
           STARTED: ${{ github.event.workflow_run.run_started_at }}
         run: |
           committed=$(gh api "repos/$GH_REPO/commits/main" --jq .commit.committer.date)
-          if [[ "$committed" > "$STARTED" ]]; then moved=true; else moved=false; fi
-          echo "main's newest commit is from $committed, and Agent merge started at $STARTED, so moved=$moved."
-          echo "moved=$moved" >> "$GITHUB_OUTPUT"
+          if [[ "$committed" > "$STARTED" ]]; then
+            wake=true
+            echo "main's newest commit is from $committed, after Agent merge started at $STARTED, so wake=$wake."
+          else
+            last=$(gh api "repos/$GH_REPO/deployments?environment=run-queue&per_page=1" --jq '.[0].created_at // ""')
+            if [[ -n "$last" && "$last" < "$(date -u -d '15 minutes ago' +%FT%TZ)" ]]; then wake=true; else wake=false; fi
+            echo "main hasn't moved since Agent merge started at $STARTED, and the queue's last run is ${last:-none yet}, so wake=$wake."
+          fi
+          echo "wake=$wake" >> "$GITHUB_OUTPUT"
 
   queue:
     needs: merged
@@ -80,7 +97,7 @@ jobs:
       !cancelled() &&
       github.ref == 'refs/heads/main' &&
       (github.event_name != 'workflow_run' ||
-      needs.merged.outputs.moved == 'true')
+      needs.merged.outputs.wake == 'true')
     runs-on: ubuntu-latest
     # The two secrets are this environment's, not the repo's, and Jasper
     # limits the environment to main, so a workflow pushed on any other

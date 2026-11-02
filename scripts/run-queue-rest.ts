@@ -678,7 +678,7 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
       // Said before the comment is edited, so a Linear failure there can't hide it.
       const { reason, jasperFixes } = refusalReason(answer.status, answer.why);
       log(`The cloud task refused ${ticket.id}: HTTP ${answer.status}, ${answer.why}`);
-      const next = jasperFixes ? "Only Jasper can fix that" : "A run an hour from now tries again";
+      const next = jasperFixes ? "Only Jasper can fix that" : "The first run after an hour tries again, whenever something wakes the queue";
       log(`::${jasperFixes ? "error" : "warning"} title=Builder start refused::${ticket.id} didn't start (HTTP ${answer.status}): ${reason}. ${next}.`);
       summary(`${ticket.id} didn't start (HTTP ${answer.status}): ${reason}.`);
       if (jasperFixes) failed = true;

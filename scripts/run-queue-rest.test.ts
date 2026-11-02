@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { OpenPull } from "./can-merge-action-steps";
@@ -850,6 +851,15 @@ describe("starting builders", () => {
     expect(lines.some((line) => line.startsWith("::warning title=Builder start refused::"))).toBe(true);
   });
 
+  // Nothing runs at the hour by itself, since GitHub may not run the schedule.
+  it("after a 429, doesn't promise a run an hour from now", async () => {
+    const { effects, lines } = recorder(() => ({ kind: "refused", status: 429, why: "rate_limit_error: slow down" }));
+    await runRound(two(), { dryRun: false }, effects);
+    const warning = lines.find((line) => line.startsWith("::warning title=Builder start refused::"));
+    expect(warning).toContain("The first run after an hour tries again, whenever something wakes the queue.");
+    expect(warning).not.toContain("A run an hour from now");
+  });
+
   it("with no answer, keeps the start comment, so it holds the ticket, and starts nothing else", async () => {
     const { effects, calls, lines } = recorder(() => ({ kind: "no answer", why: "The operation was aborted due to timeout" }));
     expect(await runRound(two(), { dryRun: false }, effects)).toEqual({ failed: false });
@@ -1162,23 +1172,67 @@ describe(".github/workflows/run-queue.yml", () => {
       "!cancelled() &&",
       "github.ref == 'refs/heads/main' &&",
       "(github.event_name != 'workflow_run' ||",
-      "needs.merged.outputs.moved == 'true')",
+      "needs.merged.outputs.wake == 'true')",
     ]);
     expect(queue).toContain("    needs: merged");
     expect(code.filter((line) => /\bif:/.test(line))).toHaveLength(2);
     expect(condition(queue).join(" ")).not.toContain("schedule");
   });
 
-  it("runs the merged job only when Agent merge finished, so a workflow_run starts the queue only when main moved", () => {
+  it("runs the merged job only when Agent merge finished, so a workflow_run starts the queue only when that job says so", () => {
     expect(condition(merged)).toEqual(["github.event_name == 'workflow_run' &&", "github.event.workflow_run.conclusion != 'skipped'"]);
-    expect(merged.map((line) => line.trim())).toContain("moved: ${{ steps.main.outputs.moved }}");
+    expect(merged.map((line) => line.trim())).toContain("wake: ${{ steps.main.outputs.wake }}");
+  });
+
+  // A Windows computer may have no bash, or one that can't run this. CI has one.
+  const hasBash = /^\d{4}-/.test(spawnSync("bash", ["-c", "date -u -d '15 minutes ago' +%FT%TZ"], { encoding: "utf8" }).stdout ?? "");
+
+  describe.runIf(hasBash)("the merged job's script", () => {
+    const MAIN = `repos/${REPO}/commits/main`;
+    const LAST_RUN = `repos/${REPO}/deployments?environment=run-queue&per_page=1`;
+    const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const MAIN_IS_OLD = minutesAgo(300);
+
+    // Runs the job's own lines under bash -e, as GitHub does, with a gh that
+    // answers as GitHub would and says on stderr which path it was asked for.
+    // Agent merge started 2 minutes ago.
+    function mergedJob(committed: string, lastRun: string) {
+      const body = merged.slice(merged.findIndex((line) => line.trim() === "run: |") + 1);
+      const gh = `gh() { echo "$2" >&2; case "$2" in */deployments*) echo "${lastRun}";; *) echo "${committed}";; esac; }`;
+      const setup = `GH_REPO=${REPO}; STARTED=${minutesAgo(2)}; GITHUB_OUTPUT=$(mktemp)`;
+      const { stdout, stderr } = spawnSync("bash", ["-e", "-c", [gh, setup, ...body, 'cat "$GITHUB_OUTPUT"'].join("\n")], { encoding: "utf8" });
+      return { wake: stdout.match(/^wake=(.*)$/m)?.[1], asked: stderr.trim().split("\n") };
+    }
+
+    it("wakes the queue when main moved after Agent merge started, for one call", () => {
+      expect(mergedJob(minutesAgo(1), minutesAgo(1))).toEqual({ wake: "true", asked: [MAIN] });
+    });
+
+    it("wakes the queue when main didn't move and its last real run is over 15 minutes old", () => {
+      expect(mergedJob(MAIN_IS_OLD, minutesAgo(16))).toEqual({ wake: "true", asked: [MAIN, LAST_RUN] });
+    });
+
+    it("leaves the queue alone when main didn't move and it ran under 15 minutes ago", () => {
+      expect(mergedJob(MAIN_IS_OLD, minutesAgo(14))).toEqual({ wake: "false", asked: [MAIN, LAST_RUN] });
+    });
+
+    // A push or a run by name makes the first deployment. If the queue job
+    // never made one, waking on none would run the queue on every wake.
+    it("leaves the queue alone when no real run has made a deployment yet", () => {
+      expect(mergedJob(MAIN_IS_OLD, "")).toEqual({ wake: "false", asked: [MAIN, LAST_RUN] });
+    });
+  });
+
+  it("reads the queue's last run from the environment the queue job runs in", () => {
+    expect(queue).toContain("    environment: run-queue");
+    expect(merged.join("\n")).toContain("deployments?environment=run-queue&per_page=1");
   });
 
   it("asks for nothing by default, and only reading on each job", () => {
     expect(code).toContain("permissions: {}");
     expect(code.filter((line) => /permissions:/.test(line))).toHaveLength(3);
     const mergedAt = merged.indexOf("    permissions:");
-    expect(merged.slice(mergedAt + 1, mergedAt + 3).map((line) => line.trim())).toEqual(["contents: read", "outputs:"]);
+    expect(merged.slice(mergedAt + 1, mergedAt + 4).map((line) => line.trim())).toEqual(["contents: read", "deployments: read", "outputs:"]);
     const queueAt = queue.indexOf("    permissions:");
     expect(queue.slice(queueAt + 1, queueAt + 5).map((line) => line.trim())).toEqual(["contents: read", "pull-requests: read", "statuses: read", "steps:"]);
   });
@@ -1249,7 +1303,7 @@ describe(".github/workflows/run-queue.yml", () => {
       return [line, ...body.slice(0, end === -1 ? undefined : end)];
     });
     expect(script.filter((line) => /^\s*(- )?run:/.test(line))).toHaveLength(4);
-    expect(script.map((line) => line.trim())).toContain('if [[ "$committed" > "$STARTED" ]]; then moved=true; else moved=false; fi');
+    expect(script.map((line) => line.trim())).toContain('if [[ "$committed" > "$STARTED" ]]; then');
     expect(script.some((line) => line.includes("${{"))).toBe(false);
     expect(merged.map((line) => line.trim())).toContain("STARTED: ${{ github.event.workflow_run.run_started_at }}");
   });
@@ -1322,6 +1376,12 @@ describe(".claude/skills/run-queue/SKILL.md", () => {
 
   it("doesn't blame a refused start on a usage limit, which the fire docs don't describe", () => {
     expect(skill).not.toMatch(/usage limit/i);
+  });
+
+  it("says, with the workflow and the decision record, that a schedule that doesn't fire leaves the timed waits to the next wake or a person", () => {
+    const workflow = source(".github/workflows/run-queue.yml");
+    const record = source("docs/adr/0026-a-script-picks-tickets-and-an-action-starts-builders.md");
+    for (const text of [skill, workflow, record]) expect(text).toContain("next wake or a person");
   });
 });
 

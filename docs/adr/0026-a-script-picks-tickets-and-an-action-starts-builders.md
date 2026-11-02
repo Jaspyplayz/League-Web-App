@@ -17,7 +17,7 @@ On 2026-11-01 he rejected the timer: "It shouldn't go on a time basis. It should
 
 ## Decision
 
-A plain script runs in a GitHub Action when a PR merges, when Jasper starts `/run-queue`, and once an hour. The hourly run is there because merges can't report what didn't happen: Vercel's limit clearing, a builder stalling, or a ticket reaching Ready while the queue is idle. The clock only makes the queue look. It doesn't decide what gets picked.
+A plain script runs in a GitHub Action when a PR merges, when Jasper starts `/run-queue`, when Agent merge finishes and the queue's last real run is over 15 minutes old, and once an hour if GitHub runs the schedule. Those last two are there because merges can't report what didn't happen: Vercel's limit clearing, a builder stalling, or a ticket reaching Ready while the queue is idle. The clock only makes the queue look. It doesn't decide what gets picked.
 
 The script leaves out any ticket with an unfinished blocker, sorts the rest by Priority and then age, and starts each one whose Touches line doesn't overlap an open PR's files or another ticket picked that round, up to a ceiling of 4. Nothing new starts while Vercel is refusing deploys. The Action starts each builder through the cloud task's API trigger.
 
@@ -39,7 +39,7 @@ Bad:
 - It relies on the API trigger, which is a beta in a research preview, so it may change.
 - The Touches line is a prediction and can be wrong, so builders can stop partway and wait.
 - A flaky test can use up a try, because the script can't always tell it from a real failure.
-- Scheduled Actions can be delayed or dropped and switch off after 60 days with no repo activity, so the hourly check can't be the only way in.
+- Scheduled Actions can be delayed or dropped and switch off after 60 days with no repo activity, and by 2026-11-02 GitHub had run none in this repo, so the hourly check can't be the only way in. If it doesn't fire, a wait that ends with time (Vercel's hour, the hourly fire limit's hour, the 2-hour start hold) is left to the next wake or a person, which can be a long time when nothing is pushed.
 
 ## Open questions
 
