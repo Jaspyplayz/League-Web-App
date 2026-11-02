@@ -86,6 +86,12 @@ function holdsRealFiles(folder: string): boolean {
   );
 }
 
+function knownToGit(root: string, folder: string): boolean {
+  return git(root, "worktree", "list", "--porcelain")
+    .split("\n")
+    .some((line) => line.startsWith("worktree ") && resolve(line.slice("worktree ".length)) === resolve(folder));
+}
+
 function removeFromGit(root: string, folder: string): void {
   // Take the link off first, so nothing that deletes the folder can follow it
   // into the main checkout's node_modules.
@@ -96,7 +102,12 @@ function removeFromGit(root: string, folder: string): void {
     // No --force: git refuses if the copy has edits, so they get looked at first.
     git(root, "worktree", "remove", folder);
   } catch (error) {
-    // The copy stays, so its tests should still run.
+    // Git gives up partway if another program is using a folder in the copy,
+    // and by then it has deleted files and forgotten the copy.
+    if (!knownToGit(root, folder)) {
+      throw new Error(`${folder} is only partly deleted, because another program may be using it. Close that program, then delete the folder by hand.`);
+    }
+    // The copy stays whole, so its tests should still run.
     if (linkedTo) symlinkSync(linkedTo, modules, "junction");
     throw error;
   }
@@ -111,10 +122,7 @@ function remove(root: string, folder: string): void {
     throw new Error(`This is running inside ${folder}. Run this from another folder.`);
   }
 
-  const known = git(root, "worktree", "list", "--porcelain")
-    .split("\n")
-    .some((line) => line.startsWith("worktree ") && resolve(line.slice("worktree ".length)) === resolve(folder));
-  if (known) removeFromGit(root, folder);
+  if (knownToGit(root, folder)) removeFromGit(root, folder);
 
   if (existsSync(folder)) {
     if (holdsRealFiles(folder)) throw new Error(`${folder} still holds files git doesn't know about. Look at them, then delete the folder by hand.`);

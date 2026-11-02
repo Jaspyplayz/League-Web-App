@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -44,6 +44,8 @@ describe("the review copy script", () => {
     writeFileSync(join(repo, ".gitignore"), "node_modules/\n.next/\n.claude/worktrees/\n");
     writeFileSync(join(repo, "package-lock.json"), lock("1.0.0"));
     writeFileSync(join(repo, "README.md"), "# Test\n");
+    mkdirSync(join(repo, "docs"));
+    writeFileSync(join(repo, "docs", "habits.md"), "Habits.\n");
     git("add", ".");
     git("commit", "-q", "-m", "first");
     git("switch", "-q", "-c", "feature");
@@ -98,6 +100,34 @@ describe("the review copy script", () => {
     expect(removed.status).toBe(1);
     expect(removed.output).toContain("still holds files");
     expect(readFileSync(join(copy, "notes.txt"), "utf8")).toBe("someone's work");
+  }, 30_000);
+
+  it("won't delete a folder if a real file is deep inside it, next to a link", () => {
+    mkdirSync(join(copy, "sub", "deeper"), { recursive: true });
+    writeFileSync(join(copy, "sub", "deeper", "notes.txt"), "someone's work");
+    symlinkSync(join(repo, "node_modules"), join(copy, "sub", "link"), "junction");
+
+    const removed = run(repo, "feature", "--remove");
+
+    expect(removed.status).toBe(1);
+    expect(removed.output).toContain("still holds files");
+    expect(readFileSync(join(copy, "sub", "deeper", "notes.txt"), "utf8")).toBe("someone's work");
+  }, 30_000);
+
+  // Only Windows stops a folder being deleted while a program is using it.
+  it.runIf(process.platform === "win32")("says the copy is partly deleted when another program is using it", async () => {
+    expect(run(repo, "feature").status).toBe(0);
+    const holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { cwd: join(copy, "docs"), stdio: "ignore" });
+
+    const removed = run(repo, "feature", "--remove");
+    const stopped = new Promise((done) => holder.once("exit", done));
+    holder.kill();
+    await stopped;
+
+    expect(removed.status).toBe(1);
+    expect(removed.output).toContain("only partly deleted");
+    expect(existsSync(join(copy, "node_modules"))).toBe(false);
+    expect(readFileSync(sentinel, "utf8")).toBe("keep me");
   }, 30_000);
 
   it("keeps the link when git refuses a copy with edits, so tests still run there", () => {
