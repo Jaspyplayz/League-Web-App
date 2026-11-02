@@ -343,6 +343,7 @@ describe("the saved answers from 2026-11-02", () => {
   it("start a written-up Ready ticket beside the real JAS-190, whose Touches line says None", () => {
     const queue = saved("linear-queue.json") as { data: { issues: { nodes: { identifier: string }[] } } };
     const jas190 = LinearIssue.parse(queue.data.issues.nodes.find((node) => node.identifier === "JAS-190"));
+    expect(jas190.description).toContain("**Touches.** None.\n\nThe output is a Linear document and new tickets.");
     const plan = planRound(snapshot({ issues: [jas190, issue("JAS-900")] }), AT_0630, RUN);
     expect(plan.running).toEqual([{ id: "JAS-190", why: "it's In Progress" }]);
     expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-900"]);
@@ -1534,7 +1535,7 @@ describe(".github/ISSUE_TEMPLATE/feature.md", () => {
   });
 
   it("gives the None rule in the same words as the code and the docs", () => {
-    const rule = "A ticket that changes no files writes None, or None. followed by a sentence. A sentence with a /, a ?, a file extension or an unsure word such as TBD, yet or maybe makes the ticket wait, and so does anything else after None.";
+    const rule = "A ticket that changes no files writes None or None., with any reason on its own line.";
     const flat = (path: string) => source(path).replace(/\n\s*\/\/ /g, " ");
     for (const path of ["scripts/run-queue-pick.ts", ".github/ISSUE_TEMPLATE/feature.md", ".claude/skills/run-queue/SKILL.md", "GLOSSARY.md", "docs/agents/issue-tracker.md"]) {
       expect(flat(path), path).toContain(rule);

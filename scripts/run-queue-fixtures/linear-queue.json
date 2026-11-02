@@ -93,7 +93,7 @@
           "id": "65c93597-614d-4772-a870-b4ca03b7ac66",
           "identifier": "JAS-190",
           "title": "JAS-190 (title left out of this saved copy)",
-          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** None. The output is a Linear document and new tickets.",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** None.\n\nThe output is a Linear document and new tickets.",
           "createdAt": "2026-11-02T05:12:11.271Z",
           "priority": 3,
           "state": {

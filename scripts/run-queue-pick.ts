@@ -81,6 +81,7 @@ export type Touches = { files: string[] } | { why: string };
 // record 0027 and docs/agents/issue-tracker.md say "Touches:", so that counts
 // too, and the Acceptance criteria label is read the same ways.
 const TOUCHES_LINE = /^\s*(?:\*\*touches[.:]\*\*|touches:)(.*)$/i;
+const STARTS_WITH_PATH = /^(?:[-*+>]\s*|\d+[.)]\s*)?`(?!``)/;
 const CRITERIA_LINE = /^\s*(?:\*\*acceptance criteria[.:]?\*\*|acceptance criteria:|#{1,6}\s*acceptance criteria\b)/im;
 
 /**
@@ -108,13 +109,15 @@ export function parseTouches(description: string): Touches {
     return { why: `its Touches line ends with "${end}", so the list may go on past it; put every path on that line` };
   }
   const next = (after[0] ?? "").trim();
-  if (next !== "" && !next.startsWith("**")) return { why: "its Touches line runs onto the next line; keep the list on one line" };
+  // A None line's list is over, so the next line can be its reason.
+  const reason = saysNone(list) && !STARTS_WITH_PATH.test(next);
+  if (next !== "" && !next.startsWith("**") && !reason) return { why: "its Touches line runs onto the next line; keep the list on one line" };
   const nextParagraph = after.find((line) => line.trim() !== "")?.trim() ?? "";
-  if (/^(?:[-*+>]\s*|\d+[.)]\s*)?`(?!``)/.test(nextParagraph)) {
+  if (STARTS_WITH_PATH.test(nextParagraph)) {
     return { why: "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word" };
   }
   if ((list.match(/`/g) ?? []).length % 2 === 1) return { why: "its Touches line has a backtick with no partner" };
-  if (!list.includes("`") && saysNone(list)) return { files: [] };
+  if (saysNone(list)) return { files: [] };
   const files = [...list.matchAll(/`([^`]*)`/g)].map((match) => match[1].trim());
   if (files.length === 0) return { why: "its Touches line names no files in backticks" };
   if (files.includes("")) return { why: "its Touches line has backticks with nothing in them" };
@@ -127,15 +130,11 @@ export function parseTouches(description: string): Touches {
 }
 
 // A ticket that holds no files blocks nothing, so a mistake here starts it
-// beside a builder changing the file it meant.
-// A ticket that changes no files writes None, or None. followed by a sentence.
-// A sentence with a /, a ?, a file extension or an unsure word such as TBD, yet
-// or maybe makes the ticket wait, and so does anything else after None.
-const NONE_UNSURE = /[/?]|\.[a-z0-9]{1,5}\b|\b(?:tbd|todo|yet|maybe|perhaps|possibly|probably|might|unknown|unsure|actually|except)\b/i;
-
+// beside a builder changing the file it meant, and nothing but the word can be
+// on its line. A ticket that changes no files writes None or None., with any
+// reason on its own line.
 function saysNone(list: string): boolean {
-  const none = list.trim().match(/^none(?:\.(?:\s+(.+))?)?$/i);
-  return none !== null && !NONE_UNSURE.test(none[1] ?? "");
+  return /^none\.?$/i.test(list.trim());
 }
 
 function notAPath(path: string): string | undefined {

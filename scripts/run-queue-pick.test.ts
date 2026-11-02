@@ -191,13 +191,20 @@ describe("parseTouches", () => {
     expect(parseTouches(touching(".nvmrc", ".github/workflows/ci.yml"))).toEqual({ files: [".nvmrc", ".github/workflows/ci.yml"] });
   });
 
-  // The third is JAS-190's real line, whose output is a Linear document.
-  it.each(["None", "none.", "None. The output is a Linear document and new tickets.", "None.", "None. It only writes in Linear, then stops. Nothing else changes."])(
-    "reads **Touches.** %s as a ticket that changes no files",
-    (line) => {
-      expect(parseTouches(`**Touches.** ${line}`)).toEqual({ files: [] });
-    },
-  );
+  it.each(["None", "none.", "None.", "NONE", "None.  "])("reads **Touches.** %s as a ticket that changes no files", (line) => {
+    expect(parseTouches(`**Touches.** ${line}`)).toEqual({ files: [] });
+  });
+
+  // The first is JAS-190's description, whose output is a Linear document.
+  it.each([
+    "**Touches.** None.\n\nThe output is a Linear document and new tickets.",
+    "**Touches.** None.\nThe output is a Linear document and new tickets.",
+    "**Touches.** None\n\nIt only writes in Linear.",
+    "**Touches.** None.\n- It only writes in Linear.",
+    "**Touches.** None.\n**Builder.** Claude Code on Opus 5.5.",
+  ])("reads a reason on its own line as no part of the list: %j", (description) => {
+    expect(parseTouches(description)).toEqual({ files: [] });
+  });
 
   // "None yet" and the rest don't say the ticket changes no files.
   it.each(["None yet", "None of the old files", "Nonesuch", "No files", "Nothing"])("can't read **Touches.** %s", (line) => {
@@ -219,7 +226,12 @@ describe("parseTouches", () => {
     "None/unknown",
     "None (it only writes in Linear)",
     "None - it only writes in Linear",
-  ])("can't read **Touches.** %s, since only None or None. and a sentence says no files", (line) => {
+    "None. The output is a Linear document and new tickets.",
+    "None. It only writes in Linear, then stops. Nothing else changes.",
+    "None. For now.",
+    "None. Not sure.",
+    "None. Also the schema.",
+  ])("can't read **Touches.** %s, since only None or None. says no files", (line) => {
     expect(parseTouches(`**Touches.** ${line}`)).toEqual({ why: "its Touches line names no files in backticks" });
   });
 
@@ -244,6 +256,7 @@ describe("parseTouches", () => {
   it.each([
     ["**Touches.** None,", 'its Touches line ends with ",", so the list may go on past it; put every path on that line'],
     ["**Touches.** None\n`src/a.ts`", "its Touches line runs onto the next line; keep the list on one line"],
+    ["**Touches.** None.\n- `src/a.ts`", "its Touches line runs onto the next line; keep the list on one line"],
     ["**Touches.** None\n\n`src/a.ts`", "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word"],
   ])("refuses a None line whose list may carry on: %j", (description, why) => {
     expect(parseTouches(description)).toEqual({ why });
@@ -310,7 +323,7 @@ describe("pickTickets: what can start", () => {
   });
 
   it("starts tickets beside a running builder whose ticket changes no files", () => {
-    const tickets = [ticket("JAS-1", { status: "In Progress", description: "**Touches.** None. The output is a Linear document." }), ticket("JAS-2")];
+    const tickets = [ticket("JAS-1", { status: "In Progress", description: "**Touches.** None.\n\nThe output is a Linear document." }), ticket("JAS-2")];
     expect(pickTickets(queue({ tickets, running: ["JAS-1"] })).start).toEqual(["JAS-2"]);
   });
 
