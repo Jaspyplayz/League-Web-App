@@ -50,7 +50,7 @@ npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --pr 155 ux-search-r
 | Journey | needs | Device | Feature file |
 |---|---|---|---|
 | `ux-search-recovery` | nothing | Desktop Chrome | [features/search-recovery.md](features/search-recovery.md) |
-| `ux-phone-home` | nothing | Pixel 7 | [features/phone-home.md](features/phone-home.md) |
+| `ux-phone-home` | nothing | Pixel 7 at 390px | [features/phone-home.md](features/phone-home.md) |
 | `ux-saved-players` | nothing | Desktop Chrome | [features/saved-players.md](features/saved-players.md) |
 | `ux-saved-players-phone` | nothing | Pixel 7 at 390px | [features/saved-players.md](features/saved-players.md) |
 | `ux-saved-players-search` | riot | Desktop Chrome | [features/saved-players.md](features/saved-players.md) |
