@@ -13,7 +13,10 @@ import { CEILING, pickTickets, type OpenPr, type Status, type Ticket } from "./r
 
 /** How long the queue's start comment holds a ticket. It matches JAS-29's stall rule; JAS-145 handles the stall. */
 export const START_HOLDS_FOR_MS = 2 * 60 * 60 * 1000;
-/** How long nothing starts after Vercel refuses a deploy. After that, one ticket starts as a test. */
+/**
+ * How long nothing starts after Vercel refuses a deploy, or the cloud task
+ * refuses a start. After a Vercel refusal, one ticket then starts as a test.
+ */
 export const REFUSAL_HOLDS_FOR_MS = 60 * 60 * 1000;
 
 const PROJECT = "Turnpoint";
@@ -421,6 +424,21 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string): Plan {
     .filter((wait) => !foreign.has(wait.id))
     .map((wait) => ({ id: wait.id, why: wait.why.map((reason) => unmoved.get(reason) ?? reason) }));
 
+  // A refusal such as the hourly fire limit can last, and each run in it
+  // would add one more refused comment to the same top ticket, so nothing
+  // starts for an hour. A refused comment is the edited start comment, so it
+  // was made within seconds of the refusal.
+  const refusedAt = Object.values(snapshot.comments)
+    .flat()
+    .filter((comment) => comment.body.trimStart().startsWith(REFUSED_LINE) && now.getTime() - Date.parse(comment.createdAt) < REFUSAL_HOLDS_FOR_MS)
+    .map((comment) => comment.createdAt)
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+  if (refusedAt) {
+    const until = new Date(Date.parse(refusedAt) + REFUSAL_HOLDS_FOR_MS).toISOString();
+    waits.push(...start.map((id) => ({ id, why: [`The cloud task refused a start at ${utc(refusedAt)}, so nothing starts until ${utc(until)}.`] })));
+    start = [];
+  }
+
   // Testing: one ticket starts, and its builder's first push shows whether
   // Vercel deploys again. While that test's start comment holds its ticket,
   // nothing else starts, so each round doesn't start one more test.
@@ -555,14 +573,15 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
       // Said before the comment is edited, so a Linear failure there can't hide it.
       const { reason, jasperFixes } = refusalReason(answer.status, answer.why);
       log(`The cloud task refused ${ticket.id}: HTTP ${answer.status}, ${answer.why}`);
-      const next = jasperFixes ? "Only Jasper can fix that" : "A later run tries again";
+      const next = jasperFixes ? "Only Jasper can fix that" : "A run an hour from now tries again";
       log(`::${jasperFixes ? "error" : "warning"} title=Builder start refused::${ticket.id} didn't start (HTTP ${answer.status}): ${reason}. ${next}.`);
       summary(`${ticket.id} didn't start (HTTP ${answer.status}): ${reason}.`);
       if (jasperFixes) failed = true;
       stop = `the cloud task refused ${ticket.id}`;
-      // Edited, not left, so it no longer holds the ticket and a later run tries again.
+      // Edited, not left, so it no longer holds the ticket, and it holds
+      // every start for an hour instead.
       await effects.updateComment(commentId, refusedBody(answer.status, answer.why));
-      summary(`${ticket.id}'s start comment now says so, and doesn't hold it.`);
+      summary(`${ticket.id}'s start comment now says so, and nothing starts for an hour.`);
     } else {
       // A builder may have started, so the start comment stays, and its
       // 2-hour hold keeps a later run from starting a second one.

@@ -39,7 +39,7 @@ Find the run, then read its summary or log. The summary lists each running build
 gh api "repos/Jaspyplayz/League-Web-App/actions/workflows/run-queue.yml/runs?per_page=3" --jq '.workflow_runs[] | "\(.id) \(.status) \(.conclusion) \(.html_url)"'
 ```
 
-Open the run's URL, or read its log with `gh run view <id> --log -R Jaspyplayz/League-Web-App` in a local session. Report back what it started (each ticket and its cloud session link) and why the others wait. Don't read a warning as a failure. A start refused for an hourly fire limit (HTTP 429) is a warning. Any other refusal fails the run, since its token or task ID is wrong, the account has no access, or the task is paused, and only Jasper can fix those. Either way it starts nothing else that round, and isn't a try.
+Open the run's URL, or read its log with `gh run view <id> --log -R Jaspyplayz/League-Web-App` in a local session. Report back what it started (each ticket and its cloud session link) and why the others wait. Don't read a warning as a failure. A start refused for an hourly fire limit (HTTP 429) is a warning. Any other refusal fails the run, since its token or task ID is wrong, the account has no access, or the task is paused, and only Jasper can fix those. Either way nothing starts on any ticket for an hour, and the refusal isn't a try.
 
 ## Stop or restart the queue
 

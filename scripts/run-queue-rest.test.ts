@@ -142,6 +142,38 @@ function dryEffects() {
   return { effects, lines };
 }
 
+// Effects that keep each ticket's comments the way Linear does, so a test
+// can run one round after another. The cloud task gives the answers given,
+// then starts every builder.
+function linearStore(clock: () => Date, answers: FireAnswer[] = []) {
+  const comments: Record<string, LinearComment[]> = {};
+  const fired: string[] = [];
+  let made = 0;
+  const effects: Effects = {
+    promote: async () => {},
+    createComment: async (uuid, body) => {
+      const id = `c${++made}`;
+      (comments[uuid] ??= []).push({ id, body, createdAt: clock().toISOString() });
+      return id;
+    },
+    updateComment: async (id, body) => {
+      const found = Object.values(comments).flat().find((posted) => posted.id === id);
+      if (!found) throw new Error(`the test's Linear has no comment ${id}`);
+      found.body = body;
+    },
+    fire: async (id) => {
+      fired.push(id);
+      return answers.shift() ?? { kind: "started", sessionUrl: `https://claude.ai/code/session_${id}` };
+    },
+    log: () => {},
+    summary: () => {},
+  };
+  const read = (issues: LinearIssue[]) =>
+    snapshot({ issues, comments: Object.fromEntries(issues.map((ticket) => [ticket.identifier, (comments[ticket.id] ?? []).map((posted) => ({ ...posted }))])) });
+  const all = () => Object.values(comments).flat();
+  return { effects, fired, read, all };
+}
+
 // Linear's answers to the queue's reads, from the tickets given. Blockers
 // come back only from the by-ID query, as they do from Linear, and each
 // answer holds no more tickets than the query's `first` asks for.
@@ -397,9 +429,39 @@ describe("a ticket can't start twice", () => {
     expect(planRound(read, AT_0630, RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
   });
 
-  it("never holds it with a refused start's comment", () => {
-    const read = snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": [comment("c1", `${REFUSED_LINE}\n\nThe cloud task answered HTTP 429.`, STARTED_30_MIN_AGO)] } });
+  it("lets a refused start's comment go after an hour, instead of holding the ticket for 2 like a start comment", () => {
+    const read = snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": [comment("c1", `${REFUSED_LINE}\n\nThe cloud task answered HTTP 429.`, "2026-11-02T05:00:00.000Z")] } });
     expect(planRound(read, AT_0630, RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
+  });
+});
+
+describe("a refused start", () => {
+  it("starts nothing on any ticket for an hour, so a lasting refusal doesn't add a refused comment each run", async () => {
+    let now = new Date("2026-11-02T06:00:00Z");
+    const store = linearStore(() => now, [{ kind: "refused", status: 429, why: "rate_limit_error: slow down" }]);
+    const tickets = [issue("JAS-1"), issue("JAS-2")];
+    const round = async () => {
+      const plan = planRound(store.read(tickets), now, RUN);
+      await runRound(plan, { dryRun: false }, store.effects);
+      return plan;
+    };
+
+    await round();
+    expect(store.fired).toEqual(["JAS-1"]);
+
+    now = new Date("2026-11-02T06:10:00Z");
+    const held = await round();
+    expect(store.fired).toEqual(["JAS-1"]);
+    expect(store.all().filter((posted) => posted.body.startsWith(START_LINE))).toEqual([]);
+    const why = "The cloud task refused a start at 2026-11-02 06:00 UTC, so nothing starts until 2026-11-02 07:00 UTC.";
+    expect(held.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-1", [why]],
+      ["JAS-2", [why]],
+    ]);
+
+    now = new Date("2026-11-02T07:01:00Z");
+    await round();
+    expect(store.fired).toEqual(["JAS-1", "JAS-1", "JAS-2"]);
   });
 });
 
