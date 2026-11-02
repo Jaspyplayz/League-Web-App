@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
-import { jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, PANEL_SKILLS, riskyFiles, type RiskyPath } from "./risky-paths";
+import { jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, riskyFiles, type RiskyPath } from "./risky-paths";
 
 const RISKY_PATHS = [...JASPERS_PATHS, ...PANEL_PATHS];
 
@@ -15,7 +16,7 @@ const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others",
 
 // The only risky patterns allowed to match no file in the repo (see the
 // "names only paths that exist" test below).
-const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/", "vite.config", ".npmrc", ".mcp.json"];
+const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/", "vite.config", ".npmrc", "npm-shrinkwrap.json", ".mcp.json", "scripts/package.json"];
 
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
@@ -53,27 +54,50 @@ function mustBeListed(file: string, source: string): boolean {
 
 const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !/\.test\./.test(file);
 
-// The mode Git keeps for each tracked file: 100644 for a plain file, 120000 for
-// a symlink. Read from Git rather than the disk, since Git on Windows checks a
-// symlink out as a plain file.
-const repoModes = new Map(
-  execFileSync("git", ["ls-files", "--stage", "-z"], { encoding: "utf8" })
-    .split("\0")
-    .filter(Boolean)
-    .map((line) => {
-      const [info, path] = line.split("\t");
-      return [path, info.split(" ")[0]];
-    }),
-);
+const onPanel = (path: string) => riskyFiles([path]).length === 1 && jaspersFiles([path]).length === 0;
 
-// A SKILL.md whose frontmatter is only its folder's name and a one-line
-// description, with no shell command for Claude Code to run as it loads. It
-// runs a ```! block anywhere (2.1.316's pattern is /```!\s*\n?([\s\S]*?)\n?```/g)
-// and a !` after most characters (2.1.42's is /(?<!\w|\$|`)!`([^`]+)`/g), so
-// either one anywhere fails.
-function isPlainSkill(folder: string, text: string): boolean {
-  const frontmatter = new RegExp(`^---\\r?\\nname: ${folder}\\r?\\ndescription: [^\\r\\n]+\\r?\\n---\\r?\\n`);
-  return frontmatter.test(text) && !/!`|```!/.test(text);
+type LockEntry = { version?: string; resolved?: string; integrity?: string; link?: boolean; inBundle?: boolean; name?: string };
+
+// What's wrong with a lockfile entry, as far as a text check can see. It must
+// look like one of the two shapes npm writes for a package from the registry:
+// fetched as the package and version its path names, with an integrity hash,
+// or bundled inside another package's tarball, with nothing of its own to
+// fetch. npm resolves a ".." in the URL, so it's compared whole. A version or
+// path written to get past this still can (decision record 0032), which is why
+// the lockfile stays on Jasper's list.
+function lockProblems(path: string, entry: LockEntry): string[] {
+  if (entry.inBundle) {
+    const own = (["resolved", "integrity", "name", "link"] as const).filter((key) => key in entry);
+    return [
+      path.split("node_modules/").length < 3 && "is bundled but not inside another package",
+      own.length > 0 && `is bundled but has its own ${own.join(", ")}`,
+    ].filter((problem) => typeof problem === "string");
+  }
+  const name = path.slice(path.lastIndexOf("node_modules/") + "node_modules/".length);
+  const tarball = `https://registry.npmjs.org/${name}/-/${name.split("/").pop()}-${entry.version}.tgz`;
+  return [
+    "link" in entry && "is a link",
+    "name" in entry && `is an alias for ${entry.name}`,
+    entry.resolved !== tarball && `comes from ${entry.resolved}, not ${tarball}`,
+    !entry.integrity && "has no integrity hash",
+  ].filter((problem) => typeof problem === "string");
+}
+
+// What's wrong with a workflow's token: no top-level permissions line, so it
+// gets the repo's default, or the word write anywhere but a comment line. It
+// reads text, not YAML, so it also refuses a YAML escape or a quoted line that
+// runs on, either of which could spell write. A trailing comment or a run step
+// that says write is refused too, which only sends that workflow to Jasper.
+function tokenProblems(workflow: string): string[] {
+  const code = workflow
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"))
+    .join("\n");
+  return [
+    !/^permissions:/m.test(code) && "doesn't set its token's permissions",
+    /\bwrite(-all)?\b/i.test(code) && "asks for write access",
+    /\\[xuU]|\\\s*$/m.test(code) && "has a YAML escape or a line that runs on",
+  ].filter((problem) => problem !== false);
 }
 
 describe("riskyFiles", () => {
@@ -178,72 +202,161 @@ describe("riskyFiles", () => {
         "src/lib/match-store.ts.bak",
         "src/components/theme-store.ts",
         "scripts/shot.ts",
+        "docs/eslint.config.md",
+        "src/lib/eslint.configs.json",
         ".cursor/skills/verify-turnpoint/SKILL.md",
       ]),
     ).toEqual([]);
   });
 
-  // Jasper merges migrations and anything that defines or runs a check, since
-  // an agent could otherwise loosen its own gate and merge that (JAS-128).
-  it("keeps migrations and every check-defining path Jasper's to merge", () => {
-    const paths = [
-      "drizzle/0014_notes.sql",
-      "drizzle.config.ts",
-      "src/db/schema.ts",
-      ".github/workflows/ci.yml",
-      ".claude/settings.json",
-      ".claude/hooks/check-before-commit.mjs",
-      ".claude/agents/reviewer.md",
-      ".claude/skills/code-review-and-quality/SKILL.md",
-      ".claude/rules/design.md",
-      ".claude/agent-merge.json",
-      ".cursor/rules/x.mdc",
-      "eslint.config.mjs",
-      "eslint-rules/no-green-classes.mjs",
-      "tsconfig.json",
-      "next.config.ts",
-      "vercel.json",
-      "vitest.config.mts",
-      "playwright.config.ts",
-      "e2e/fixtures.ts",
-      "e2e/preview-login.ts",
-      "e2e/preview-secret.spec.ts",
-      "scripts/preview-login.test.ts",
-      "src/app/themes.test.ts",
-      "src/app/corners.test.ts",
-      "package.json",
-      "package-lock.json",
-      ".npmrc",
-      ".nvmrc",
-      ".mcp.json",
-      "scripts/can-merge-gates.ts",
-      "scripts/risky-paths.ts",
-      "src/lib/.claude/rules/x.md",
-    ];
-    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
+  // Jasper merges migrations and the merge gates' own code (JAS-191): only he
+  // runs `npm run db:migrate`, and an agent could otherwise loosen a gate and
+  // merge that.
+  it.each([
+    "drizzle/0014_notes.sql",
+    "drizzle/meta/_journal.json",
+    "drizzle.config.ts",
+    "src/db/schema.ts",
+    "scripts/can-merge.ts",
+    "scripts/can-merge-gates.ts",
+    "scripts/can-merge-gates.test.ts",
+    "scripts/can-merge-action.ts",
+    "scripts/can-merge-rest.ts",
+    "scripts/can-merge-reviewer-check.ts",
+    "scripts/can-merge-fixtures/body-245.md",
+    "scripts/can-merge.tsconfig.json",
+    "scripts/risky-paths.ts",
+    "scripts/risky-paths.test.ts",
+    ".github/workflows/agent-merge.yml",
+    ".github/workflows/agent-merge-sweep.yml",
+    ".github/workflows/reviewer.yml",
+    ".claude/agent-merge.json",
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    "scripts/package.json",
+    "package-lock.json",
+    "scripts/node_modules/zod/index.js",
+    "scripts/node_modules/zod/package.json",
+    "node_modules/zod/index.js",
+    "src/lib/node_modules/react/index.js",
+  ])("keeps %s Jasper's to merge", (path) => {
+    expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
   });
 
-  // It decides what builders run with nobody watching (JAS-143). The Action's
-  // own scripts in JAS-144 will start with the same name.
-  it("keeps the ticket queue's code Jasper's to merge", () => {
+  // Jasper chose exactly these on 2026-11-02 (decision record 0032), so a
+  // change to his list shows up here as well as in a new record.
+  it("keeps Jasper's list to migrations and the gates' own code", () => {
+    expect(JASPERS_PATHS.map(({ pattern }) => pattern)).toEqual([
+      "drizzle/",
+      "drizzle.config.ts",
+      "src/db/schema.ts",
+      "scripts/can-merge",
+      "scripts/risky-paths",
+      ".github/workflows/agent-merge",
+      ".github/workflows/reviewer",
+      ".claude/agent-merge.json",
+      ".claude/settings",
+      "scripts/package.json",
+      "package-lock.json",
+    ]);
+  });
+
+  // GitHub runs a workflow named .yml or .yaml, Windows ignores case, and a
+  // name that only starts like a gate's file could be a gate too.
+  it.each([
+    ".github/workflows/agent-merge.yaml",
+    ".github/workflows/agent-merge-retry.yml",
+    ".github/workflows/reviewer.yaml",
+    ".github/workflows/Reviewer.yml",
+    ".GitHub/Workflows/Agent-Merge.yml",
+    ".claude/Agent-Merge.json",
+    ".Claude/Settings.json",
+    "scripts/Node_Modules/zod/index.js",
+    "Scripts/Can-Merge-Gates.ts",
+    "scripts/RISKY-PATHS.ts",
+    "Drizzle/0015_x.sql",
+    "src/DB/Schema.ts",
+  ])("keeps %s Jasper's, though it's spelled another way", (path) => {
+    expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
+  });
+
+  // Jasper chose on 2026-11-02 to let Claude merge these once the panel and
+  // the reviewer clear them (JAS-191). They still need both, so each must stay
+  // on the panel list, not drop off both lists.
+  it.each([
+    ".github/workflows/ci.yml",
+    ".github/workflows/smoke.yml",
+    ".github/workflows/dependency-review.yml",
+    ".github/workflows/new-check.yaml",
+    ".github/pull_request_template.md",
+    ".github/dependabot.yml",
+    ".github/ISSUE_TEMPLATE/feature.md",
+    ".claude/hooks/check-before-commit.mjs",
+    ".claude/hooks/cloud-setup.mjs",
+    ".claude/agents/reviewer.md",
+    ".claude/skills/code-review-and-quality/SKILL.md",
+    ".claude/skills/interrogate/SKILL.md",
+    ".claude/skills/verify-turnpoint-ux/scripts/drive.ts",
+    ".claude/rules/design.md",
+    ".claude/commands/ship.md",
+    ".cursor/settings.json",
+    ".cursor/rules/x.mdc",
+    "eslint.config.mjs",
+    "eslint-rules/no-green-classes.mjs",
+    "tsconfig.json",
+    "next.config.ts",
+    "vercel.json",
+    "vitest.config.mts",
+    "playwright.config.ts",
+    "e2e/fixtures.ts",
+    "e2e/preview-login.ts",
+    "e2e/preview-secret.spec.ts",
+    "scripts/preview-login.test.ts",
+    "src/app/themes.test.ts",
+    "src/app/corners.test.ts",
+    "package.json",
+    "npm-shrinkwrap.json",
+    ".npmrc",
+    ".nvmrc",
+    ".mcp.json",
+    "scripts/run-queue-pick.ts",
+    "src/lib/.claude/rules/x.md",
+  ])("lets Claude merge %s after the panel", (path) => {
+    expect(onPanel(path)).toBe(true);
+  });
+
+  // It decides what builders run with nobody watching (JAS-143).
+  it("flags the ticket queue's code, with its reason", () => {
     const paths = ["scripts/run-queue-pick.ts", "scripts/run-queue-pick.test.ts", "scripts/run-queue.ts", "scripts/run-queue-rest.ts"];
-    expect(jaspersFiles(paths)).toEqual(
-      paths.map((path) => ({ path, why: "the ticket queue, which decides what builders run unattended" })),
-    );
+    expect(riskyFiles(paths)).toEqual(paths.map((path) => ({ path, why: "the ticket queue, which decides what builders run unattended" })));
   });
 
   // Each tool loads another file name ahead of the one the repo has today, so
-  // an exact name would let a new file replace a check's config.
+  // an exact name would let a new file replace a check's config unreviewed.
   it.each(["eslint.config.js", "next.config.js", "vitest.config.ts", "vite.config.ts", "playwright.config.js", "tsconfig.base.json"])(
-    "keeps %s Jasper's, which could replace a check's config",
+    "flags %s for the panel, which could replace a check's config",
     (path) => {
-      expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
+      expect(onPanel(path)).toBe(true);
     },
   );
 
+  // ESLint 10 reads the eslint.config nearest each file instead of the root's,
+  // so a one-line `export default []` in a folder turns lint off there. Until
+  // JAS-191 this was on neither list, so a tiny PR could add one unreviewed.
+  it.each([
+    "src/lib/x/eslint.config.mjs",
+    "src/eslint.config.js",
+    "src/app/player/eslint.config.ts",
+    "src/components/eslint.config.mts",
+    "scripts/eslint.config.cjs",
+    "docs/ESLint.config.mjs",
+  ])("flags %s, which replaces lint for its folder, for the panel", (path) => {
+    expect(riskyFiles([path])).toEqual([{ path, why: "lint for the files in its folder, which ESLint reads in place of the root's" }]);
+    expect(jaspersFiles([path])).toEqual([]);
+  });
+
   // These are risky, so they get the interrogate panel, but Claude merges them
-  // once it clears them. e2e/ holds the smoke test's specs; what decides
-  // whether and how they run (playwright.config.ts, .github/) stays Jasper's.
+  // once it clears them.
   it("lets Claude merge the product's risky paths after the panel", () => {
     const paths = [
       "src/db/freshness.ts",
@@ -261,216 +374,202 @@ describe("riskyFiles", () => {
     expect(riskyFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
-  // Most redesign PRs update the verify skills, so Jasper chose to let Claude
-  // merge their Markdown, and the postmortem skill's and the skills' credits
-  // (JAS-146). Agents follow them, so they still get the panel and the reviewer.
-  it("lets Claude merge Markdown in the verify and postmortem skills, and the skills' credits, after the panel", () => {
-    const skills = [
+  // Most redesign PRs update the verify skills (JAS-146). Their scripts and
+  // the skills' credits merge after the panel now too, like the rest of
+  // .claude/skills/.
+  it("lets Claude merge the verify and postmortem skills, and the skills' credits, after the panel", () => {
+    const paths = [
       ".claude/skills/verify/SKILL.md",
       ".claude/skills/verify/features/match-page.md",
-      ".claude/skills/verify/features/README.md",
-      ".claude/skills/verify-turnpoint/SKILL.md",
       ".claude/skills/verify-turnpoint/features/ask-teaser.md",
-      ".claude/skills/verify-turnpoint-ux/SKILL.md",
       ".claude/skills/verify-turnpoint-ux/README.md",
-      ".claude/skills/verify-turnpoint-ux/features/review-path.md",
-      ".claude/skills/postmortem/SKILL.md",
+      ".claude/skills/verify-turnpoint-ux/scripts/drive.ts",
       ".claude/skills/postmortem/fix-ladder.md",
+      ".claude/skills/THIRD-PARTY-NOTICES.md",
     ];
-    const credits = ".claude/skills/THIRD-PARTY-NOTICES.md";
-    expect(jaspersFiles([...skills, credits])).toEqual([]);
-    expect(riskyFiles([...skills, credits])).toEqual([
-      ...skills.map((path) => ({ path, why: "the verify and postmortem skills, which agents follow" })),
-      { path: credits, why: "credits for the copied skills, and how they fit this repo" },
+    expect(jaspersFiles(paths)).toEqual([]);
+    expect(riskyFiles(paths)).toEqual(paths.map((path) => ({ path, why: "skills the reviewer loads, and skills agents follow" })));
+  });
+
+  // A new skill, or a new kind of Claude Code config such as a commands
+  // folder, steers agents too, so it gets the panel.
+  it("flags a brand-new skill, and a new file anywhere in .claude/, for the panel", () => {
+    const paths = [".claude/skills/new-skill/SKILL.md", ".claude/commands/ship.md"];
+    expect(riskyFiles(paths)).toEqual([
+      { path: ".claude/skills/new-skill/SKILL.md", why: "skills the reviewer loads, and skills agents follow" },
+      { path: ".claude/commands/ship.md", why: "Claude Code's own setup, which steers every agent here" },
+    ]);
+    expect(jaspersFiles(paths)).toEqual([]);
+  });
+
+  // Every file in these folders steers agents or runs a check. Of them, only
+  // the merge switch, Claude's deny rules and the workflows that merge or check
+  // the reviewer are Jasper's.
+  it("flags every file in .claude/ and .github/, and keeps only the gates' files there Jasper's", () => {
+    const files = repoFiles.filter((file) => file.startsWith(".claude/") || file.startsWith(".github/"));
+    expect(files.length).toBeGreaterThan(100);
+    expect(riskyFiles(files).map((file) => file.path)).toEqual(files);
+    expect(jaspersFiles(files).map((file) => file.path).sort()).toEqual([
+      ".claude/agent-merge.json",
+      ".claude/settings.json",
+      ".github/workflows/agent-merge-sweep.yml",
+      ".github/workflows/agent-merge.yml",
+      ".github/workflows/reviewer.yml",
     ]);
   });
 
-  // A script could be run by the skill, and Claude Code runs no other kind of
-  // file in it, so only Markdown gets the exemption.
-  it("keeps scripts and other files that aren't Markdown in those skills Jasper's", () => {
-    const paths = [
-      ".claude/skills/verify-turnpoint-ux/scripts/drive.ts",
-      ".claude/skills/verify-turnpoint/scripts/target.test.ts",
-      ".claude/skills/verify/features/drive.ts",
-      ".claude/skills/postmortem/log.sh",
-      ".claude/skills/verify/settings.json",
-      ".claude/skills/verify/notes.mdx",
-      ".claude/skills/verify/features/x.mdc",
-    ];
-    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
-  });
-
-  // Claude Code loads a CLAUDE file from any folder it reads, and other tools
-  // load an AGENTS file the same way, so either would steer every agent there.
-  it("keeps CLAUDE and AGENTS files in those skills Jasper's", () => {
-    const paths = [
-      ".claude/skills/verify/CLAUDE.md",
-      ".claude/skills/verify/CLAUDE.local.md",
-      ".claude/skills/postmortem/AGENTS.md",
-      ".claude/skills/verify-turnpoint/claude.md",
-      ".claude/skills/verify-turnpoint-ux/features/CLAUDE.md",
-      ".claude/skills/verify-turnpoint-ux/features/Agents.md",
-    ];
-    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
-  });
-
-  // A .claude/ folder there would load its own skills and rules, and a
-  // SKILL.md one level down could become a skill of its own.
-  it("keeps a .claude/ folder, or a skill nested inside those skills, Jasper's", () => {
-    const paths = [
-      ".claude/skills/verify/.claude/rules/x.md",
-      ".claude/skills/verify-turnpoint-ux/features/.claude/skills/x/SKILL.md",
-      ".claude/skills/verify/nested/SKILL.md",
-      ".claude/skills/verify/features/SKILL.md",
-      ".claude/skills/verify/features/deep/SKILL.md",
-      ".claude/skills/verify/features/deep/notes.md",
-      ".claude/skills/postmortem/references/fix-ladder.md",
-      "src/.claude/skills/verify/SKILL.md",
-    ];
-    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
-  });
-
-  // The reviewer loads code-review-and-quality, and the others below when a
-  // diff needs them; interrogate runs the panel and poteto-mode picks how work
-  // is done. Every file in every other skill folder stays Jasper's too.
-  it("keeps every other skill Jasper's, including the reviewer's, interrogate and poteto-mode", () => {
-    const named = [
-      ".claude/skills/code-review-and-quality/SKILL.md",
-      ".claude/skills/security-and-hardening/SKILL.md",
-      ".claude/skills/supabase-postgres-best-practices/SKILL.md",
-      ".claude/skills/frontend-ui-engineering/SKILL.md",
-      ".claude/skills/test-driven-development/SKILL.md",
-      ".claude/skills/interrogate/SKILL.md",
-      ".claude/skills/poteto-mode/SKILL.md",
-      ".claude/skills/pstack-manifest.txt",
-    ];
-    expect(jaspersFiles(named).map((file) => file.path)).toEqual(named);
-    const others = repoFiles.filter(
-      (file) =>
-        file.startsWith(".claude/skills/") &&
-        file !== ".claude/skills/THIRD-PARTY-NOTICES.md" &&
-        !PANEL_SKILLS.some((skill) => file.startsWith(`.claude/skills/${skill}/`)),
-    );
-    expect(others.length).toBeGreaterThan(100);
-    expect(jaspersFiles(others).map((file) => file.path)).toEqual(others);
-  });
-
-  // A name that starts like a listed one, or the explain-back skill PR 220
-  // deleted, would be a skill nobody has reviewed.
-  it("keeps a brand-new skill folder Jasper's", () => {
-    const paths = [
-      ".claude/skills/new-skill/SKILL.md",
-      ".claude/skills/explain-back/SKILL.md",
-      ".claude/skills/verify-extra/SKILL.md",
-      ".claude/skills/verify-turnpoint-ux2/features/x.md",
-      ".claude/skills/postmortem-old/SKILL.md",
-      ".claude/skills/x.md",
-    ];
-    expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
-  });
-
-  // ".." could step into another skill, other capitals on Linux are another
-  // folder (a new skill), and Windows reads a backslash as a folder break. A
-  // Mac or Windows file system folds some names into SKILL.md, CLAUDE.md or
-  // AGENTS.md: other capitals, a Kelvin sign for K, a long s, an invisible
-  // character. Other AI tools load GEMINI.md and AGENT.md by themselves.
-  it.each([
-    ".claude/skills/verify/../interrogate/SKILL.md",
-    ".claude/skills/verify/features/../../code-review-and-quality/SKILL.md",
-    ".claude/skills/../skills/verify/SKILL.md",
-    ".claude/skills/Verify/SKILL.md",
-    ".claude/skills/VERIFY-TURNPOINT/features/x.md",
-    ".claude/Skills/verify/SKILL.md",
-    ".Claude/skills/verify/SKILL.md",
-    ".claude/skills/verify/Features/x.md",
-    ".claude/skills/verify/SKILL.MD",
-    ".claude/skills/verify/skill.md",
-    ".claude/skills/verify/features/x.MD",
-    ".claude/skills/verify/features/Match-Page.md",
-    ".claude/skills/verify/features/match page.md",
-    ".claude/skills/verify/features/match.page.md",
-    ".claude/skills/third-party-notices.md",
-    ".claude/skills/verify/a\\..\\..\\interrogate\\SKILL.md",
-    ".claude/skills/verify/features\\..\\..\\interrogate\\SKILL.md",
-    ".claude/skills/verify\\SKILL.md",
-    ".claude/skills/verify/SKILL.md",
-    ".claude/skills/verify/ſKILL.md",
-    ".claude/skills/postmortem/AGENTſ.md",
-    ".claude/skills/verify/‌CLAUDE.md",
-    ".claude/skills/verify/‌skill.md",
-    ".claude/skills/verify/ CLAUDE.md",
-    ".claude/skills/verify/.CLAUDE.md",
-    ".claude/skills/verify/GEMINI.md",
-    ".claude/skills/verify/gemini.md",
-    ".claude/skills/verify/AGENT.md",
-    ".claude/skills/verify/agent.md",
-    ".claude/skills/verify/features/README.MD",
-  ])("keeps %s Jasper's, which tries to step around the exemption", (path) => {
-    expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
-  });
-
-  // The carve-out is only for paths that nothing narrower on Jasper's list
-  // names, so an entry Jasper adds for one of these skills wins, wherever it
-  // goes in the list. The test adds one at each end and takes it out again.
+  // Jasper's list is checked first, so an entry he adds wins over a panel
+  // pattern that also matches, wherever it goes in his list. The test adds one
+  // at each end and takes it out again.
   it.each([
     ["first", 0],
     ["last", JASPERS_PATHS.length],
-  ])("keeps a listed skill Jasper's when his list names it, with the entry %s", (_, at) => {
+  ])("keeps a panel path Jasper's once his list names it, with the entry %s", (_, at) => {
     const list = JASPERS_PATHS as RiskyPath[];
-    list.splice(at, 0, { pattern: ".claude/skills/postmortem/", why: "an entry Jasper added" });
+    list.splice(at, 0, { pattern: ".github/workflows/ci.yml", why: "an entry Jasper added" });
     try {
-      expect(jaspersFiles([".claude/skills/postmortem/SKILL.md"]).map((file) => file.path)).toEqual([".claude/skills/postmortem/SKILL.md"]);
+      expect(jaspersFiles([".github/workflows/ci.yml"])).toEqual([{ path: ".github/workflows/ci.yml", why: "an entry Jasper added" }]);
     } finally {
       list.splice(at, 1);
     }
-    expect(jaspersFiles([".claude/skills/postmortem/SKILL.md"])).toEqual([]);
+    expect(jaspersFiles([".github/workflows/ci.yml"])).toEqual([]);
   });
 
-  // A SKILL.md can grant tools without asking (allowed-tools), add hooks for
-  // the rest of the session, run as another agent, or run shell commands as it
-  // loads (!`cmd` or a ```! block), which a script could do too. Its name could
-  // take another skill's, such as the reviewer's. This file is Jasper's, so a
-  // listed skill that wants any of that waits for him.
-  it.each(PANEL_SKILLS)("keeps the %s skill's SKILL.md to its own name and a description, with no command", (skill) => {
-    expect(isPlainSkill(skill, readFileSync(`.claude/skills/${skill}/SKILL.md`, "utf8"))).toBe(true);
-  });
-
-  it.each([
-    ["no description", "---\nname: verify\n---\nBody\n"],
-    ["another skill's name", "---\nname: code-review-and-quality\ndescription: Review.\n---\nBody\n"],
-    ["tools granted", "---\nname: verify\ndescription: Shots.\nallowed-tools: Bash\n---\nBody\n"],
-    ["hooks", "---\nname: verify\ndescription: Shots.\nhooks:\n  Stop: []\n---\nBody\n"],
-    ["a fork into another agent", "---\nname: verify\ndescription: Shots.\ncontext: fork\nagent: reviewer\n---\nBody\n"],
-    ["a description over two lines", "---\nname: verify\ndescription: >\n  Shots.\n---\nBody\n"],
-    ["an inline command", "---\nname: verify\ndescription: Shots.\n---\nBranch: !`git branch`\n"],
-    ["an inline command starting a line", "---\nname: verify\ndescription: Shots.\n---\n!`git branch`\n"],
-    ["an inline command after a colon", "---\nname: verify\ndescription: Shots.\n---\nBranch:!`git branch`\n"],
-    ["an inline command in brackets", "---\nname: verify\ndescription: Shots.\n---\nBranch (!`git branch`)\n"],
-    ["a command block", "---\nname: verify\ndescription: Shots.\n---\n```!\ngit status\n```\n"],
-    ["an indented command block", "---\nname: verify\ndescription: Shots.\n---\n  ````!\ngit status\n  ````\n"],
-    ["a command block in a list item", "---\nname: verify\ndescription: Shots.\n---\n- ```!\n  git status\n  ```\n"],
-    ["a command block in a quote", "---\nname: verify\ndescription: Shots.\n---\n> ```!\ngit status\n> ```\n"],
-    ["a command block after text", "---\nname: verify\ndescription: Shots.\n---\nRun ```!\ngit status\n``` first.\n"],
-    ["a one-line command block", "---\nname: verify\ndescription: Shots.\n---\nRun ```!git status``` to see.\n"],
-  ])("refuses a SKILL.md with %s", (_, text) => {
-    expect(isPlainSkill("verify", text)).toBe(false);
-  });
-
-  // The verify skill shows a Markdown image inside inline code, which Claude
-  // Code doesn't run.
-  it.each([
-    ["Windows line endings", "---\r\nname: verify\r\ndescription: Shots.\r\n---\r\nBody\r\n"],
-    ["an image in inline code", "---\nname: verify\ndescription: Shots.\n---\nA line like `![Light](a.png)` places it.\n"],
-  ])("accepts a SKILL.md with %s", (_, text) => {
-    expect(isPlainSkill("verify", text)).toBe(true);
-  });
-
-  // A new kind of Claude Code config, such as a commands folder, could steer
-  // agents too, so it is Jasper's until someone decides otherwise.
-  it("keeps a new file anywhere in .claude/ Jasper's", () => {
-    expect(jaspersFiles([".claude/commands/ship.md"])).toEqual([
-      { path: ".claude/commands/ship.md", why: "Claude Code's own setup, which steers every agent here" },
+  // These deny rules catch a session merging around can-merge by mistake: without
+  // them, one could merge a migration or a gate change with `gh pr merge`.
+  // So the file that holds them stays Jasper's (JAS-191's reviewer blocker).
+  it("keeps the deny rules on merging, and the file that holds them, Jasper's", () => {
+    const settings = JSON.parse(readFileSync(".claude/settings.json", "utf8")) as { permissions: { deny: string[] } };
+    expect(settings.permissions.deny).toEqual(
+      expect.arrayContaining(["Edit(.claude/agent-merge.json)", "Bash(gh pr merge)", "Bash(gh pr merge*)", "Bash(gh api *pulls/*/merge*)"]),
+    );
+    expect(jaspersFiles([".claude/settings.json"])).toEqual([
+      { path: ".claude/settings.json", why: "Claude's deny rules on merging, and local overrides of them" },
     ]);
+  });
+
+  // GitHub counts a check named check or reviewer from any workflow, and a
+  // token that can write could merge a PR without can-merge. So a workflow
+  // Claude merges after the panel sets its token's permissions and asks for no
+  // write access; one that needs it changes this test, which is Jasper's. CI
+  // runs this at the PR's head, so a PR would have to stop CI running it too.
+  it("lets only the merge gates' own workflows ask for write access", () => {
+    const workflows = repoFiles.filter((file) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file) && existsSync(file));
+    expect(workflows.length).toBeGreaterThan(3);
+    const others = workflows.filter((file) => jaspersFiles([file]).length === 0);
+    expect(others).toContain(".github/workflows/ci.yml");
+    expect(others.flatMap((file) => tokenProblems(readFileSync(file, "utf8")).map((problem) => `${file} ${problem}`))).toEqual([]);
+  });
+
+  it.each([
+    ["no permissions line", "name: X\non: push\njobs: {}\n"],
+    ["a write permission", "permissions:\n  contents: write\n"],
+    ["a job's write permission", "permissions: {}\njobs:\n  x:\n    permissions:\n      pull-requests: write\n"],
+    ["write-all", "permissions: write-all\n"],
+    ["a flow-style write", "permissions: { contents: read, actions: write }\n"],
+    ["a write after a quoted #", 'permissions: { contents: "read #", pull-requests: write }\n'],
+    ["a write spelled with a YAML escape", 'permissions:\n  pull-requests: "\\x77rite"\n'],
+    ["a write split over a quoted line that runs on", 'permissions:\n  pull-requests: "wr\\\n    ite"\n'],
+    ["Write in capitals", "permissions:\n  contents: Write\n"],
+  ])("would refuse a workflow with %s", (_, text) => {
+    expect(tokenProblems(text)).not.toEqual([]);
+  });
+
+  it("accepts a workflow that reads only, whatever its comment lines say", () => {
+    expect(tokenProblems("# This job never writes; write access stays with Agent merge.\npermissions:\n  contents: read\n  # no write here\n")).toEqual([]);
+  });
+
+  // The gates' code is Jasper's by name, so a helper they load under another
+  // name would be on neither list. This resolves what each gate loads, side
+  // effects and dynamic imports included, with the esbuild tsx runs and the
+  // tsconfig the Agent merge workflow gives it. Installed packages come from
+  // the lockfile, which 0032 leaves to the panel.
+  it("keeps every file the gates load, other than installed packages, Jasper's", async () => {
+    const fromTsx = createRequire(createRequire(import.meta.url).resolve("tsx/package.json"));
+    const esbuild = fromTsx("esbuild") as {
+      build: (options: object) => Promise<{ metafile: { inputs: Record<string, unknown> } }>;
+    };
+    const gates = repoFiles.filter((file) => /^scripts\/can-merge[^/]*\.ts$/.test(file) && !/\.test\.ts$/.test(file));
+    expect(gates).toContain("scripts/can-merge-action.ts");
+    const { metafile } = await esbuild.build({
+      entryPoints: gates,
+      bundle: true,
+      write: false,
+      metafile: true,
+      platform: "node",
+      format: "esm",
+      outdir: "out",
+      tsconfig: "scripts/can-merge.tsconfig.json",
+      logLevel: "silent",
+    });
+    const loaded = Object.keys(metafile.inputs);
+    expect(loaded).toEqual(expect.arrayContaining(["scripts/risky-paths.ts", "scripts/can-merge-gates.ts"]));
+    expect(loaded.some((file) => file.startsWith("node_modules/zod/"))).toBe(true);
+    expect(loaded.filter((file) => !file.startsWith("node_modules/") && jaspersFiles([file]).length === 0)).toEqual([]);
+  });
+
+  // npx runs package.json's own bin ahead of node_modules/.bin, a package name
+  // with exports, imports or workspaces can stand in for one the gates import,
+  // and a dependency from a file, a Git host or another registry skips npm's
+  // checks. The Agent merge workflow refuses the first group at run time; this
+  // stops a PR bringing any of them in. The lockfile half catches an entry
+  // edited by hand or by mistake, not one written to get past it: review found
+  // four ways round it, so the lockfile itself stays Jasper's (decision record
+  // 0032).
+  it("keeps package.json and the lockfile from swapping what the gates load", () => {
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as Record<string, unknown> & {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      optionalDependencies?: Record<string, string>;
+    };
+    expect(["bin", "exports", "imports", "workspaces"].filter((key) => key in pkg)).toEqual([]);
+    const specs = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
+    expect(Object.entries(specs).filter(([, spec]) => !/^[\^~]?\d+(\.\d+){0,2}(-[\w.]+)?$/.test(spec))).toEqual([]);
+    const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as { packages: Record<string, LockEntry> };
+    const entries = Object.entries(lock.packages).filter(([path]) => path !== "");
+    expect(entries.length).toBeGreaterThan(100);
+    expect(entries.some(([, entry]) => entry.inBundle)).toBe(true);
+    expect(entries.flatMap(([path, entry]) => lockProblems(path, entry).map((problem) => `${path}: ${problem}`))).toEqual([]);
+  });
+
+  // Each bad entry is wrong in exactly one way, so each case shows the one
+  // condition that refuses it.
+  const ZOD = "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz";
+  const OTHER = "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz";
+  const fromURL = expect.stringMatching(/^comes from /);
+  it.each<[string, string, LockEntry, unknown[]]>([
+    ["another package's tarball", "node_modules/zod", { version: "4.6.7", resolved: OTHER, integrity: "sha512-x" }, [fromURL]],
+    ["a path that steps back to another package", "node_modules/zod", { version: "4.6.7", resolved: `${ZOD}/../../../is-number/-/is-number-7.0.0.tgz`, integrity: "sha512-x" }, [fromURL]],
+    ["an encoded step back", "node_modules/zod", { version: "4.6.7", resolved: `${ZOD}/%2e%2e/../../is-number/-/is-number-7.0.0.tgz`, integrity: "sha512-x" }, [fromURL]],
+    ["another version than the entry says", "node_modules/zod", { version: "4.6.7", resolved: "https://registry.npmjs.org/zod/-/zod-4.0.0.tgz", integrity: "sha512-x" }, [fromURL]],
+    ["another registry", "node_modules/zod", { version: "4.6.7", resolved: "https://registry.example.com/zod/-/zod-4.6.7.tgz", integrity: "sha512-x" }, [fromURL]],
+    ["another scope", "node_modules/@types/react", { version: "19.0.0", resolved: "https://registry.npmjs.org/@evil/react/-/react-19.0.0.tgz", integrity: "sha512-x" }, [fromURL]],
+    ["an alias", "node_modules/zod", { version: "4.6.7", name: "is-number", resolved: ZOD, integrity: "sha512-x" }, ["is an alias for is-number"]],
+    ["a link", "node_modules/zod", { version: "4.6.7", link: true, resolved: ZOD, integrity: "sha512-x" }, ["is a link"]],
+    ["no integrity hash", "node_modules/zod", { version: "4.6.7", resolved: ZOD }, ["has no integrity hash"]],
+    ["a bundled mark at the top level", "node_modules/zod", { version: "4.6.7", inBundle: true }, ["is bundled but not inside another package"]],
+    ["a bundled entry's own tarball", "node_modules/next/node_modules/zod", { version: "4.6.7", inBundle: true, resolved: OTHER, integrity: "sha512-x" }, ["is bundled but has its own resolved, integrity"]],
+  ])("refuses a lockfile entry with %s, for that reason alone", (_, path, entry, problems) => {
+    expect(lockProblems(path, entry)).toEqual(problems);
+  });
+
+  it("refuses the reviewer's bundled swap of zod", () => {
+    expect(lockProblems("node_modules/zod", { version: "4.6.7", inBundle: true, resolved: OTHER, integrity: "sha512-x" })).toEqual([
+      "is bundled but not inside another package",
+      "is bundled but has its own resolved, integrity",
+    ]);
+  });
+
+  it("accepts a lockfile entry for the package and version its path names, scoped, nested or bundled", () => {
+    expect(lockProblems("node_modules/zod", { version: "4.6.7", resolved: ZOD, integrity: "sha512-x" })).toEqual([]);
+    expect(lockProblems("node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/tslib", { version: "2.8.1", inBundle: true })).toEqual([]);
+    expect(
+      lockProblems("node_modules/drizzle-kit/node_modules/@esbuild/linux-x64", {
+        version: "0.25.12",
+        resolved: "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.25.12.tgz",
+        integrity: "sha512-x",
+      }),
+    ).toEqual([]);
   });
 
   // A file on Jasper's list can sit in a panel folder, like src/db/schema.ts
@@ -478,35 +577,6 @@ describe("riskyFiles", () => {
   it("puts no panel pattern inside one of Jasper's", () => {
     const both = PANEL_PATHS.filter(({ pattern }) => JASPERS_PATHS.some((jaspers) => matchesPattern(jaspers.pattern, pattern)));
     expect(both).toEqual([]);
-  });
-
-  // An exemption that matches no file does nothing, so renaming a skill's
-  // folder or the credits would quietly send them back to Jasper. Every file in
-  // .claude/skills/ stays risky, and only Markdown in the listed skills, or the
-  // credits, goes to the panel.
-  it("exempts skills and credits that exist, and nothing in .claude/skills/ but their Markdown", () => {
-    const skillFiles = repoFiles.filter((file) => file.startsWith(".claude/skills/"));
-    expect(riskyFiles(skillFiles).map((file) => file.path)).toEqual(skillFiles);
-    const exempt = skillFiles.filter((file) => jaspersFiles([file]).length === 0);
-    expect(exempt).toEqual(
-      expect.arrayContaining([
-        ...PANEL_SKILLS.map((skill) => `.claude/skills/${skill}/SKILL.md`),
-        ".claude/skills/THIRD-PARTY-NOTICES.md",
-      ]),
-    );
-    const listed = (file: string) => PANEL_SKILLS.some((skill) => file.startsWith(`.claude/skills/${skill}/`));
-    expect(exempt.filter((file) => !file.endsWith(".md") || !(listed(file) || file === ".claude/skills/THIRD-PARTY-NOTICES.md"))).toEqual([]);
-    expect(skillFiles.filter((file) => listed(file) && !file.endsWith(".md") && jaspersFiles([file]).length === 0)).toEqual([]);
-  });
-
-  // A symlink here could point at a file a docs-only PR can change, or at a
-  // secret such as .env.local, and a symlink named like the credits pointing
-  // at a folder would load that folder as a skill. Git lists only the path, so
-  // the mode is checked here, at the head CI tests.
-  it("keeps every file Claude merges in .claude/skills/ a plain file, not a symlink", () => {
-    const exempt = [...repoModes.keys()].filter((file) => file.startsWith(".claude/skills/") && jaspersFiles([file]).length === 0);
-    expect(exempt.length).toBeGreaterThan(0);
-    expect(exempt.filter((file) => repoModes.get(file) !== "100644")).toEqual([]);
   });
 
   // A folder renamed without updating the list would quietly stop being risky.

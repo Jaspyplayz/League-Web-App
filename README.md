@@ -109,7 +109,7 @@ The win chance's learned weights are worth a look: kills and towers are worth al
 | [Sentry](https://sentry.io) | Error tracking | Reports crashes on the live site with the exact error and stack trace. |
 | Hand-written SVG | Charts | The curves are simple enough that a chart library wasn't worth the extra JavaScript. |
 
-Everything runs on free tiers except the Claude API, which is pay per use: Ask stops at $20 a month for the whole site, and each account can write 20 recaps a day.
+Everything runs on free tiers except the Claude API, which is pay per use: Ask stops at $20 a month for the whole site, and each account gets 20 tries at a recap a day, failed ones included.
 
 ## Architecture
 

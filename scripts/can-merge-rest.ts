@@ -42,8 +42,9 @@ export type CheckRun = z.infer<typeof CheckRun>;
 export const CheckRunPage = z.object({ total_count: z.number(), check_runs: z.array(CheckRun) });
 
 // GET repos/{owner}/{repo}/actions/runs?head_sha={sha}. `name` is the
-// workflow's name, such as "CI".
-const WorkflowRun = z.object({ name: z.string().nullable(), check_suite_id: z.number() });
+// workflow's name, such as "CI", and `event` what started it, such as
+// "pull_request".
+const WorkflowRun = z.object({ name: z.string().nullable(), event: z.string(), check_suite_id: z.number() });
 type WorkflowRun = z.infer<typeof WorkflowRun>;
 export const WorkflowRunPage = z.object({ total_count: z.number(), workflow_runs: z.array(WorkflowRun) });
 
@@ -88,13 +89,17 @@ export function toPrSnapshot({ pull, ...checks }: RestAnswers, files: string[]):
 // check suite, and each workflow run has its own suite (a re-run keeps it).
 // A check run from an app such as CodeQL has no workflow run, so its workflow
 // is "". GitHub runs a check again on each push, description edit and re-run,
-// and lists every run. The merge box counts only the latest run of each, so
-// the gates do too. Runs that started in the same second all count.
+// and lists every run. The merge box counts only the latest run of each
+// workflow, event and name, and needs all of those to pass (PR 278), so the
+// gates do too: the Reviewer workflow runs on two events. Runs that started in
+// the same second all count.
 export function toChecks({ checkRuns, workflowRuns, statuses }: Omit<RestAnswers, "pull">): Check[] {
-  const workflowOf = new Map(workflowRuns.map((run) => [run.check_suite_id, run.name ?? ""]));
-  const workflow = (run: CheckRun) => (run.check_suite ? workflowOf.get(run.check_suite.id) : undefined) ?? "";
-  const runs = checkRuns.map((run) => ({ run, workflow: workflow(run) }));
-  const key = ({ run, workflow }: (typeof runs)[number]) => JSON.stringify([workflow, run.name]);
+  const workflowRunOf = new Map(workflowRuns.map((run) => [run.check_suite_id, run]));
+  const runs = checkRuns.map((run) => {
+    const workflowRun = run.check_suite ? workflowRunOf.get(run.check_suite.id) : undefined;
+    return { run, workflow: workflowRun?.name ?? "", event: workflowRun?.event ?? "" };
+  });
+  const key = ({ run, workflow, event }: (typeof runs)[number]) => JSON.stringify([workflow, event, run.name]);
   const latest = new Map<string, number>();
   for (const entry of runs) latest.set(key(entry), Math.max(latest.get(key(entry)) ?? -Infinity, started(entry.run)));
   return [

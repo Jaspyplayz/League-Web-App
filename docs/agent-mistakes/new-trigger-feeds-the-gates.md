@@ -1,6 +1,6 @@
 # A new way to start a check that the merge gates trust
 
-A change adds a way to start a workflow (a trigger, a dispatch, a button) for one purpose, without asking what else reads the check runs it makes. The merge gates and GitHub's ruleset read a PR's newest run of each check, so a run started another way can stand in for the PR's own.
+A change adds a way to start a workflow (a trigger, a dispatch, a button) for one purpose, without asking what else reads the check runs it makes. The merge gates read a PR's newest run of each check, so a run started another way could stand in for the PR's own. Since PR 294 they keep each workflow's runs from different events apart.
 
 ## 2026-10-31
 
