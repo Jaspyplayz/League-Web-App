@@ -1,0 +1,11 @@
+name: Probe fast
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+permissions: {}
+jobs:
+  reviewer:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
