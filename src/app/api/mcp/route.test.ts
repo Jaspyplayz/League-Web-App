@@ -11,66 +11,73 @@ vi.mock("@/lib/mcp/tools", () => ({
   recentGames: vi.fn(),
 }));
 
-// A client on the 2026-07-28 protocol revision puts these in every request.
-const MODERN = "2026-07-28";
-const modernMeta = {
-  "io.modelcontextprotocol/protocolVersion": MODERN,
-  "io.modelcontextprotocol/clientInfo": { name: "test", version: "1.0.0" },
-  "io.modelcontextprotocol/clientCapabilities": {},
-};
-
-function modernRequest(method: string, params: object = {}) {
-  return new Request("https://league-web-app.vercel.app/api/mcp", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-      "mcp-protocol-version": MODERN,
-      "mcp-method": method,
-    },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta: modernMeta } }),
-  });
+function post(body: object, headers: Record<string, string> = {}, signal?: AbortSignal) {
+  return POST(
+    new Request("https://league-web-app.vercel.app/api/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...headers },
+      body: JSON.stringify(body),
+      signal,
+    }),
+  );
 }
 
-// Reads a response to its end, or gives up after `ms` and says the stream
-// is still open (a real client would sit there until Vercel's 300 s limit).
-async function readToEnd(response: Response, ms = 2_000): Promise<string> {
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  const deadline = new Promise<"open">((resolve) => setTimeout(() => resolve("open"), ms));
-  for (;;) {
-    const next = await Promise.race([reader.read(), deadline]);
-    if (next === "open") {
-      await reader.cancel();
-      return `${text}[still open after ${ms} ms]`;
-    }
-    if (next.done) return text;
-    text += decoder.decode(next.value);
-  }
+// A client on the 2026-07-28 protocol names it in a header and in `_meta`.
+function postModern(method: string, params: object = {}, signal?: AbortSignal) {
+  const _meta = {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    "io.modelcontextprotocol/clientInfo": { name: "test", version: "1.0.0" },
+    "io.modelcontextprotocol/clientCapabilities": {},
+  };
+  const headers = { "mcp-protocol-version": "2026-07-28", "mcp-method": method };
+  return post({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta } }, headers, signal);
+}
+
+// The JSON-RPC messages in a stream (SSE) answer: one on each `data:` line.
+function sseMessages(text: string) {
+  return text
+    .split("\n")
+    .filter((line) => line.startsWith("data: "))
+    .map((line) => JSON.parse(line.slice("data: ".length)));
 }
 
 describe("POST /api/mcp", () => {
-  it("tells a client the tool list never changes", async () => {
-    const response = await POST(modernRequest("server/discover"));
-    const body = JSON.parse(await readToEnd(response));
-    expect(body.result.capabilities.tools).toEqual({ listChanged: false });
+  it("tells a 2026-07-28 client the tool list never changes", async () => {
+    const { result } = await (await postModern("server/discover")).json();
+    expect(result.capabilities.tools).toEqual({ listChanged: false });
   });
 
-  it("ends a subscriptions/listen stream at once instead of holding it open", async () => {
-    const response = await POST(modernRequest("subscriptions/listen", { notifications: { toolsListChanged: true } }));
-    const text = await readToEnd(response);
-    expect(text).not.toContain("[still open");
-    // The answer is the acknowledgement, with nothing subscribed, then the
-    // result that closes the subscription.
-    expect(text).toContain('"notifications":{}');
-    expect(text).toContain('"resultType":"complete"');
+  it("tells a 2025-era client the same", async () => {
+    const response = await post({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1.0.0" } },
+    });
+    const [{ result }] = sseMessages(await response.text());
+    expect(result.capabilities.tools).toEqual({ listChanged: false });
+  });
+
+  it("ends a subscriptions/listen at once, whatever the client asks to hear about", async () => {
+    // If the server held the stream open, this timeout would end it instead.
+    const timeout = AbortSignal.timeout(1_000);
+    const everything = {
+      toolsListChanged: true,
+      promptsListChanged: true,
+      resourcesListChanged: true,
+      resourceSubscriptions: ["turnpoint://anything"],
+    };
+    const response = await postModern("subscriptions/listen", { notifications: everything }, timeout);
+    const [ack, end] = sseMessages(await response.text());
+
+    expect(timeout.aborted).toBe(false);
+    expect(ack.params.notifications).toEqual({});
+    expect(end.result.resultType).toBe("complete");
   });
 
   it("still lists the three tools", async () => {
-    const response = await POST(modernRequest("tools/list"));
-    const body = JSON.parse(await readToEnd(response));
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+    const { result } = await (await postModern("tools/list")).json();
+    expect(result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       "look_up_player",
       "recent_games",
       "analyze_game",
