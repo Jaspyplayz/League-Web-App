@@ -100,8 +100,12 @@ function decide(snapshot: PrSnapshot, state: MainState, git: ReviewHistory = his
   return decideGates(snapshot, state, git);
 }
 
+// can-merge acts on ok alone, not on the list of gates, so every test that
+// reads the list also checks that ok agrees with it.
 function failed(decision: Decision): string[] {
-  return decision.gates.filter((gate) => !gate.pass).map((gate) => gate.name);
+  const names = decision.gates.filter((gate) => !gate.pass).map((gate) => gate.name);
+  expect(decision.ok, `ok with failing gates: ${names.join(", ") || "none"}`).toBe(names.length === 0);
+  return names;
 }
 
 function detail(decision: Decision, name: string): string {
@@ -270,6 +274,9 @@ describe("decide", () => {
     ["it has no Builder line", { body: body({ builder: null }) }],
     ["the Cursor chat built it", { body: body({ builder: "Cursor chat on Grok 4.7." }) }],
     ["its Builder line names other builders too", { body: body({ builder: "Claude Code on Opus 5.5, Cursor chat on Grok 4.7, or cloud agent." }) }],
+    // Names no tool the other-builders check knows, so only "must name
+    // Claude Code" refuses it.
+    ["another tool built it", { body: body({ builder: "Codex on GPT-5." }) }],
   ])("refuses a PR that Claude Code didn't build: %s", (_, overrides) => {
     expect(failed(decide(pr(overrides), main()))).toEqual(["Built by Claude Code"]);
   });
@@ -445,6 +452,14 @@ describe("decide", () => {
       const decision = decide(pr({ body: risky(review), files: SIGN_IN }), main());
       expect(failed(decision)).toEqual(["Interrogate panel ran"]);
       expect(detail(decision, "Interrogate panel ran")).toContain('no "Interrogate panel at <sha>: <n> to act on" line');
+    });
+
+    // The cases above all change a risky path, which needs the panel anyway,
+    // so this one shows the risky tier needs it on its own.
+    it("refuses a risky tier with no risky paths and no panel line", () => {
+      const decision = decide(pr({ body: risky([`Reviewer agent at ${HEAD}: no blockers`]) }), main());
+      expect(failed(decision)).toEqual(["Interrogate panel ran"]);
+      expect(detail(decision, "Interrogate panel ran")).toContain("which a risky tier needs");
     });
 
     // A panel that ran before the PR touched a risky path never read it, so a
@@ -725,6 +740,10 @@ describe("decide", () => {
     ["Vercel hasn't reported", without("Vercel"), "Vercel hasn't reported from Vercel"],
     ["check failed", [...without("check"), ci("failure")], "check failed"],
     ["another check failed", [...passing, { kind: "run", name: "CodeQL", workflow: "", state: "failure" }], "CodeQL failed"],
+    // In the CI workflow but not named check, so it isn't the required one.
+    ["another job in the CI workflow failed", [...passing, { kind: "run", name: "extra", workflow: "CI", state: "failure" }], "extra failed"],
+    // Named smoke but from another workflow, so it isn't the required one either.
+    ["a smoke run from another workflow failed", [...passing, { kind: "run", name: "smoke", workflow: "Quick smoke", state: "failure" }], "smoke failed"],
     [
       "another check is running",
       [...passing, { kind: "run", name: "dependency-review", workflow: "Dependency review", state: "pending" }],
@@ -881,6 +900,7 @@ describe("decide", () => {
       (file) => {
         const changed = [...files, file];
         const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(changes({ [file]: 1 })), changed);
+        expect(failed(decision)).toContain("Reviewer cleared the PR");
         expect(reviewer(decision)).toContain(`${file} changed after the verdict`);
       },
     );
@@ -888,6 +908,7 @@ describe("decide", () => {
     it("refuses a mode-only change to a rule file after the verdict", () => {
       const changed = [...files, ".claude/hooks/cloud-setup.mjs"];
       const decision = gateOf([`Reviewer agent at ${OLDER}: no blockers`], after(changes({ ".claude/hooks/cloud-setup.mjs": 0 })), changed);
+      expect(failed(decision)).toContain("Reviewer cleared the PR");
       expect(reviewer(decision)).toContain(".claude/hooks/cloud-setup.mjs changed after the verdict");
     });
 
