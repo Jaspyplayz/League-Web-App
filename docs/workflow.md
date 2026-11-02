@@ -10,7 +10,7 @@ Work lives in Linear ([linear.app/jaspy](https://linear.app/jaspy), team JAS, pr
 |---|---|---|
 | Backlog | An idea, not written up yet | Anyone |
 | Todo | Written up with the [Feature or fix](../.github/ISSUE_TEMPLATE/feature.md) sections; a builder starts it only when Jasper asks | Claude or Jasper |
-| Ready | A builder may take it without being asked. Claude Code may move a ticket here from Backlog or Todo once it has the Feature or fix sections, a Priority and a Touches line, and says why on the ticket; Jasper can move it back. A later `/run-queue` skill will hand these to cloud sessions | Claude or Jasper |
+| Ready | A builder may take it without being asked. Claude Code may move a ticket here from Backlog or Todo once it has the Feature or fix sections, a Priority and a `Touches:` line, and says why on the ticket; Jasper can move it back. [Some tickets stay Jasper's to move](agents/issue-tracker.md). A later `/run-queue` skill will hand these to cloud sessions | Claude or Jasper |
 | In Progress | A builder posted its start comment and plan | The builder |
 | In Review | The PR is open | The builder |
 | Done | The PR merged | Linear, from the ticket ID in the branch name |
@@ -79,7 +79,7 @@ Three of Matt Pocock's skills turn it into tickets before any builder starts. Cl
 2. **`/to-spec`** writes what was decided up as one parent ticket. Its only question is whether the places it plans to test match what Jasper expects. The parent keeps the skill's own sections instead of the Feature or fix ones, because it's a plan for the sub-tickets and no PR builds it.
 3. **`/to-tickets JAS-<n>`**, given that ticket, splits it into slices, checks the split with Jasper, and saves each slice as a sub-ticket, joined by Linear's blocking links. Two of this repo's rules override the skill's: each slice fits one PR (the skill sizes them to one Claude session), and each sub-ticket has the [Feature or fix](../.github/ISSUE_TEMPLATE/feature.md) sections, so it counts as written up in Todo.
 
-Every ticket they make stays in Todo until Claude Code or Jasper moves it to Ready ([triage roles](agents/triage-labels.md)). Each sub-ticket is then built like any other, but only after the tickets that block it are Done. The parent ticket stays in Todo until the last sub-ticket's PR merges; the parent then moves to Done: by Jasper when the PR is his to merge, and otherwise by the builder if its session sees the merge, or by Jasper in his weekly read of merged PRs, since the Agent merge workflow can't reach Linear.
+Every sub-ticket they make stays in Todo until Claude Code or Jasper moves it to Ready ([triage roles](agents/triage-labels.md)). Each sub-ticket is then built like any other, but only after the tickets that block it are Done. The parent ticket stays in Todo until the last sub-ticket's PR merges; the parent then moves to Done: by Jasper when the PR is his to merge, and otherwise by the builder if its session sees the merge, or by Jasper in his weekly read of merged PRs, since the Agent merge workflow can't reach Linear.
 
 When the plan itself is still unclear, too foggy to grill in one sitting, Jasper can type **`/wayfinder`** first. It keeps a map ticket of the open decisions in Linear and works through them one session at a time, ending in something `/to-spec` can write up. How its tickets sit in Linear is in [Wayfinding operations](agents/issue-tracker.md#wayfinding-operations).
 
