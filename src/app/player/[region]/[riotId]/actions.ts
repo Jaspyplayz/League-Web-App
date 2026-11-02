@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { loadBuilds, type BuildsResult } from "@/lib/match-builds";
 import { updateProfile, type UpdateResult } from "@/lib/profile-store";
+import { isPuuid } from "@/lib/puuid";
 import { isMatchIdFor, isRegion } from "@/lib/regions";
 
 // Server Actions are functions the browser can call on the server, here
@@ -10,7 +11,7 @@ import { isMatchIdFor, isRegion } from "@/lib/regions";
 // with any arguments, so they're checked before use; updateProfile also only
 // refreshes players Turnpoint has already saved, and applies the cooldown.
 export async function updateProfileAction(region: string, puuid: string): Promise<UpdateResult> {
-  if (!isRegion(region) || typeof puuid !== "string") {
+  if (!isRegion(region) || !isPuuid(puuid)) {
     return { status: "failed", kind: "not-found" };
   }
 

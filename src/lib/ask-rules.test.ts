@@ -26,6 +26,15 @@ describe("cleanQuestion", () => {
     expect(cleanQuestion("a".repeat(MAX_QUESTION_LENGTH + 1)).ok).toBe(false);
     expect(cleanQuestion("a".repeat(MAX_QUESTION_LENGTH)).ok).toBe(true);
   });
+
+  // Postgres text can't hold a NUL character (JAS-214).
+  it("drops NUL characters before squeezing spaces", () => {
+    expect(cleanQuestion("Why \u0000 do I lose?\u0000")).toEqual({ ok: true, text: "Why do I lose?" });
+  });
+
+  it("refuses a question of only NUL characters and spaces", () => {
+    expect(cleanQuestion("\u0000 \u0000\u0000 ")).toEqual({ ok: false, message: "Type a question first." });
+  });
 });
 
 describe("costMicros", () => {
