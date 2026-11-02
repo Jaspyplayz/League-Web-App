@@ -8,7 +8,7 @@ name: Reviewer
 # passes it, and a push reruns it, so a big new commit needs a new review.
 #
 # The check runs main's copy of the script and its packages, never the PR's,
-# so a PR can't change what judges it (JAS-43, decision record 0029). It only
+# so a PR can't change what judges it (JAS-43, decision record 0030). It only
 # reads the PR: its description from the event file, and its commits through
 # git diff.
 on:

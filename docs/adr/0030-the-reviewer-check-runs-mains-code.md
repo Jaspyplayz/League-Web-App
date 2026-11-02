@@ -1,4 +1,4 @@
-# 0029: The reviewer check runs main's code, not the PR's
+# 0030: The reviewer check runs main's code, not the PR's
 
 Status: draft (JAS-43). Jasper accepts it by merging its PR, which he merges by hand, since it changes `.github/` and `scripts/can-merge*`. It changes the second Bad consequence of [0010](0010-github-requires-the-reviewer.md) ("It runs the PR's own copy of the workflow and the script") and its line that GitHub doesn't run the check while a PR has a merge conflict; 0010 stays as it was written.
 
