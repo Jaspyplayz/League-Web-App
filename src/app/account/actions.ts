@@ -5,7 +5,7 @@ import { askEnabled } from "@/lib/ask";
 import { cleanQuestion } from "@/lib/ask-rules";
 import { ask, type AskOutcome } from "@/lib/ask-store";
 import { getCurrentUser } from "@/lib/auth";
-import { isDayKey } from "@/lib/daily-log";
+import { isDayKey, LOG_DAYS } from "@/lib/daily-log";
 import { writeDayNote } from "@/lib/day-note-store";
 import { cleanNote, MAX_NOTE_LENGTH, type SaveNoteResult } from "@/lib/match-note";
 import { writeMatchNote } from "@/lib/match-note-store";
@@ -63,10 +63,12 @@ export async function saveMatchNoteAction(
     : { status: "failed", message: "Couldn't save the note. Try again in a moment." };
 }
 
-// The Save button under a day on the Log tab. Same checks as above; the day
-// is "2026-10-16" in the player's own timezone.
+// The Save button under a day in By day. Same checks as above; the day is
+// "2026-10-16" in the player's own timezone.
 export async function saveDayNoteAction(day: string, note: string): Promise<SaveNoteResult> {
-  if (!isDayKey(day)) return { status: "failed", message: "Couldn't save the note for this day." };
+  if (!isDayKey(day) || !isNoteDay(day, Date.now())) {
+    return { status: "failed", message: "Couldn't save the note for this day." };
+  }
   const cleaned = cleanNote(note);
   if (!cleaned.ok) {
     return { status: "failed", message: `Notes can be up to ${MAX_NOTE_LENGTH} characters.` };
@@ -77,6 +79,22 @@ export async function saveDayNoteAction(day: string, note: string): Promise<Save
   return (await writeDayNote(user.id, day, cleaned.text))
     ? { status: "saved" }
     : { status: "failed", message: "Couldn't save the note. Try again in a moment." };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Whether By day could have shown this day, so a note on it can be saved.
+// Without this, a script could save a note on every date from 0100 to 9999
+// and fill the database (JAS-212). By day shows the player's last LOG_DAYS
+// days, in a timezone only their browser knows. Every timezone in use is
+// between UTC-12 and UTC+14, so their today is the server's UTC yesterday,
+// today or tomorrow, and the days allowed are UTC today minus LOG_DAYS
+// through UTC tomorrow: a spare day on each side. It counts in UTC, not the
+// server's own timezone, which could be 26 hours from a player's: two days.
+function isNoteDay(day: string, now: number): boolean {
+  const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  // "2026-10-16" sorts as plain text, so the edges compare as strings.
+  return day >= utcDay(now - LOG_DAYS * DAY_MS) && day <= utcDay(now + DAY_MS);
 }
 
 // The "Write recap" button on a match page. Signed-in accounts only, so the
