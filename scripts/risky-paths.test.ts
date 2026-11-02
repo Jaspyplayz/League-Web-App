@@ -56,6 +56,22 @@ const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && 
 
 const onPanel = (path: string) => riskyFiles([path]).length === 1 && jaspersFiles([path]).length === 0;
 
+type LockEntry = { version?: string; resolved?: string; integrity?: string; link?: boolean; inBundle?: boolean; name?: string };
+
+// What's wrong with a lockfile entry, if anything: it must install the
+// package and version its path names, from npm's registry, with an integrity
+// hash. The tarball is compared whole, since npm resolves a ".." in the URL.
+function lockProblems(path: string, entry: LockEntry): string[] {
+  const name = path.slice(path.lastIndexOf("node_modules/") + "node_modules/".length);
+  const tarball = `https://registry.npmjs.org/${name}/-/${name.split("/").pop()}-${entry.version}.tgz`;
+  return [
+    entry.link && "is a link",
+    entry.name !== undefined && `is an alias for ${entry.name}`,
+    entry.resolved !== tarball && `comes from ${entry.resolved}, not ${tarball}`,
+    !entry.integrity && "has no integrity hash",
+  ].filter((problem) => typeof problem === "string");
+}
+
 // What's wrong with a workflow's token: no top-level permissions line, so it
 // gets the repo's default, or the word write anywhere but a comment line. It
 // reads text, not YAML, so it also refuses a YAML escape or a quoted line that
@@ -407,7 +423,7 @@ describe("riskyFiles", () => {
     expect(jaspersFiles([".github/workflows/ci.yml"])).toEqual([]);
   });
 
-  // These deny rules keep a session merging only through can-merge: without
+  // These deny rules catch a session merging around can-merge by mistake: without
   // them, one could merge a migration or a gate change with `gh pr merge`.
   // So the file that holds them stays Jasper's (JAS-191's reviewer blocker).
   it("keeps the deny rules on merging, and the file that holds them, Jasper's", () => {
@@ -482,10 +498,11 @@ describe("riskyFiles", () => {
 
   // npx runs package.json's own bin ahead of node_modules/.bin, a package name
   // with exports, imports or workspaces can stand in for one the gates import,
-  // a dependency from a file, a Git host or another registry skips npm's
-  // checks, and a lockfile entry whose tarball is another package's installs
-  // that package under the name, so anything on npm could stand in for zod. The Agent merge workflow refuses the first group at run time; this
-  // stops a PR bringing any of them in.
+  // and a dependency from a file, a Git host or another registry skips npm's
+  // checks. A lockfile entry whose tarball is another package's installs that
+  // package under the entry's name, so anything on npm could stand in for zod.
+  // The Agent merge workflow refuses the first group at run time; this stops a
+  // PR bringing any of them in.
   it("keeps package.json and the lockfile from swapping what the gates load", () => {
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as Record<string, unknown> & {
       dependencies?: Record<string, string>;
@@ -495,21 +512,36 @@ describe("riskyFiles", () => {
     expect(["bin", "exports", "imports", "workspaces"].filter((key) => key in pkg)).toEqual([]);
     const specs = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
     expect(Object.entries(specs).filter(([, spec]) => !/^[\^~]?\d+(\.\d+){0,2}(-[\w.]+)?$/.test(spec))).toEqual([]);
-    const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as {
-      packages: Record<string, { resolved?: string; integrity?: string; link?: boolean; inBundle?: boolean; name?: string }>;
-    };
+    const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as { packages: Record<string, LockEntry> };
     const fetched = Object.entries(lock.packages).filter(([path, entry]) => path !== "" && !entry.inBundle);
     expect(fetched.length).toBeGreaterThan(100);
-    // The tarball must be the package the entry's path names, from npm's
-    // registry: node_modules/@scope/name comes from .../@scope/name/-/name-<version>.tgz.
-    const tarball = (path: string) => {
-      const name = path.slice(path.lastIndexOf("node_modules/") + "node_modules/".length);
-      return `https://registry.npmjs.org/${name}/-/${name.split("/").pop()}-`;
-    };
+    expect(fetched.flatMap(([path, entry]) => lockProblems(path, entry).map((problem) => `${path}: ${problem}`))).toEqual([]);
+  });
+
+  const ZOD = "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz";
+  const OTHER = "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz";
+  it.each<[string, string, LockEntry]>([
+    ["another package's tarball", "node_modules/zod", { version: "4.6.7", resolved: OTHER, integrity: "sha512-x" }],
+    ["a path that steps back to another package", "node_modules/zod", { version: "4.6.7", resolved: `${ZOD}/../../../is-number/-/is-number-7.0.0.tgz`, integrity: "sha512-x" }],
+    ["an encoded step back", "node_modules/zod", { version: "4.6.7", resolved: `${ZOD}/%2e%2e/../../is-number/-/is-number-7.0.0.tgz`, integrity: "sha512-x" }],
+    ["another version than the entry says", "node_modules/zod", { version: "4.6.7", resolved: "https://registry.npmjs.org/zod/-/zod-4.0.0.tgz", integrity: "sha512-x" }],
+    ["another registry", "node_modules/zod", { version: "4.6.7", resolved: "https://registry.example.com/zod/-/zod-4.6.7.tgz", integrity: "sha512-x" }],
+    ["an alias", "node_modules/zod", { version: "7.0.0", name: "is-number", resolved: OTHER, integrity: "sha512-x" }],
+    ["a link", "node_modules/zod", { link: true, resolved: "scripts/zod" }],
+    ["no integrity hash", "node_modules/zod", { version: "4.6.7", resolved: ZOD }],
+    ["another scope", "node_modules/@types/react", { version: "19.0.0", resolved: "https://registry.npmjs.org/@evil/react/-/react-19.0.0.tgz", integrity: "sha512-x" }],
+  ])("refuses a lockfile entry with %s", (_, path, entry) => {
+    expect(lockProblems(path, entry)).not.toEqual([]);
+  });
+
+  it("accepts a lockfile entry for the package and version its path names, scoped or nested", () => {
+    expect(lockProblems("node_modules/zod", { version: "4.6.7", resolved: ZOD, integrity: "sha512-x" })).toEqual([]);
     expect(
-      fetched
-        .filter(([path, entry]) => entry.link || "name" in entry || !entry.resolved?.startsWith(tarball(path)) || !entry.integrity)
-        .map(([path]) => path),
+      lockProblems("node_modules/drizzle-kit/node_modules/@esbuild/linux-x64", {
+        version: "0.25.12",
+        resolved: "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.25.12.tgz",
+        integrity: "sha512-x",
+      }),
     ).toEqual([]);
   });
 

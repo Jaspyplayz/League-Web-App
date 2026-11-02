@@ -1,7 +1,8 @@
 // The paths that make a PR risky (issue #158), in two lists (JAS-128, JAS-191):
 //
 // - JASPERS_PATHS: migrations, the schema they come from, and the merge gates
-//   (their code, Claude's deny rules and the switch). `npm run can-merge`
+//   (their code, Claude's deny rules, the switch, and the package files Node
+//   would load in place of the gates' imports). `npm run can-merge`
 //   refuses a PR that touches one, whatever its tier says. Only Jasper runs
 //   `npm run db:migrate`, so code merged before its migration would break the
 //   live site's reads; and an agent could otherwise loosen a gate and merge
