@@ -58,15 +58,25 @@ const onPanel = (path: string) => riskyFiles([path]).length === 1 && jaspersFile
 
 type LockEntry = { version?: string; resolved?: string; integrity?: string; link?: boolean; inBundle?: boolean; name?: string };
 
-// What's wrong with a lockfile entry, if anything: it must install the
-// package and version its path names, from npm's registry, with an integrity
-// hash. The tarball is compared whole, since npm resolves a ".." in the URL.
+// What's wrong with a lockfile entry, if anything. It must have one of the two
+// shapes npm writes for a package from the registry: fetched as the package
+// and version its path names, with an integrity hash, or bundled inside
+// another package's tarball, with nothing of its own to fetch. Any other shape
+// is refused, not only the tricks found so far: npm resolves a ".." in the URL,
+// so it's compared whole, and it still fetches a bundled entry's own URL.
 function lockProblems(path: string, entry: LockEntry): string[] {
+  if (entry.inBundle) {
+    const own = (["resolved", "integrity", "name", "link"] as const).filter((key) => key in entry);
+    return [
+      path.split("node_modules/").length < 3 && "is bundled but not inside another package",
+      own.length > 0 && `is bundled but has its own ${own.join(", ")}`,
+    ].filter((problem) => typeof problem === "string");
+  }
   const name = path.slice(path.lastIndexOf("node_modules/") + "node_modules/".length);
   const tarball = `https://registry.npmjs.org/${name}/-/${name.split("/").pop()}-${entry.version}.tgz`;
   return [
-    entry.link && "is a link",
-    entry.name !== undefined && `is an alias for ${entry.name}`,
+    "link" in entry && "is a link",
+    "name" in entry && `is an alias for ${entry.name}`,
     entry.resolved !== tarball && `comes from ${entry.resolved}, not ${tarball}`,
     !entry.integrity && "has no integrity hash",
   ].filter((problem) => typeof problem === "string");
@@ -513,29 +523,43 @@ describe("riskyFiles", () => {
     const specs = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
     expect(Object.entries(specs).filter(([, spec]) => !/^[\^~]?\d+(\.\d+){0,2}(-[\w.]+)?$/.test(spec))).toEqual([]);
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as { packages: Record<string, LockEntry> };
-    const fetched = Object.entries(lock.packages).filter(([path, entry]) => path !== "" && !entry.inBundle);
-    expect(fetched.length).toBeGreaterThan(100);
-    expect(fetched.flatMap(([path, entry]) => lockProblems(path, entry).map((problem) => `${path}: ${problem}`))).toEqual([]);
+    const entries = Object.entries(lock.packages).filter(([path]) => path !== "");
+    expect(entries.length).toBeGreaterThan(100);
+    expect(entries.some(([, entry]) => entry.inBundle)).toBe(true);
+    expect(entries.flatMap(([path, entry]) => lockProblems(path, entry).map((problem) => `${path}: ${problem}`))).toEqual([]);
   });
 
+  // Each bad entry is wrong in exactly one way, so each case shows the one
+  // condition that refuses it.
   const ZOD = "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz";
   const OTHER = "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz";
-  it.each<[string, string, LockEntry]>([
-    ["another package's tarball", "node_modules/zod", { version: "4.6.7", resolved: OTHER, integrity: "sha512-x" }],
-    ["a path that steps back to another package", "node_modules/zod", { version: "4.6.7", resolved: `${ZOD}/../../../is-number/-/is-number-7.0.0.tgz`, integrity: "sha512-x" }],
-    ["an encoded step back", "node_modules/zod", { version: "4.6.7", resolved: `${ZOD}/%2e%2e/../../is-number/-/is-number-7.0.0.tgz`, integrity: "sha512-x" }],
-    ["another version than the entry says", "node_modules/zod", { version: "4.6.7", resolved: "https://registry.npmjs.org/zod/-/zod-4.0.0.tgz", integrity: "sha512-x" }],
-    ["another registry", "node_modules/zod", { version: "4.6.7", resolved: "https://registry.example.com/zod/-/zod-4.6.7.tgz", integrity: "sha512-x" }],
-    ["an alias", "node_modules/zod", { version: "7.0.0", name: "is-number", resolved: OTHER, integrity: "sha512-x" }],
-    ["a link", "node_modules/zod", { link: true, resolved: "scripts/zod" }],
-    ["no integrity hash", "node_modules/zod", { version: "4.6.7", resolved: ZOD }],
-    ["another scope", "node_modules/@types/react", { version: "19.0.0", resolved: "https://registry.npmjs.org/@evil/react/-/react-19.0.0.tgz", integrity: "sha512-x" }],
-  ])("refuses a lockfile entry with %s", (_, path, entry) => {
-    expect(lockProblems(path, entry)).not.toEqual([]);
+  const fromURL = expect.stringMatching(/^comes from /);
+  it.each<[string, string, LockEntry, unknown[]]>([
+    ["another package's tarball", "node_modules/zod", { version: "4.6.7", resolved: OTHER, integrity: "sha512-x" }, [fromURL]],
+    ["a path that steps back to another package", "node_modules/zod", { version: "4.6.7", resolved: `${ZOD}/../../../is-number/-/is-number-7.0.0.tgz`, integrity: "sha512-x" }, [fromURL]],
+    ["an encoded step back", "node_modules/zod", { version: "4.6.7", resolved: `${ZOD}/%2e%2e/../../is-number/-/is-number-7.0.0.tgz`, integrity: "sha512-x" }, [fromURL]],
+    ["another version than the entry says", "node_modules/zod", { version: "4.6.7", resolved: "https://registry.npmjs.org/zod/-/zod-4.0.0.tgz", integrity: "sha512-x" }, [fromURL]],
+    ["another registry", "node_modules/zod", { version: "4.6.7", resolved: "https://registry.example.com/zod/-/zod-4.6.7.tgz", integrity: "sha512-x" }, [fromURL]],
+    ["another scope", "node_modules/@types/react", { version: "19.0.0", resolved: "https://registry.npmjs.org/@evil/react/-/react-19.0.0.tgz", integrity: "sha512-x" }, [fromURL]],
+    ["an alias", "node_modules/zod", { version: "4.6.7", name: "is-number", resolved: ZOD, integrity: "sha512-x" }, ["is an alias for is-number"]],
+    ["a link", "node_modules/zod", { version: "4.6.7", link: true, resolved: ZOD, integrity: "sha512-x" }, ["is a link"]],
+    ["no integrity hash", "node_modules/zod", { version: "4.6.7", resolved: ZOD }, ["has no integrity hash"]],
+    ["a bundled mark at the top level", "node_modules/zod", { version: "4.6.7", inBundle: true }, ["is bundled but not inside another package"]],
+    ["a bundled entry's own tarball", "node_modules/next/node_modules/zod", { version: "4.6.7", inBundle: true, resolved: OTHER, integrity: "sha512-x" }, ["is bundled but has its own resolved, integrity"]],
+  ])("refuses a lockfile entry with %s, for that reason alone", (_, path, entry, problems) => {
+    expect(lockProblems(path, entry)).toEqual(problems);
   });
 
-  it("accepts a lockfile entry for the package and version its path names, scoped or nested", () => {
+  it("refuses the reviewer's bundled swap of zod", () => {
+    expect(lockProblems("node_modules/zod", { version: "4.6.7", inBundle: true, resolved: OTHER, integrity: "sha512-x" })).toEqual([
+      "is bundled but not inside another package",
+      "is bundled but has its own resolved, integrity",
+    ]);
+  });
+
+  it("accepts a lockfile entry for the package and version its path names, scoped, nested or bundled", () => {
     expect(lockProblems("node_modules/zod", { version: "4.6.7", resolved: ZOD, integrity: "sha512-x" })).toEqual([]);
+    expect(lockProblems("node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/tslib", { version: "2.8.1", inBundle: true })).toEqual([]);
     expect(
       lockProblems("node_modules/drizzle-kit/node_modules/@esbuild/linux-x64", {
         version: "0.25.12",
