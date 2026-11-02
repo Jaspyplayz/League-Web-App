@@ -40,8 +40,8 @@ const dialect = new PgDialect();
 const tableName = (table: unknown) => (table === tables.askSpend ? "ask_spend" : "ask_questions");
 const rowsOf = (table: unknown) => (table === tables.askSpend ? spend : questions);
 // The values a filter compares against, like the id in `where id = $1`.
-const paramsOf = (filter: SQL) => dialect.sqlToQuery(filter).params;
-const sqlOf = (filter: SQL) => dialect.sqlToQuery(filter).sql;
+const paramsOf = (query: SQL) => dialect.sqlToQuery(query).params;
+const sqlOf = (query: SQL) => dialect.sqlToQuery(query).sql;
 
 function fake(prefix: string) {
   return {
@@ -201,7 +201,7 @@ describe("ask", () => {
     });
   });
 
-  it("counts this account's last 24 hours and adds up its month and the whole site's month", async () => {
+  it("asks Postgres to count this account's last 24 hours and add up its month and the whole site's", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-21T12:00:00Z"));
     claudeReturns({ answer: "You die early.", costMicros: 120_000 });
@@ -312,9 +312,6 @@ describe("ask", () => {
   });
 
   it("still counts the question when something fails after it was saved", async () => {
-    // The 10th question today, so none are left after it. This also pins
-    // QUESTIONS_PER_DAY at 10: at 11 one would be left, and at 9 or fewer
-    // the question would be turned away before it was saved.
     used.askedToday = 9;
     vi.mocked(answerQuestion).mockRejectedValue(new Error("database blip"));
 

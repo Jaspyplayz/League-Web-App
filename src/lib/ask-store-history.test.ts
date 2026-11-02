@@ -9,17 +9,21 @@ vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/ask", () => ({ answerQuestion: vi.fn(), ASK_MODEL: "claude-sonnet-5-5" }));
 
 // The query chain readQuestions runs, ending in `limit`, which answers with
-// the rows or throws. `where` keeps the filter it was given. ask-store.test.ts
-// covers asking; this file covers reading the history back.
+// the rows or throws. `where` and `orderBy` keep what they were given.
+// ask-store.test.ts covers asking; this file covers reading the history back.
 const limit = vi.fn();
 let filter: SQL | undefined;
+let order: SQL | undefined;
 const chain = {
   from: () => chain,
   where: (condition: SQL) => {
     filter = condition;
     return chain;
   },
-  orderBy: () => chain,
+  orderBy: (ordering: SQL) => {
+    order = ordering;
+    return chain;
+  },
   limit,
 };
 let db: { select: () => typeof chain } | null;
@@ -31,6 +35,7 @@ beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "postgres://test");
   db = { select: () => chain };
   filter = undefined;
+  order = undefined;
   limit.mockReset();
   vi.mocked(Sentry.captureException).mockClear();
 });
@@ -55,6 +60,15 @@ describe("readQuestions", () => {
       '("ask_questions"."user_id" = $1 and "ask_questions"."puuid" = $2 and "ask_questions"."answer" is not null)',
     );
     expect(query.params).toEqual(["user-1", "player-1"]);
+  });
+
+  // Read oldest first, a player past 10 questions would only ever see their
+  // first 10 answers, and a new one would be gone on reload.
+  it("reads the 10 newest first", async () => {
+    limit.mockResolvedValue([]);
+    await readQuestions("user-1", "player-1");
+    expect(new PgDialect().sqlToQuery(order!).sql).toBe('"ask_questions"."created_at" desc');
+    expect(limit).toHaveBeenCalledWith(10);
   });
 
   it("returns no questions when none were asked", async () => {

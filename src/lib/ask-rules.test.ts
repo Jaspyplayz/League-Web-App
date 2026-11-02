@@ -52,10 +52,9 @@ describe("costMicros", () => {
     ).toBe(50_000);
   });
 
-  // Anthropic can hand a declined question to Opus (see src/lib/ask.ts).
   it("prices Opus", () => {
-    // The same tokens at $4, $20, $0.20 and $5 per million: 4 cents of
-    // input, 2 of output, 1 of cache reads and 2 of cache writes.
+    // The same tokens at Opus 5.5's $4, $20, $0.20 and $5 per million: 4
+    // cents of input, 2 of output, 1 of cache reads and 2 of cache writes.
     expect(
       costMicros("claude-opus-5-5", {
         input_tokens: 10_000,
@@ -67,15 +66,16 @@ describe("costMicros", () => {
   });
 
   // One kind of token at a time, so an unknown model's price left low for
-  // one kind can't hide behind the others.
+  // one kind can't hide behind the others. The price list isn't exported, so
+  // a row added to it needs adding here too.
   it.each([
     ["input", { input_tokens: 1_000_000, output_tokens: 0 }],
     ["output", { input_tokens: 0, output_tokens: 1_000_000 }],
     ["cache write", { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 1_000_000 }],
     ["cache read", { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 1_000_000 }],
-  ])("prices an unknown model's %s at least as high as the dearest known one", (_, usage) => {
+  ])("prices an unknown model's %s at least as high as Sonnet's and Opus's", (_, usage) => {
     for (const known of ["claude-sonnet-5-5", "claude-opus-5-5"]) {
-      expect(costMicros("some-new-model", usage)).toBeGreaterThanOrEqual(costMicros(known, usage));
+      expect(costMicros("some-new-model", usage), known).toBeGreaterThanOrEqual(costMicros(known, usage));
     }
   });
 });
@@ -92,14 +92,15 @@ describe("allowance", () => {
   const none = { askedToday: 0, accountSpent: 0, siteSpent: 0 };
   const dollars = (usd: number) => usd * 1_000_000;
 
-  it("counts down the day's questions", () => {
-    expect(allowance(none)).toEqual({ ok: true, left: QUESTIONS_PER_DAY });
-    expect(allowance({ ...none, askedToday: QUESTIONS_PER_DAY - 1 })).toEqual({ ok: true, left: 1 });
-    expect(allowance({ ...none, askedToday: QUESTIONS_PER_DAY }).ok).toBe(false);
+  // The three caps are written out in these tests, not read from
+  // ask-rules.ts, so changing what Jasper picked (10 questions a day, $20 a
+  // month for the site, $5 an account) fails a test.
+  it("counts down the day's 10 questions", () => {
+    expect(allowance(none)).toEqual({ ok: true, left: 10 });
+    expect(allowance({ ...none, askedToday: 9 })).toEqual({ ok: true, left: 1 });
+    expect(allowance({ ...none, askedToday: 10 }).ok).toBe(false);
   });
 
-  // The two budgets are written out, not read from ask-rules.ts, so changing
-  // what Jasper picked ($20 for the site, $5 an account) fails a test.
   it("pauses everyone once the month's $20 is spent", () => {
     expect(allowance({ ...none, siteSpent: dollars(20) }).ok).toBe(false);
     expect(allowance({ ...none, siteSpent: dollars(20) - 1 }).ok).toBe(true);
