@@ -23,7 +23,7 @@ import { updateSavedPlayers, useSavedPlayers } from "./saved-players";
 
 // Null for any failure, an answer that isn't the expected shape included, so
 // the box keeps what it has and asks again next time.
-async function fetchDetails(players: SavedPlayer[]): Promise<SavedPlayerDetails | null> {
+export async function fetchDetails(players: SavedPlayer[]): Promise<SavedPlayerDetails | null> {
   try {
     const response = await fetch("/api/saved-players", {
       method: "POST",
