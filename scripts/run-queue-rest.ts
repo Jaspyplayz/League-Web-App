@@ -524,18 +524,15 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   }
 
   // Testing: one ticket starts, and its builder's first push shows whether
-  // Vercel deploys again. While a builder the queue started after the
-  // refusal still runs, however long it takes, nothing else starts, so each
-  // round doesn't start one more test.
+  // Vercel deploys again. While any builder runs, however long it takes,
+  // nothing else starts, so each round doesn't start one more test. Times
+  // can't pick out the test's builder, since its own refused push moves
+  // Vercel's newest refusal past its start comment.
   if (vercel.kind === "testing") {
-    const since = Date.parse(vercel.since);
-    const [test] = running.flatMap(({ id }) => {
-      const started = (snapshot.comments[id] ?? []).find((comment) => isStartComment(comment) && Date.parse(comment.createdAt) > since);
-      return started ? [{ id, at: started.createdAt }] : [];
-    });
-    const keep = test ? [] : start.slice(0, 1);
-    const why = test
-      ? `Vercel refused a deploy at ${utc(vercel.since)}, and ${test.id} started at ${utc(test.at)} as a test, so nothing else starts until a preview deploys.`
+    const [busy] = running;
+    const keep = busy ? [] : start.slice(0, 1);
+    const why = busy
+      ? `Vercel refused a deploy at ${utc(vercel.since)}, and ${busy.id} has a builder running, so nothing else starts until it finishes or a preview deploys.`
       : `Vercel refused a deploy at ${utc(vercel.since)}, so only ${keep[0]} starts this round, as a test, until a preview deploys.`;
     waits.push(...start.slice(keep.length).map((id) => ({ id, why: [why] })));
     start = keep;

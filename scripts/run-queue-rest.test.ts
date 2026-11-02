@@ -896,7 +896,7 @@ describe("Vercel's test mode", () => {
     });
     const plan = planRound(read, new Date("2026-11-02T08:00:00Z"), RUN);
     expect(plan.start).toEqual([]);
-    const why = "Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 started at 2026-11-02 05:30 UTC as a test, so nothing else starts until a preview deploys.";
+    const why = "Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys.";
     expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
       ["JAS-2", [why]],
       ["JAS-3", [why]],
@@ -908,6 +908,49 @@ describe("Vercel's test mode", () => {
     const plan = planRound({ ...testStarted, issues: [...testStarted.issues, issue("JAS-9", { status: "In Progress" })] }, AT_0630, RUN);
     expect(plan.start).toEqual([]);
     expect(plan.waits.map((wait) => wait.id)).toEqual(["JAS-1", "JAS-2", "JAS-3"]);
+  });
+
+  // The test's own push is refused at 07:15, which moves Vercel's newest
+  // refusal past its start comment from 07:05.
+  it("starts no second test when the first test's own push is refused", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1", { status: "In Progress" }), issue("JAS-2")],
+      statuses: [refusal("2026-11-02T06:00:00Z"), refusal("2026-11-02T07:15:00Z")],
+      comments: { "JAS-1": [comment("c1", START_LINE, "2026-11-02T07:05:00.000Z")] },
+    });
+    const plan = planRound(read, new Date("2026-11-02T08:20:00Z"), RUN);
+    expect(plan.vercel).toEqual({ kind: "testing", since: "2026-11-02T07:15:00Z" });
+    expect(plan.start).toEqual([]);
+    expect(plan.waits.map((wait) => wait.why)).toEqual([
+      ["Vercel refused a deploy at 2026-11-02 07:15 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys."],
+    ]);
+  });
+
+  it("starts no test beside a builder someone started by hand", () => {
+    const read = snapshot({ issues: [issue("JAS-1", { status: "In Progress" }), issue("JAS-2")], statuses: [refusal("2026-11-02T05:00:00Z")] });
+    expect(planRound(read, AT_0630, RUN).start).toEqual([]);
+  });
+
+  it("starts the next test once the first test's builder has finished", () => {
+    const read = snapshot({ issues: [issue("JAS-1", { status: "In Review" }), issue("JAS-2")], statuses: [refusal("2026-11-02T05:00:00Z")] });
+    expect(planRound(read, AT_0630, RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-2"]);
+  });
+
+  it("keeps to one builder through a day of refused pushes, however many rounds run", async () => {
+    let now = new Date("2026-11-02T06:00:00Z");
+    const store = linearStore(() => now);
+    const statuses = [refusal(now.toISOString())];
+    const ids = ["JAS-1", "JAS-2", "JAS-3", "JAS-4", "JAS-5", "JAS-6"];
+    for (let round = 1; round <= 96; round++) {
+      now = new Date(now.getTime() + 15 * 60 * 1000);
+      const started = store.fired.length;
+      // Every builder is still working, so its ticket stays In Progress.
+      const issues = ids.map((id) => issue(id, { status: store.fired.includes(id) ? "In Progress" : "Ready" }));
+      await runRound(planRound(store.read(issues, { statuses }), now, RUN), { dryRun: false }, store.effects);
+      // A builder's push comes 10 minutes after it starts, and Vercel refuses it.
+      if (store.fired.length > started) statuses.push(refusal(new Date(now.getTime() + 10 * 60 * 1000).toISOString()));
+    }
+    expect(store.fired).toEqual(["JAS-1"]);
   });
 });
 
