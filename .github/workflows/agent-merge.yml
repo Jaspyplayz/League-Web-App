@@ -13,9 +13,12 @@ run-name: Agent merge ${{ github.event.workflow_run.head_branch || inputs.branch
 #
 # A workflow_run workflow always runs as this file is on main, never a PR's
 # copy, and the job checks out main. The PR's code is never checked out or
-# run here, so no PR can change what this job does with its write token. A run
-# started by name uses the copy on the ref it's started on, so the job's `if`
-# skips every ref but main. Starting one takes write access to the repo.
+# run here, so no PR can change what a run from a check does with its write
+# token. A run started by name is different: GitHub uses the copy on the ref
+# it's started on. The sweep always starts it on main, and the job's `if` skips
+# any other ref. A branch's edited copy could drop that `if`, so what guards
+# this route is who has write access to the repo, as with any workflow a branch
+# adds (docs/adr/0024-a-github-action-runs-can-merge.md).
 on:
   workflow_run:
     # Every named workflow that reports a check on a PR. Vercel's check comes
@@ -52,13 +55,16 @@ jobs:
       startsWith(github.event.workflow_run.head_branch, 'claude/') &&
       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
+    # A run normally takes under two minutes. A hung one would hold its branch's
+    # queue for GitHub's default of six hours, and the sweep couldn't help.
+    timeout-minutes: 10
     # One run per branch at a time, so two checks finishing together, or a
     # check and a run started by name, can't both merge or both comment. A new
     # run never cancels a running one, since it may be mid-merge; a queued one
     # is replaced by the newest, which reads the latest state anyway. This
-    # doesn't stop a cancel from outside: 23 runs on 2026-11-02 were cancelled
-    # with the note "canceled by @Jaspyplayz", cause unknown (JAS-164). So the
-    # sweep starts another run for any PR still marked ready.
+    # doesn't stop a cancel from outside: at least 24 runs on 2026-11-02 were
+    # cancelled with the note "canceled by @Jaspyplayz", cause unknown
+    # (JAS-164). So the sweep starts another run for any PR still marked ready.
     concurrency:
       group: agent-merge-${{ github.event.workflow_run.head_branch || inputs.branch }}
       cancel-in-progress: false

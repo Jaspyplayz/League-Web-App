@@ -160,6 +160,7 @@ export type CanMergeRun = { status: number | null; why: string };
 // can fake GitHub. startMainCi throws if GitHub refuses.
 export type MergeEffects = {
   runCanMerge: (attempt: number) => CanMergeRun;
+  hasConflict: () => boolean;
   isMerged: () => boolean;
   waitBeforeRetry: () => void;
   startMainCi: () => void;
@@ -172,6 +173,14 @@ export type MergeEffects = {
 // so Jasper sees it: two crashes, a step after the merge failing, or GitHub
 // refusing to start CI.
 export function mergePull(number: number, effects: MergeEffects): { failed: boolean } {
+  // GitHub refuses to merge a PR with a conflict, so can-merge would crash on
+  // the merge and turn the run red, and the sweep would repeat that every 15
+  // minutes. Nothing here can fix it, so it's a refusal like any other.
+  if (effects.hasConflict()) {
+    effects.summary(`#${number}: not merged, since it has a merge conflict. Merge main into its branch, then name the new head on the Ready line.`);
+    effects.log(`::notice title=Not merged::#${number} has a merge conflict.`);
+    return { failed: false };
+  }
   let crash = ""; // why the last try crashed, if one did
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     const run = effects.runCanMerge(attempt);

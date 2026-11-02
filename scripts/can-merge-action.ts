@@ -40,6 +40,17 @@ function isMerged(number: number): boolean {
   }
 }
 
+// Whether GitHub says the PR has a merge conflict. It answers null while it's
+// still working that out, and then can-merge goes ahead as usual. If GitHub
+// can't say, assume not.
+function hasConflict(number: number): boolean {
+  try {
+    return (api(`repos/${repository}/pulls/${number}`) as { mergeable?: unknown }).mergeable === false;
+  } catch {
+    return false;
+  }
+}
+
 const event = AgentMergeEvent.parse(JSON.parse(readFileSync(eventPath, "utf8")));
 const target = branchToTry(event, repository);
 if ("skip" in target) {
@@ -65,6 +76,7 @@ for (const number of ready) {
       const result = spawnSync("npx", ["tsx", "scripts/can-merge.ts", String(number), "--merge"], { stdio: "inherit" });
       return { status: result.status, why: result.error ? result.error.message : `exit ${result.status ?? result.signal}` };
     },
+    hasConflict: () => hasConflict(number),
     isMerged: () => isMerged(number),
     waitBeforeRetry: () => execFileSync("sleep", ["30"]),
     startMainCi: () => execFileSync("gh", mainCiDispatchArgs(repository), { encoding: "utf8" }),
