@@ -332,7 +332,11 @@ describe("answerQuestion's time limit", () => {
     expect(await answerAfter(120)).toMatchObject({ answer: "You die early in most losses.", costMicros: 3 * round });
   });
 
-  it("doesn't start a round with under 20 seconds left", async () => {
+  // The second round started with 70 s left, so it could still ask for
+  // games, and its reply came back with 19 s left, too late to read them.
+  // The question is charged for both rounds with no answer: a gap decision
+  // record 0030 keeps.
+  it("doesn't start a round with under 20 seconds left, even after a request for games", async () => {
     create.mockImplementationOnce(after(50, askForGames)).mockImplementationOnce(after(51, askForGames));
 
     const result = await answerAfter(120);

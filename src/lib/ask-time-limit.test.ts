@@ -42,7 +42,8 @@ beforeEach(() => {
   );
   // The shared rate limit is full. Each check takes a second (the store gives
   // up on the database after that) and says to wait a second, twice, before
-  // it lets the request go: two seconds of waiting, the client's cap today.
+  // it lets the request go: two seconds of waiting, which assumes the
+  // client's cap on waiting (MAX_WAIT_MS) is at least that.
   let check = 0;
   vi.mocked(waitTimeFor).mockImplementation(
     () => new Promise((resolve) => setTimeout(() => resolve([1000, 1000, 0][check++ % 3]), 1000)),
@@ -58,15 +59,17 @@ afterEach(() => {
 
 it("leaves room in the match page's maxDuration for the slowest Riot lookup, and saving", async () => {
   const start = Date.now();
-  const lookup = getAccount("na", { gameName: "Jaspy", tagLine: "CA1" }).catch(() => "failed");
+  const lookup = getAccount("na", { gameName: "Jaspy", tagLine: "CA1" }).catch((error: unknown) => error);
   await vi.runAllTimersAsync();
-  expect(await lookup).toBe("failed");
+  // It failed the way a Riot that never answers makes it fail, after really
+  // sending requests, rather than stopping early at the rate limit.
+  expect(await lookup).toMatchObject({ kind: "unavailable" });
+  expect(fetch).toHaveBeenCalled();
   const lookupMs = Date.now() - start;
-  // Every try the client makes really ran.
-  expect(fetch).toHaveBeenCalledTimes(3);
 
   const page = readFileSync("src/app/player/[region]/[riotId]/match/[matchId]/page.tsx", "utf8");
   const maxDuration = Number(/export const maxDuration = (\d+);/.exec(page)?.[1]) * 1000;
+  expect(maxDuration, "the match page's maxDuration, as a number").toBeGreaterThan(0);
   // The rest is for the sign-in check before, and reserve() and settle()
   // in src/lib/ask-store.ts, each a short database call.
   expect(maxDuration - lookupMs - ASK_TIME_LIMIT_MS).toBeGreaterThanOrEqual(15_000);

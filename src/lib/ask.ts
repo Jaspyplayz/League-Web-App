@@ -128,9 +128,7 @@ export async function answerQuestion(
   question: string,
 ): Promise<AskResult> {
   // No retries from the SDK: sendRound makes the second try itself. tryOnce
-  // stops each try; the client's timeout is only a backstop, and without one
-  // the SDK would refuse, before sending, any request it guesses could take
-  // over 10 minutes.
+  // stops each try, so the client's timeout is only a backstop.
   const client = new Anthropic({ maxRetries: 0, timeout: TRY_TIMEOUT_MS });
   const deadline = Date.now() + ASK_TIME_LIMIT_MS;
   const timeLeft = () => deadline - Date.now();
@@ -151,9 +149,11 @@ export async function answerQuestion(
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     if (timeLeft() < MIN_TRY_MS) return outOfTime();
-    // A round with less than a full try's time left is the last one too: if
-    // Claude asked for more games then, there'd be no time to send it what
-    // they say, and the question would be paid for with no answer.
+    // A round with less than a full try's time left is the last one too, so
+    // Claude answers with what it has instead of asking for games there'd be
+    // no time to read. A round started with a little more time can still ask
+    // for games and run out of time before reading them (decision record
+    // 0030); the question is then charged with no answer.
     const lastRound = round === MAX_ROUNDS || timeLeft() < TRY_TIMEOUT_MS;
     const sent = await sendRound(client, timeLeft, {
       model: ASK_MODEL,

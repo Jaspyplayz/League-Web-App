@@ -23,7 +23,7 @@ The other 60 seconds of the page's 180 are for what runs outside `answerQuestion
 ## Consequences
 
 Good:
-- A question that ends normally or at the limit saves at least what its rounds may have been billed, so the caps hold as 0005 describes, to within the last question let in.
+- A question that ends normally or at the limit saves what its rounds cost, plus 0005's 50-cent estimate once for each round with a try that may have been billed, so the caps hold as 0005 describes, to within the last question let in. The estimate is once per round, so a round whose two tries were both cut off still adds 50 cents, not a dollar.
 - A question that runs long ends with "Couldn't finish answering. Try again in a moment." instead of a request Vercel stopped.
 
 Bad:
@@ -31,8 +31,9 @@ Bad:
 - A try cut off at the limit adds 50 cents, even if it really cost less. That errs on the safe side.
 - A round started with under a minute left can't reuse the cached conversation, because changing which tools Claude may use drops the cached messages. It pays the cache-write price for them instead of the cache-read price: about 9 cents more on a 40,000-token conversation, which `costMicros` counts. Before, only the 8th round paid that.
 - A long question's answer rests on the games Claude read in about its first minute, so a question about a pattern may read fewer games than it would have.
+- The last-round rule doesn't cover every case. A round started with 60 to 80 seconds left can still ask for games, and if its reply comes back with under 20 seconds left, or the games take too long, the question ends with no answer and is charged for its rounds. Keeping room for one answering round after every round that may ask for games would need a second, earlier limit for those rounds, and that was left for later.
 - The limit counts from when `answerQuestion` starts, not from when the request did. The test measures the Riot lookup, but the 15 seconds for the sign-in check, `reserve()` and `settle()` is a judgement: none of them has a timeout of its own. Passing the request's start time in would need `ask-store.ts` and `askAction` to change.
-- The 40.25 seconds assumes the rate-limit checks are few. `waitForTurn` in the Riot client caps how long it sleeps, not how many times it checks, and each check can take up to a second, so with a slow database and many short waits a lookup can run longer: the reviewer measured 94 seconds. Then Vercel can still stop the request before `settle()`. That needs Riot not answering, the rate limit full and the database slow at once.
+- The 40.25 seconds assumes the rate-limit checks are few. `waitForTurn` in the Riot client caps how long it sleeps, not how many times it checks, and each check can take up to a second, so with a slow database and many short waits a lookup can run longer: 20 checks of just under a second, each asking for a 100-millisecond wait, took 94 seconds on the test's pretend clock. Then Vercel can still stop the request before `settle()`. That needs Riot not answering, the rate limit full and the database slow at once.
 - A crash, a deploy, or a `settle()` that fails still leaves the 50-cent estimate in place.
 - `ask-store.ts` reports every question that runs out of time to Sentry as an error, like any other failed question.
 - The 120 seconds and the page's 180 are kept in step by the test rather than by sharing one constant: Next.js reads `maxDuration` from the page file's own text when it builds (`extractExportedConstValue`), so it has to be a number written there.
