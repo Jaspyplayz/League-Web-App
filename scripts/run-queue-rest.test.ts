@@ -227,6 +227,21 @@ describe("the saved answers from 2026-11-02", () => {
     ]);
   });
 
+  it("leave out a stranger's PR from a fork, even on a builder's branch name", async () => {
+    const fork = { number: 999, body: "**Ready to merge:** no", head: { ref: "claude/jas-901-x", sha: "f".repeat(40), repo: { full_name: "stranger/League-Web-App" } } };
+    const deletedFork = { ...fork, number: 998, head: { ...fork.head, repo: null } };
+    const github = (path: string): unknown => {
+      if (path === `repos/${REPO}/pulls?state=open&per_page=100`) return [[...(saved("pulls-open.json") as unknown[]), fork, deletedFork]];
+      if (/\/pulls\/99[89]\/files/.test(path)) return [[{ filename: "src/JAS-901.ts" }]];
+      if (path.includes(fork.head.sha)) return [{ statuses: [] }];
+      return savedGitHub(path);
+    };
+    const queue = (saved("linear-queue.json") as { data: { issues: { nodes: unknown[] } } }).data.issues.nodes;
+    const read = await readSnapshot(REPO, fakeLinear([...queue, issue("JAS-901", { status: "In Review" })]).call, github);
+    expect(read.pulls.map((pull) => pull.number)).toEqual([295, 294, 293, 291, 287, 283, 276]);
+    expect(runningTickets(read, AT_0630).map((ticket) => ticket.id)).not.toContain("JAS-901");
+  });
+
   it("give a dry run at 06:30 that starts nothing and says why", async () => {
     const plan = planRound(await todaysSnapshot(), AT_0630, RUN);
     expect(plan.start).toEqual([]);

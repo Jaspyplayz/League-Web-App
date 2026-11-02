@@ -172,7 +172,14 @@ export async function readSnapshot(repo: string, linear: LinearCall, github: Git
   const ready = teams.nodes.flatMap((team) => team.states.nodes).filter((state) => state.name === "Ready");
   if (teams.nodes.length !== 1 || ready.length !== 1) throw new Error("Linear should have one team JAS with one Ready status.");
 
-  const pulls = z.array(OpenPulls).parse(github(`repos/${repo}/pulls?state=open&per_page=100`)).flat();
+  // Anyone can open a PR from a fork on a claude/jas-<n>- branch, which could
+  // mark a ticket running or hold files and stall the queue, so only this
+  // repo's own branches count, as in can-merge's pullsOnBranch.
+  const pulls = z
+    .array(OpenPulls)
+    .parse(github(`repos/${repo}/pulls?state=open&per_page=100`))
+    .flat()
+    .filter((pull) => pull.head.repo?.full_name === repo);
   const files: Record<number, PullFile[]> = {};
   for (const pull of pulls) {
     files[pull.number] = z.array(z.array(PullFile)).parse(github(`repos/${repo}/pulls/${pull.number}/files?per_page=100`)).flat();
