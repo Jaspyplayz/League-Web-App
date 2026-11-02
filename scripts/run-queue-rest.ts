@@ -748,6 +748,19 @@ export function fireRequest(taskId: string, ticketId: string): { url: string; he
   };
 }
 
+/**
+ * What a dry run gets in place of the Linear writes and the fire: each one
+ * throws. runRound already skips them in a dry run, so this is a second
+ * guard: a mistake there stops the run instead of changing Linear or
+ * starting a builder.
+ */
+export function dryRunEffects(): Pick<Effects, "promote" | "createComment" | "updateComment" | "fire"> {
+  const refuse = async (): Promise<never> => {
+    throw new Error("A dry run tried to change Linear or start a builder, so the queue stopped.");
+  };
+  return { promote: refuse, createComment: refuse, updateComment: refuse, fire: refuse };
+}
+
 /** The round's writes to Linear. Each throws unless Linear says it worked. */
 export function linearWrites(linear: LinearCall, readyStateId: string): Pick<Effects, "promote" | "createComment" | "updateComment"> {
   return {

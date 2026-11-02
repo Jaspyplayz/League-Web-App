@@ -6,7 +6,7 @@
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import { fireAnswer, fireRequest, linearWrites, oneLine, planRound, readSnapshot, runRound, type FireAnswer } from "./run-queue-rest";
+import { dryRunEffects, fireAnswer, fireRequest, linearWrites, oneLine, planRound, readSnapshot, runRound, type FireAnswer } from "./run-queue-rest";
 
 // Prints which setting is missing, never a value.
 function required(name: string): string {
@@ -97,12 +97,8 @@ async function main() {
   console.log(`Woken by ${oneLine(eventName ?? "a person, outside GitHub Actions", 40)}.`);
   const snapshot = await readSnapshot(repo, linear, github);
   const plan = planRound(snapshot, new Date(), runUrl, { byName: eventName === "workflow_dispatch" });
-  const { failed } = await runRound(plan, { dryRun }, {
-    ...linearWrites(linear, snapshot.readyStateId),
-    fire,
-    log: (line) => console.log(line),
-    summary,
-  });
+  const writes = dryRun ? dryRunEffects() : { ...linearWrites(linear, snapshot.readyStateId), fire };
+  const { failed } = await runRound(plan, { dryRun }, { ...writes, log: (line) => console.log(line), summary });
   if (failed) process.exit(1);
 }
 

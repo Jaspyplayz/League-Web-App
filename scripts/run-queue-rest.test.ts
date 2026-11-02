@@ -12,6 +12,7 @@ import {
   ISSUES_QUERY,
   LinearIssue,
   linearWrites,
+  dryRunEffects,
   planRound,
   QUEUE_QUERY,
   readSnapshot,
@@ -135,18 +136,16 @@ function recorder(fire: (id: string) => FireAnswer = (id) => ({ kind: "started",
 }
 
 // Effects for a dry run: anything but a log or summary line fails the test.
-// `lines` has both, in order; `summaryLines` only what reaches the run's page.
+// `summaryLines` holds only what reaches the run's page.
 function dryEffects() {
-  const lines: string[] = [];
   const summaryLines: string[] = [];
   const refuse = (): never => {
     throw new Error("a dry run reached Linear or the cloud task");
   };
-  const effects: Effects = { promote: refuse, createComment: refuse, updateComment: refuse, fire: refuse, log: (line) => lines.push(line), summary: (line) => {
-    lines.push(line);
+  const effects: Effects = { promote: refuse, createComment: refuse, updateComment: refuse, fire: refuse, log: () => {}, summary: (line) => {
     summaryLines.push(line);
   } };
-  return { effects, lines, summaryLines };
+  return { effects, summaryLines };
 }
 
 // Effects that keep each ticket's comments the way Linear does, so a test
@@ -640,6 +639,22 @@ describe("In Review", () => {
 });
 
 describe("a dry run", () => {
+  it("says it would move a written-up blocker to Ready, and writes nothing", async () => {
+    const read = snapshot({ issues: [issue("JAS-1", { blockedBy: ["JAS-9"] }), issue("JAS-9", { status: "Todo" })] });
+    const { effects, summaryLines } = dryEffects();
+    expect(await runRound(planRound(read, AT_0630, RUN), { dryRun: true }, effects)).toEqual({ failed: false });
+    expect(summaryLines).toContain("Would move JAS-9 to Ready and rate it High, with a comment.");
+  });
+
+  it("gets writes and a fire that throw, so a mistake can't change Linear or start a builder", async () => {
+    const writes = dryRunEffects();
+    const refused = "A dry run tried to change Linear or start a builder, so the queue stopped.";
+    await expect(writes.promote("uuid-JAS-9", 2, true)).rejects.toThrow(refused);
+    await expect(writes.createComment("uuid-JAS-9", "x")).rejects.toThrow(refused);
+    await expect(writes.updateComment("c1", "x")).rejects.toThrow(refused);
+    await expect(writes.fire("JAS-9")).rejects.toThrow(refused);
+  });
+
   it("says what it would start and why each other ticket waits, and touches nothing", async () => {
     const read = snapshot({ issues: [issue("JAS-1"), issue("JAS-2", { priority: 0 })] });
     const { effects, summaryLines } = dryEffects();
@@ -1047,6 +1062,11 @@ describe(".github/workflows/run-queue.yml", () => {
 describe("scripts/run-queue.ts", () => {
   const code = source("scripts/run-queue.ts");
   const lines = code.split("\n");
+
+  it("hands a dry run writes and a fire that throw, not Linear's or the cloud task's", () => {
+    expect(code).toContain("const writes = dryRun ? dryRunEffects() : { ...linearWrites(linear, snapshot.readyStateId), fire };");
+    expect(code.match(/linearWrites\(/g)).toHaveLength(1);
+  });
 
   it("reads the task token and the Linear key in one place each, and sends each only in its Authorization header", () => {
     expect(code.match(/RUN_QUEUE_TASK_TOKEN/g)).toHaveLength(1);
