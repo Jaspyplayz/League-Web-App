@@ -52,11 +52,31 @@ describe("costMicros", () => {
     ).toBe(50_000);
   });
 
-  it("prices an unknown model at least as high as the dearest known one", () => {
-    const usage = { input_tokens: 1_000, output_tokens: 1_000 };
-    expect(costMicros("some-new-model", usage)).toBeGreaterThan(
-      costMicros("claude-opus-5-5", usage),
-    );
+  it("prices Opus", () => {
+    // The same tokens at Opus 5.5's $4, $20, $0.20 and $5 per million: 4
+    // cents of input, 2 of output, 1 of cache reads and 2 of cache writes.
+    expect(
+      costMicros("claude-opus-5-5", {
+        input_tokens: 10_000,
+        output_tokens: 1_000,
+        cache_read_input_tokens: 50_000,
+        cache_creation_input_tokens: 4_000,
+      }),
+    ).toBe(90_000);
+  });
+
+  // One kind of token at a time, so an unknown model's price left low for
+  // one kind can't hide behind the others. The price list isn't exported, so
+  // a row added to it needs adding here too.
+  it.each([
+    ["input", { input_tokens: 1_000_000, output_tokens: 0 }],
+    ["output", { input_tokens: 0, output_tokens: 1_000_000 }],
+    ["cache write", { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 1_000_000 }],
+    ["cache read", { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 1_000_000 }],
+  ])("prices an unknown model's %s at least as high as Sonnet's and Opus's", (_, usage) => {
+    for (const known of ["claude-sonnet-5-5", "claude-opus-5-5"]) {
+      expect(costMicros("some-new-model", usage), known).toBeGreaterThanOrEqual(costMicros(known, usage));
+    }
   });
 });
 
@@ -72,26 +92,27 @@ describe("allowance", () => {
   const none = { askedToday: 0, accountSpent: 0, siteSpent: 0 };
   const dollars = (usd: number) => usd * 1_000_000;
 
-  it("counts down the day's questions", () => {
-    expect(allowance(none)).toEqual({ ok: true, left: QUESTIONS_PER_DAY });
-    expect(allowance({ ...none, askedToday: QUESTIONS_PER_DAY - 1 })).toEqual({ ok: true, left: 1 });
-    expect(allowance({ ...none, askedToday: QUESTIONS_PER_DAY }).ok).toBe(false);
+  // The three caps are written out in these tests, not read from
+  // ask-rules.ts, so changing what Jasper picked (10 questions a day, $20 a
+  // month for the site, $5 an account) fails a test.
+  it("counts down the day's 10 questions", () => {
+    expect(allowance(none)).toEqual({ ok: true, left: 10 });
+    expect(allowance({ ...none, askedToday: 9 })).toEqual({ ok: true, left: 1 });
+    expect(allowance({ ...none, askedToday: 10 }).ok).toBe(false);
   });
 
-  it("pauses everyone once the month's budget is spent", () => {
-    expect(allowance({ ...none, siteSpent: dollars(MONTHLY_BUDGET_USD) }).ok).toBe(false);
-    expect(allowance({ ...none, siteSpent: dollars(MONTHLY_BUDGET_USD) - 1 }).ok).toBe(true);
+  it("pauses everyone once the month's $20 is spent", () => {
+    expect(allowance({ ...none, siteSpent: dollars(20) }).ok).toBe(false);
+    expect(allowance({ ...none, siteSpent: dollars(20) - 1 }).ok).toBe(true);
   });
 
-  it("stops one account once it has spent its share of the month", () => {
-    const spent = allowance({ ...none, accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD) });
+  it("stops one account once it has spent its $5 share of the month", () => {
+    const spent = allowance({ ...none, accountSpent: dollars(5) });
     expect(spent).toEqual({
       ok: false,
       message: "You've used your Ask allowance for this month. It resets on the 1st.",
     });
-    expect(allowance({ ...none, accountSpent: dollars(ACCOUNT_MONTHLY_BUDGET_USD) - 1 }).ok).toBe(
-      true,
-    );
+    expect(allowance({ ...none, accountSpent: dollars(5) - 1 }).ok).toBe(true);
   });
 
   it("leaves room for other accounts after one reaches its share", () => {

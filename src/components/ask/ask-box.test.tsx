@@ -11,7 +11,7 @@ const props = {
   playerPath: "/player/na/Jaspy-CA1",
   allowance: { ok: true, left: 5 } as const,
 };
-const asked: AskedQuestion = { id: "q1", question: "Why do I lose?", answer: "You die early.", games: [], askedAt: new Date() };
+const asked: AskedQuestion = { id: "q1", question: "Why do I lose?", answer: "You die early.", games: [] };
 
 describe("AskBox", () => {
   it("lists past questions", () => {

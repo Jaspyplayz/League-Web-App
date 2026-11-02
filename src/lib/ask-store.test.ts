@@ -22,14 +22,17 @@ vi.mock("@/lib/ask", () => ({ answerQuestion: vi.fn(), ASK_MODEL: "claude-sonnet
 // a different one, shows up.
 // `used` is what the limit checks read; the two arrays are the rows saved in
 // ask_questions and ask_spend; `steps` records the order things happen in;
-// `reads` which table each limit check read, its filter's SQL and the values
-// that filter compared against; `locks` the SQL each lock ran.
+// `reads` which table each limit check read, the SQL of what it asked
+// Postgres to count or add up, its filter's SQL and the values that filter
+// compared against; `locks` the SQL each lock ran.
+// The fake answers each check with the totals in `used` whatever it asked
+// for, so `fields` is what shows the code adds up the right column.
 type Row = Record<string, unknown>;
 let used: { askedToday: number; accountSpent: number; siteSpent: number };
 let questions: Row[];
 let spend: Row[];
 let steps: string[];
-let reads: { table: string; counts: boolean; sql: string; params: unknown[] }[];
+let reads: { table: string; fields: Record<string, string>; sql: string; params: unknown[] }[];
 let locks: string[];
 let transactions: number;
 
@@ -37,8 +40,8 @@ const dialect = new PgDialect();
 const tableName = (table: unknown) => (table === tables.askSpend ? "ask_spend" : "ask_questions");
 const rowsOf = (table: unknown) => (table === tables.askSpend ? spend : questions);
 // The values a filter compares against, like the id in `where id = $1`.
-const paramsOf = (filter: SQL) => dialect.sqlToQuery(filter).params;
-const sqlOf = (filter: SQL) => dialect.sqlToQuery(filter).sql;
+const paramsOf = (query: SQL) => dialect.sqlToQuery(query).params;
+const sqlOf = (query: SQL) => dialect.sqlToQuery(query).sql;
 
 function fake(prefix: string) {
   return {
@@ -48,13 +51,13 @@ function fake(prefix: string) {
       steps.push(`${prefix}lock`);
       locks.push(sqlOf(query));
     },
-    select: (fields: Row) => ({
+    select: (fields: Record<string, SQL>) => ({
       from: (table: unknown) => ({
         where: async (filter: SQL) => {
           steps.push(`${prefix}check`);
           reads.push({
             table: tableName(table),
-            counts: "n" in fields,
+            fields: Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, sqlOf(field)])),
             sql: sqlOf(filter),
             params: paramsOf(filter),
           });
@@ -71,7 +74,7 @@ function fake(prefix: string) {
           steps.push(`${prefix}save`);
           // Each table numbers its own ids, so mixing up the two rows shows.
           const id = `${tableName(table)}-${rowsOf(table).length + 1}`;
-          const saved = { ...row, id, askedAt: new Date() };
+          const saved = { ...row, id };
           rowsOf(table).push(saved);
           return [saved];
         },
@@ -198,7 +201,7 @@ describe("ask", () => {
     });
   });
 
-  it("counts this account's last 24 hours, its month, and the whole site's month", async () => {
+  it("asks Postgres to count this account's last 24 hours and add up its month and the whole site's", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-21T12:00:00Z"));
     claudeReturns({ answer: "You die early.", costMicros: 120_000 });
@@ -213,17 +216,22 @@ describe("ask", () => {
       '("ask_questions"."user_id" = $1 and "ask_questions"."created_at" >= $2)';
     expect(reads).toEqual(
       expect.arrayContaining([
-        { table: "ask_questions", counts: true, sql: sinceForAccount, params: ["user-1", dayAgo] },
         {
           table: "ask_questions",
-          counts: false,
+          fields: { n: "count(*)" },
+          sql: sinceForAccount,
+          params: ["user-1", dayAgo],
+        },
+        {
+          table: "ask_questions",
+          fields: { spent: 'sum("ask_questions"."cost_micros")' },
           sql: sinceForAccount,
           params: ["user-1", monthStart],
         },
         // The site's total is everyone's, so it isn't filtered by account.
         {
           table: "ask_spend",
-          counts: false,
+          fields: { spent: 'sum("ask_spend"."cost_micros")' },
           sql: '"ask_spend"."created_at" >= $1',
           params: [monthStart],
         },

@@ -38,7 +38,6 @@ export type AskedQuestion = {
   question: string;
   answer: string;
   games: AskGame[];
-  askedAt: Date;
 };
 
 // One account's answered questions about one player, newest first. A failed
@@ -54,7 +53,6 @@ export async function readQuestions(userId: string, puuid: string): Promise<Read
         question: tables.askQuestions.question,
         answer: tables.askQuestions.answer,
         games: tables.askQuestions.games,
-        askedAt: tables.askQuestions.createdAt,
       })
       .from(tables.askQuestions)
       .where(
@@ -118,7 +116,6 @@ export type AskOutcome =
 type Hold = {
   questionId: string;
   spendId: string;
-  askedAt: Date;
   used: UsedSoFar;
   left: number;
 };
@@ -179,7 +176,6 @@ export async function ask(
         question,
         answer: result.answer,
         games: result.games,
-        askedAt: hold.askedAt,
       },
       left,
     };
@@ -228,7 +224,7 @@ async function reserve(
         model: ASK_MODEL,
         costMicros: HOLD_MICROS,
       })
-      .returning({ id: tables.askQuestions.id, askedAt: tables.askQuestions.createdAt });
+      .returning({ id: tables.askQuestions.id });
     const [spend] = await tx
       .insert(tables.askSpend)
       .values({ costMicros: HOLD_MICROS })
@@ -238,7 +234,6 @@ async function reserve(
       hold: {
         questionId: row.id,
         spendId: spend.id,
-        askedAt: row.askedAt,
         used,
         left: allowed.left,
       },
