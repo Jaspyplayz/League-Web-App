@@ -88,6 +88,9 @@ function lockProblems(path: string, entry: LockEntry): string[] {
 // reads text, not YAML, so it also refuses a YAML escape or a quoted line that
 // runs on, either of which could spell write. A trailing comment or a run step
 // that says write is refused too, which only sends that workflow to Jasper.
+// A bare carriage return can end a YAML comment where this reads one line, and
+// so may NEL, LS or PS, so text after one could hide from this test and the
+// secrets test. Those are refused in the raw text, comment lines included.
 function tokenProblems(workflow: string): string[] {
   const code = workflow
     .split("\n")
@@ -97,6 +100,7 @@ function tokenProblems(workflow: string): string[] {
     !/^permissions:/m.test(code) && "doesn't set its token's permissions",
     /\bwrite(-all)?\b/i.test(code) && "asks for write access",
     /\\[xuU]|\\\s*$/m.test(code) && "has a YAML escape or a line that runs on",
+    /\r(?!\n)|[\u0085\u{2028}\u{2029}]/u.test(workflow) && "has a line ending this test can't read",
   ].filter((problem) => problem !== false);
 }
 
@@ -501,12 +505,20 @@ describe("riskyFiles", () => {
     ["a write spelled with a YAML escape", 'permissions:\n  pull-requests: "\\x77rite"\n'],
     ["a write split over a quoted line that runs on", 'permissions:\n  pull-requests: "wr\\\n    ite"\n'],
     ["Write in capitals", "permissions:\n  contents: Write\n"],
+    ["a bare carriage return after a comment", "permissions: {}\njobs:\n  x:\n    # note\r    environment: run-queue\n"],
+    ["a next-line character after a comment", "permissions: {}\n# note\u0085secrets: inherit\n"],
+    ["a line separator after a comment", "permissions: {}\n# note\u2028secrets: inherit\n"],
+    ["a paragraph separator after a comment", "permissions: {}\n# note\u2029secrets: inherit\n"],
   ])("would refuse a workflow with %s", (_, text) => {
     expect(tokenProblems(text)).not.toEqual([]);
   });
 
   it("accepts a workflow that reads only, whatever its comment lines say", () => {
     expect(tokenProblems("# This job never writes; write access stays with Agent merge.\npermissions:\n  contents: read\n  # no write here\n")).toEqual([]);
+  });
+
+  it("accepts a workflow with Windows line endings", () => {
+    expect(tokenProblems("# A comment.\r\npermissions:\r\n  contents: read\r\n")).toEqual([]);
   });
 
   // The two secrets live in the run-queue environment, whose only rule is that a
