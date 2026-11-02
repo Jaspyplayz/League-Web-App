@@ -185,6 +185,7 @@ describe("riskyFiles", () => {
       "e2e/fixtures.ts",
       "e2e/preview-login.ts",
       "e2e/preview-secret.spec.ts",
+      "scripts/preview-login.test.ts",
       "src/app/themes.test.ts",
       "src/app/corners.test.ts",
       "package.json",
