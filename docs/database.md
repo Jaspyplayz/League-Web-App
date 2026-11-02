@@ -8,7 +8,7 @@ Turnpoint caches Riot API data in Supabase Postgres so it never asks Riot for th
 |---|---|---|
 | `players` | searched player (by PUUID), with their latest match IDs | the whole profile after 24 h, or on "Update" (2 min cooldown) |
 | `ranked_entries` | player × ranked queue | with the player's profile |
-| `rank_history` | player × ranked queue × change, a dated copy of the rank | never; a row is added whenever a profile save finds the rank, LP or games played changed ([`src/lib/rank-history.ts`](../src/lib/rank-history.ts)), for the LP graph |
+| `rank_history` | player × ranked queue × change, a dated copy of the rank | never; a row is added whenever a profile save finds the rank, LP or games played changed ([`src/lib/rank-history.ts`](../src/lib/rank-history.ts)), for the LP graph and By day's LP. Both read it only on the server the profile is saved for (`Profile.stored`, [0021](adr/0021-a-profile-belongs-to-its-saved-region.md)), so another server's page shows no LP |
 | `player_seasons` | player × season, every match ID they played that season | with the player's profile, and by the [daily season sync](#the-daily-season-sync); the games fill into `season_games` 10 per visit to the plain profile page (All tab, first 10 games), and into `matches` 10 per visit to the Champions tab |
 | `season_games` | player × game, only the champion, result, K/D/A, CS, mode, start time and length the Season box adds up (about 100 bytes, against about 90 KB for a whole match) | never; filled by the profile and the daily season sync. Games already in `matches` count too, so none is fetched twice. Moved to the new PUUID when the Riot key changes |
 | `matches` | game, with the full match-v5 JSON in `raw` | never |
