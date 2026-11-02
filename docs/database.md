@@ -47,10 +47,27 @@ Use the pooler URLs, not the "Direct connection" one: on the free tier the direc
 
 1. Edit `src/db/schema.ts`.
 2. `npm run db:generate` writes a new SQL file in `drizzle/`. Read it: it's the exact SQL that will run.
-3. `npm run db:migrate` applies any SQL files the database hasn't seen yet (it uses `DATABASE_URL_DIRECT`).
+3. `npm run db:migrate` applies any SQL files the database hasn't seen yet (it uses `DATABASE_URL_DIRECT`). Only Jasper runs it, before merging; Claude Code refuses it ([below](#commands-claude-code-refuses)).
 4. Commit the schema change and the new `drizzle/` files together.
 
 `npm run db:studio` opens a browser view of the tables, handy for checking what got cached.
+
+### Commands Claude Code refuses
+
+The deny rules in [`.claude/settings.json`](../.claude/settings.json) refuse the commands that change the live tables or rewrite players' IDs, which only Jasper runs. They hold in every Claude Code session on this repo, even in bypass mode, and Claude Code shows no approval card for them, so nobody can approve one by accident.
+
+| Rule | What it refuses |
+|---|---|
+| `Bash(*db:migrate*)` | `npm run db:migrate`, and the same script through `node --run`, `pnpm`, `yarn` or `bun` |
+| `Bash(*drizzle-kit*migrate*)` | The same migration however `drizzle-kit` is started: `npx`, `npm exec`, `node_modules/.bin`, or a pinned version like `drizzle-kit@0.31.11` |
+| `Bash(*drizzle-kit*push*)` | `drizzle-kit push`, which changes the live tables to match `schema.ts` directly. It skips the SQL file you read in step 2, can drop columns, and leaves no record in `drizzle/` |
+| `Bash(*remap-puuids*--apply*)` and `Bash(*remap-puuids*--rollback*)` | The two remap steps that write ([below](#when-the-riot-key-changes)), through `npm run` or `npx tsx scripts/remap-puuids.ts` |
+
+Every rule starts with `*`, so it matches its words anywhere in a command, `bash -c "…"` included. Claude Code checks each part of a command split by `&&`, `;` or `|` on its own, so `npx drizzle-kit generate && git push` still runs. It also looks past `NAME=value`, `env` or `timeout` in front of a command, so a `DATABASE_URL_DIRECT` set on the command line is refused too.
+
+The rules catch mistakes and aren't a security boundary. A command that builds the words from pieces gets past them, and so does code that opens the database itself, such as `psql` given the live address. A database tool outside Bash, such as the Supabase connector, isn't covered either. `scripts/deny-rules.test.ts` fails if a `package.json` script that runs `drizzle-kit migrate` or `push` isn't refused, whether it runs it itself, through another script or from a `pre` or `post` hook, so a new script name can't slip past.
+
+The cost is that a Bash command that only mentions the words is refused as well, such as `grep "drizzle-kit push" docs` or `git commit -m "… db:migrate"`. Use the Grep tool, or write the message to a file and run `git commit -F <file>`.
 
 ## Using it from code
 
@@ -135,7 +152,7 @@ npm run benchmarks -- --regions na --tiers gold --players 2 # a quick test
 
 Riot encrypts PUUIDs separately for each app. A refreshed key from the same app keeps every PUUID, but a key from another app sees every player under a different one. Rows saved under the old key then stop matching: the profile looks for the visitor's new PUUID in each saved game, doesn't find it, and leaves the game out. This happened when the site moved to Jasper's personal key on 2026-10-24 ([#154](https://github.com/Jaspyplayz/League-Web-App/issues/154), [decision record 0007](adr/0007-remap-puuids-after-key-change.md)).
 
-`npm run remap-puuids` ([`scripts/remap-puuids.ts`](../scripts/remap-puuids.ts)) moves the rows saved before the cutoff to the new PUUIDs. It reads `RIOT_API_KEY` and `DATABASE_URL` from `.env.local` like the other scripts, and needs the key the live site uses: if `.env.local` still holds an old dev key, set `RIOT_API_KEY` in the shell first, which wins over the file. Only Jasper runs `--apply` and `--rollback`:
+`npm run remap-puuids` ([`scripts/remap-puuids.ts`](../scripts/remap-puuids.ts)) moves the rows saved before the cutoff to the new PUUIDs. It reads `RIOT_API_KEY` and `DATABASE_URL` from `.env.local` like the other scripts, and needs the key the live site uses: if `.env.local` still holds an old dev key, set `RIOT_API_KEY` in the shell first, which wins over the file. Only Jasper runs `--apply` and `--rollback`, and Claude Code refuses both ([deny rules](#commands-claude-code-refuses)):
 
 ```sh
 npm run remap-puuids                                                       # dry run: writes the map, changes nothing
@@ -150,12 +167,12 @@ npm run remap-puuids -- --rollback .cache/puuid-remap/backup-<time>.jsonl  # put
 - **The files** in `.cache/puuid-remap/` hold PUUIDs. Never commit them, and delete them once the site checks out.
 - **Next time,** change `CUTOFF` in `scripts/remap-puuids-map.ts` and the two players in `ANCHORS` in `scripts/remap-puuids-db.ts`, who must each have a players row under both keys. Before applying for a production key, ask Riot whether the new app can keep this one's PUUIDs; that would make the remap unnecessary.
 
-`scripts/remap-puuids-db.test.ts` runs the dry run, apply and rollback against a throwaway Postgres with a fake Riot. It empties the app's tables, so it only runs when `REMAP_TEST_DATABASE_URL` points at localhost. Set `DATABASE_URL_DIRECT` on the command line, so it wins over `.env.local`, and use `127.0.0.1`: Docker on Windows may not answer `localhost` over IPv6. The `auth` schema stands in for Supabase's.
+`scripts/remap-puuids-db.test.ts` runs the dry run, apply and rollback against a throwaway Postgres with a fake Riot. It empties the app's tables, so it only runs when `REMAP_TEST_DATABASE_URL` points at localhost. Use `127.0.0.1`: Docker on Windows may not answer `localhost` over IPv6. The `auth` schema stands in for Supabase's. The third line applies each file in `drizzle/` with `psql` inside the container, which can only reach the container. It replaces `npm run db:migrate`, which Claude Code's [deny rules](#commands-claude-code-refuses) refuse even with a local `DATABASE_URL_DIRECT`, and which would reach the live database if that variable were left off. So Claude can run all five lines.
 
 ```sh
 docker run -d --rm --name remap-pg -e POSTGRES_PASSWORD=local -p 127.0.0.1:55432:5432 postgres:17
 docker exec remap-pg psql -U postgres -c "create schema auth; create table auth.users (id uuid primary key);"
-DATABASE_URL_DIRECT=postgres://postgres:local@127.0.0.1:55432/postgres npm run db:migrate
+(for f in drizzle/*.sql; do docker exec -i remap-pg psql -q -U postgres -v ON_ERROR_STOP=1 < "$f" || { echo "stopped at $f"; exit 1; }; done)
 REMAP_TEST_DATABASE_URL=postgres://postgres:local@127.0.0.1:55432/postgres npx vitest run scripts/remap-puuids-db.test.ts
 docker stop remap-pg
 ```
