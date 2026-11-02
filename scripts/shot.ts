@@ -4,6 +4,7 @@
 //
 //   npm run shot -- /settings                       the local dev server
 //   npm run shot -- --pr 155 / --light --phone      that PR's Vercel preview, 390px wide
+//   npm run shot -- --viewport /                    only the first screen, for checking a long page
 //   npm run shot -- --check --pr 155                is that site worth driving?
 //
 // Screenshots go to the git-ignored .cache/verify/. A page that isn't the app
@@ -22,7 +23,7 @@ import { loadEnv, previewUrl } from "./preview";
 import { browserFor } from "./shot-device";
 import { classify, OUTCOMES, type Outcome } from "./shot-outcome";
 
-const USAGE = `Usage: npm run shot -- [--pr <number> | --base <url>] [--light] [--phone] [--tab <name>] [--expect <outcome>] <path>...
+const USAGE = `Usage: npm run shot -- [--pr <number> | --base <url>] [--light] [--phone] [--viewport] [--tab <name>] [--expect <outcome>] <path>...
        npm run shot -- --check [--pr <number> | --base <url>]
 Outcomes: ${OUTCOMES.join(", ")}`;
 
@@ -33,6 +34,7 @@ const { values: options, positionals: paths } = parseArgs({
     base: { type: "string" },
     light: { type: "boolean", default: false },
     phone: { type: "boolean", default: false },
+    viewport: { type: "boolean", default: false },
     tab: { type: "string" },
     expect: { type: "string", default: "ok" },
     out: { type: "string", default: ".cache/verify" },
@@ -76,6 +78,7 @@ function fileName(site: string, path: string): string {
   if (options.tab) parts.push(options.tab.toLowerCase().replace(/\s+/g, "-"));
   if (options.light) parts.push("light");
   if (options.phone) parts.push("phone");
+  if (options.viewport) parts.push("viewport");
   return `${parts.join("-")}.png`;
 }
 
@@ -109,7 +112,7 @@ async function shoot(context: BrowserContext, origin: string, site: string, path
     }
     const file = resolve(options.out, fileName(site, path));
     mkdirSync(dirname(file), { recursive: true });
-    await page.screenshot({ path: file, fullPage: true });
+    await page.screenshot({ path: file, fullPage: !options.viewport });
     console.log(`${seen.outcome} ${path}: saved ${file}`);
     return true;
   } finally {
