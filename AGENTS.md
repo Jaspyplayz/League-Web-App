@@ -16,7 +16,7 @@ If another open pull request already edits a file, leave that file alone.
 
 ## Cloud sessions
 
-A Claude Code cloud session starts from a pushed branch, usually `origin/main`, on Node 22. Its startup hooks run `npm ci` and `npx playwright install chromium`, and download Matt Pocock's skills; the hook's line in your context says if the skills failed. How each of these was found out is in [docs/workflow.md](docs/workflow.md#tickets-and-builders).
+A Claude Code cloud session starts from a pushed branch, usually `origin/main`, on Node 22. Its startup hooks run `npm ci` and `npx playwright install chromium`, and download Matt Pocock's skills. Those skills can appear only after your first tool call, and a line from that hook in your context says if they failed ([details](docs/workflow.md#matt-pococks-skills)). How the rules below were found out is in [docs/workflow.md](docs/workflow.md#tickets-and-builders).
 
 - **GitHub goes over REST.** GraphQL is blocked there, so `gh pr`, `gh issue` and skills that call them, such as `fix-ci`, need a local session. `gh api` does the same jobs: `-X POST repos/Jaspyplayz/League-Web-App/pulls` opens a pull request, `-X POST .../issues/<n>/comments` comments on it, and `-X PATCH .../pulls/<n> -F body=@<file>` edits its description.
 - **Prove it there.** `npm run can-merge -- <pr>`, `npm run shot -- --pr` and the `reviewer` agent all work in a cloud session, so try each acceptance criterion, screenshot and review there before leaving it to a local session. `npm run test:e2e` runs against the Vercel preview, not on that machine.
