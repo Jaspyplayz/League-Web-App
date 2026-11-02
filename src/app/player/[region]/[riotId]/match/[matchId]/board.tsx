@@ -25,6 +25,8 @@ import {
   type BoardPlay,
 } from "@/lib/board";
 import type { DiffPoint } from "@/lib/diff-chart";
+import { formatPercent } from "@/lib/percent";
+import { Switch } from "./switch";
 
 const METRIC_NAMES: Record<Metric, string> = {
   gold: "Gold",
@@ -98,6 +100,8 @@ export function Board({
               options={METRICS.map((m) => ({ value: m, name: METRIC_NAMES[m] }))}
               value={metric}
               onChange={setMetric}
+              look="lifted"
+              className="bg-raised"
             />
           )}
           {lead ? (
@@ -109,6 +113,8 @@ export function Board({
               }))}
               value={view}
               onChange={setView}
+              look="lifted"
+              className="bg-raised"
             />
           ) : (
             <span className="text-note text-quiet">Team gold</span>
@@ -275,7 +281,7 @@ export function ChanceStrip({
                 type="button"
                 onClick={() => onSelect(i)}
                 aria-pressed={i === selected}
-                aria-label={`${play.clock} ${play.title}, ${play.grade}. Your team's chance to win after it: ${Math.round(play.after * 100)}%`}
+                aria-label={`${play.clock} ${play.title}, ${play.grade}. Your team's chance to win after it: ${formatPercent(play.after)}`}
                 title={`${play.clock} ${play.title}`}
                 // 24px wide, and 44px tall with the invisible ::before, so it's easy
                 // to hit on a phone. Close marks can still overlap, even fully;
@@ -297,37 +303,6 @@ export function ChanceStrip({
           })}
         </div>
       </div>
-    </div>
-  );
-}
-
-// Pressed buttons in a raised strip, for choosing what the chart shows.
-function Switch<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: T; name: string }[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div role="group" aria-label={label} className="flex gap-0.5 rounded-md bg-raised p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={o.value === value}
-          onClick={() => onChange(o.value)}
-          className={`min-h-10 rounded-sm px-2.5 text-note sm:min-h-8 ${
-            o.value === value ? "bg-panel font-semibold text-main" : "text-quiet hover:text-main"
-          }`}
-        >
-          {o.name}
-        </button>
-      ))}
     </div>
   );
 }

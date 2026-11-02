@@ -17,7 +17,9 @@ import { SubHeading } from "@/components/ui/panel-heading";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { formatSwing, GRADES } from "@/lib/analyzer/plays";
 import type { BoardPlay } from "@/lib/board";
+import { formatPercentTenths } from "@/lib/percent";
 import { useReviewLinks } from "./review-links";
+import { StepButton } from "./step-button";
 
 // One of the score tiles: Overall, Early, Mid or Late.
 export type ScoreTile = { label: string; span: string; score: number };
@@ -236,7 +238,8 @@ function PlayDetail({ play, notes }: { play: BoardPlay; notes: boolean }) {
     <div className="flex flex-col gap-2 py-2 pl-[42px] pr-2">
       <p className="text-note text-quiet tabular-nums">
         {play.grade} {formatSwing(play.swing)}. Your team&apos;s chance to win went from{" "}
-        {percent(play.before)} to {percent(play.after)}.{moment?.tempo ? ` ${moment.tempo}` : ""}
+        {formatPercentTenths(play.before)} to {formatPercentTenths(play.after)}.
+        {moment?.tempo ? ` ${moment.tempo}` : ""}
       </p>
       {moment && (
         <div className="flex flex-col gap-0.5">
@@ -294,37 +297,17 @@ export function StepButtons({
   return (
     <div className="grid grid-cols-4 gap-1.5">
       {steps.map((step) => (
-        <button
+        <StepButton
           key={step.label}
-          type="button"
-          aria-label={step.label}
-          aria-disabled={step.off}
-          title={step.label}
+          label={step.label}
+          icon={step.icon}
+          unavailable={step.off}
           onClick={() => {
             if (!step.off) onSelect(step.to);
           }}
-          className="flex min-h-11 items-center justify-center rounded-md bg-raised hover:bg-select aria-disabled:text-quiet aria-disabled:hover:bg-raised"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d={step.icon} />
-          </svg>
-        </button>
+          className="min-h-11 bg-raised hover:bg-select aria-disabled:text-quiet aria-disabled:hover:bg-raised"
+        />
       ))}
     </div>
   );
-}
-
-// 0.5234 -> "52.3%", like the replay's plays list.
-function percent(chance: number): string {
-  return `${(chance * 100).toFixed(1)}%`;
 }

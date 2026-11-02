@@ -29,6 +29,7 @@ import {
   type ReplayObjective,
 } from "@/lib/analyzer/replay";
 import type { TempoTimeline } from "@/lib/analyzer/tempo";
+import { formatPercent } from "@/lib/percent";
 import { LegendSwatch } from "./legend-swatch";
 import { ReplayMap } from "./replay-map";
 import {
@@ -39,14 +40,11 @@ import {
   PlayMarks,
   PlayNow,
   ReplayPlays,
-  SWITCH,
-  SWITCH_BUTTON,
-  SWITCH_OFF,
-  SWITCH_ON,
 } from "./replay-plays";
 import { ReplayScoreboard, type ItemInfo, type ReplayPerson } from "./replay-scoreboard";
 import { useReviewLinks } from "./review-links";
 import { StepButton } from "./step-button";
+import { Switch } from "./switch";
 import {
   JunglerMarks,
   joinRuns,
@@ -76,6 +74,9 @@ type Props = {
   docsHref: string;
   tempoDocsHref: string;
 };
+
+// The previous and next buttons, in the panel's fill on the raised play bar.
+const STEP_BUTTON = "size-10 bg-panel text-main hover:bg-divider disabled:opacity-40 disabled:hover:bg-panel";
 
 // Playback moves the clock every TICK_MS, by `speed` seconds of game time
 // per real second: at 30x a 30-minute game plays in a minute.
@@ -211,7 +212,7 @@ export function Replay({
     (gold && ours && theirs
       ? `${gold.tone === "even" ? "gold even" : `your team ${gold.text} in gold`}, ${ours.kills} kills to ${theirs.kills}`
       : "") +
-    (chance !== null ? `, ${percent(chance)} chance to win` : "");
+    (chance !== null ? `, ${formatPercent(chance)} chance to win` : "");
 
   const scoreboard = (
     <ReplayScoreboard
@@ -391,11 +392,11 @@ export function Replay({
             <div className="flex items-center gap-1.5">
               <StepButton
                 label={`Previous ${stopName}`}
+                icon="M15 6l-6 6 6 6"
                 disabled={previousStop === undefined}
                 onClick={() => moveTo(previousStop ?? 0)}
-              >
-                <path d="M15 6l-6 6 6 6" />
-              </StepButton>
+                className={STEP_BUTTON}
+              />
               <button
                 type="button"
                 aria-label={playing ? "Pause" : "Play"}
@@ -413,11 +414,11 @@ export function Replay({
               </button>
               <StepButton
                 label={`Next ${stopName}`}
+                icon="M9 6l6 6-6 6"
                 disabled={nextStop === undefined}
                 onClick={() => moveTo(nextStop ?? end)}
-              >
-                <path d="M9 6l6 6-6 6" />
-              </StepButton>
+                className={STEP_BUTTON}
+              />
               <span className="ml-1.5 whitespace-nowrap text-sm tabular-nums text-main">
                 {formatClock(t)} <span className="text-quiet">/ {formatClock(end)}</span>
               </span>
@@ -434,23 +435,18 @@ export function Replay({
                       chance > 0.5 ? "text-ahead-soft" : chance < 0.5 ? "text-behind" : "text-main"
                     }`}
                   >
-                    {percent(chance)}
+                    {formatPercent(chance)}
                   </span>
                 </div>
               )}
-              <div role="group" aria-label="Playback speed" className={`${SWITCH} bg-panel`}>
-                {SPEEDS.map((x) => (
-                  <button
-                    key={x}
-                    type="button"
-                    aria-pressed={speed === x}
-                    onClick={() => setSpeed(x)}
-                    className={`${SWITCH_BUTTON} tabular-nums ${speed === x ? SWITCH_ON : SWITCH_OFF}`}
-                  >
-                    {x}×
-                  </button>
-                ))}
-              </div>
+              <Switch
+                label="Playback speed"
+                options={SPEEDS.map((x) => ({ value: x, name: `${x}×` }))}
+                value={speed}
+                onChange={setSpeed}
+                look="solid"
+                className="bg-panel tabular-nums"
+              />
             </div>
           </div>
           {current && (
@@ -490,11 +486,6 @@ export function Replay({
       )}
     </section>
   );
-}
-
-// 0.6143 -> "61%".
-function percent(chance: number): string {
-  return `${Math.round(chance * 100)}%`;
 }
 
 function RowLabel({ className, children }: { className: string; children: string }) {

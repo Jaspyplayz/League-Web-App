@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Panel, panelClass } from "@/components/ui/panel";
 import { REPO_URL } from "@/components/site-header";
+import { linkClass } from "@/components/ui/state-panel";
 import { MIN_PHASE_MINUTES, PHASES } from "@/lib/analyzer/phase-score";
 import { rankModelHelps } from "@/lib/analyzer/win-chance";
 import { SCORE_MODEL } from "@/lib/game-score";
@@ -32,7 +33,6 @@ export const metadata: Metadata = {
     "How Turnpoint gets its data, finds turning points, and trains its three models, with how each did on games it never saw.",
 };
 
-const LINK = "text-main underline decoration-quiet underline-offset-[3px] hover:decoration-main";
 // A row in a list or table inside a panel: a thin line above every row but
 // the first.
 const ROW_LINE = "border-t border-divider first:border-t-0";
@@ -90,7 +90,7 @@ export default function HowItWorksPage() {
             >
               Open the example game
             </Link>
-            <a href={REPO_URL} className={LINK}>
+            <a href={REPO_URL} className={linkClass}>
               Source on GitHub
             </a>
           </div>
@@ -465,19 +465,19 @@ export default function HowItWorksPage() {
           </p>
           <p>
             The code is open:{" "}
-            <a href={REPO_URL} className={LINK}>
+            <a href={REPO_URL} className={linkClass}>
               Source on GitHub
             </a>
             , with the full write-ups in{" "}
-            <a href={`${REPO_URL}/blob/main/docs/win-chance.md`} className={LINK}>
+            <a href={`${REPO_URL}/blob/main/docs/win-chance.md`} className={linkClass}>
               docs/win-chance.md
             </a>
             ,{" "}
-            <a href={`${REPO_URL}/blob/main/docs/phase-ratings.md`} className={LINK}>
+            <a href={`${REPO_URL}/blob/main/docs/phase-ratings.md`} className={linkClass}>
               docs/phase-ratings.md
             </a>{" "}
             and{" "}
-            <a href={`${REPO_URL}/blob/main/docs/game-score.md`} className={LINK}>
+            <a href={`${REPO_URL}/blob/main/docs/game-score.md`} className={linkClass}>
               docs/game-score.md
             </a>
             .
