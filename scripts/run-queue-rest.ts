@@ -323,7 +323,9 @@ export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why
     const prs = listOf(working.map((pull) => `PR ${pull.number}`));
     const notDone = `${working.length === 1 ? "isn't" : "aren't"} marked ready or left for Jasper`;
     const startedAt = started.get(id);
-    if (issue.state.name === "In Progress") {
+    // In Progress with no PR yet is a builder before its first push. Once
+    // every PR is finished, it takes no slot, even if Linear never moved on.
+    if (issue.state.name === "In Progress" && (open.length === 0 || working.length > 0)) {
       running.push({ id, why: "it's In Progress" });
     } else if (issue.state.name === "In Review" && working.length > 0) {
       running.push({ id, why: `it's In Review, and ${prs} ${notDone}` });

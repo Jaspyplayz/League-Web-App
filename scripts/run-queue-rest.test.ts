@@ -638,6 +638,45 @@ describe("In Review", () => {
   });
 });
 
+describe("In Progress", () => {
+  const inProgress = (...bodies: string[]) => {
+    const pulls = bodies.map((body, i) => pull(9 + i, `claude/jas-5-${i}`, body));
+    return runningTickets(snapshot({ issues: [issue("JAS-5", { status: "In Progress" })], pulls }), AT_0630);
+  };
+  const JASPER_MERGES = "**Ready to merge:** no: Jasper merges this one by hand.";
+
+  it("counts as running with no PR yet, or while any of its PRs isn't finished", () => {
+    expect(inProgress()).toEqual([{ id: "JAS-5", why: "it's In Progress" }]);
+    expect(inProgress("**Ready to merge:** no")).toEqual([{ id: "JAS-5", why: "it's In Progress" }]);
+    expect(inProgress(JASPER_MERGES, "**Ready to merge:** no")).toEqual([{ id: "JAS-5", why: "it's In Progress" }]);
+  });
+
+  it("doesn't count once every PR is marked ready at its head or left for Jasper", () => {
+    expect(inProgress("**Ready to merge:** yes at 4d2a4fe")).toEqual([]);
+    expect(inProgress(JASPER_MERGES)).toEqual([]);
+    expect(inProgress(JASPER_MERGES, "**Ready to merge:** yes at 4d2a4fe")).toEqual([]);
+  });
+
+  it("gives a finished PR's slot to another ticket, while that PR's files stay held", () => {
+    const read = snapshot({
+      issues: [
+        issue("JAS-1"),
+        issue("JAS-2"),
+        issue("JAS-3"),
+        issue("JAS-4"),
+        issue("JAS-5", { status: "In Progress" }),
+        issue("JAS-6", { description: "**Touches.** `src/JAS-5.ts`" }),
+      ],
+      pulls: [pull(9, "claude/jas-5-x", JASPER_MERGES)],
+      files: { 9: [{ filename: "src/JAS-5.ts" }] },
+    });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.running).toEqual([]);
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-1", "JAS-2", "JAS-3", "JAS-4"]);
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([["JAS-6", ["It touches `src/JAS-5.ts`, which PR 9 changes."]]]);
+  });
+});
+
 describe("a dry run", () => {
   it("says it would move a written-up blocker to Ready, and writes nothing", async () => {
     const read = snapshot({ issues: [issue("JAS-1", { blockedBy: ["JAS-9"] }), issue("JAS-9", { status: "Todo" })] });
