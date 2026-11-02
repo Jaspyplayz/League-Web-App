@@ -552,20 +552,17 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
     if (answer.kind === "started") {
       summary(`Started a builder on ${ticket.id}: ${answer.sessionUrl}`);
     } else if (answer.kind === "refused") {
+      // Said before the comment is edited, so a Linear failure there can't hide it.
+      const { reason, jasperFixes } = refusalReason(answer.status, answer.why);
+      log(`The cloud task refused ${ticket.id}: HTTP ${answer.status}, ${answer.why}`);
+      const next = jasperFixes ? "Only Jasper can fix that" : "A later run tries again";
+      log(`::${jasperFixes ? "error" : "warning"} title=Builder start refused::${ticket.id} didn't start (HTTP ${answer.status}): ${reason}. ${next}.`);
+      summary(`${ticket.id} didn't start (HTTP ${answer.status}): ${reason}.`);
+      if (jasperFixes) failed = true;
+      stop = `the cloud task refused ${ticket.id}`;
       // Edited, not left, so it no longer holds the ticket and a later run tries again.
       await effects.updateComment(commentId, refusedBody(answer.status, answer.why));
-      log(`The cloud task refused ${ticket.id}: HTTP ${answer.status}, ${answer.why}`);
-      summary(`${ticket.id} didn't start: the cloud task refused it (HTTP ${answer.status}). Its start comment now says so, and doesn't hold it.`);
-      // 429 is a limit (Jasper's usage, or the task's fires an hour) and 5xx
-      // is Anthropic's side, so a later run tries again. Anything else means
-      // the token or the task ID is wrong, which only Jasper can fix.
-      if (answer.status === 429 || answer.status >= 500) {
-        log(`::warning title=Builder start refused::The cloud task answered HTTP ${answer.status} for ${ticket.id}, so nothing else starts this round. A later run tries again.`);
-      } else {
-        log(`::error title=Builder start refused::The cloud task answered HTTP ${answer.status} for ${ticket.id}, so its token or task ID is wrong. Nothing starts until that's fixed.`);
-        failed = true;
-      }
-      stop = `the cloud task refused ${ticket.id}`;
+      summary(`${ticket.id}'s start comment now says so, and doesn't hold it.`);
     } else {
       // A builder may have started, so the start comment stays, and its
       // 2-hour hold keeps a later run from starting a second one.
@@ -582,6 +579,14 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
     for (const line of waitLines(wait, dryRun)) summary(line);
   }
   return { failed };
+}
+
+// What a refused fire means, from the errors the fire docs list. Only the
+// hourly limit clears by itself; Jasper fixes the rest.
+function refusalReason(status: number, why: string): { reason: string; jasperFixes: boolean } {
+  if (status === 401 || status === 403 || status === 404) return { reason: "its token or task ID is wrong, or the account has no access", jasperFixes: true };
+  if (status === 429) return { reason: "an hourly fire limit (30 a task, 100 an account) was reached", jasperFixes: false };
+  return { reason: `the cloud task refused it: ${why}`, jasperFixes: true };
 }
 
 const FireStarted = z.object({ type: z.literal("routine_fire"), claude_code_session_url: z.string() });

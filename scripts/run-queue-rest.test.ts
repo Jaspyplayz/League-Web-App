@@ -488,6 +488,33 @@ describe("starting builders", () => {
     expect(lines).toContain("JAS-2 didn't start, since the cloud task didn't answer for JAS-1.");
   });
 
+  it("says what each refusal means, as the fire docs list them, and fails the run unless it's the hourly limit", async () => {
+    const why = "invalid_request_error: This routine is paused";
+    const cases: [number, string, string, boolean][] = [
+      [401, "error", "its token or task ID is wrong, or the account has no access", true],
+      [403, "error", "its token or task ID is wrong, or the account has no access", true],
+      [404, "error", "its token or task ID is wrong, or the account has no access", true],
+      [429, "warning", "an hourly fire limit (30 a task, 100 an account) was reached", false],
+      [400, "error", `the cloud task refused it: ${why}`, true],
+    ];
+    for (const [status, level, reason, failed] of cases) {
+      const { effects, lines } = recorder(() => ({ kind: "refused", status, why }));
+      expect(await runRound(two(), { dryRun: false }, effects)).toEqual({ failed });
+      const annotation = lines.find((line) => line.startsWith("::"));
+      expect(annotation).toMatch(new RegExp(`^::${level} title=Builder start refused::`));
+      expect(annotation).toContain(`JAS-1 didn't start (HTTP ${status}): ${reason}.`);
+      expect(lines.join("\n")).not.toMatch(/usage/i);
+    }
+  });
+
+  it("says a refusal before editing the start comment, so a Linear failure there can't hide it", async () => {
+    const { effects, lines } = recorder(() => ({ kind: "refused", status: 401, why: "authentication_error: invalid token" }));
+    const linearDown = { ...effects, updateComment: async () => Promise.reject(new Error("Linear is down")) };
+    await expect(runRound(two(), { dryRun: false }, linearDown)).rejects.toThrow("Linear is down");
+    expect(lines.some((line) => line.startsWith("::error title=Builder start refused::JAS-1 didn't start (HTTP 401)"))).toBe(true);
+    expect(lines).toContain("JAS-1 didn't start (HTTP 401): its token or task ID is wrong, or the account has no access.");
+  });
+
   it("after a 5xx, keeps the start comment, since the docs don't say no session started", async () => {
     const serverError = JSON.stringify({ type: "error", error: { type: "api_error", message: "Internal server error" } });
     expect(fireAnswer(500, serverError)).toEqual({ kind: "no answer", why: "HTTP 500: api_error: Internal server error" });
