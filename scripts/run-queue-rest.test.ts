@@ -488,8 +488,17 @@ describe("starting builders", () => {
     expect(lines).toContain("JAS-2 didn't start, since the cloud task didn't answer for JAS-1.");
   });
 
+  it("after a 5xx, keeps the start comment, since the docs don't say no session started", async () => {
+    const serverError = JSON.stringify({ type: "error", error: { type: "api_error", message: "Internal server error" } });
+    expect(fireAnswer(500, serverError)).toEqual({ kind: "no answer", why: "HTTP 500: api_error: Internal server error" });
+    expect(fireAnswer(503, "<html>Service\nUnavailable</html>")).toEqual({ kind: "no answer", why: "HTTP 503: <html>Service Unavailable</html>" });
+    const { effects, calls } = recorder(() => fireAnswer(503, "upstream connect error"));
+    expect(await runRound(two(), { dryRun: false }, effects)).toEqual({ failed: false });
+    expect(calls).toEqual([`createComment uuid-JAS-1: ${START_LINE}`, "fire JAS-1"]);
+  });
+
   it("keeps the cloud task's message on one line in the log", async () => {
-    const { effects, lines } = recorder(() => ({ kind: "refused", status: 500, why: "x\n::error::injected" }));
+    const { effects, lines } = recorder(() => ({ kind: "refused", status: 400, why: "x\n::error::injected" }));
     await runRound(two(), { dryRun: false }, effects);
     expect(lines.filter((line) => line.includes("injected")).every((line) => !line.startsWith("::error::"))).toBe(true);
     expect(lines.every((line) => !line.includes("\n"))).toBe(true);

@@ -464,9 +464,9 @@ function waitComment(issue: LinearIssue, why: string[], comments: LinearComment[
 
 export type FireAnswer =
   | { kind: "started"; sessionUrl: string }
-  /** The cloud task answered, and didn't start a session. */
+  /** The cloud task answered with a 4xx, and didn't start a session. */
   | { kind: "refused"; status: number; why: string }
-  /** No answer, or one that can't be read: a session may have started. */
+  /** No answer, a 5xx, or one that can't be read: a session may have started. */
   | { kind: "no answer"; why: string };
 
 /** Everything a round does outside this file, passed in so the tests can fake Linear and the cloud task. */
@@ -603,8 +603,12 @@ export function fireAnswer(status: number, body: string): FireAnswer {
     return { kind: "no answer", why: `HTTP ${status}, but not the routine_fire answer the docs describe` };
   }
   const error = FireError.safeParse(json);
-  const why = error.success ? `${error.data.error.type}: ${error.data.error.message}` : body;
-  return { kind: "refused", status, why: oneLine(why, 300) || "no message" };
+  const why = oneLine(error.success ? `${error.data.error.type}: ${error.data.error.message}` : body, 300) || "no message";
+  // A fire has no idempotency key, and the docs don't say a 5xx started no
+  // session, so only a 4xx releases the ticket. Anything else may have
+  // started one, and the start comment keeps holding it.
+  if (status >= 400 && status < 500) return { kind: "refused", status, why };
+  return { kind: "no answer", why: `HTTP ${status}: ${why}` };
 }
 
 /** The fire request for one ticket, without the token, which scripts/run-queue.ts adds. */
