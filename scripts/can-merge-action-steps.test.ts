@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  AgentMergeEvent,
   ATTEMPTS,
   branchToTry,
   mainCiDispatchArgs,
@@ -12,6 +13,7 @@ import {
   pullsToMerge,
   readyToMerge,
   shouldRetry,
+  whatStartedRun,
   WorkflowRunEvent,
   type CanMergeRun,
   type OpenPull,
@@ -27,6 +29,14 @@ function source(path: string): string {
   return readFileSync(new URL(`../${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 }
 
+// A workflow's lines without blank lines or comments, so a test pins what runs.
+function workflowLines(path: string): string[] {
+  return source(path)
+    .split("\n")
+    .filter((line) => line.trim() !== "" && !line.trim().startsWith("#"))
+    .map((line) => line.replace(/\s+#.*$/, ""));
+}
+
 function event(branch: string | null, repo: string | null = REPO): WorkflowRunEvent {
   return WorkflowRunEvent.parse({
     workflow_run: {
@@ -39,11 +49,55 @@ function event(branch: string | null, repo: string | null = REPO): WorkflowRunEv
   });
 }
 
+// What GitHub sends when the sweep or a person starts a run by name.
+function startedByName(branch: string): AgentMergeEvent {
+  return AgentMergeEvent.parse({
+    inputs: { branch },
+    // GitHub sends many more fields here too; the schema keeps only inputs.
+    ref: "refs/heads/main",
+  });
+}
+
 function pull(number: number, ref: string, repo: string | null = REPO, body = "**Ready to merge:** yes at 4d2a4fe"): OpenPull {
   return { number, body, head: { ref, sha: HEAD, repo: repo === null ? null : { full_name: repo } } };
 }
 
+describe("AgentMergeEvent", () => {
+  it("reads both ways a run can start", () => {
+    expect("workflow_run" in AgentMergeEvent.parse(event("claude/x"))).toBe(true);
+    expect("inputs" in startedByName("claude/x")).toBe(true);
+  });
+
+  it("refuses anything else, so a run can't go on without knowing its branch", () => {
+    expect(() => AgentMergeEvent.parse({ schedule: "7 * * * *" })).toThrow();
+    expect(() => AgentMergeEvent.parse({ inputs: {} })).toThrow();
+  });
+});
+
+describe("whatStartedRun", () => {
+  it("names the workflow that finished, or says another try was asked for", () => {
+    expect(whatStartedRun(event("claude/x"))).toBe("CI finished");
+    expect(whatStartedRun(startedByName("claude/x"))).toBe("Another try was asked for");
+  });
+});
+
 describe("branchToTry", () => {
+  it("tries a Claude branch named by the sweep or a person", () => {
+    expect(branchToTry(startedByName("claude/jas-164-x"), REPO)).toEqual({ branch: "claude/jas-164-x" });
+  });
+
+  it("skips any other branch named that way", () => {
+    for (const branch of ["main", "jaspyplayz/jas-121-thing", "dependabot/npm_and_yarn/next-16.1.0"]) {
+      expect(branchToTry(startedByName(branch), REPO)).toEqual({ skip: `${branch} doesn't start with claude/` });
+    }
+  });
+
+  it("leaves a named branch's repo to pullsOnBranch, which drops a fork's PR of the same name", () => {
+    const { ready, held } = pullsToMerge([pull(5, "claude/x", "someone/League-Web-App")], "claude/x", REPO);
+    expect(ready).toEqual([]);
+    expect(held).toEqual([]);
+  });
+
   it("tries a Claude branch in this repo", () => {
     expect(branchToTry(event("claude/jas-121-agent-merge"), REPO)).toEqual({ branch: "claude/jas-121-agent-merge" });
   });
@@ -292,10 +346,27 @@ describe("scripts/can-merge.ts", () => {
 // (JAS-121's fourth criterion). These pin every place the file could reach
 // the PR or the token, so a change there has to change this test too.
 describe(".github/workflows/agent-merge.yml", () => {
-  const code = source(".github/workflows/agent-merge.yml")
-    .split("\n")
-    .filter((line) => line.trim() !== "" && !line.trim().startsWith("#"))
-    .map((line) => line.replace(/\s+#.*$/, ""));
+  const code = workflowLines(".github/workflows/agent-merge.yml");
+
+  it("starts when a check finishes, or by name", () => {
+    const on = code.indexOf("on:");
+    const end = code.findIndex((line, i) => i > on && !line.startsWith(" "));
+    expect(code.slice(on + 1, end).map((line) => line.trim())).toEqual([
+      "workflow_run:",
+      "workflows: [CI, Reviewer, Smoke test, Dependency review]",
+      "types: [completed]",
+      "workflow_dispatch:",
+      "inputs:",
+      "branch:",
+      "description: The claude/ branch whose PR to try",
+      "required: true",
+      "type: string",
+    ]);
+  });
+
+  it("never lets a new run cancel a running one", () => {
+    expect(code.map((line) => line.trim())).toContain("cancel-in-progress: false");
+  });
 
   it("runs only main's checkout, node, npm ci and the action script", () => {
     expect(code.filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
@@ -312,12 +383,19 @@ describe(".github/workflows/agent-merge.yml", () => {
     ]);
   });
 
-  it("reads the event and the token only in the job's if, its concurrency group and the last step", () => {
-    expect(code.filter((line) => /github\b|\$\{\{/.test(line)).map((line) => line.trim())).toEqual([
-      "github.event.workflow_run.conclusion == 'success' &&",
+  // The ref line matters: a run started by name on a PR's branch would put a
+  // check on that PR's head, which the gates read
+  // (docs/agent-mistakes/new-trigger-feeds-the-gates.md). On main it can't.
+  it("reads the event and the token only in the run's name, the job's if, its concurrency group and the last step", () => {
+    expect(code.filter((line) => /github\b|inputs\.|\$\{\{/.test(line)).map((line) => line.trim())).toEqual([
+      "run-name: Agent merge ${{ github.event.workflow_run.head_branch || inputs.branch }}",
+      "(github.event_name == 'workflow_dispatch' &&",
+      "github.ref == 'refs/heads/main' &&",
+      "startsWith(inputs.branch, 'claude/')) ||",
+      "(github.event.workflow_run.conclusion == 'success' &&",
       "startsWith(github.event.workflow_run.head_branch, 'claude/') &&",
-      "github.event.workflow_run.head_repository.full_name == github.repository",
-      "group: agent-merge-${{ github.event.workflow_run.head_branch }}",
+      "github.event.workflow_run.head_repository.full_name == github.repository)",
+      "group: agent-merge-${{ github.event.workflow_run.head_branch || inputs.branch }}",
       "GH_TOKEN: ${{ github.token }}",
       "GH_REPO: ${{ github.repository }}",
     ]);
@@ -344,14 +422,82 @@ describe(".github/workflows/agent-merge.yml", () => {
   });
 });
 
+// The sweep only starts Agent merge again for a PR still marked ready
+// (JAS-164). can-merge still decides, in the run it starts, so the sweep must
+// have no way to merge anything itself.
+describe(".github/workflows/agent-merge-sweep.yml", () => {
+  const code = workflowLines(".github/workflows/agent-merge-sweep.yml");
+  const text = code.join("\n");
+
+  it("runs on its schedule alone", () => {
+    const on = code.indexOf("on:");
+    const end = code.findIndex((line, i) => i > on && !line.startsWith(" "));
+    expect(code.slice(on + 1, end).map((line) => line.trim())).toEqual(["schedule:", '- cron: "7,22,37,52 * * * *"']);
+  });
+
+  it("can list PRs and start runs, but can't push or merge", () => {
+    expect(code.filter((line) => /permissions:|: (read|write)$/.test(line)).map((line) => line.trim())).toEqual([
+      "permissions: {}",
+      "permissions:",
+      "pull-requests: read",
+      "actions: write",
+    ]);
+  });
+
+  it("runs none of the repo's code", () => {
+    expect(code.filter((line) => /uses:|\bnpm\b|\bnpx\b|\bgit\b|can-merge/.test(line))).toEqual([]);
+    expect(text).not.toMatch(/gh pr merge|-X\s/);
+  });
+
+  it("fails the run if gh fails partway, instead of looking like a quiet sweep", () => {
+    // Bash adds pipefail only when the step names its shell.
+    expect(code.map((line) => line.trim())).toContain("shell: bash");
+  });
+
+  it("starts Agent merge on main, naming only Claude's branches in this repo", () => {
+    expect(text).toContain('select(.head.ref | startswith("claude/"))');
+    expect(text).toContain("select(.head.repo.full_name == env.GH_REPO)");
+    expect(text).toContain('gh workflow run agent-merge.yml --ref main -f branch="$branch"');
+  });
+
+  it("never misses a PR readyToMerge would pass, and skips one still saying no", () => {
+    // The rough match in the workflow. It has no backslashes, so it reads the
+    // same here, in jq on GitHub's runner, and through any shell.
+    const written = text.match(/test\("(.+)"; "i"\)/)?.[1];
+    expect(written).toBeDefined();
+    expect(written).not.toContain("\\");
+    const rough = new RegExp(written as string, "i");
+
+    const ready = [
+      "**Ready to merge:** yes at 4d2a4fe",
+      "**Ready to merge:** yes at 4d2a4fe.",
+      "**Ready to merge:**   YES AT 4D2A4FE",
+      `  **Ready to merge:** yes at ${HEAD}`,
+      "**Tier:** tiny\n\n**Ready to merge:** yes at 4d2a4fe\n\nThe rest.",
+    ];
+    for (const body of ready) {
+      expect(readyToMerge(body, HEAD)).toEqual({ ready: true });
+      expect(rough.test(body)).toBe(true);
+    }
+
+    const held = [
+      "**Ready to merge:** no",
+      "**Ready to merge:** no: Jasper merges this one by hand.",
+      "**Ready to merge:** no. As its last step the builder changes this to `yes at <head sha>`",
+      "No such line.",
+    ];
+    for (const body of held) {
+      expect(readyToMerge(body, HEAD).ready).toBe(false);
+      expect(rough.test(body)).toBe(false);
+    }
+  });
+});
+
 // The Agent merge job starts this through workflow_dispatch after each merge
 // (JAS-123). That trigger is the only change: its token still only reads, so
 // the write access stays on the Agent merge job alone.
 describe(".github/workflows/ci.yml", () => {
-  const code = source(".github/workflows/ci.yml")
-    .split("\n")
-    .filter((line) => line.trim() !== "" && !line.trim().startsWith("#"))
-    .map((line) => line.replace(/\s+#.*$/, ""));
+  const code = workflowLines(".github/workflows/ci.yml");
 
   it("can be started through the API, and still runs on pushes to main and on PRs", () => {
     const on = code.indexOf("on:");

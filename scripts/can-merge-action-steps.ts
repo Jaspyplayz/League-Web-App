@@ -2,10 +2,11 @@
 // .github/workflows/agent-merge.yml), kept pure so they're tested without
 // GitHub. scripts/can-merge-action.ts reads the event and calls GitHub.
 //
-// When CI, Reviewer, Smoke test or Dependency review finishes on a branch,
-// the workflow finds the branch's open PR and, once its builder has marked it
-// ready, runs `can-merge --merge` on it. can-merge decides everything else;
-// this only picks which PR to ask about and reads what its exit code meant.
+// When CI, Reviewer, Smoke test or Dependency review finishes on a branch, or
+// the Agent merge sweep names one, the workflow finds the branch's open PR and,
+// once its builder has marked it ready, runs `can-merge --merge` on it.
+// can-merge decides everything else; this only picks which PR to ask about and
+// reads what its exit code meant.
 
 import { z } from "zod";
 import { field, REFUSED_EXIT_CODE } from "./can-merge-gates";
@@ -21,18 +22,33 @@ export const WorkflowRunEvent = z.object({
 });
 export type WorkflowRunEvent = z.infer<typeof WorkflowRunEvent>;
 
+// What the event holds when the Agent merge sweep or a person starts a run by
+// name (JAS-164): only the branch to try.
+const StartedByNameEvent = z.object({ inputs: z.object({ branch: z.string() }) });
+
+export const AgentMergeEvent = z.union([WorkflowRunEvent, StartedByNameEvent]);
+export type AgentMergeEvent = z.infer<typeof AgentMergeEvent>;
+
+// For the run's log.
+export function whatStartedRun(event: AgentMergeEvent): string {
+  return "inputs" in event ? "Another try was asked for" : `${event.workflow_run.name} finished`;
+}
+
 export type Target = { branch: string } | { skip: string };
 
 // Only Claude's branches in this repo. The workflow's `if:` skips the rest
 // before a runner even starts; this repeats it so the script is safe on its
 // own. A Smoke test run's repo is always this one, even for a fork's PR, so
 // the real fork guards are the PR lookup below and can-merge's own
-// "Built by Claude Code" gate.
-export function branchToTry(event: WorkflowRunEvent, repository: string): Target {
-  const { head_branch: branch, head_repository: repo } = event.workflow_run;
+// "Built by Claude Code" gate. A run started by name has no repo to check, so
+// it relies on those same two.
+export function branchToTry(event: AgentMergeEvent, repository: string): Target {
+  const branch = "inputs" in event ? event.inputs.branch : event.workflow_run.head_branch;
   if (!branch) return { skip: "the run has no branch" };
   if (!branch.startsWith("claude/")) return { skip: `${branch} doesn't start with claude/` };
-  if (repo?.full_name !== repository) return { skip: `${branch} is in ${repo?.full_name ?? "a deleted fork"}, not ${repository}` };
+  if ("workflow_run" in event && event.workflow_run.head_repository?.full_name !== repository) {
+    return { skip: `${branch} is in ${event.workflow_run.head_repository?.full_name ?? "a deleted fork"}, not ${repository}` };
+  }
   return { branch };
 }
 
