@@ -137,7 +137,7 @@ export function parseTouches(description: string): Touches {
 // A ticket that holds no files blocks nothing, so a mistake here starts it
 // beside a builder changing the file it meant, and nothing but the word can be
 // on its line. A ticket that changes no files writes None or None., with any
-// reason on its own line.
+// reason on its own line and no backtick or / in it.
 function saysNone(list: string): boolean {
   return /^none\.?$/i.test(list.trim());
 }

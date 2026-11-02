@@ -273,6 +273,7 @@ describe("parseTouches", () => {
     "**Touches.** None\n- src/db/schema.ts",
     "**Touches.** None.\n\nAlso `src/db/schema.ts`.",
     "**Touches.** None.\n\nIt changes src/db/schema.ts.",
+    "**Touches.** None.\nAlso `package.json`.",
   ])("refuses a None line whose reason names a path: %j", (description) => {
     expect(parseTouches(description)).toEqual({
       why: "the line after its Touches None names a path, so the ticket may change files; write the reason without one",

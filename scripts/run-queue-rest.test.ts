@@ -1628,7 +1628,7 @@ describe(".github/ISSUE_TEMPLATE/feature.md", () => {
   });
 
   it("gives the None rule in the same words as the code and the docs", () => {
-    const rule = "A ticket that changes no files writes None or None., with any reason on its own line.";
+    const rule = "A ticket that changes no files writes None or None., with any reason on its own line and no backtick or / in it.";
     const flat = (path: string) => source(path).replace(/\n\s*\/\/ /g, " ");
     for (const path of ["scripts/run-queue-pick.ts", ".github/ISSUE_TEMPLATE/feature.md", ".claude/skills/run-queue/SKILL.md", "GLOSSARY.md", "docs/agents/issue-tracker.md"]) {
       expect(flat(path), path).toContain(rule);
