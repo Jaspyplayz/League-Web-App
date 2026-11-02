@@ -1,3 +1,5 @@
+import { readLocalSetting, saveLocalSetting } from "./local-setting";
+
 // Light or dark colors, picked with the theme switch in the header and kept
 // in this browser's localStorage. The colors themselves live in src/app/globals.css:
 // dark is the default, and data-theme="light" on <html> swaps in the light set.
@@ -37,22 +39,9 @@ export const LIGHT_QUERY = "(prefers-color-scheme: light)";
 // below does. theme.test.ts runs it to check the two agree.
 export const THEME_SCRIPT = `(function(){try{var c=localStorage.getItem(${JSON.stringify(THEME_KEY)});var l=c==="light"||(c==="system"&&window.matchMedia(${JSON.stringify(LIGHT_QUERY)}).matches);document.documentElement.dataset.theme=l?"light":"dark"}catch(e){}})()`;
 
-// localStorage can throw, for example when the browser blocks site data. The
-// site then simply stays dark.
+// With nothing saved, or storage blocked, the site stays dark.
 export function readThemeChoice(): ThemeChoice {
-  try {
-    return parseThemeChoice(localStorage.getItem(THEME_KEY));
-  } catch {
-    return DEFAULT_THEME_CHOICE;
-  }
-}
-
-export function saveThemeChoice(choice: ThemeChoice) {
-  try {
-    localStorage.setItem(THEME_KEY, choice);
-  } catch {
-    // Not saved, but applyTheme() still switches this page.
-  }
+  return parseThemeChoice(readLocalSetting(THEME_KEY));
 }
 
 // Sets data-theme on <html>, which globals.css reads to pick the colors.
@@ -85,9 +74,10 @@ export function applyThemeWithoutFading(choice: ThemeChoice = readThemeChoice())
   setTimeout(() => noFade.remove(), 1);
 }
 
-// What the header's switch does: saves the other theme and shows it.
+// What the header's switch does: saves the other theme and shows it. If the
+// browser won't save it, this page still switches.
 export function switchTheme() {
   const next: Theme = shownTheme() === "dark" ? "light" : "dark";
-  saveThemeChoice(next);
+  saveLocalSetting(THEME_KEY, next);
   applyThemeWithoutFading(next);
 }
