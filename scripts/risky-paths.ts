@@ -38,10 +38,14 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   { pattern: ".github/workflows/agent-merge", why: "the workflows that run can-merge with a token that can merge" },
   { pattern: ".github/workflows/reviewer", why: "GitHub's required reviewer check" },
   { pattern: ".claude/agent-merge.json", why: "the switch for agent merging" },
-  // Its deny rules stop a session merging with `gh pr merge` or the REST merge
-  // request, around can-merge, and stop it editing the switch. Local overrides
-  // match too.
+  // Its deny rules stop a session merging around can-merge with `gh pr merge`
+  // or the REST merge request, or editing the switch, by mistake. They aren't
+  // a security boundary (docs/workflow.md), but a PR shouldn't drop them
+  // unseen. Local overrides match too.
   { pattern: ".claude/settings", why: "Claude's deny rules on merging, and local overrides of them" },
+  // Node reads the package.json nearest each gate, so one here with a name and
+  // exports would stand in for a package the gates import, such as zod.
+  { pattern: "scripts/package.json", why: "a package scope the gates would load in place of an installed package" },
 ];
 
 export const PANEL_PATHS: readonly RiskyPath[] = [
@@ -56,7 +60,7 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
   { pattern: ".claude/rules/", why: "rules the reviewer checks against" },
   // The configs match without an extension, because each tool loads other file
   // names first: an eslint.config.js would replace the .mjs. ESLint also reads
-  // the eslint.config nearest each file, which NESTED below covers.
+  // the eslint.config nearest each file, which PANEL_ANYWHERE below covers.
   { pattern: "eslint.config", why: "lint" },
   { pattern: "eslint-rules/", why: "lint" },
   { pattern: "tsconfig", why: "the type check" },
@@ -72,11 +76,13 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
   { pattern: "e2e/preview-login.ts", why: "the code that sends the preview's secret" },
   { pattern: "e2e/preview-secret.spec.ts", why: "the check that the preview's secret stays on the preview" },
   { pattern: "scripts/preview-login", why: "the test of the check that the preview's secret stays on the preview" },
-  // The Agent merge workflow installs from these, with install scripts off and
-  // .npmrc deleted, and runs main's lockfile's dependencies (decision record
+  // The Agent merge workflow refuses a package.json with a bin, exports,
+  // imports or workspaces, deletes .npmrc and npm-shrinkwrap.json, installs
+  // with scripts off, and runs main's lockfile's dependencies (decision record
   // 0032).
   { pattern: "package.json", why: "the commands CI runs, and dependencies" },
   { pattern: "package-lock.json", why: "dependencies" },
+  { pattern: "npm-shrinkwrap.json", why: "dependencies, in place of the lockfile" },
   { pattern: ".npmrc", why: "how npm ci installs, in every workflow" },
   { pattern: ".nvmrc", why: "the Node version CI uses" },
   { pattern: ".mcp.json", why: "tools every agent here would load" },
@@ -131,11 +137,20 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
   { pattern: ".claude/", why: "Claude Code's own setup, which steers every agent here" },
 ];
 
-// Config that a tool reads below the repo root too. Claude Code and Cursor load
-// skills and rules from a .claude/ or .cursor/ folder in any folder, and ESLint
-// 10 reads the eslint.config nearest each file, so a one-line one in src/lib/x/
-// turns lint off for every file there (JAS-191).
-const NESTED: readonly { test: RegExp; why: string }[] = [
+// Files a tool reads in any folder, not only the root (JAS-191).
+type Anywhere = { test: RegExp; why: string };
+
+// Node looks for a package in node_modules/ beside the importing file first, so
+// a committed scripts/node_modules/zod would replace the zod the gates import.
+// Nothing here commits node_modules/.
+const JASPERS_ANYWHERE: readonly Anywhere[] = [
+  { test: /(^|\/)node_modules\//i, why: "a package folder Node would load in place of an installed one" },
+];
+
+// Claude Code and Cursor load skills and rules from a .claude/ or .cursor/
+// folder in any folder, and ESLint 10 reads the eslint.config nearest each
+// file, so a one-line one in src/lib/x/ turns lint off for every file there.
+const PANEL_ANYWHERE: readonly Anywhere[] = [
   { test: /\/\.(claude|cursor)\//i, why: "agent skills or rules below the repo root" },
   { test: /\/eslint\.config\.[cm]?[jt]s$/i, why: "lint for the files in its folder, which ESLint reads in place of the root's" },
 ];
@@ -156,9 +171,9 @@ type Owner = { why: string; jaspers: boolean };
 // panel pattern that also matches, such as src/db/schema.ts inside src/db/, or
 // .claude/agent-merge.json inside .claude/.
 function owner(path: string): Owner | undefined {
-  const jaspers = JASPERS_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
+  const jaspers = JASPERS_PATHS.find(({ pattern }) => matchesPattern(pattern, path)) ?? JASPERS_ANYWHERE.find(({ test }) => test.test(path));
   if (jaspers) return { why: jaspers.why, jaspers: true };
-  const panel = PANEL_PATHS.find(({ pattern }) => matchesPattern(pattern, path)) ?? NESTED.find(({ test }) => test.test(path));
+  const panel = PANEL_PATHS.find(({ pattern }) => matchesPattern(pattern, path)) ?? PANEL_ANYWHERE.find(({ test }) => test.test(path));
   return panel ? { why: panel.why, jaspers: false } : undefined;
 }
 

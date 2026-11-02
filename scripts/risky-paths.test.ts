@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { posix } from "node:path";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
 import { jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, riskyFiles, type RiskyPath } from "./risky-paths";
@@ -16,7 +16,7 @@ const repoFiles = execFileSync("git", ["ls-files", "-z", "--cached", "--others",
 
 // The only risky patterns allowed to match no file in the repo (see the
 // "names only paths that exist" test below).
-const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/", "vite.config", ".npmrc", ".mcp.json"];
+const KEPT_WITHOUT_FILES = [".cursor/settings.json", ".cursor/rules/", "vite.config", ".npmrc", "npm-shrinkwrap.json", ".mcp.json", "scripts/package.json"];
 
 // The modules in src/db/ that never touch the database.
 const PURE_DB_MODULES = new Set(["db/freshness"]);
@@ -56,16 +56,20 @@ const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && 
 
 const onPanel = (path: string) => riskyFiles([path]).length === 1 && jaspersFiles([path]).length === 0;
 
-// What's wrong with a workflow's token, comments aside: no top-level
-// permissions line, so it gets the repo's default, or any write access.
+// What's wrong with a workflow's token: no top-level permissions line, so it
+// gets the repo's default, or the word write anywhere but a comment line. It
+// reads text, not YAML, so it also refuses a YAML escape or a quoted line that
+// runs on, either of which could spell write. A trailing comment or a run step
+// that says write is refused too, which only sends that workflow to Jasper.
 function tokenProblems(workflow: string): string[] {
   const code = workflow
     .split("\n")
-    .map((line) => line.replace(/(^|\s)#.*$/, ""))
+    .filter((line) => !line.trim().startsWith("#"))
     .join("\n");
   return [
     !/^permissions:/m.test(code) && "doesn't set its token's permissions",
-    /\bwrite(-all)?\b/.test(code) && "asks for write access",
+    /\bwrite(-all)?\b/i.test(code) && "asks for write access",
+    /\\[xuU]|\\\s*$/m.test(code) && "has a YAML escape or a line that runs on",
   ].filter((problem) => problem !== false);
 }
 
@@ -202,6 +206,11 @@ describe("riskyFiles", () => {
     ".claude/agent-merge.json",
     ".claude/settings.json",
     ".claude/settings.local.json",
+    "scripts/package.json",
+    "scripts/node_modules/zod/index.js",
+    "scripts/node_modules/zod/package.json",
+    "node_modules/zod/index.js",
+    "src/lib/node_modules/react/index.js",
   ])("keeps %s Jasper's to merge", (path) => {
     expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
   });
@@ -219,6 +228,7 @@ describe("riskyFiles", () => {
       ".github/workflows/reviewer",
       ".claude/agent-merge.json",
       ".claude/settings",
+      "scripts/package.json",
     ]);
   });
 
@@ -232,6 +242,7 @@ describe("riskyFiles", () => {
     ".GitHub/Workflows/Agent-Merge.yml",
     ".claude/Agent-Merge.json",
     ".Claude/Settings.json",
+    "scripts/Node_Modules/zod/index.js",
     "Scripts/Can-Merge-Gates.ts",
     "scripts/RISKY-PATHS.ts",
     "Drizzle/0015_x.sql",
@@ -276,6 +287,7 @@ describe("riskyFiles", () => {
     "src/app/corners.test.ts",
     "package.json",
     "package-lock.json",
+    "npm-shrinkwrap.json",
     ".npmrc",
     ".nvmrc",
     ".mcp.json",
@@ -427,31 +439,69 @@ describe("riskyFiles", () => {
     ["a job's write permission", "permissions: {}\njobs:\n  x:\n    permissions:\n      pull-requests: write\n"],
     ["write-all", "permissions: write-all\n"],
     ["a flow-style write", "permissions: { contents: read, actions: write }\n"],
+    ["a write after a quoted #", 'permissions: { contents: "read #", pull-requests: write }\n'],
+    ["a write spelled with a YAML escape", 'permissions:\n  pull-requests: "\\x77rite"\n'],
+    ["a write split over a quoted line that runs on", 'permissions:\n  pull-requests: "wr\\\n    ite"\n'],
+    ["Write in capitals", "permissions:\n  contents: Write\n"],
   ])("would refuse a workflow with %s", (_, text) => {
     expect(tokenProblems(text)).not.toEqual([]);
   });
 
-  it("accepts a workflow that reads only, whatever its comments say", () => {
-    expect(tokenProblems("# This job never writes; write access stays with Agent merge.\npermissions:\n  contents: read # no write\n")).toEqual([]);
+  it("accepts a workflow that reads only, whatever its comment lines say", () => {
+    expect(tokenProblems("# This job never writes; write access stays with Agent merge.\npermissions:\n  contents: read\n  # no write here\n")).toEqual([]);
   });
 
-  // The gates' code is Jasper's by name, so a helper they import under another
-  // name would be on neither list. This follows their imports from each file.
-  it("keeps every file the gates import Jasper's", () => {
-    const seen = new Set<string>();
-    const queue = repoFiles.filter((file) => /^scripts\/can-merge[^/]*\.ts$/.test(file) && !/\.test\.ts$/.test(file));
-    expect(queue).toContain("scripts/can-merge-gates.ts");
-    while (queue.length > 0) {
-      const file = queue.pop() as string;
-      if (seen.has(file)) continue;
-      seen.add(file);
-      for (const [, relative] of readFileSync(file, "utf8").matchAll(/from\s+["'](\.{1,2}\/[^"']+)["']/g)) {
-        const target = posix.normalize(posix.join(posix.dirname(file), relative));
-        queue.push(/\.[cm]?[jt]s$/.test(target) ? target : `${target}.ts`);
-      }
-    }
-    expect([...seen]).toContain("scripts/risky-paths.ts");
-    expect([...seen].filter((file) => jaspersFiles([file]).length === 0)).toEqual([]);
+  // The gates' code is Jasper's by name, so a helper they load under another
+  // name would be on neither list. This resolves what each gate loads, side
+  // effects and dynamic imports included, with the esbuild tsx runs and the
+  // tsconfig the Agent merge workflow gives it. Installed packages come from
+  // the lockfile, which 0032 leaves to the panel.
+  it("keeps every file the gates load, other than installed packages, Jasper's", async () => {
+    const fromTsx = createRequire(createRequire(import.meta.url).resolve("tsx/package.json"));
+    const esbuild = fromTsx("esbuild") as {
+      build: (options: object) => Promise<{ metafile: { inputs: Record<string, unknown> } }>;
+    };
+    const gates = repoFiles.filter((file) => /^scripts\/can-merge[^/]*\.ts$/.test(file) && !/\.test\.ts$/.test(file));
+    expect(gates).toContain("scripts/can-merge-action.ts");
+    const { metafile } = await esbuild.build({
+      entryPoints: gates,
+      bundle: true,
+      write: false,
+      metafile: true,
+      platform: "node",
+      format: "esm",
+      outdir: "out",
+      tsconfig: "scripts/can-merge.tsconfig.json",
+      logLevel: "silent",
+    });
+    const loaded = Object.keys(metafile.inputs);
+    expect(loaded).toEqual(expect.arrayContaining(["scripts/risky-paths.ts", "scripts/can-merge-gates.ts"]));
+    expect(loaded.some((file) => file.startsWith("node_modules/zod/"))).toBe(true);
+    expect(loaded.filter((file) => !file.startsWith("node_modules/") && jaspersFiles([file]).length === 0)).toEqual([]);
+  });
+
+  // npx runs package.json's own bin ahead of node_modules/.bin, a package name
+  // with exports, imports or workspaces can stand in for one the gates import,
+  // and a dependency from a file, a Git host or another registry skips npm's
+  // checks. The Agent merge workflow refuses the first group at run time; this
+  // stops a PR bringing any of them in.
+  it("keeps package.json and the lockfile from swapping what the gates load", () => {
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as Record<string, unknown> & {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      optionalDependencies?: Record<string, string>;
+    };
+    expect(["bin", "exports", "imports", "workspaces"].filter((key) => key in pkg)).toEqual([]);
+    const specs = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
+    expect(Object.entries(specs).filter(([, spec]) => !/^[\^~]?\d+(\.\d+){0,2}(-[\w.]+)?$/.test(spec))).toEqual([]);
+    const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as {
+      packages: Record<string, { resolved?: string; integrity?: string; link?: boolean; inBundle?: boolean }>;
+    };
+    const fetched = Object.entries(lock.packages).filter(([path, entry]) => path !== "" && !entry.inBundle);
+    expect(fetched.length).toBeGreaterThan(100);
+    expect(
+      fetched.filter(([, entry]) => entry.link || !entry.resolved?.startsWith("https://registry.npmjs.org/") || !entry.integrity).map(([path]) => path),
+    ).toEqual([]);
   });
 
   // A file on Jasper's list can sit in a panel folder, like src/db/schema.ts

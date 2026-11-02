@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   AgentMergeEvent,
@@ -404,14 +407,16 @@ describe(".github/workflows/agent-merge.yml", () => {
     expect(code.map((line) => line.trim())).toContain("timeout-minutes: 10");
   });
 
-  // .npmrc, package.json and tsconfig.json are on the panel list (decision
-  // record 0032), so the install runs with no .npmrc and no install scripts,
-  // and tsx reads a tsconfig on Jasper's list with no paths to swap a module.
-  it("runs only main's checkout, node, npm ci with no .npmrc or install scripts, and the action script", () => {
-    expect(code.filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
+  // package.json, .npmrc, tsconfig.json and the lockfile are on the panel list
+  // (decision record 0032), so the job refuses a package.json or a file under
+  // scripts/ that would change what the gates load, installs with no .npmrc,
+  // shrinkwrap or install scripts, and gives tsx a tsconfig on Jasper's list.
+  it("runs only main's checkout, node, the guard, npm ci with no .npmrc, shrinkwrap or install scripts, and the action script", () => {
+    expect(code.filter((line) => /^\s*- (uses|run|name):/.test(line)).map((line) => line.trim())).toEqual([
       "- uses: actions/checkout@v7",
       "- uses: actions/setup-node@v7",
-      "- run: rm -f .npmrc && npm ci --ignore-scripts",
+      "- name: Refuse files that would change what the gates load",
+      "- run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts",
       "- run: npx tsx scripts/can-merge-action.ts",
     ]);
     expect(code.filter((line) => /^\s*(ref|repository|path|token|cache|fetch-depth|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
@@ -445,6 +450,48 @@ describe(".github/workflows/agent-merge.yml", () => {
       "GH_REPO: ${{ github.repository }}",
       "TSX_TSCONFIG_PATH: scripts/can-merge.tsconfig.json",
     ]);
+  });
+
+  // The guard's own script, run on throwaway repos. npx would run a bin named
+  // tsx from package.json, and Node would load zod from a package scope with
+  // exports or a node_modules/ folder beside the gates.
+  describe("the guard step", () => {
+    const guard = source(".github/workflows/agent-merge.yml").match(/node -e '\n([\s\S]*?)\n\s*'\n/)?.[1] ?? "";
+    const plain = { name: "league-web-app", private: true, scripts: { test: "vitest run" }, dependencies: { zod: "^4.0.0" } };
+
+    function runGuard(files: Record<string, string>): number {
+      const dir = mkdtempSync(join(tmpdir(), "agent-merge-guard-"));
+      try {
+        for (const [path, text] of Object.entries(files)) {
+          mkdirSync(dirname(join(dir, path)), { recursive: true });
+          writeFileSync(join(dir, path), text);
+        }
+        execFileSync("git", ["init", "-q"], { cwd: dir });
+        execFileSync("git", ["add", "-f", "-A"], { cwd: dir });
+        return spawnSync(process.execPath, ["-e", guard], { cwd: dir, stdio: "pipe" }).status ?? -1;
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    it("passes main's package.json and a plain one, with a package.json in a skill folder", () => {
+      expect(guard).toContain("process.exit(1)");
+      expect(runGuard({ "package.json": source("package.json") })).toBe(0);
+      expect(runGuard({ "package.json": JSON.stringify(plain), ".claude/skills/x/scripts/package.json": "{}" })).toBe(0);
+    });
+
+    it.each<[string, Record<string, string>]>([
+      ["a bin", { "package.json": JSON.stringify({ ...plain, bin: { tsx: "./x.js" } }) }],
+      ["a bin named after the package", { "package.json": JSON.stringify({ ...plain, name: "tsx", bin: "./x.js" }) }],
+      ["exports", { "package.json": JSON.stringify({ ...plain, name: "zod", exports: "./x.js" }) }],
+      ["imports", { "package.json": JSON.stringify({ ...plain, imports: { "#x": "./x.js" } }) }],
+      ["workspaces", { "package.json": JSON.stringify({ ...plain, workspaces: ["zod"] }) }],
+      ["a scripts/package.json", { "package.json": JSON.stringify(plain), "scripts/package.json": JSON.stringify({ name: "zod", exports: "./x.js" }) }],
+      ["a scripts/node_modules/ folder", { "package.json": JSON.stringify(plain), "scripts/node_modules/zod/index.js": "export {};" }],
+      ["a package.json that isn't JSON", { "package.json": "{ not json" }],
+    ])("refuses %s", (_, files) => {
+      expect(runGuard(files)).toBe(1);
+    });
   });
 
   // tsx follows a tsconfig's paths for bare imports, so a paths entry here

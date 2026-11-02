@@ -518,6 +518,8 @@ describe("decide", () => {
       ".github/workflows/reviewer.yml",
       ".claude/agent-merge.json",
       ".claude/settings.json",
+      "scripts/package.json",
+      "scripts/node_modules/zod/index.js",
     ])("still refuses %s with a panel line and a clean verdict at the head, in every tier", (file) => {
       for (const tier of ["tiny. One line.", "normal. One line.", "risky. One line."]) {
         const files = ["src/app/sign-in/page.tsx", file];
