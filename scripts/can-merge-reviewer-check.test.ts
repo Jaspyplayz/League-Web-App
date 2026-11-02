@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -120,23 +120,39 @@ describe("the reviewer check GitHub requires", () => {
     expect(code).toBe(1);
   });
 
-  it("fetches a head commit the checkout doesn't have, as a fork's is", () => {
-    const checkout = join(events, "checkout");
+  // Like the workflow's checkout: main's branch only, cloned through git's
+  // transport, so a commit on another branch is missing until fetched.
+  const cloneOfMain = (name: string) => {
+    const checkout = join(events, name);
     execFileSync("git", ["clone", "--quiet", "--no-local", "--single-branch", "--branch", "main", repo, checkout]);
+    return checkout;
+  };
+
+  it("fetches a head commit the checkout doesn't have, as a fork's is", () => {
+    const checkout = cloneOfMain("fork-checkout");
     const { code, out } = check(body("normal. A habit card.", [`Reviewer agent at ${heads.code}: no blockers`]), heads.code, checkout);
     expect(out).toContain(`PASS Reviewer cleared the PR: Reviewer agent at ${heads.code}: no blockers`);
     expect(code).toBe(0);
   });
 
-  // Without the hex check, git still fails on these, so the test looks for
-  // the schema's own error instead.
-  it.each(["head", "base"])("fails an event whose %s isn't a full commit name, before git sees it", (which) => {
-    const bad = "--output=/dev/null";
-    const { code, out } = which === "head" ? check(body("normal. A habit card."), bad) : check(body("normal. A habit card."), heads.code, repo, bad);
-    expect(out).toContain("ZodError");
-    expect(out).toMatch(new RegExp(`"${which}",\\s*"sha"`));
+  // The commit names reach git as arguments, so one starting with "--" would
+  // be read as an option. Without the hex check, this base makes git write the
+  // diff to a file instead of listing it, so a tiny PR looks like it changed
+  // nothing and passes.
+  it("doesn't let a base that looks like an option hide the PR's files", () => {
+    const { code, out } = check(body("tiny. A copy fix."), heads.big, repo, `--output=${join(events, "leak")}`);
     expect(out).not.toContain("PASS");
     expect(code).toBe(1);
+    expect(readdirSync(events).filter((name) => name.startsWith("leak"))).toEqual([]);
+  });
+
+  // Without the hex check, this head makes git fetch run a command.
+  it("doesn't let a head that looks like an option run a command", () => {
+    const pwned = join(events, "pwned");
+    const { code, out } = check(body("normal. A habit card."), `--upload-pack=touch ${pwned}`, cloneOfMain("option-checkout"));
+    expect(out).not.toContain("PASS");
+    expect(code).toBe(1);
+    expect(existsSync(pwned)).toBe(false);
   });
 });
 
@@ -154,7 +170,7 @@ describe(WORKFLOW, () => {
     expect(workflow()).toMatch(/^jobs:\n {2}reviewer:$/m);
   });
 
-  it("runs main's copy of the workflow on every PR into main, edit and push", () => {
+  it("runs on both PR triggers into main, for every edit and push", () => {
     const lines = workflowLines();
     const on = lines.indexOf("on:");
     const end = lines.findIndex((line, i) => i > on && !line.startsWith(" "));
@@ -169,18 +185,26 @@ describe(WORKFLOW, () => {
     ]);
   });
 
-  it("runs only main's checkout, node, npm ci and the check script", () => {
-    expect(workflowLines().filter((line) => /^\s*- (uses|run):/.test(line)).map((line) => line.trim())).toEqual([
-      "- uses: actions/checkout@v7",
-      "- uses: actions/setup-node@v7",
-      "- run: npm ci",
-      "- run: npx tsx scripts/can-merge-reviewer-check.ts",
-    ]);
-    expect(workflowLines().filter((line) => /^\s*(ref|repository|path|token|cache|fetch-depth|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
-      "ref: main",
-      "fetch-depth: 0",
-      "persist-credentials: false",
-      "package-manager-cache: false",
+  // Every line of the job, so any new step, option or setting changes this
+  // test too. The whole history keeps the PR's base commit here.
+  it("runs only main's checkout, node, npm ci and the check script, for at most 10 minutes", () => {
+    const lines = workflowLines();
+    expect(lines.slice(lines.indexOf("jobs:") + 1)).toEqual([
+      "  reviewer:",
+      "    runs-on: ubuntu-latest",
+      "    timeout-minutes: 10",
+      "    steps:",
+      "      - uses: actions/checkout@v7",
+      "        with:",
+      "          ref: main",
+      "          fetch-depth: 0",
+      "          persist-credentials: false",
+      "      - uses: actions/setup-node@v7",
+      "        with:",
+      "          node-version-file: .nvmrc",
+      "          package-manager-cache: false",
+      "      - run: npm ci",
+      "      - run: npx tsx scripts/can-merge-reviewer-check.ts",
     ]);
   });
 
@@ -197,10 +221,6 @@ describe(WORKFLOW, () => {
     const end = lines.findIndex((line, i) => i > start && !line.startsWith(" "));
     expect(lines.slice(start + 1, end)).toEqual(["  contents: read"]);
     expect(lines.filter((line) => /permissions:/.test(line))).toHaveLength(1);
-  });
-
-  it("gives up on a hung run in minutes, so the check can't sit pending for hours", () => {
-    expect(workflowLines().map((line) => line.trim())).toContain("timeout-minutes: 10");
   });
 
   // GitHub counts a skipped job as passing a required check, and a paths
