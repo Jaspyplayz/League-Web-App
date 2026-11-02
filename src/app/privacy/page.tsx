@@ -93,9 +93,9 @@ export default function PrivacyPage() {
         data) to Anthropic, which runs the Claude AI model, and saves the recap it writes. No
         account details, Riot IDs or notes are sent. Anyone looking at that game sees the saved
         recap. Turnpoint also notes when your account asks for a recap, including tries that
-        fail, only to limit how many one account can request a day. Notes more than a day old are
-        deleted the next time you ask, and all of them when your account is deleted. Older recaps
-        also note which account asked for them, until that account is deleted.
+        fail, only to limit how many one account can request a day. It keeps no more than your
+        last 20 of these notes, and deleting your account deletes them. Older recaps also note
+        which account asked for them, until that account is deleted.
       </p>
 
       <h2>Ask</h2>

@@ -39,7 +39,7 @@ Each try costs under a tenth of a cent on Haiku, but it also spends the Riot lim
 Good:
 - The cap holds however many tries arrive at once: `src/lib/recap-store-db.test.ts` sends 30 and 20 reach Claude, and with the lock taken out, runs let 21 to 27 through.
 - Failed tries count, so retrying a game Claude can't write stops at 20.
-- New recaps no longer say which account asked for them, and an account keeps at most its last day of tries, plus up to 20 older ones until its next try.
+- New recaps no longer say which account asked for them, and an account never has more than 20 rows in `recap_tries`. A try is saved only when the locked count found fewer than 20 in the last day, and the same transaction deletes everything older.
 
 Bad:
 - A try that fails because Anthropic or Riot is down still uses one of the day's 20. That's plenty for one player, and it errs on the safe side.

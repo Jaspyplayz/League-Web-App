@@ -121,6 +121,8 @@ describe.skipIf(!url)("createRecap on a throwaway Postgres", () => {
     expect(vi.mocked(writeRecap).mock.calls.length).toBe(RECAPS_PER_DAY);
     expect(results.filter((r) => r.status === "written")).toHaveLength(RECAPS_PER_DAY);
     expect(results.filter((r) => r.status === "failed")).toHaveLength(10);
+    // /privacy says an account never has more than 20 of these rows.
+    expect(await triesOf(USER)).toBe(RECAPS_PER_DAY);
   });
 
   it("counts tries Claude couldn't finish toward the day", async () => {
