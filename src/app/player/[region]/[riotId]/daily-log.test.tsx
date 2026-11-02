@@ -38,7 +38,7 @@ const OCTOBER = groupDays(
 
 function render(days = OCTOBER, notes: ReadDayNotesResult | null = null): string {
   return renderToStaticMarkup(
-    <ByDayView days={days} now={NOW} notes={notes} player="kr:hide on bush#kr1" playerPath="/player/kr/x" />,
+    <ByDayView days={days} now={NOW} stored notes={notes} player="kr:hide on bush#kr1" playerPath="/player/kr/x" />,
   );
 }
 
@@ -81,7 +81,7 @@ describe("By day", () => {
     expect(october).toMatch(/aria-label="Next month"[^>]*disabled=""/);
     // 2 November: the four weeks reach back into October, and it opens there.
     const html = renderToStaticMarkup(
-      <ByDayView days={OCTOBER} now={at(11, 2, 12)} notes={null} player="p" playerPath="/player/kr/x" />,
+      <ByDayView days={OCTOBER} now={at(11, 2, 12)} stored notes={null} player="p" playerPath="/player/kr/x" />,
     );
     expect(html).toContain("October 2026");
     expect(html).not.toMatch(/aria-label="Next month"[^>]*disabled=""/);
@@ -93,7 +93,7 @@ describe("By day", () => {
     // October rather than on a September it couldn't leave.
     const days = groupDays([game(at(9, 30, 23), true)], []);
     const html = renderToStaticMarkup(
-      <ByDayView days={days} now={at(10, 28, 22)} notes={null} player="p" playerPath="/player/kr/x" />,
+      <ByDayView days={days} now={at(10, 28, 22)} stored notes={null} player="p" playerPath="/player/kr/x" />,
     );
     expect(html).toContain("October 2026");
     expect(html).toContain("No games in the last 4 weeks");

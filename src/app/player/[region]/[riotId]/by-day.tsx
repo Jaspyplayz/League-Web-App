@@ -76,8 +76,8 @@ export async function ByDay({
     getDataDragon().catch(() => null),
     // The saved ranks belong to the region the profile is saved for. On
     // another region's page they'd give these games LP from that other
-    // server's climb, so the days say "LP not recorded" instead, like the
-    // rank card draws no graph there (JAS-41).
+    // server's climb, so the days show no LP, like the rank card draws no
+    // graph there (JAS-41).
     stored ? loadRankHistory(puuid, new Date(now)) : [],
     loadNotes(puuid, dayKey(now - (LOG_DAYS + 2) * DAY_S * 1000)),
     readRecapHeadlines(
@@ -135,6 +135,7 @@ export async function ByDay({
       <DailyLog
         games={games}
         ranks={ranks}
+        stored={stored}
         notes={notes}
         player={playerKey(region, gameName, tagLine)}
         playerPath={playerPath}

@@ -80,12 +80,14 @@ async function renderByDay(stored: boolean): Promise<string> {
   })) as ReactElement<{ children: ReactNode }>;
   const log = Children.toArray(page.props.children).find(
     (child) => isValidElement(child) && child.type === DailyLog,
-  ) as ReactElement<ComponentProps<typeof DailyLog>>;
+  ) as ReactElement<ComponentProps<typeof DailyLog>> | undefined;
+  if (!log) throw new Error("ByDay didn't render DailyLog as a direct child");
   const { games, ranks, notes, player, playerPath } = log.props;
   return renderToStaticMarkup(
     <ByDayView
       days={groupDays(games, ranks)}
       now={NOW}
+      stored={log.props.stored}
       notes={notes}
       player={player}
       playerPath={playerPath}
@@ -102,13 +104,15 @@ describe("By day's LP", () => {
     expect(loadRankHistory).toHaveBeenCalledWith("player-1", expect.any(Date));
     expect(html).toContain("0W 2L</b>");
     expect(html).toContain("30 LP lost");
+    expect(html).toContain("a day with no update in between says");
   });
 
   it("shows no LP on another server's page", async () => {
     const html = await renderByDay(false);
     expect(loadRankHistory).not.toHaveBeenCalled();
     expect(html).toContain("0W 2L</b>");
-    expect(html).not.toMatch(/LP (lost|gained|even)/);
-    expect(html).toContain("LP not recorded");
+    expect(html).not.toMatch(/LP (lost|gained|even|not recorded)/);
+    // Said once, under the days, instead of "LP not recorded" on each one.
+    expect(html).toContain("Turnpoint saves ranks only on the server this profile is saved for");
   });
 });
