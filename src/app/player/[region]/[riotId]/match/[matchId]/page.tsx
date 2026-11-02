@@ -128,20 +128,18 @@ async function Analysis({ params }: { params: Params }) {
     />
   );
   const notes = <MatchNotes region={region} matchId={matchId} />;
+  // A game the analyzer can't read: say why, then show the scoreboard.
+  const notAnalyzed = (reason: string) => (
+    <>
+      {top}
+      <p className={`${panelClass} px-5 py-4 text-quiet`}>{reason} Here&apos;s the scoreboard.</p>
+      {scoreboard}
+      {notes}
+    </>
+  );
 
   const skipped = whyNotAnalyzed(match);
-  if (skipped) {
-    return (
-      <>
-        {top}
-        <p className={`${panelClass} px-5 py-4 text-quiet`}>
-          {skipped} Here&apos;s the scoreboard.
-        </p>
-        {scoreboard}
-        {notes}
-      </>
-    );
-  }
+  if (skipped) return notAnalyzed(skipped);
 
   const [timeline, tier] = await Promise.all([
     // `items`, so the replay can show what everyone was carrying.
@@ -160,7 +158,11 @@ async function Analysis({ params }: { params: Params }) {
   }
 
   const label = (name: string) => championName(dd, name);
-  const analysis = analyzeMatch(match, timeline.value, me.puuid, label)!;
+  const analysis = analyzeMatch(match, timeline.value, me.puuid, label);
+  // `me` is in the game, so null means the timeline is missing some players.
+  if (!analysis) {
+    return notAnalyzed("This game's timeline is missing some players, so it couldn't be analyzed.");
+  }
   const winChance = matchWinChance(match, timeline.value, me.teamId, tier);
   // The replay's win chance at every second and its graded plays, from the
   // same model as the win chance chart.
