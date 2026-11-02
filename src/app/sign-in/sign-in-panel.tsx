@@ -13,11 +13,20 @@ const LOGOS: Record<Provider, typeof GoogleLogo> = {
 };
 
 // Shown when a sign-in attempt bounces back here with ?error=.
-const ERRORS: Record<string, string> = {
+const ERRORS = {
   provider: "That sign-in option isn't available.",
   start: "Couldn't start signing in. Please try again.",
   callback: "Signing in didn't finish. If you pressed Cancel, that's fine: try again any time.",
-};
+} as const;
+
+// Every object also answers to names like "__proto__", "constructor" and
+// "toString", so a plain ERRORS[error] found one of those for a crafted
+// ?error=, and drawing "__proto__" showed the error page. Object.hasOwn only
+// sees our three. ERRORS has exact keys, so TypeScript won't let ERRORS[error]
+// compile until this check has passed.
+function isErrorCode(value: string): value is keyof typeof ERRORS {
+  return Object.hasOwn(ERRORS, value);
+}
 
 export function SignInPanel({
   configured,
@@ -48,7 +57,7 @@ export function SignInPanel({
           >
             !
           </span>
-          <span>{ERRORS[error] ?? ERRORS.start}</span>
+          <span>{isErrorCode(error) ? ERRORS[error] : ERRORS.start}</span>
         </p>
       )}
       {/* Each button is its own small form, so it works before any JavaScript

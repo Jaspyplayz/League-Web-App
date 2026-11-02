@@ -24,9 +24,19 @@ describe("the sign-in panel", () => {
   });
 
   it("keeps a safe ?next= for after signing in", () => {
-    const html = renderToStaticMarkup(<SignInPanel configured next="//evil.com" />);
-    expect(html).toContain('name="next" value="/"');
+    const html = renderToStaticMarkup(<SignInPanel configured next="/player/kr/Faker-KR1" />);
+    expect(html).toContain('name="next" value="/player/kr/Faker-KR1"');
   });
+
+  // The last three made the URL parser throw, which showed the error page.
+  it.each(["//evil.com", "//[", "//a b", "//:"])(
+    "sends ?next=%j home, with the buttons still there",
+    (next) => {
+      const html = renderToStaticMarkup(<SignInPanel configured next={next} />);
+      expect(html).toContain('name="next" value="/"');
+      expect(html).toContain("Continue with Google");
+    },
+  );
 
   it("shows today's message above the buttons after a failed attempt, in neutral colours", () => {
     const html = renderToStaticMarkup(<SignInPanel configured error="callback" />);
@@ -36,10 +46,25 @@ describe("the sign-in panel", () => {
     expect(html.indexOf('role="alert"')).toBeLessThan(html.indexOf("Continue with Google"));
   });
 
-  it("falls back to the start message for an unknown error", () => {
-    const html = renderToStaticMarkup(<SignInPanel configured error="nonsense" />);
-    expect(alertOf(html)).toContain("Couldn&#x27;t start signing in.");
+  it.each([
+    ["provider", "That sign-in option isn&#x27;t available."],
+    ["start", "Couldn&#x27;t start signing in. Please try again."],
+  ])("shows the %s message", (error, message) => {
+    const html = renderToStaticMarkup(<SignInPanel configured error={error} />);
+    expect(alertOf(html)).toContain(message);
   });
+
+  // __proto__, constructor and toString are on every object, so a plain
+  // lookup found them, and drawing __proto__ threw the error page.
+  it.each(["nonsense", "__proto__", "constructor", "toString"])(
+    "falls back to the start message for ?error=%j",
+    (error) => {
+      const html = renderToStaticMarkup(<SignInPanel configured error={error} />);
+      expect(alertOf(html)).toContain("Couldn&#x27;t start signing in.");
+      expect(html).toContain("Continue with Google");
+      expect(html).toContain("Continue with Discord");
+    },
+  );
 
   it("says sign-in isn't set up in place of the buttons", () => {
     const html = renderToStaticMarkup(<SignInPanel configured={false} error="callback" />);

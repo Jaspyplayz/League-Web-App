@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isProvider, safeNextPath, userFromClaims, cleanName } from "./sign-in";
+import { isProvider, loneValue, safeNextPath, userFromClaims, cleanName } from "./sign-in";
 
 describe("isProvider", () => {
   it("accepts the providers we offer", () => {
@@ -36,12 +36,33 @@ describe("safeNextPath", () => {
     "/.//evil.com",
     "/%2e%2e//evil.com",
     "player",
+    // new URL throws on these, which showed the error page.
+    "//[",
+    "//a b",
+    "//:",
+    "/\\[",
   ])(
     "sends %j home instead",
     (next) => {
       expect(safeNextPath(next)).toBe("/");
     },
   );
+});
+
+describe("loneValue", () => {
+  it("keeps a value that's there once", () => {
+    expect(loneValue("/player")).toBe("/player");
+    expect(loneValue(["/player"])).toBe("/player");
+  });
+
+  it("treats a value sent twice as not sent", () => {
+    expect(loneValue(["/a", "/b"])).toBeUndefined();
+  });
+
+  it("leaves a missing value missing", () => {
+    expect(loneValue(undefined)).toBeUndefined();
+    expect(loneValue([])).toBeUndefined();
+  });
 });
 
 describe("cleanName", () => {
