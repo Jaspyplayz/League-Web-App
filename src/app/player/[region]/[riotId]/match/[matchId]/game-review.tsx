@@ -19,6 +19,7 @@ import { formatSwing, GRADES } from "@/lib/analyzer/plays";
 import type { BoardPlay } from "@/lib/board";
 import { formatPercentTenths } from "@/lib/percent";
 import { useReviewLinks } from "./review-links";
+import { StepButton } from "./step-button";
 
 // One of the score tiles: Overall, Early, Mid or Late.
 export type ScoreTile = { label: string; span: string; score: number };
@@ -296,31 +297,17 @@ export function StepButtons({
   return (
     <div className="grid grid-cols-4 gap-1.5">
       {steps.map((step) => (
-        <button
+        <StepButton
           key={step.label}
-          type="button"
-          aria-label={step.label}
-          aria-disabled={step.off}
-          title={step.label}
+          label={step.label}
+          unavailable={step.off}
           onClick={() => {
             if (!step.off) onSelect(step.to);
           }}
-          className="flex min-h-11 items-center justify-center rounded-md bg-raised hover:bg-select aria-disabled:text-quiet aria-disabled:hover:bg-raised"
+          className="min-h-11 bg-raised hover:bg-select aria-disabled:text-quiet aria-disabled:hover:bg-raised"
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d={step.icon} />
-          </svg>
-        </button>
+          <path d={step.icon} />
+        </StepButton>
       ))}
     </div>
   );

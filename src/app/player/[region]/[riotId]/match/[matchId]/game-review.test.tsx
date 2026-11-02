@@ -71,12 +71,17 @@ function review(overrides: Partial<GameReviewProps> = {}) {
 }
 
 // There's no browser in these tests (e2e/smoke.spec.ts clicks the real thing),
-// so this walks what a component returns to find its buttons.
+// so this walks what a component returns to find its buttons, drawing the
+// components inside it, such as StepButton, which have no hooks.
 type ButtonProps = { onClick: () => void; "aria-label": string; "aria-disabled": boolean };
 function buttons(node: ReactNode): ReactElement<ButtonProps>[] {
   if (Array.isArray(node)) return node.flatMap(buttons);
   if (!isValidElement<{ children?: ReactNode }>(node)) return [];
   if (node.type === "button") return [node as ReactElement<ButtonProps>];
+  if (typeof node.type === "function") {
+    const draw = node.type as (props: unknown) => ReactNode;
+    return buttons(draw(node.props));
+  }
   return buttons(node.props.children);
 }
 
