@@ -2,12 +2,16 @@ import { Children, isValidElement, type ComponentProps, type ReactElement, type 
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { match, participants } from "@/lib/analyzer/test-fixtures";
+import { getCurrentUser } from "@/lib/auth";
 import { groupDays } from "@/lib/daily-log";
+import { readDayNotes } from "@/lib/day-note-store";
 import { loadMatches, loadTimelines } from "@/lib/match-store";
+import { readMyPlayer } from "@/lib/my-player";
 import { loadRankHistory } from "@/lib/profile-store";
 import { readQueueFilter } from "@/lib/queue-filters";
 import type { RankPoint } from "@/lib/rank-history";
 import { getMatchIds } from "@/lib/riot/api";
+import { supabaseConfig } from "@/lib/supabase/config";
 import { ByDay } from "./by-day";
 import { ByDayView, DailyLog } from "./daily-log";
 
@@ -21,8 +25,9 @@ vi.mock("@/lib/ddragon", () => ({
   getDataDragon: async () => null,
   championName: (_dd: null, name: string) => name,
 }));
-// Signed out, so By day reads no notes and no session.
-vi.mock("@/lib/supabase/config", () => ({ supabaseConfig: () => null }));
+// Signed out unless a test turns sign-in on, so By day reads no notes and no
+// session.
+vi.mock("@/lib/supabase/config", () => ({ supabaseConfig: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/lib/day-note-store", () => ({ readDayNotes: vi.fn() }));
 vi.mock("@/lib/my-player", () => ({ readMyPlayer: vi.fn() }));
@@ -63,12 +68,15 @@ beforeEach(() => {
   vi.mocked(loadMatches).mockReset().mockResolvedValue({ matches: GAMES, waiting: 0, error: null });
   vi.mocked(loadTimelines).mockReset().mockResolvedValue({ timelines: new Map(), error: null });
   vi.mocked(loadRankHistory).mockReset().mockResolvedValue(HISTORY);
+  vi.mocked(supabaseConfig).mockReset().mockReturnValue(null);
+  vi.mocked(getCurrentUser).mockReset().mockResolvedValue(null);
+  vi.mocked(readMyPlayer).mockReset();
+  vi.mocked(readDayNotes).mockReset();
 });
 
-// By day's day panels, as the browser draws them. DailyLog itself only draws
-// "Loading your days…" outside a browser, because days depend on the
-// viewer's timezone, so this draws its days the way it does once loaded.
-async function renderByDay(stored: boolean): Promise<string> {
+// What By day hands its DailyLog: the games, ranks and notes for player-1's
+// profile.
+async function byDayLog(stored: boolean): Promise<ComponentProps<typeof DailyLog>> {
   const page = (await ByDay({
     region: "na",
     puuid: "player-1",
@@ -82,17 +90,27 @@ async function renderByDay(stored: boolean): Promise<string> {
     (child) => isValidElement(child) && child.type === DailyLog,
   ) as ReactElement<ComponentProps<typeof DailyLog>> | undefined;
   if (!log) throw new Error("ByDay didn't render DailyLog as a direct child");
-  const { games, ranks, notes, player, playerPath } = log.props;
+  return log.props;
+}
+
+// By day's day panels, as the browser draws them. DailyLog itself only draws
+// "Loading your days…" outside a browser, because days depend on the
+// viewer's timezone, so this draws its days the way it does once loaded.
+function draw({ games, ranks, stored, notes, player, playerPath }: ComponentProps<typeof DailyLog>): string {
   return renderToStaticMarkup(
     <ByDayView
       days={groupDays(games, ranks)}
       now={NOW}
-      stored={log.props.stored}
+      stored={stored}
       notes={notes}
       player={player}
       playerPath={playerPath}
     />,
   );
+}
+
+async function renderByDay(stored: boolean): Promise<string> {
+  return draw(await byDayLog(stored));
 }
 
 // The saved rank history belongs to the server the profile is saved for, so
@@ -114,5 +132,59 @@ describe("By day's LP", () => {
     expect(html).not.toMatch(/LP (lost|gained|even|not recorded)/);
     // Said once, under the days, instead of "LP not recorded" on each one.
     expect(html).toContain("Turnpoint saves ranks only on the server this profile is saved for");
+  });
+});
+
+// Day notes are private: only the profile the signed-in account marked "This
+// is me" reads them and shows a box to write one (JAS-256). Every other test
+// here runs signed out, which skips these checks.
+describe("By day's notes", () => {
+  // The account's saved notes: one on 17 October, the day of both games.
+  const notes = { ok: true as const, byDay: { "2026-10-17": "Stop forcing level 2 fights." } };
+  // The account marked `puuid` as "This is me".
+  const marked = (puuid: string) => ({
+    ok: true as const,
+    player: { puuid, region: "na" as const, gameName: "Someone", tagLine: "NA1", profileIconId: null },
+  });
+
+  beforeEach(() => {
+    vi.mocked(supabaseConfig).mockReturnValue({ url: "https://example.supabase.co", key: "publishable" });
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: "user-1", name: "Jaspy", provider: null });
+    vi.mocked(readDayNotes).mockResolvedValue(notes);
+  });
+
+  it("shows the account's notes on the profile it marked as its own", async () => {
+    vi.mocked(readMyPlayer).mockResolvedValue(marked("player-1"));
+    const log = await byDayLog(true);
+    expect(readDayNotes).toHaveBeenCalledWith("user-1", expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+    expect(log.notes).toEqual(notes);
+    const html = draw(log);
+    expect(html).toContain("Your note for this day");
+    expect(html).toContain("Stop forcing level 2 fights.");
+  });
+
+  // Otherwise your notes, and a box that saves to your days, would show on
+  // the By day of whoever you look up.
+  it("reads no notes on a profile the account didn't mark", async () => {
+    vi.mocked(readMyPlayer).mockResolvedValue(marked("player-2"));
+    const log = await byDayLog(true);
+    expect(readMyPlayer).toHaveBeenCalledWith("user-1");
+    expect(readDayNotes).not.toHaveBeenCalled();
+    expect(log.notes).toBeNull();
+    const html = draw(log);
+    expect(html).not.toContain("Your note for this day");
+    expect(html).not.toContain("Stop forcing level 2 fights.");
+  });
+
+  // #167: a failed read can't say whose profile this is, so it shows no note
+  // box and says the notes couldn't be loaded.
+  it("says the notes couldn't be loaded when it can't read which profile is the account's", async () => {
+    vi.mocked(readMyPlayer).mockResolvedValue({ ok: false });
+    const log = await byDayLog(true);
+    expect(readDayNotes).not.toHaveBeenCalled();
+    expect(log.notes).toEqual({ ok: false });
+    const html = draw(log);
+    expect(html).toContain("Your notes couldn&#x27;t be loaded");
+    expect(html).not.toContain("<textarea");
   });
 });
