@@ -615,11 +615,12 @@ describe("riskyFiles", () => {
     expect(loaded.filter((file) => !file.startsWith("node_modules/") && jaspersFiles([file]).length === 0)).toEqual([]);
   });
 
-  // npx runs package.json's own bin ahead of node_modules/.bin, a package name
-  // with exports, imports or workspaces can stand in for one the gates import,
-  // and a dependency from a file, a Git host or another registry skips npm's
-  // checks. The Agent merge workflow refuses the first group at run time; this
-  // stops a PR bringing any of them in. The lockfile half catches an entry
+  // npx runs package.json's own bin, or a file in its directories.bin, ahead of
+  // node_modules/.bin, a package name with exports, imports or workspaces can
+  // stand in for one the gates import, and a dependency from a file, a Git host
+  // or another registry skips npm's checks. The Agent merge workflow refuses the
+  // first group, apart from directories, at run time; this stops a PR bringing
+  // any of them in. The lockfile half catches an entry
   // edited by hand or by mistake, not one written to get past it: review found
   // four ways round it, so the lockfile itself stays Jasper's (decision record
   // 0032).
@@ -629,7 +630,7 @@ describe("riskyFiles", () => {
       devDependencies?: Record<string, string>;
       optionalDependencies?: Record<string, string>;
     };
-    expect(["bin", "exports", "imports", "workspaces"].filter((key) => key in pkg)).toEqual([]);
+    expect(["bin", "directories", "exports", "imports", "workspaces"].filter((key) => key in pkg)).toEqual([]);
     const specs = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
     expect(Object.entries(specs).filter(([, spec]) => !/^[\^~]?\d+(\.\d+){0,2}(-[\w.]+)?$/.test(spec))).toEqual([]);
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as { packages: Record<string, LockEntry> };
