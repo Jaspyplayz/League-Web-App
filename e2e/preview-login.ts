@@ -60,12 +60,14 @@ type OnHop = (firstUrl: string, hopUrl: string) => void;
 
 // Playwright reports no redirect for a keepalive fetch: its first hop looks like
 // a plain 200, and the later hop fires nothing. Chrome's own protocol shows it,
-// so this asks there too, for each page.
+// so this asks there too, for each page. A new tab's first script can start a
+// chain before this attaches, so a hop first seen mid-chain counts from the hop
+// before it.
 async function watchChromeRedirects(context: BrowserContext, page: Page, onHop: OnHop) {
   const chrome = await context.newCDPSession(page);
   const firstUrls = new Map<string, string>();
-  chrome.on("Network.requestWillBeSent", ({ requestId, request }) => {
-    const first = firstUrls.get(requestId) ?? request.url;
+  chrome.on("Network.requestWillBeSent", ({ requestId, request, redirectResponse }) => {
+    const first = firstUrls.get(requestId) ?? redirectResponse?.url ?? request.url;
     firstUrls.set(requestId, first);
     onHop(first, request.url);
   });

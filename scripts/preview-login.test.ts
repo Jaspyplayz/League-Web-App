@@ -22,7 +22,12 @@ function fakeContext(openPages: Page[] = []) {
     openPage: (page: Page) => events.emit("page", page),
     newCDPSession,
     // Chrome numbers a chain's requests with one id, and reports each hop under it.
-    chromeHop: (requestId: string, url: string) => chrome.emit("Network.requestWillBeSent", { requestId, request: { url } }),
+    chromeHop: (requestId: string, url: string, redirectedFromUrl?: string) =>
+      chrome.emit("Network.requestWillBeSent", {
+        requestId,
+        request: { url },
+        redirectResponse: redirectedFromUrl ? { url: redirectedFromUrl } : undefined,
+      }),
     listeners: () => events.listenerCount("request") + events.listenerCount("page"),
   };
 }
@@ -193,6 +198,18 @@ describe("recordLeaks", () => {
 
         chromeHop("1", `${PREVIEW}/go`);
         chromeHop("1", `${OTHER}/keepalive`);
+
+        await expect(leaked()).resolves.toEqual([OTHER]);
+      });
+
+      // A new tab's first script can start a chain before the watch attaches.
+      it("counts a hop first seen mid-chain from the hop before it", async () => {
+        withSecret();
+        const { context, chromeHop } = fakeContext([PAGE]);
+        const leaked = recordLeaks(context, PREVIEW);
+        await attached();
+
+        chromeHop("1", `${OTHER}/keepalive`, `${PREVIEW}/go`);
 
         await expect(leaked()).resolves.toEqual([OTHER]);
       });

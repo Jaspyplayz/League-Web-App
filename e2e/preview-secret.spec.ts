@@ -41,10 +41,16 @@ test.describe("the check on redirects", () => {
       const url = new URL(req.url!, "http://local");
       if (url.pathname === "/favicon.ico") return void res.writeHead(404).end();
       heard.push({ url: `http://${host}:${(server.address() as AddressInfo).port}${req.url}`, secret: "x-vercel-protection-bypass" in req.headers });
-      if (url.pathname === "/go") return void res.writeHead(302, { location: url.searchParams.get("to")! }).end();
+      if (url.pathname === "/go") return void res.writeHead(302, { location: url.searchParams.get("to")!, "access-control-allow-origin": "*" }).end();
       if (url.pathname === "/hang") return;
+      if (url.pathname === "/script") {
+        const script = `fetch(${JSON.stringify(url.searchParams.get("to"))}, { keepalive: ${url.searchParams.get("keepalive")} }).catch(() => {})`;
+        return void res.writeHead(200, { "content-type": "text/html" }).end(`<!doctype html><title>script</title><script>${script}</script>`);
+      }
       if (url.pathname === "/die") return void req.socket.destroy();
-      res.writeHead(200, { "content-type": "text/html", "access-control-allow-origin": "*" }).end("<!doctype html><title>page</title>");
+      if (url.pathname === "/page") return void res.writeHead(200, { "content-type": "text/html" }).end("<!doctype html><title>page</title>");
+      // Plain text, since Chrome fails a no-cors fetch that gets HTML.
+      res.writeHead(200, { "content-type": "text/plain", "access-control-allow-origin": "*" }).end("ok");
     });
     servers.push(server);
     await new Promise<void>((resolve) => server.listen(0, host, resolve));
@@ -74,23 +80,35 @@ test.describe("the check on redirects", () => {
 
   const via = (site: string, to: string) => `${site}/go?to=${encodeURIComponent(to)}`;
 
-  const cases: { name: string; url: () => string; lastHop: string; init?: RequestInit; carries: boolean }[] = [
+  type From = "page" | "new tab" | "worker";
+
+  const cases: { name: string; url: () => string; lastHop: string; init?: RequestInit; from?: From; addToEveryRequest?: boolean; carries: boolean }[] = [
     { name: "catches a redirect whose last hop fails", url: () => via(preview, `${other}/die`), lastHop: "/die", carries: true },
     { name: "catches a redirect still running at the check", url: () => via(preview, `${other}/hang`), lastHop: "/hang", carries: true },
     { name: "catches a redirect that answers", url: () => via(preview, `${other}/ok`), lastHop: "/ok", carries: true },
     { name: "catches a keepalive fetch's redirect", url: () => via(preview, `${other}/ok`), lastHop: "/ok", init: { keepalive: true }, carries: true },
+    { name: "catches a keepalive fetch from a new tab's first script", url: () => via(preview, `${other}/ok`), lastHop: "/ok", init: { keepalive: true }, from: "new tab", carries: true },
+    // Only Playwright's request event sees this one: a page's Chrome session
+    // doesn't report what a worker sends.
+    { name: "catches a redirect from a worker", url: () => via(preview, `${other}/hang`), lastHop: "/hang", from: "worker", carries: true },
+    { name: "catches a secret a config adds to every request", url: () => `${other}/ok`, lastHop: "/ok", init: { mode: "no-cors" }, addToEveryRequest: true, carries: true },
     { name: "passes a request to another site", url: () => `${other}/ok`, lastHop: "/ok", init: { mode: "no-cors" }, carries: false },
     { name: "passes a chain that only passes through the preview", url: () => via(other, via(preview, `${other}/ok`)), lastHop: "/ok", init: { mode: "no-cors" }, carries: false },
   ];
 
-  async function runCheck(browser: Browser, url: string, lastHop: string, init: RequestInit = {}) {
+  async function runCheck(browser: Browser, url: string, lastHop: string, init: RequestInit = {}, from: From = "page", addToEveryRequest = false) {
     heard.length = 0;
-    const context = await browser.newContext({ baseURL: preview });
+    // How the first leak happened: playwright.config.ts set this for every request.
+    const extraHTTPHeaders = addToEveryRequest ? { "x-vercel-protection-bypass": "made-up-for-this-test" } : undefined;
+    const context = await browser.newContext({ baseURL: preview, extraHTTPHeaders });
     await passPreviewLogin(context, preview);
     const leaked = recordLeaks(context, preview);
     const page = await context.newPage();
     await page.goto("/page");
-    await page.evaluate(([u, i]) => void fetch(u as string, i as RequestInit).catch(() => {}), [url, init]);
+    const script = (site: string) => `${site}/script?keepalive=${init.keepalive ?? false}&to=${encodeURIComponent(url)}`;
+    if (from === "new tab") await page.evaluate((u) => void window.open(u), script(preview));
+    else if (from === "worker") await page.evaluate((u) => void new Worker(URL.createObjectURL(new Blob([`fetch(${JSON.stringify(u)}).catch(() => {})`]))), url);
+    else await page.evaluate(([u, i]) => void fetch(u as string, i as RequestInit).catch(() => {}), [url, init]);
     await expect.poll(() => heard.some((h) => h.url === `${other}${lastHop}`)).toBe(true);
     // A failing hop reports its failure after the server has heard it.
     await page.waitForTimeout(100);
@@ -100,9 +118,9 @@ test.describe("the check on redirects", () => {
     return { answer, secretAtOther };
   }
 
-  for (const { name, url, lastHop, init, carries } of cases) {
+  for (const { name, url, lastHop, init, from, addToEveryRequest, carries } of cases) {
     test(name, async ({ browser }) => {
-      const { answer, secretAtOther } = await runCheck(browser, url(), lastHop, init);
+      const { answer, secretAtOther } = await runCheck(browser, url(), lastHop, init, from, addToEveryRequest);
       expect(secretAtOther, "the other site's server got the secret").toBe(carries);
       expect(answer).toEqual(carries ? [other] : []);
     });
