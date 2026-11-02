@@ -359,7 +359,8 @@ const newestOf = (statuses: CommitStatus[]) => statuses.map((status) => status.u
 //
 // A blocked account, as Vercel's pause for going over its Active CPU limit at
 // 13:01 UTC on 2026-11-02, is one only Jasper can fix, so no hour runs it out.
-// It lasts until a later success, and after that it's a refusal like any other.
+// It lasts while main's head or an open PR's head still shows it, until a later
+// success, and after that it's a refusal like any other.
 export function vercelState(statuses: CommitStatus[], now: Date): VercelState {
   const finished = statuses.filter((status) => status.context === "Vercel" && ["success", "failure", "error"].includes(status.state));
   const deployed = finished.filter((status) => status.state === "success");
