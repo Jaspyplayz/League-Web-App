@@ -21,12 +21,16 @@ const MAX_BLOCKER_ROUNDS = 10;
 const FINISHED: readonly Status[] = ["Done", "Canceled", "Duplicate"];
 const TICKET_ID = /^JAS-\d+$/;
 
+// Linear refuses a query over 10,000 complexity points, and each ticket's 20
+// labels and 20 relations multiply its cost, so one answer holds 25 tickets.
+const TICKETS_PER_PAGE = 25;
+
 // The GraphQL documents the queue sends, checked against Linear's published schema.
 const QUEUE_ISSUE =
-  "fragment QueueIssue on Issue { id identifier title description createdAt priority state { name } project { name } assignee { id } labels(first: 50) { nodes { name } } children(first: 1) { nodes { id } } inverseRelations(first: 50) { nodes { type issue { id identifier } } } }";
-export const QUEUE_QUERY = `query Queue($after: String) { viewer { id } issues(first: 50, after: $after, filter: { team: { key: { eq: "JAS" } }, project: { name: { eq: "Turnpoint" } }, state: { name: { in: ["Ready", "In Progress", "In Review"] } } }) { pageInfo { hasNextPage endCursor } nodes { ...QueueIssue } } }
+  "fragment QueueIssue on Issue { id identifier title description createdAt priority state { name } project { name } assignee { id } labels(first: 20) { pageInfo { hasNextPage } nodes { name } } children(first: 1) { nodes { id } } inverseRelations(first: 20) { pageInfo { hasNextPage } nodes { type issue { id identifier } } } }";
+export const QUEUE_QUERY = `query Queue($after: String) { viewer { id } issues(first: ${TICKETS_PER_PAGE}, after: $after, filter: { team: { key: { eq: "JAS" } }, project: { name: { eq: "Turnpoint" } }, state: { name: { in: ["Ready", "In Progress", "In Review"] } } }) { pageInfo { hasNextPage endCursor } nodes { ...QueueIssue } } }
 ${QUEUE_ISSUE}`;
-export const ISSUES_QUERY = `query Issues($ids: [ID!]) { issues(first: 50, filter: { id: { in: $ids } }) { nodes { ...QueueIssue } } }
+export const ISSUES_QUERY = `query Issues($ids: [ID!]) { issues(first: ${TICKETS_PER_PAGE}, filter: { id: { in: $ids } }) { nodes { ...QueueIssue } } }
 ${QUEUE_ISSUE}`;
 export const COMMENTS_QUERY =
   "query Comments($id: String!, $after: String) { issue(id: $id) { comments(first: 100, after: $after) { pageInfo { hasNextPage endCursor } nodes { id body createdAt } } } }";
@@ -39,6 +43,7 @@ export const ISSUE_UPDATE =
   "mutation IssueUpdate($id: String!, $stateId: String!, $priority: Int!) { issueUpdate(id: $id, input: { stateId: $stateId, priority: $priority }) { success } }";
 
 const STATUSES = ["Backlog", "Todo", "Ready", "In Progress", "In Review", "Done", "Canceled", "Duplicate"] as const satisfies readonly Status[];
+const HasNextPage = z.object({ hasNextPage: z.boolean() });
 
 // One ticket, as the QueueIssue fragment asks for it.
 export const LinearIssue = z.object({
@@ -52,10 +57,11 @@ export const LinearIssue = z.object({
   state: z.object({ name: z.enum(STATUSES) }),
   project: z.object({ name: z.string() }).nullable(),
   assignee: z.object({ id: z.string() }).nullable(),
-  labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
+  labels: z.object({ pageInfo: HasNextPage, nodes: z.array(z.object({ name: z.string() })) }),
   children: z.object({ nodes: z.array(z.object({ id: z.string() })) }),
   // Relations other tickets made to this one. A "blocks" one names a blocker.
   inverseRelations: z.object({
+    pageInfo: HasNextPage,
     nodes: z.array(z.object({ type: z.string(), issue: z.object({ id: z.string(), identifier: z.string() }) })),
   }),
 });
@@ -154,12 +160,19 @@ export async function readSnapshot(repo: string, linear: LinearCall, github: Git
     const missing = [...new Set(issues.flatMap(blockersOf).map((blocker) => blocker.id))].filter((id) => !asked.has(id));
     if (missing.length === 0) break;
     if (round > MAX_BLOCKER_ROUNDS) throw new Error(`A chain of blockers runs more than ${MAX_BLOCKER_ROUNDS} tickets deep, so the queue stopped reading it.`);
-    for (let i = 0; i < missing.length; i += 50) {
-      const ids = missing.slice(i, i + 50);
+    for (let i = 0; i < missing.length; i += TICKETS_PER_PAGE) {
+      const ids = missing.slice(i, i + TICKETS_PER_PAGE);
       for (const id of ids) asked.add(id);
       const found = linearData("Issues", IssuesAnswer, await linear(ISSUES_QUERY, { ids }));
       issues.push(...found.issues.nodes.filter((issue) => ids.includes(issue.id)));
     }
+  }
+
+  // A label or relation past the first 20 goes unread, and a missed blocker
+  // or wayfinder: label would start a ticket that shouldn't start.
+  for (const issue of issues) {
+    if (issue.labels.pageInfo.hasNextPage) throw new Error(`${issue.identifier} has more than 20 labels, which the queue doesn't read.`);
+    if (issue.inverseRelations.pageInfo.hasNextPage) throw new Error(`${issue.identifier} has more than 20 relations, which the queue doesn't read.`);
   }
 
   // Comments matter only on the tickets the queue could start or comment on.

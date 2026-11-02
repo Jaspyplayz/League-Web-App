@@ -81,9 +81,12 @@ function issue(id: string, input: IssueInput = {}): LinearIssue {
     state: { name: input.status ?? "Ready" },
     project: input.project === null ? null : { name: input.project ?? "Turnpoint" },
     assignee: input.assignee ? { id: input.assignee } : null,
-    labels: { nodes: [] },
+    labels: { pageInfo: { hasNextPage: false }, nodes: [] },
     children: { nodes: Array.from({ length: input.subTickets ?? 0 }, (_, i) => ({ id: `child-${i}` })) },
-    inverseRelations: { nodes: (input.blockedBy ?? []).map((blocker) => ({ type: "blocks", issue: { id: uuidOf(blocker), identifier: blocker } })) },
+    inverseRelations: {
+      pageInfo: { hasNextPage: false },
+      nodes: (input.blockedBy ?? []).map((blocker) => ({ type: "blocks", issue: { id: uuidOf(blocker), identifier: blocker } })),
+    },
   });
 }
 
@@ -137,18 +140,28 @@ function dryEffects() {
 }
 
 // Linear's answers to the queue's reads, from the tickets given. Blockers
-// come back only from the by-ID query, as they do from Linear.
+// come back only from the by-ID query, as they do from Linear, and each
+// answer holds no more tickets than the query's `first` asks for.
 function fakeLinear(queue: unknown[], { blockers = [], comments = {} }: { blockers?: LinearIssue[]; comments?: Record<string, LinearComment[]> } = {}) {
   const asked: string[] = [];
   const call: LinearCall = async (query, variables) => {
+    const first = Number(query.match(/issues\(first: (\d+)/)?.[1]);
     if (query === QUEUE_QUERY) {
-      asked.push("Queue");
-      return { data: { viewer: { id: JASPER }, issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: queue } } };
+      const after = variables.after as string | null;
+      asked.push(after ? `Queue after ${after}` : "Queue");
+      const start = Number(after ?? 0);
+      const more = start + first < queue.length;
+      return {
+        data: {
+          viewer: { id: JASPER },
+          issues: { pageInfo: { hasNextPage: more, endCursor: more ? String(start + first) : null }, nodes: queue.slice(start, start + first) },
+        },
+      };
     }
     if (query === ISSUES_QUERY) {
       const ids = variables.ids as string[];
       asked.push(`Issues ${ids.join(" ")}`);
-      return { data: { issues: { nodes: blockers.filter((blocker) => ids.includes(blocker.id)) } } };
+      return { data: { issues: { nodes: blockers.filter((blocker) => ids.includes(blocker.id)).slice(0, first) } } };
     }
     if (query === COMMENTS_QUERY) {
       const nodes = comments[variables.id as string] ?? [];
@@ -335,6 +348,27 @@ describe("reading Linear's answers", () => {
     expect(read.issues.map((ticket) => ticket.identifier)).toEqual(["JAS-1", "JAS-2", "JAS-3"]);
     // JAS-9 never comes back, and isn't asked for again.
     expect(linear.asked).toEqual(["Queue", "Issues uuid-JAS-2", "Issues uuid-JAS-3 uuid-JAS-9"]);
+  });
+
+  it("asks Linear for 25 tickets at a time, under its complexity limit, and reads every page", async () => {
+    const numbers = Array.from({ length: 30 }, (_, i) => i + 1);
+    const blockers = numbers.map((n) => issue(`JAS-${n + 100}`, { status: "Todo" }));
+    const linear = fakeLinear(
+      numbers.map((n) => issue(`JAS-${n}`, { blockedBy: [`JAS-${n + 100}`] })),
+      { blockers },
+    );
+    const read = await readSnapshot(REPO, linear.call, quietGitHub);
+    expect(read.issues).toHaveLength(60);
+    const ids = blockers.map((blocker) => blocker.id);
+    expect(linear.asked).toEqual(["Queue", "Queue after 25", `Issues ${ids.slice(0, 25).join(" ")}`, `Issues ${ids.slice(25).join(" ")}`]);
+  });
+
+  it("stops at a ticket with more labels or relations than it reads, since a missed one could be a blocker", async () => {
+    const moreLabels = { ...issue("JAS-1"), labels: { pageInfo: { hasNextPage: true }, nodes: [] } };
+    await expect(readSnapshot(REPO, fakeLinear([moreLabels]).call, quietGitHub)).rejects.toThrow("JAS-1 has more than 20 labels, which the queue doesn't read");
+    const moreRelations = { ...issue("JAS-3", { status: "Todo" }), inverseRelations: { pageInfo: { hasNextPage: true }, nodes: [] } };
+    const linear = fakeLinear([issue("JAS-2", { blockedBy: ["JAS-3"] })], { blockers: [moreRelations as LinearIssue] });
+    await expect(readSnapshot(REPO, linear.call, quietGitHub)).rejects.toThrow("JAS-3 has more than 20 relations, which the queue doesn't read");
   });
 
   it("throws on a Linear answer with errors", async () => {
