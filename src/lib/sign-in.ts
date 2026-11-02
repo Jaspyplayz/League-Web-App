@@ -23,26 +23,25 @@ export function isProvider(value: string): value is Provider {
 // result only if it stays on our (placeholder) site.
 const HOME = "http://turnpoint.invalid";
 
-// It takes the value the way the address gives it. A ?next= that's there
-// twice comes as an array (Next.js does that for a page, and the callback
-// reads every copy with getAll), and which one the player meant is anyone's
-// guess, so only a lone value counts.
-export function safeNextPath(next: string | string[] | null | undefined): string {
-  const value = Array.isArray(next) && next.length === 1 ? next[0] : next;
-  if (typeof value !== "string" || !value.startsWith("/")) return "/";
-
-  let url: URL;
-  try {
-    url = new URL(value, HOME);
-  } catch {
-    // A crafted value like "//[" isn't an address at all, and the parser
-    // throws on it. Going home is the same answer as for any other bad value.
-    return "/";
-  }
+export function safeNextPath(next: string | null | undefined): string {
+  if (!next?.startsWith("/")) return "/";
+  // URL.parse, not new URL: a crafted value like "//[" isn't an address at
+  // all, and new URL throws on it, which showed the error page. URL.parse
+  // gives null instead, and that goes home like any other bad value.
+  const url = URL.parse(next, HOME);
   // The parser also tidies the path, and that can make a new "//":
   // "/a/..//evil.com" tidies to "//evil.com". So check the tidied path too.
-  if (url.origin !== HOME || url.pathname.startsWith("//")) return "/";
+  if (!url || url.origin !== HOME || url.pathname.startsWith("//")) return "/";
   return `${url.pathname}${url.search}${url.hash}`;
+}
+
+// One value from the address, or undefined when it's missing or there more
+// than once. Next.js gives a page an array when a value is repeated, and
+// getAll() always gives an array. Which copy the player meant is anyone's
+// guess, so a value sent twice counts as not sent.
+export function loneValue(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value.length === 1 ? value[0] : undefined;
+  return value;
 }
 
 // The parts of a signed-in user the site uses. Google and Discord fill in

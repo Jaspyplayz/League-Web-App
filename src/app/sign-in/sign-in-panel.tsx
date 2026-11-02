@@ -13,31 +13,29 @@ const LOGOS: Record<Provider, typeof GoogleLogo> = {
 };
 
 // Shown when a sign-in attempt bounces back here with ?error=.
-const ERRORS: Record<string, string> = {
+const ERRORS = {
   provider: "That sign-in option isn't available.",
   start: "Couldn't start signing in. Please try again.",
   callback: "Signing in didn't finish. If you pressed Cancel, that's fine: try again any time.",
-};
+} as const;
 
-// Object.hasOwn, not ERRORS[error]: every object also answers to names like
-// "__proto__", "constructor" and "toString", so a crafted ?error= would find
-// one of those instead of a message, and drawing "__proto__" throws. Anything
-// that isn't one of ours, an ?error= sent twice included, gets the start
-// message.
-function errorMessage(error: string | string[]): string {
-  return typeof error === "string" && Object.hasOwn(ERRORS, error) ? ERRORS[error] : ERRORS.start;
+// Every object also answers to names like "__proto__", "constructor" and
+// "toString", so a plain ERRORS[error] found one of those for a crafted
+// ?error=, and drawing "__proto__" showed the error page. Object.hasOwn only
+// sees our three. ERRORS has exact keys, so TypeScript won't let ERRORS[error]
+// compile until this check has passed.
+function isErrorCode(value: string): value is keyof typeof ERRORS {
+  return Object.hasOwn(ERRORS, value);
 }
 
-// next and error come straight from the address, so either can be an array
-// when it's there twice.
 export function SignInPanel({
   configured,
   next,
   error,
 }: {
   configured: boolean;
-  next?: string | string[];
-  error?: string | string[];
+  next?: string;
+  error?: string;
 }) {
   if (!configured) {
     return (
@@ -59,7 +57,7 @@ export function SignInPanel({
           >
             !
           </span>
-          <span>{errorMessage(error)}</span>
+          <span>{isErrorCode(error) ? ERRORS[error] : ERRORS.start}</span>
         </p>
       )}
       {/* Each button is its own small form, so it works before any JavaScript

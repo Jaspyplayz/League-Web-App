@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { safeNextPath } from "@/lib/sign-in";
+import { loneValue, safeNextPath } from "@/lib/sign-in";
 import { createSupabaseClient } from "@/lib/supabase/server";
 
 // Step 2 of signing in. Google or Discord sent the player back here with a
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   // Every copy, not get()'s first: a ?next= sent twice goes home, as on /sign-in.
-  const next = safeNextPath(searchParams.getAll("next"));
+  const next = safeNextPath(loneValue(searchParams.getAll("next")));
 
   const supabase = await createSupabaseClient();
   if (code && supabase) {

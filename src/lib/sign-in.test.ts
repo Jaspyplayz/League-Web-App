@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isProvider, safeNextPath, userFromClaims, cleanName } from "./sign-in";
+import { isProvider, loneValue, safeNextPath, userFromClaims, cleanName } from "./sign-in";
 
 describe("isProvider", () => {
   it("accepts the providers we offer", () => {
@@ -24,10 +24,6 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/player/../?tab=insights")).toBe("/?tab=insights");
   });
 
-  it("keeps a lone value read with getAll", () => {
-    expect(safeNextPath(["/?tab=insights"])).toBe("/?tab=insights");
-  });
-
   it.each([
     null,
     undefined,
@@ -40,7 +36,7 @@ describe("safeNextPath", () => {
     "/.//evil.com",
     "/%2e%2e//evil.com",
     "player",
-    // The URL parser throws on these, which used to show the error page.
+    // new URL throws on these, which showed the error page.
     "//[",
     "//a b",
     "//:",
@@ -51,14 +47,21 @@ describe("safeNextPath", () => {
       expect(safeNextPath(next)).toBe("/");
     },
   );
+});
 
-  it("sends ?next= sent twice, or not at all, home", () => {
-    expect(safeNextPath(["/a", "/b"])).toBe("/");
-    expect(safeNextPath([])).toBe("/");
+describe("loneValue", () => {
+  it("keeps a value that's there once", () => {
+    expect(loneValue("/player")).toBe("/player");
+    expect(loneValue(["/player"])).toBe("/player");
   });
 
-  it("still checks a lone value read with getAll", () => {
-    expect(safeNextPath(["//evil.com"])).toBe("/");
+  it("treats a value sent twice as not sent", () => {
+    expect(loneValue(["/a", "/b"])).toBeUndefined();
+  });
+
+  it("leaves a missing value missing", () => {
+    expect(loneValue(undefined)).toBeUndefined();
+    expect(loneValue([])).toBeUndefined();
   });
 });
 
