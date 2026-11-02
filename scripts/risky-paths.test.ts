@@ -200,6 +200,15 @@ describe("riskyFiles", () => {
     expect(jaspersFiles(paths).map((file) => file.path)).toEqual(paths);
   });
 
+  // It decides what builders run with nobody watching (JAS-143). The Action's
+  // own scripts in JAS-144 will start with the same name.
+  it("keeps the ticket queue's code Jasper's to merge", () => {
+    const paths = ["scripts/run-queue-pick.ts", "scripts/run-queue-pick.test.ts", "scripts/run-queue.ts", "scripts/run-queue-rest.ts"];
+    expect(jaspersFiles(paths)).toEqual(
+      paths.map((path) => ({ path, why: "the ticket queue, which decides what builders run unattended" })),
+    );
+  });
+
   // Each tool loads another file name ahead of the one the repo has today, so
   // an exact name would let a new file replace a check's config.
   it.each(["eslint.config.js", "next.config.js", "vitest.config.ts", "vite.config.ts", "playwright.config.js", "tsconfig.base.json"])(
