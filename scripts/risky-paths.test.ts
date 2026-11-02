@@ -58,12 +58,13 @@ const onPanel = (path: string) => riskyFiles([path]).length === 1 && jaspersFile
 
 type LockEntry = { version?: string; resolved?: string; integrity?: string; link?: boolean; inBundle?: boolean; name?: string };
 
-// What's wrong with a lockfile entry, if anything. It must have one of the two
-// shapes npm writes for a package from the registry: fetched as the package
-// and version its path names, with an integrity hash, or bundled inside
-// another package's tarball, with nothing of its own to fetch. Any other shape
-// is refused, not only the tricks found so far: npm resolves a ".." in the URL,
-// so it's compared whole, and it still fetches a bundled entry's own URL.
+// What's wrong with a lockfile entry, as far as a text check can see. It must
+// look like one of the two shapes npm writes for a package from the registry:
+// fetched as the package and version its path names, with an integrity hash,
+// or bundled inside another package's tarball, with nothing of its own to
+// fetch. npm resolves a ".." in the URL, so it's compared whole. A version or
+// path written to get past this still can (decision record 0032), which is why
+// the lockfile stays on Jasper's list.
 function lockProblems(path: string, entry: LockEntry): string[] {
   if (entry.inBundle) {
     const own = (["resolved", "integrity", "name", "link"] as const).filter((key) => key in entry);
@@ -233,6 +234,7 @@ describe("riskyFiles", () => {
     ".claude/settings.json",
     ".claude/settings.local.json",
     "scripts/package.json",
+    "package-lock.json",
     "scripts/node_modules/zod/index.js",
     "scripts/node_modules/zod/package.json",
     "node_modules/zod/index.js",
@@ -255,6 +257,7 @@ describe("riskyFiles", () => {
       ".claude/agent-merge.json",
       ".claude/settings",
       "scripts/package.json",
+      "package-lock.json",
     ]);
   });
 
@@ -312,7 +315,6 @@ describe("riskyFiles", () => {
     "src/app/themes.test.ts",
     "src/app/corners.test.ts",
     "package.json",
-    "package-lock.json",
     "npm-shrinkwrap.json",
     ".npmrc",
     ".nvmrc",
@@ -509,10 +511,11 @@ describe("riskyFiles", () => {
   // npx runs package.json's own bin ahead of node_modules/.bin, a package name
   // with exports, imports or workspaces can stand in for one the gates import,
   // and a dependency from a file, a Git host or another registry skips npm's
-  // checks. A lockfile entry whose tarball is another package's installs that
-  // package under the entry's name, so anything on npm could stand in for zod.
-  // The Agent merge workflow refuses the first group at run time; this stops a
-  // PR bringing any of them in.
+  // checks. The Agent merge workflow refuses the first group at run time; this
+  // stops a PR bringing any of them in. The lockfile half catches an entry
+  // edited by hand or by mistake, not one written to get past it: review found
+  // four ways round it, so the lockfile itself stays Jasper's (decision record
+  // 0032).
   it("keeps package.json and the lockfile from swapping what the gates load", () => {
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as Record<string, unknown> & {
       dependencies?: Record<string, string>;

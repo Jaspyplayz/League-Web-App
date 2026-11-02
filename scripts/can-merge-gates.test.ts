@@ -520,6 +520,7 @@ describe("decide", () => {
       ".claude/settings.json",
       "scripts/package.json",
       "scripts/node_modules/zod/index.js",
+      "package-lock.json",
     ])("still refuses %s with a panel line and a clean verdict at the head, in every tier", (file) => {
       for (const tier of ["tiny. One line.", "normal. One line.", "risky. One line."]) {
         const files = ["src/app/sign-in/page.tsx", file];
@@ -539,7 +540,7 @@ describe("decide", () => {
       "playwright.config.ts",
       "e2e/preview-login.ts",
       "src/app/themes.test.ts",
-      "package-lock.json",
+      "npm-shrinkwrap.json",
       "scripts/run-queue-pick.ts",
     ])("merges %s with a panel line and a clean verdict at the head, in every tier", (file) => {
       for (const tier of ["tiny. One line.", "normal. One line.", "risky. One line."]) {
@@ -579,9 +580,9 @@ describe("decide", () => {
       });
     });
 
-    // JAS-191's third criterion. Dependabot's PRs change package.json,
-    // package-lock.json and .github/workflows/, which are off Jasper's list
-    // now, so only "Built by Claude Code" keeps them, and anyone else's, his.
+    // JAS-191's third criterion. Dependabot's PRs change package.json and
+    // .github/workflows/, which are off Jasper's list now, so only "Built by
+    // Claude Code" keeps them, and anyone else's, his.
     it.each<[string, Partial<PrSnapshot>]>([
       ["it comes from a fork", { isCrossRepository: true }],
       ["Dependabot opened it on its own branch", { headRefName: "dependabot/npm_and_yarn/next-16.1.0", author: { login: "app/dependabot", isBot: true } }],
@@ -589,7 +590,7 @@ describe("decide", () => {
       ["a person opened it on their own branch", { headRefName: "jasper/try-ci" }],
       ["its Builder line names another builder", { body: body({ builder: "Cursor chat on Grok 4.7.", review: [panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`] }) }],
     ])("still refuses a PR that changes CI and dependencies when %s, with the panel and the reviewer", (_, overrides) => {
-      const files = ["package.json", "package-lock.json", ".github/workflows/ci.yml"];
+      const files = ["package.json", ".github/workflows/ci.yml", ".github/dependabot.yml"];
       const decision = decide(pr({ body: body({ review: [panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`] }), files, ...overrides }), main());
       expect(failed(decision)).toEqual(["Built by Claude Code"]);
     });

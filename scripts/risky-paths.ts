@@ -1,8 +1,8 @@
 // The paths that make a PR risky (issue #158), in two lists (JAS-128, JAS-191):
 //
 // - JASPERS_PATHS: migrations, the schema they come from, and the merge gates
-//   (their code, Claude's deny rules, the switch, and the package files Node
-//   would load in place of the gates' imports). `npm run can-merge`
+//   (their code, Claude's deny rules, the switch, the lockfile, and the
+//   package files Node would load in place of the gates' imports). `npm run can-merge`
 //   refuses a PR that touches one, whatever its tier says. Only Jasper runs
 //   `npm run db:migrate`, so code merged before its migration would break the
 //   live site's reads; and an agent could otherwise loosen a gate and merge
@@ -47,6 +47,12 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   // Node reads the package.json nearest each gate, so one here with a name and
   // exports would stand in for a package the gates import, such as zod.
   { pattern: "scripts/package.json", why: "a package scope the gates would load in place of an installed package" },
+  // It decides which tsx, esbuild and zod the Agent merge job runs with its
+  // token, and an entry can install another package under any name in ways a
+  // test kept missing (decision record 0032), so it stays Jasper's until the
+  // gates have a lockfile of their own (JAS-252). npm ci refuses a package.json
+  // that doesn't match it, so package.json alone can't change what's installed.
+  { pattern: "package-lock.json", why: "the dependencies the merge gates run with" },
 ];
 
 export const PANEL_PATHS: readonly RiskyPath[] = [
@@ -78,11 +84,9 @@ export const PANEL_PATHS: readonly RiskyPath[] = [
   { pattern: "e2e/preview-secret.spec.ts", why: "the check that the preview's secret stays on the preview" },
   { pattern: "scripts/preview-login", why: "the test of the check that the preview's secret stays on the preview" },
   // The Agent merge workflow refuses a package.json with a bin, exports,
-  // imports or workspaces, deletes .npmrc and npm-shrinkwrap.json, installs
-  // with scripts off, and runs main's lockfile's dependencies (decision record
-  // 0032).
+  // imports or workspaces, deletes .npmrc and npm-shrinkwrap.json, and installs
+  // with scripts off (decision record 0032).
   { pattern: "package.json", why: "the commands CI runs, and dependencies" },
-  { pattern: "package-lock.json", why: "dependencies" },
   { pattern: "npm-shrinkwrap.json", why: "dependencies, in place of the lockfile" },
   { pattern: ".npmrc", why: "how npm ci installs, in every workflow" },
   { pattern: ".nvmrc", why: "the Node version CI uses" },

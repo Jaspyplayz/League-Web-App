@@ -100,8 +100,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      # Claude can merge package.json, .npmrc, tsconfig.json and the lockfile
-      # after the panel, so these steps stop the ones found so far from changing
+      # Claude can merge package.json, .npmrc and tsconfig.json after the panel,
+      # so these steps stop the ones found so far from changing
       # which code runs below with the token (decision record 0032). npx runs
       # package.json's own bin ahead of node_modules/.bin, and a package scope
       # with exports, imports or workspaces, or a node_modules/ folder beside the
@@ -119,7 +119,7 @@ jobs:
           '
       # An .npmrc could set node-options, npm-shrinkwrap.json would replace the
       # lockfile, and an install script could rewrite the gates on disk. The
-      # dependencies themselves still come from main's lockfile.
+      # dependencies come from main's lockfile, which stays Jasper's.
       - run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts
       - run: npx tsx scripts/can-merge-action.ts
         env:
