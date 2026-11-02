@@ -626,3 +626,27 @@ describe(".github/workflows/run-queue.yml", () => {
     expect(runLines.some((line) => line.includes("${{"))).toBe(false);
   });
 });
+
+describe("scripts/run-queue.ts", () => {
+  const code = source("scripts/run-queue.ts");
+  const lines = code.split("\n");
+
+  it("reads the task token and the Linear key in one place each, and sends each only in its Authorization header", () => {
+    expect(code.match(/RUN_QUEUE_TASK_TOKEN/g)).toHaveLength(1);
+    expect(code.match(/LINEAR_API_KEY/g)).toHaveLength(1);
+    expect(lines.filter((line) => line.includes("taskToken")).map((line) => line.trim())).toEqual([
+      'const taskToken = dryRun ? "" : required("RUN_QUEUE_TASK_TOKEN");',
+      "headers: { ...request.headers, Authorization: `Bearer ${taskToken}` },",
+    ]);
+    expect(lines.filter((line) => line.includes("linearKey")).map((line) => line.trim())).toEqual([
+      'const linearKey = required("LINEAR_API_KEY");',
+      'headers: { "content-type": "application/json", Authorization: linearKey },',
+    ]);
+  });
+
+  it("never logs a secret or the environment", () => {
+    const logging = lines.filter((line) => /console\.|log\(|summary\(/.test(line));
+    expect(logging.length).toBeGreaterThan(0);
+    for (const line of logging) expect(line).not.toMatch(/taskToken|linearKey|process\.env|TOKEN|API_KEY/);
+  });
+});
