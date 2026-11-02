@@ -93,7 +93,8 @@ const journeys: Journey[] = [
     needs: ["nothing"],
     phone: true,
     run: async ({ page, step, note }) => {
-      await step("open home on a phone", async () => {
+      await step("open home at 390px", async () => {
+        await page.setViewportSize({ width: 390, height: 844 });
         await page.goto("/", LOAD);
         await expect(page.getByRole("heading", { level: 1 })).toHaveText("Turnpoint", LOAD);
         await expectCalm(page);

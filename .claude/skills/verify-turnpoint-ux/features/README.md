@@ -42,7 +42,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 - [Search form recovery](./search-recovery.md) covers a Riot ID without a tag: a clear inline message, the input kept, no page change. Journey `ux-search-recovery`.
 - [Saved players box](./saved-players.md) covers the box under both searches: opening and closing it, the tabs, filtering, pin, remove, rank badges, 390px. Journeys `ux-saved-players`, `ux-saved-players-phone`, `ux-saved-players-search`.
-- [Home on a phone](./phone-home.md) covers the home page on a Pixel 7: no sideways scroll, a reachable Search button, the example game. Journey `ux-phone-home`.
+- [Home on a phone](./phone-home.md) covers the home page on a phone at 390px: no sideways scroll, a reachable Search button, the example game. Journey `ux-phone-home`.
 - [60-second review path](./review-path.md) covers home → sample game → review → Watch in replay → back to Summary. Journey `ux-review-path`.
 - [Game review](./game-review.md) covers the Summary's right column: score tiles, grade counts, stepping through your plays with the board following, Start review in the replay, 390px. Journeys `ux-game-review`, `ux-game-review-phone`.
 - [Signed-out teasers](./signed-out-teasers.md) covers Ask, Game recap and Your notes for a signed-out visitor, and the Sign in round trip. Journey `ux-signed-out-teasers`.
