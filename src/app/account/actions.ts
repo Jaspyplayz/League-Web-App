@@ -63,11 +63,17 @@ export async function saveMatchNoteAction(
     : { status: "failed", message: "Couldn't save the note. Try again in a moment." };
 }
 
-// The Save button under a day in By day. Same checks as above; the day is
-// "2026-10-16" in the player's own timezone.
+// The Save button under a day in By day. Same checks as above, plus the day
+// must be one By day could be showing (isNoteDay). The day is "2026-10-16"
+// in the player's own timezone.
 export async function saveDayNoteAction(day: string, note: string): Promise<SaveNoteResult> {
   if (!isDayKey(day) || !isNoteDay(day, Date.now())) {
-    return { status: "failed", message: "Couldn't save the note for this day." };
+    // A player only gets this from a page left open for days, and reloading
+    // moves By day on to days that save.
+    return {
+      status: "failed",
+      message: "Couldn't save the note for this day. Reload the page and try again.",
+    };
   }
   const cleaned = cleanNote(note);
   if (!cleaned.ok) {
@@ -83,18 +89,29 @@ export async function saveDayNoteAction(day: string, note: string): Promise<Save
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Whether By day could have shown this day, so a note on it can be saved.
-// Without this, a script could save a note on every date from 0100 to 9999
-// and fill the database (JAS-212). By day shows the player's last LOG_DAYS
-// days, in a timezone only their browser knows. Every timezone in use is
-// between UTC-12 and UTC+14, so their today is the server's UTC yesterday,
-// today or tomorrow, and the days allowed are UTC today minus LOG_DAYS
-// through UTC tomorrow: a spare day on each side. It counts in UTC, not the
-// server's own timezone, which could be 26 hours from a player's: two days.
+// "2026-10-16" for the UTC day the time falls on.
+function utcDay(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+// Whether a note can be saved on this day: one By day could be showing.
+// Without this check, a script could save a note on every date from 0100 to
+// 9999 and fill the database (JAS-212).
+//
+// By day shows the player's last LOG_DAYS days, in their browser's timezone,
+// which the server doesn't know. Every timezone in use is between UTC-12 and
+// UTC+14, so the player's today is the server's UTC yesterday, today or
+// tomorrow. So By day can show UTC today minus LOG_DAYS through UTC tomorrow.
+// A spare day on each side covers a page left open since yesterday, or a
+// clock a day fast: UTC today minus LOG_DAYS + 1 through the day after
+// tomorrow.
+//
+// It counts in UTC, not in the server's own timezone. A server set to UTC-12
+// and a player at UTC+14 are 26 hours apart, so their dates can be two days
+// apart.
 function isNoteDay(day: string, now: number): boolean {
-  const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
   // "2026-10-16" sorts as plain text, so the edges compare as strings.
-  return day >= utcDay(now - LOG_DAYS * DAY_MS) && day <= utcDay(now + DAY_MS);
+  return day >= utcDay(now - (LOG_DAYS + 1) * DAY_MS) && day <= utcDay(now + 2 * DAY_MS);
 }
 
 // The "Write recap" button on a match page. Signed-in accounts only, so the
