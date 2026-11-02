@@ -7,6 +7,8 @@
 //   says, since an agent could otherwise loosen its own gate and merge that.
 // - PANEL_PATHS: the rest of the risky code. Claude merges a PR that touches
 //   one only after the interrogate panel and the reviewer clear it.
+// - PANEL_SKILLS: four skills whose Markdown is carved out of Jasper's
+//   .claude/skills/ entry and merged like PANEL_PATHS (JAS-146).
 //
 // The docs link here instead of copying the lists.
 //
@@ -71,31 +73,36 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   { pattern: ".claude/", why: "Claude Code's own setup, which steers every agent here" },
 ];
 
-// Inside JASPERS_PATHS, but Claude merges their Markdown after the panel, like
-// PANEL_PATHS (JAS-146, decision record 0028). Most redesign PRs update the
-// verify skills, so Jasper chose to let them go (2026-11-01). Agents follow
-// them, so they still get the panel and the reviewer, and risky-paths.test.ts
-// keeps each SKILL.md to its name and a description, since one could otherwise
-// grant tools, add hooks or run commands.
+// Carved out of the .claude/skills/ entry above, so Claude merges them after the
+// panel, like PANEL_PATHS (JAS-146, decision record 0028): the Markdown in
+// these skills, and the skills' credits and notes on how they fit this repo.
+// Most redesign PRs update the verify skills, so Jasper chose to let them go
+// (2026-11-01). Agents follow them, so they still get the panel and the
+// reviewer. risky-paths.test.ts keeps each of these files a plain file, not a
+// symlink, and each SKILL.md to its name and a description, since one could
+// otherwise grant tools, add hooks or run commands.
 export const PANEL_SKILLS: readonly string[] = ["verify", "verify-turnpoint", "verify-turnpoint-ux", "postmortem"];
 const SKILL_CREDITS = ".claude/skills/THIRD-PARTY-NOTICES.md";
 
-// Markdown directly in a listed skill's folder or its features/ folder. Exact
-// capitals, and no backslash, which Windows reads as a folder break, so a path
-// that could reach another skill stays Jasper's.
-const PANEL_SKILL_FILE = new RegExp(`^\\.claude/skills/(?:${PANEL_SKILLS.join("|")})/(features/)?([^/\\\\]+\\.md)$`);
+// A note's name is lower-case words joined by hyphens, like match-page.md, so a
+// name a Windows or Mac file system could fold into CLAUDE.md or SKILL.md
+// (capitals, other alphabets, invisible characters) stays Jasper's. So does a
+// name that another AI tool loads by itself, or a SKILL file, which could make
+// features/ a skill of its own.
+function isNoteName(name: string): boolean {
+  if (name === "README.md") return true;
+  return /^[a-z0-9][a-z0-9-]*\.md$/.test(name) && !/^(claude|agent|skill|gemini)/.test(name);
+}
 
-function isPanelSkillFile(path: string): boolean {
-  const match = PANEL_SKILL_FILE.exec(path);
-  if (!match) return false;
-  const [, features, name] = match;
-  // A CLAUDE or AGENTS file would steer every agent working in the folder.
-  if (/^(claude|agents)/i.test(name)) return false;
-  // Only the skill's own SKILL.md, spelled exactly so: a skill.md beside it
-  // would replace it on Windows or a Mac, and one in features/ could become a
-  // skill of its own.
-  if (/^skill/i.test(name)) return !features && name === "SKILL.md";
-  return true;
+// A file directly in a listed skill's folder, or in its features/ folder.
+function skillOnPanel(path: string): string | undefined {
+  if (path === SKILL_CREDITS) return "credits for the copied skills, and how they fit this repo";
+  const [claude, skills, folder, ...rest] = path.split("/");
+  if (claude !== ".claude" || skills !== "skills" || !PANEL_SKILLS.includes(folder)) return undefined;
+  const onPanel =
+    (rest.length === 1 && (rest[0] === "SKILL.md" || isNoteName(rest[0]))) ||
+    (rest.length === 2 && rest[0] === "features" && isNoteName(rest[1]));
+  return onPanel ? "the verify and postmortem skills, which agents follow" : undefined;
 }
 
 export const PANEL_PATHS: readonly RiskyPath[] = [
@@ -163,9 +170,11 @@ type Owner = { why: string; jaspers: boolean };
 // panel pattern that also matches, such as src/db/schema.ts inside src/db/.
 function owner(path: string): Owner | undefined {
   if (NESTED_AGENT_CONFIG.test(path)) return { why: "agent skills or rules below the repo root", jaspers: true };
-  if (path === SKILL_CREDITS) return { why: "credits for the copied skills", jaspers: false };
-  if (isPanelSkillFile(path)) return { why: "the verify and postmortem skills, which agents follow", jaspers: false };
   const jaspers = JASPERS_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
+  // Only where .claude/skills/ is the entry that matched, so a narrower entry
+  // on Jasper's list, added later, still wins.
+  const carvedOut = jaspers?.pattern === ".claude/skills/" ? skillOnPanel(path) : undefined;
+  if (carvedOut) return { why: carvedOut, jaspers: false };
   if (jaspers) return { why: jaspers.why, jaspers: true };
   const panel = PANEL_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
   return panel ? { why: panel.why, jaspers: false } : undefined;

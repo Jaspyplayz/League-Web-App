@@ -37,7 +37,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [Description quotes a field line](agent-mistakes/description-quotes-a-field-line.md) | 1 | none yet |
 | [A check left to a local session that the cloud could run](agent-mistakes/check-left-for-a-local-session.md) | 1 | CLAUDE.md line |
 | [Merge Danger understated on a risky path](agent-mistakes/merge-danger-understated.md) | 3 | none yet |
-| [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 6 | check |
+| [A merge gate tested only on made-up inputs](agent-mistakes/gate-tested-only-on-fakes.md) | 7 | check |
 | [Automation that merges before the builder is done](agent-mistakes/merge-before-the-builder-is-done.md) | 1 | design |
 | [A new way to start a check that the merge gates trust](agent-mistakes/new-trigger-feeds-the-gates.md) | 1 | check |
 | [A throwing read moved onto a page that didn't expect it](agent-mistakes/throwing-read-moved-to-a-busier-page.md) | 1 | check |
@@ -82,3 +82,4 @@ A rule agents are given, next to what fails when they break it. A rule whose sec
 | Every agent mistake gets an entry | Nothing yet: the `postmortem` skill and step 10 of `docs/workflow.md`; check 5 of [the wellness check](wellness.md#check-5-agent-mistakes) looks for missed ones twice a month |
 | A cloud session tries a criterion, screenshot or review on the preview before leaving it to a local session | Nothing yet: `AGENTS.md`, Cloud sessions; `npm run can-merge` refuses an unticked criterion at merge time |
 | Jasper's Dev Log why and what-I-learned lines are never listed as his to-do | Nothing yet: a line in Jasper's `~/.claude/CLAUDE.md` |
+| The verify and postmortem skills' files that Claude merges are plain files, and each `SKILL.md` has only its name and a one-line description, with no shell command | `scripts/risky-paths.test.ts` ([0028](adr/0028-the-verify-and-postmortem-skills-merge-after-the-panel.md)) |

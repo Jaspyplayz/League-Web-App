@@ -53,12 +53,27 @@ function mustBeListed(file: string, source: string): boolean {
 
 const isSourceFile = (file: string) => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !/\.test\./.test(file);
 
+// The mode Git keeps for each tracked file: 100644 for a plain file, 120000 for
+// a symlink. Read from Git rather than the disk, since Git on Windows checks a
+// symlink out as a plain file.
+const repoModes = new Map(
+  execFileSync("git", ["ls-files", "--stage", "-z"], { encoding: "utf8" })
+    .split("\0")
+    .filter(Boolean)
+    .map((line) => {
+      const [info, path] = line.split("\t");
+      return [path, info.split(" ")[0]];
+    }),
+);
+
 // A SKILL.md whose frontmatter is only its folder's name and a one-line
-// description, with no shell command for Claude Code to run as it loads: a !
-// before a backtick at a line's start or after a space, or a block opening ```!.
+// description, with no shell command for Claude Code to run as it loads. It
+// runs a ```! block anywhere (2.1.316's pattern is /```!\s*\n?([\s\S]*?)\n?```/g)
+// and a !` after most characters (2.1.42's is /(?<!\w|\$|`)!`([^`]+)`/g), so
+// either one anywhere fails.
 function isPlainSkill(folder: string, text: string): boolean {
   const frontmatter = new RegExp(`^---\\r?\\nname: ${folder}\\r?\\ndescription: [^\\r\\n]+\\r?\\n---\\r?\\n`);
-  return frontmatter.test(text) && !/(?:^|\s)!`|^\s*`{3,}!/m.test(text);
+  return frontmatter.test(text) && !/!`|```!/.test(text);
 }
 
 describe("riskyFiles", () => {
@@ -266,7 +281,7 @@ describe("riskyFiles", () => {
     expect(jaspersFiles([...skills, credits])).toEqual([]);
     expect(riskyFiles([...skills, credits])).toEqual([
       ...skills.map((path) => ({ path, why: "the verify and postmortem skills, which agents follow" })),
-      { path: credits, why: "credits for the copied skills" },
+      { path: credits, why: "credits for the copied skills, and how they fit this repo" },
     ]);
   });
 
@@ -356,7 +371,9 @@ describe("riskyFiles", () => {
 
   // ".." could step into another skill, other capitals on Linux are another
   // folder (a new skill), and Windows reads a backslash as a folder break. A
-  // skill.md beside the SKILL.md would replace it on Windows or a Mac.
+  // Mac or Windows file system folds some names into SKILL.md, CLAUDE.md or
+  // AGENTS.md: other capitals, a Kelvin sign for K, a long s, an invisible
+  // character. Other AI tools load GEMINI.md and AGENT.md by themselves.
   it.each([
     ".claude/skills/verify/../interrogate/SKILL.md",
     ".claude/skills/verify/features/../../code-review-and-quality/SKILL.md",
@@ -369,10 +386,25 @@ describe("riskyFiles", () => {
     ".claude/skills/verify/SKILL.MD",
     ".claude/skills/verify/skill.md",
     ".claude/skills/verify/features/x.MD",
+    ".claude/skills/verify/features/Match-Page.md",
+    ".claude/skills/verify/features/match page.md",
+    ".claude/skills/verify/features/match.page.md",
     ".claude/skills/third-party-notices.md",
     ".claude/skills/verify/a\\..\\..\\interrogate\\SKILL.md",
     ".claude/skills/verify/features\\..\\..\\interrogate\\SKILL.md",
     ".claude/skills/verify\\SKILL.md",
+    ".claude/skills/verify/SKILL.md",
+    ".claude/skills/verify/ſKILL.md",
+    ".claude/skills/postmortem/AGENTſ.md",
+    ".claude/skills/verify/‌CLAUDE.md",
+    ".claude/skills/verify/‌skill.md",
+    ".claude/skills/verify/ CLAUDE.md",
+    ".claude/skills/verify/.CLAUDE.md",
+    ".claude/skills/verify/GEMINI.md",
+    ".claude/skills/verify/gemini.md",
+    ".claude/skills/verify/AGENT.md",
+    ".claude/skills/verify/agent.md",
+    ".claude/skills/verify/features/README.MD",
   ])("keeps %s Jasper's, which tries to step around the exemption", (path) => {
     expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
   });
@@ -395,8 +427,14 @@ describe("riskyFiles", () => {
     ["a description over two lines", "---\nname: verify\ndescription: >\n  Shots.\n---\nBody\n"],
     ["an inline command", "---\nname: verify\ndescription: Shots.\n---\nBranch: !`git branch`\n"],
     ["an inline command starting a line", "---\nname: verify\ndescription: Shots.\n---\n!`git branch`\n"],
+    ["an inline command after a colon", "---\nname: verify\ndescription: Shots.\n---\nBranch:!`git branch`\n"],
+    ["an inline command in brackets", "---\nname: verify\ndescription: Shots.\n---\nBranch (!`git branch`)\n"],
     ["a command block", "---\nname: verify\ndescription: Shots.\n---\n```!\ngit status\n```\n"],
     ["an indented command block", "---\nname: verify\ndescription: Shots.\n---\n  ````!\ngit status\n  ````\n"],
+    ["a command block in a list item", "---\nname: verify\ndescription: Shots.\n---\n- ```!\n  git status\n  ```\n"],
+    ["a command block in a quote", "---\nname: verify\ndescription: Shots.\n---\n> ```!\ngit status\n> ```\n"],
+    ["a command block after text", "---\nname: verify\ndescription: Shots.\n---\nRun ```!\ngit status\n``` first.\n"],
+    ["a one-line command block", "---\nname: verify\ndescription: Shots.\n---\nRun ```!git status``` to see.\n"],
   ])("refuses a SKILL.md with %s", (_, text) => {
     expect(isPlainSkill("verify", text)).toBe(false);
   });
@@ -426,15 +464,32 @@ describe("riskyFiles", () => {
   });
 
   // An exemption that matches no file does nothing, so renaming a skill's
-  // folder or the credits would quietly send them back to Jasper.
-  it("exempts skills and credits that exist", () => {
-    const exempt = repoFiles.filter((file) => file.startsWith(".claude/skills/") && jaspersFiles([file]).length === 0);
+  // folder or the credits would quietly send them back to Jasper. Every file in
+  // .claude/skills/ stays risky, and only Markdown in the listed skills, or the
+  // credits, goes to the panel.
+  it("exempts skills and credits that exist, and nothing in .claude/skills/ but their Markdown", () => {
+    const skillFiles = repoFiles.filter((file) => file.startsWith(".claude/skills/"));
+    expect(riskyFiles(skillFiles).map((file) => file.path)).toEqual(skillFiles);
+    const exempt = skillFiles.filter((file) => jaspersFiles([file]).length === 0);
     expect(exempt).toEqual(
       expect.arrayContaining([
         ...PANEL_SKILLS.map((skill) => `.claude/skills/${skill}/SKILL.md`),
         ".claude/skills/THIRD-PARTY-NOTICES.md",
       ]),
     );
+    const listed = (file: string) => PANEL_SKILLS.some((skill) => file.startsWith(`.claude/skills/${skill}/`));
+    expect(exempt.filter((file) => !file.endsWith(".md") || !(listed(file) || file === ".claude/skills/THIRD-PARTY-NOTICES.md"))).toEqual([]);
+    expect(skillFiles.filter((file) => listed(file) && !file.endsWith(".md") && jaspersFiles([file]).length === 0)).toEqual([]);
+  });
+
+  // A symlink here could point at a file a docs-only PR can change, or at a
+  // secret such as .env.local, and a symlink named like the credits pointing
+  // at a folder would load that folder as a skill. Git lists only the path, so
+  // the mode is checked here, at the head CI tests.
+  it("keeps every file Claude merges in .claude/skills/ a plain file, not a symlink", () => {
+    const exempt = [...repoModes.keys()].filter((file) => file.startsWith(".claude/skills/") && jaspersFiles([file]).length === 0);
+    expect(exempt.length).toBeGreaterThan(0);
+    expect(exempt.filter((file) => repoModes.get(file) !== "100644")).toEqual([]);
   });
 
   // A folder renamed without updating the list would quietly stop being risky.
