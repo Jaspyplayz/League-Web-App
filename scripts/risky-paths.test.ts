@@ -482,8 +482,9 @@ describe("riskyFiles", () => {
 
   // npx runs package.json's own bin ahead of node_modules/.bin, a package name
   // with exports, imports or workspaces can stand in for one the gates import,
-  // and a dependency from a file, a Git host or another registry skips npm's
-  // checks. The Agent merge workflow refuses the first group at run time; this
+  // a dependency from a file, a Git host or another registry skips npm's
+  // checks, and a lockfile entry whose tarball is another package's installs
+  // that package under the name, so anything on npm could stand in for zod. The Agent merge workflow refuses the first group at run time; this
   // stops a PR bringing any of them in.
   it("keeps package.json and the lockfile from swapping what the gates load", () => {
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as Record<string, unknown> & {
@@ -495,12 +496,20 @@ describe("riskyFiles", () => {
     const specs = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
     expect(Object.entries(specs).filter(([, spec]) => !/^[\^~]?\d+(\.\d+){0,2}(-[\w.]+)?$/.test(spec))).toEqual([]);
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8")) as {
-      packages: Record<string, { resolved?: string; integrity?: string; link?: boolean; inBundle?: boolean }>;
+      packages: Record<string, { resolved?: string; integrity?: string; link?: boolean; inBundle?: boolean; name?: string }>;
     };
     const fetched = Object.entries(lock.packages).filter(([path, entry]) => path !== "" && !entry.inBundle);
     expect(fetched.length).toBeGreaterThan(100);
+    // The tarball must be the package the entry's path names, from npm's
+    // registry: node_modules/@scope/name comes from .../@scope/name/-/name-<version>.tgz.
+    const tarball = (path: string) => {
+      const name = path.slice(path.lastIndexOf("node_modules/") + "node_modules/".length);
+      return `https://registry.npmjs.org/${name}/-/${name.split("/").pop()}-`;
+    };
     expect(
-      fetched.filter(([, entry]) => entry.link || !entry.resolved?.startsWith("https://registry.npmjs.org/") || !entry.integrity).map(([path]) => path),
+      fetched
+        .filter(([path, entry]) => entry.link || "name" in entry || !entry.resolved?.startsWith(tarball(path)) || !entry.integrity)
+        .map(([path]) => path),
     ).toEqual([]);
   });
 
