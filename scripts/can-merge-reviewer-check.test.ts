@@ -44,9 +44,9 @@ describe("the reviewer check GitHub requires", () => {
     rmSync(events, { recursive: true, force: true });
   });
 
-  function check(body: string | null, head: string, cwd = repo) {
+  function check(body: string | null, head: string, cwd = repo, base = heads.base) {
     const event = join(events, "event.json");
-    writeFileSync(event, JSON.stringify({ action: "edited", pull_request: { body, head: { sha: head }, base: { sha: heads.base } } }));
+    writeFileSync(event, JSON.stringify({ action: "edited", pull_request: { body, head: { sha: head }, base: { sha: base } } }));
     const result = spawnSync(process.execPath, [TSX, SCRIPT], {
       cwd,
       encoding: "utf8",
@@ -128,10 +128,14 @@ describe("the reviewer check GitHub requires", () => {
     expect(code).toBe(0);
   });
 
-  it("fails an event whose head isn't a full commit name", () => {
-    const { code, out } = check(body("normal. A habit card."), "--output=/dev/null");
+  // Without the hex check, git still fails on these, so the test looks for
+  // the schema's own error instead.
+  it.each(["head", "base"])("fails an event whose %s isn't a full commit name, before git sees it", (which) => {
+    const bad = "--output=/dev/null";
+    const { code, out } = which === "head" ? check(body("normal. A habit card."), bad) : check(body("normal. A habit card."), heads.code, repo, bad);
+    expect(out).toContain("ZodError");
+    expect(out).toMatch(new RegExp(`"${which}",\\s*"sha"`));
     expect(out).not.toContain("PASS");
-    expect(out).toContain("sha");
     expect(code).toBe(1);
   });
 });
@@ -193,6 +197,10 @@ describe(WORKFLOW, () => {
     const end = lines.findIndex((line, i) => i > start && !line.startsWith(" "));
     expect(lines.slice(start + 1, end)).toEqual(["  contents: read"]);
     expect(lines.filter((line) => /permissions:/.test(line))).toHaveLength(1);
+  });
+
+  it("gives up on a hung run in minutes, so the check can't sit pending for hours", () => {
+    expect(workflowLines().map((line) => line.trim())).toContain("timeout-minutes: 10");
   });
 
   // GitHub counts a skipped job as passing a required check, and a paths
