@@ -1,0 +1,98 @@
+name: Run queue
+run-name: Run queue${{ inputs.dry_run && ' (dry run)' || '' }}
+
+# The ticket queue (JAS-144, decision record 0026). Each run reads Linear and
+# GitHub, asks scripts/run-queue-pick.ts which Ready tickets get a builder, and
+# starts one cloud builder per picked ticket through the cloud task's API
+# trigger. It uses no Claude itself, so a run with nothing to start costs no
+# usage. scripts/run-queue.ts does the work.
+#
+# To stop the queue, switch this workflow off: Actions, Run queue, the "..."
+# menu, Disable workflow (or `gh workflow disable run-queue.yml`). Nothing else
+# starts builders from Ready, and builders already running carry on.
+on:
+  # A PR Agent merge merged. Its merges use github.token, so GitHub starts no
+  # workflow for them, and this runs when an Agent merge run finishes instead.
+  # Most of those runs merge nothing, but a run with nothing new to do changes
+  # nothing, and each one is another chance to notice Vercel's limit clearing.
+  workflow_run:
+    workflows: [Agent merge]
+    types: [completed]
+  # Jasper's own merges, from GitHub's page or a local can-merge, push to main
+  # with his token, which does start workflows.
+  push:
+    branches: [main]
+  # /run-queue (.claude/skills/run-queue/SKILL.md), or the Actions tab.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print what it would do and change nothing
+        type: boolean
+        default: false
+  # A bonus, not a way in to count on. On 2026-11-02 this repo had never had a
+  # scheduled run, and GitHub can delay or drop one and turns a schedule off
+  # after 60 days with no activity. Away from the top of the hour, when GitHub
+  # is busiest.
+  schedule:
+    - cron: "41 * * * *"
+
+# Nothing by default; the job asks for only what reading needs.
+permissions: {}
+
+# One run at a time, so two runs can't both pick a ticket before either one's
+# start comment is on it. A new run never cancels a running one, which may be
+# between its comment and its fire; a queued one is replaced by the newest,
+# which reads the latest state anyway.
+concurrency:
+  group: run-queue
+  cancel-in-progress: false
+
+jobs:
+  queue:
+    # Only main's copy of this file. A workflow_run, push or schedule run
+    # always uses main's, but a run started by name uses the copy on the ref
+    # it names, and a branch's copy could do anything with the secrets below.
+    # A skipped Agent merge run (any branch but claude/) has nothing to report.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion != 'skipped')
+    runs-on: ubuntu-latest
+    # A run takes about a minute. A hung one would hold the queue for GitHub's
+    # default of six hours.
+    timeout-minutes: 10
+    # Read-only. Every write goes to Linear or the cloud task, with the two
+    # secrets below. A public repo lets any token read these, but naming them
+    # keeps this working if the repo goes private.
+    permissions:
+      contents: read # check out main
+      pull-requests: read # open PRs and the files each changes
+      statuses: read # Vercel's deploy status on main and each open PR
+    steps:
+      # The token is only for this one fetch of main, and
+      # persist-credentials: false removes it from .git/config afterwards.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      # No npm cache, so nothing another workflow saved can change the code
+      # that runs with the secrets below.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      # npm ci runs without the secrets in its environment.
+      - run: npm ci
+      - run: npx tsx scripts/run-queue.ts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          # Not a secret: firing it also needs the token. The task is
+          # "Ticket queue builder" at claude.ai/code/routines; a new task
+          # means a new ID here.
+          RUN_QUEUE_TASK_ID: trig_01Fsa3wuXbvBFWKyb1WyYHoY
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          # A dry run never gets the token, so it can't start a builder even
+          # if the script had a bug.
+          RUN_QUEUE_TASK_TOKEN: ${{ !inputs.dry_run && secrets.RUN_QUEUE_TASK_TOKEN || '' }}
