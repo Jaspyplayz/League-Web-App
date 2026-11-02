@@ -73,16 +73,19 @@ jobs:
     needs: merged
     # Runs after the merged job, or without it for every other way in.
     # Only on main's ref: a run by name on another branch would use that
-    # branch's copy of this file. That stops a mistake, not an attacker: a
-    # branch can edit this line out, and any branch's workflow can read the
-    # repo's secrets, so what guards the two secrets below is who can push to
-    # this repo, as with Agent merge (docs/adr/0024-a-github-action-runs-can-merge.md).
+    # branch's copy of this file. That stops a mistake, not an attacker,
+    # since a branch can edit this line out. The environment below is what
+    # keeps the two secrets on main.
     if: >-
       !cancelled() &&
       github.ref == 'refs/heads/main' &&
       (github.event_name != 'workflow_run' ||
       needs.merged.outputs.moved == 'true')
     runs-on: ubuntu-latest
+    # The two secrets are this environment's, not the repo's, and Jasper
+    # limits the environment to main, so a workflow pushed on any other
+    # branch can't read them, even one that edits this file.
+    environment: run-queue
     # A run takes about a minute. A hung one would hold the queue for GitHub's
     # default of six hours.
     timeout-minutes: 10

@@ -29,7 +29,7 @@ If `gh workflow run` fails in a cloud session, use GitHub's REST API, which work
 gh api -X POST repos/Jaspyplayz/League-Web-App/actions/workflows/run-queue.yml/dispatches -f ref=main -f 'inputs[dry_run]=true'
 ```
 
-Always use `--ref main`. The workflow skips a run started on any other branch, so a branch's copy of the file isn't used by mistake. That check isn't what protects the queue's secrets, since a branch can edit it out. Who can push to the repo is what protects them.
+Always use `--ref main`. The workflow skips a run started on any other branch, so a branch's copy of the file isn't used by mistake. That check isn't what protects the queue's secrets, since a branch can edit it out. They live in the `run-queue` environment, which only main can use.
 
 ## Read the result
 
