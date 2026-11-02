@@ -11,6 +11,9 @@
 // working (Vercel's login, the expired Riot key notice, a 404, an error page)
 // is not saved: the run prints what it saw and exits with an error. --expect
 // saves one of those on purpose, for a PR that changes the 404 page.
+//
+// On a preview, the run also fails, naming the site, if the bypass secret went
+// to any site other than the preview.
 
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -18,7 +21,7 @@ import { parseArgs } from "node:util";
 import { chromium, type BrowserContext, type Page } from "@playwright/test";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { THEME_KEY } from "@/lib/theme";
-import { passPreviewLogin } from "../e2e/preview-login";
+import { passPreviewLogin, recordLeaks } from "../e2e/preview-login";
 import { loadEnv, previewUrl } from "./preview";
 import { browserFor } from "./shot-device";
 import { classify, OUTCOMES, type Outcome } from "./shot-outcome";
@@ -58,6 +61,10 @@ async function look(page: Page, origin: string, status: number | null): Promise<
 
 type Visit = Look & { page: Page; status: number | null };
 
+// Each page stays open until the run ends, when the browser closes them all.
+// On a preview, the leak check reads each finished request's headers, and
+// Playwright cancels a read whose page has closed, which would crash the run
+// (JAS-141). So nothing closes a page before that read.
 async function visit(context: BrowserContext, origin: string, path: string): Promise<Visit> {
   const page = await context.newPage();
   let status: number | null = null;
@@ -84,40 +91,36 @@ function fileName(site: string, path: string): string {
 
 async function shoot(context: BrowserContext, origin: string, site: string, path: string): Promise<boolean> {
   const { page, status, ...loaded } = await visit(context, origin, path);
-  try {
-    let seen: Look = loaded;
-    if (options.tab && seen.outcome === "ok") {
-      const tab = page.getByRole("tab", { name: options.tab, exact: true });
-      if (!(await tab.isVisible())) {
-        console.log(`FAILED ${path}: no tab named "${options.tab}" on this page. Not saved.`);
-        return false;
-      }
-      await tab.click();
-      // A click before the page is ready does nothing, and the new panel was
-      // hidden when the page was first read, so it is checked again.
-      const opened = await tab
-        .and(page.locator('[aria-selected="true"]'))
-        .waitFor({ timeout: 10_000 })
-        .then(() => true, () => false);
-      if (!opened) {
-        console.log(`FAILED ${path}: the "${options.tab}" tab didn't open. Not saved.`);
-        return false;
-      }
-      seen = await look(page, origin, status);
-    }
-    if (seen.outcome !== options.expect) {
-      console.log(`FAILED ${path}: ${seen.outcome}, ${seen.reason}. Not saved.`);
-      if (seen.text) console.log(`  The page showed: ${seen.text.slice(0, 300).replace(/\s+/g, " ")}`);
+  let seen: Look = loaded;
+  if (options.tab && seen.outcome === "ok") {
+    const tab = page.getByRole("tab", { name: options.tab, exact: true });
+    if (!(await tab.isVisible())) {
+      console.log(`FAILED ${path}: no tab named "${options.tab}" on this page. Not saved.`);
       return false;
     }
-    const file = resolve(options.out, fileName(site, path));
-    mkdirSync(dirname(file), { recursive: true });
-    await page.screenshot({ path: file, fullPage: !options.viewport });
-    console.log(`${seen.outcome} ${path}: saved ${file}`);
-    return true;
-  } finally {
-    await page.close();
+    await tab.click();
+    // A click before the page is ready does nothing, and the new panel was
+    // hidden when the page was first read, so it is checked again.
+    const opened = await tab
+      .and(page.locator('[aria-selected="true"]'))
+      .waitFor({ timeout: 10_000 })
+      .then(() => true, () => false);
+    if (!opened) {
+      console.log(`FAILED ${path}: the "${options.tab}" tab didn't open. Not saved.`);
+      return false;
+    }
+    seen = await look(page, origin, status);
   }
+  if (seen.outcome !== options.expect) {
+    console.log(`FAILED ${path}: ${seen.outcome}, ${seen.reason}. Not saved.`);
+    if (seen.text) console.log(`  The page showed: ${seen.text.slice(0, 300).replace(/\s+/g, " ")}`);
+    return false;
+  }
+  const file = resolve(options.out, fileName(site, path));
+  mkdirSync(dirname(file), { recursive: true });
+  await page.screenshot({ path: file, fullPage: !options.viewport });
+  console.log(`${seen.outcome} ${path}: saved ${file}`);
+  return true;
 }
 
 // One look before driving: is the site up, can it read the database, and is
@@ -142,8 +145,7 @@ async function check(context: BrowserContext, origin: string): Promise<boolean> 
   ];
   let ok = true;
   for (const { label, path, required } of pages) {
-    const { page, outcome, reason } = await visit(context, origin, path);
-    await page.close();
+    const { outcome, reason } = await visit(context, origin, path);
     console.log(`${label}: ${outcome} (${reason})`);
     if (outcome !== "ok" && required) ok = false;
   }
@@ -175,12 +177,38 @@ async function main() {
   try {
     const context = await browser.newContext(browserFor(options.phone));
     if (options.light) await context.addInitScript((key) => localStorage.setItem(key, "light"), THEME_KEY);
-    if (preview) await passPreviewLogin(context, preview);
+    // Only a preview gets the secret, so a --base run has no leak to look for.
+    let leaked = async (): Promise<string[]> => [];
+    if (preview) {
+      await passPreviewLogin(context, preview);
+      // Before any page opens, so it sees every request (decision record 0006).
+      leaked = recordLeaks(context, preview);
+    }
 
-    let ok = true;
-    if (options.check) ok = await check(context, origin);
-    else for (const path of paths) ok = (await shoot(context, origin, site, path)) && ok;
-    if (!ok) process.exitCode = 1;
+    try {
+      let ok = true;
+      if (options.check) ok = await check(context, origin);
+      else for (const path of paths) ok = (await shoot(context, origin, site, path)) && ok;
+      if (!ok) process.exitCode = 1;
+    } finally {
+      // This runs even when a page threw partway, so a run that sent the secret
+      // to another site always says where. A screenshot saved on that run is
+      // still a true picture, but the run fails.
+      //
+      // Read the list while every page is still open (see visit) and the route
+      // still adds the secret: recordLeaks counts a redirect off the preview as
+      // a leak because the route put the secret on its chain. A request sent
+      // without it would meet Vercel's login, a redirect to vercel.com, and be
+      // counted as a leak that never happened.
+      const leaks = await leaked();
+      if (leaks.length) {
+        console.log(`LEAK: the bypass secret went to other sites: ${leaks.join(", ")}`);
+        process.exitCode = 1;
+      }
+      // Then remove the route, so one still reading a request's headers when
+      // the browser closes can't crash the run.
+      await context.unrouteAll({ behavior: "ignoreErrors" });
+    }
   } finally {
     await browser.close();
   }
