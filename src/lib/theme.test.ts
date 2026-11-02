@@ -3,6 +3,7 @@ import {
   THEME_KEY,
   THEME_SCRIPT,
   parseThemeChoice,
+  readThemeChoice,
   resolveTheme,
   switchTheme,
   themeSwitchLabel,
@@ -82,7 +83,7 @@ describe("switchTheme", () => {
     vi.useRealTimers();
   });
 
-  function fakeBrowser(shown: "dark" | "light") {
+  function fakeBrowser(shown: "dark" | "light", storageThrows = false) {
     vi.useFakeTimers();
     const root = { dataset: { theme: shown } as Record<string, string> };
     const styles: { textContent: string; remove: () => void }[] = [];
@@ -101,8 +102,14 @@ describe("switchTheme", () => {
     });
     const saved = new Map<string, string>();
     vi.stubGlobal("localStorage", {
-      getItem: (key: string) => saved.get(key) ?? null,
-      setItem: (key: string, value: string) => saved.set(key, value),
+      getItem: (key: string) => {
+        if (storageThrows) throw new Error("blocked");
+        return saved.get(key) ?? null;
+      },
+      setItem: (key: string, value: string) => {
+        if (storageThrows) throw new Error("blocked");
+        saved.set(key, value);
+      },
     });
     return { root, styles, saved };
   }
@@ -124,6 +131,33 @@ describe("switchTheme", () => {
     switchTheme();
     expect(root.dataset.theme).toBe("dark");
     expect(saved.get(THEME_KEY)).toBe("dark");
+  });
+
+  it("still switches this page when the browser blocks storage", () => {
+    const { root } = fakeBrowser("dark", true);
+    expect(() => switchTheme()).not.toThrow();
+    expect(root.dataset.theme).toBe("light");
+  });
+});
+
+// What ThemeWatcher and the error page apply when they don't say which theme.
+describe("readThemeChoice", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function storage(getItem: (key: string) => string | null) {
+    vi.stubGlobal("localStorage", { getItem });
+  }
+
+  it("reads the saved choice", () => {
+    storage((key) => (key === THEME_KEY ? "light" : null));
+    expect(readThemeChoice()).toBe("light");
+  });
+
+  it("falls back to dark when the browser blocks storage", () => {
+    storage(() => {
+      throw new Error("blocked");
+    });
+    expect(readThemeChoice()).toBe("dark");
   });
 });
 
