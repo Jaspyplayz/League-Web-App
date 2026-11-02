@@ -21,7 +21,7 @@ A plain script runs in a GitHub Action when a PR merges, when Jasper starts `/ru
 
 The script leaves out any ticket with an unfinished blocker, sorts the rest by Priority and then age, and starts each one whose Touches line doesn't overlap an open PR's files or another ticket picked that round, up to a ceiling of 4. Nothing new starts while Vercel is refusing deploys. The Action starts each builder through the cloud task's API trigger.
 
-A ticket gets two tries, then moves to Todo, assigned to Jasper. A builder that needs a file an open PR has stops and waits, which doesn't use up a try, following the rule in `AGENTS.md`. A finished PR only Jasper can merge frees its slot, but its files stay held.
+A ticket gets two tries, then moves to Todo, assigned to Jasper. Until the failure loop is built, the queue does only the first half: after two starts it stops starting the ticket and says why on it. A builder that needs a file an open PR has stops and waits, which doesn't use up a try, following the rule in `AGENTS.md`. A finished PR only Jasper can merge frees its slot, but its files stay held.
 
 The number of builders comes from the tickets, not a setting. The ceiling is only a safety limit, because each builder's pushes use Vercel's 100 deploys a day, shared with petri, and we don't yet know what a run costs. It goes up once real runs show it's safe.
 
@@ -46,4 +46,4 @@ Bad:
 1. Do Linear's "needs approval" prompts stall a builder with nobody watching? Answered by the trial on 2026-11-01: no tool stopped to ask, and the builder went from the fire to a merged PR alone.
 2. What does one builder run cost against Jasper's usage limits? Still open: the trial's run log has no cost figure.
 3. How does a refused PR get retried? `.github/workflows/agent-merge.yml` notes that GitHub won't run a workflow from a push made with the Action's own token, so CI wouldn't run on it.
-4. Until the failure loop is built, how many times can one ticket start? Tries aren't counted yet, so a ticket whose builder never moves it out of Ready starts again each time the queue's start comment stops holding it, after 2 hours.
+4. Until the failure loop is built, how many times can one ticket start? Answered by JAS-144: twice. The queue counts its own start comments on the ticket. A refused start's comment doesn't count, and one with no answer does, since a builder may have started. If a run dies between its comment and its fire, that uses up a try with no builder. Deleting a start comment gives the ticket another try, and a run by name doesn't.

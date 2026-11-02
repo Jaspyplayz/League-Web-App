@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CEILING, parseTouches, pickTickets, type Picks, type QueueState, type Status, type Ticket } from "./run-queue-pick";
+import { CEILING, parseTouches, pickTickets, TRIES, type Picks, type QueueState, type Status, type Ticket } from "./run-queue-pick";
 
 // A written-up, Ready, Medium ticket that touches a file of its own, so
 // tickets clash only when a test says so.
@@ -26,7 +26,7 @@ function touching(...files: string[]): string {
 }
 
 function queue(overrides: Partial<QueueState> = {}): QueueState {
-  return { tickets: [], openPrs: [], running: [], vercelRefusing: false, ...overrides };
+  return { tickets: [], openPrs: [], running: [], outOfTries: [], vercelRefusing: false, ...overrides };
 }
 
 function whyWaits(picks: Picks, id: string): string[] | undefined {
@@ -214,6 +214,40 @@ describe("parseTouches", () => {
     ["**Touches.** None\n\n`src/a.ts`", "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word"],
   ])("refuses a None line whose list may carry on: %j", (description, why) => {
     expect(parseTouches(description)).toEqual({ why });
+  });
+});
+
+describe("pickTickets: a ticket out of tries", () => {
+  it("is two tries, as decision record 0026 says", () => {
+    expect(TRIES).toBe(2);
+  });
+
+  it("doesn't start, and says why", () => {
+    const picks = pickTickets(queue({ tickets: [ticket("JAS-1")], outOfTries: ["JAS-1"] }));
+    expect(picks.start).toEqual([]);
+    expect(whyWaits(picks, "JAS-1")).toEqual([
+      "It can't start, because the queue has already tried it 2 times, which is the limit. Deleting one of the queue's start comments on it gives it another try, if Jasper wants one.",
+    ]);
+  });
+
+  it("takes no slot from the tickets after it", () => {
+    const tickets = ["JAS-1", "JAS-2", "JAS-3", "JAS-4", "JAS-5"].map((id) => ticket(id));
+    expect(pickTickets(queue({ tickets, outOfTries: ["JAS-1"] })).start).toEqual(["JAS-2", "JAS-3", "JAS-4", "JAS-5"]);
+  });
+
+  it("holds no files from the tickets after it", () => {
+    const tickets = [ticket("JAS-1", { description: touching("src/shared.ts") }), ticket("JAS-2", { description: touching("src/shared.ts") })];
+    expect(pickTickets(queue({ tickets, outOfTries: ["JAS-1"] })).start).toEqual(["JAS-2"]);
+  });
+
+  it("doesn't pull its blockers into the queue, since it can't start once they're done", () => {
+    const tickets = [ticket("JAS-1", { blockedBy: ["JAS-9"] }), ticket("JAS-9", { status: "Todo", description: `${CRITERIA}\n\n${touching("src/JAS-9.ts")}` })];
+    expect(pickTickets(queue({ tickets, outOfTries: ["JAS-1"] })).promote).toEqual([]);
+  });
+
+  it("says a builder is running, not that it's out of tries, while one is", () => {
+    const picks = pickTickets(queue({ tickets: [ticket("JAS-1")], running: ["JAS-1"], outOfTries: ["JAS-1"] }));
+    expect(whyWaits(picks, "JAS-1")).toEqual(["A builder is already running on it."]);
   });
 });
 

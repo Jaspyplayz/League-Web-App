@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { OpenPulls, READY_LABEL, readyToMerge, type OpenPull } from "./can-merge-action-steps";
 import { field } from "./can-merge-gates";
-import { CEILING, pickTickets, type OpenPr, type Status, type Ticket } from "./run-queue-pick";
+import { CEILING, pickTickets, TRIES, type OpenPr, type Status, type Ticket } from "./run-queue-pick";
 
 /** How long the queue's start comment holds a ticket. It matches JAS-29's stall rule; JAS-145 handles the stall. */
 export const START_HOLDS_FOR_MS = 2 * 60 * 60 * 1000;
@@ -484,10 +484,17 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   });
   const running = runningTickets(snapshot, now);
   const vercel = vercelState(snapshot.statuses, now);
+  // A refused start's comment no longer starts with START_LINE, so a refusal
+  // isn't a try. One with no answer keeps its comment, since a builder may
+  // have started, so it is.
+  const outOfTries = snapshot.issues
+    .filter((issue) => (snapshot.comments[issue.identifier] ?? []).filter(isStartComment).length >= TRIES)
+    .map((issue) => issue.identifier);
   const picks = pickTickets({
     tickets,
     openPrs: toOpenPrs(snapshot.pulls, snapshot.files),
     running: running.map((ticket) => ticket.id),
+    outOfTries,
     vercelRefusing: vercel.kind === "refusing",
   });
 

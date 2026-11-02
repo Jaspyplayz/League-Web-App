@@ -618,6 +618,94 @@ describe("a refused start", () => {
   });
 });
 
+describe("a ticket's two tries", () => {
+  const OUT_OF_TRIES =
+    "It can't start, because the queue has already tried it 2 times, which is the limit. Deleting one of the queue's start comments on it gives it another try, if Jasper wants one.";
+
+  // One Ready ticket whose builders never move it, so each start comment's
+  // hold runs out. Each round reads what the last one wrote.
+  function staysReady(answers: FireAnswer[] = []) {
+    let now = new Date("2026-11-02T06:00:00Z");
+    const store = linearStore(() => now, answers);
+    const round = async (at: string, extra: Partial<Snapshot> = {}, byName = false) => {
+      now = new Date(at);
+      const plan = planRound(store.read([issue("JAS-1")], extra), now, RUN, { byName });
+      await runRound(plan, { dryRun: false }, store.effects);
+      return plan;
+    };
+    return { store, round };
+  }
+
+  it("starts a ticket that stays Ready twice, then never again, with one comment however many rounds follow", async () => {
+    const { store, round } = staysReady();
+    await round("2026-11-02T06:00:00Z");
+    expect((await round("2026-11-02T07:00:00Z")).running.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
+    await round("2026-11-02T08:01:00Z");
+    expect(store.fired).toEqual(["JAS-1", "JAS-1"]);
+    // Its second builder is still inside the start comment's 2 hours.
+    expect((await round("2026-11-02T09:00:00Z")).waits).toEqual([{ id: "JAS-1", why: ["A builder is already running on it."], comment: { kind: "none" } }]);
+
+    const out = await round("2026-11-02T10:02:00Z");
+    expect(out.running).toEqual([]);
+    expect(out.start).toEqual([]);
+    expect(out.waits).toEqual([{ id: "JAS-1", why: [OUT_OF_TRIES], comment: expect.objectContaining({ kind: "create" }) }]);
+
+    // Nothing in a later round changes why it waits: not Vercel, nor a run by name.
+    const refused = [refusal("2026-11-02T14:00:00Z")];
+    const later: [string, Partial<Snapshot>, boolean][] = [
+      ["2026-11-02T12:03:00Z", {}, false],
+      ["2026-11-02T14:04:00Z", { statuses: refused }, false],
+      ["2026-11-02T16:05:00Z", { statuses: refused }, false],
+      ["2026-11-02T18:06:00Z", {}, true],
+      ["2026-11-02T20:07:00Z", {}, false],
+    ];
+    for (const [at, extra, byName] of later) {
+      const plan = await round(at, extra, byName);
+      expect(plan.start).toEqual([]);
+      expect(plan.waits).toEqual([{ id: "JAS-1", why: [OUT_OF_TRIES], comment: { kind: "same" } }]);
+    }
+    expect(store.fired).toEqual(["JAS-1", "JAS-1"]);
+    expect(store.all().map((posted) => posted.body.split("\n")[0])).toEqual([START_LINE, START_LINE, WAIT_LINE]);
+  });
+
+  it("doesn't count a refused start, and counts one with no answer, since a builder may have started", async () => {
+    const { store, round } = staysReady([
+      { kind: "refused", status: 429, why: "rate_limit_error: slow down" },
+      { kind: "no answer", why: "The operation was aborted due to timeout" },
+    ]);
+    await round("2026-11-02T06:00:00Z");
+    await round("2026-11-02T07:01:00Z");
+    await round("2026-11-02T09:02:00Z");
+    expect(store.fired).toEqual(["JAS-1", "JAS-1", "JAS-1"]);
+    expect((await round("2026-11-02T11:03:00Z")).waits.map((wait) => wait.why)).toEqual([[OUT_OF_TRIES]]);
+    expect(store.fired).toHaveLength(3);
+  });
+
+  it("gives the ticket another try once someone deletes a start comment", () => {
+    const old = (id: string) => comment(id, START_LINE, "2026-11-01T06:00:00.000Z");
+    const read = (comments: LinearComment[]) => snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": comments } });
+    expect(planRound(read([old("c1"), old("c2")]), AT_0630, RUN).start).toEqual([]);
+    expect(planRound(read([old("c2")]), AT_0630, RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
+  });
+
+  it("lets the next ticket start instead, and says why in the run's summary", async () => {
+    const old = comment("c1", START_LINE, "2026-11-01T06:00:00.000Z");
+    const read = snapshot({ issues: [issue("JAS-1"), issue("JAS-2")], comments: { "JAS-1": [old, { ...old, id: "c2" }] } });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-2"]);
+    const { effects, summaryLines } = dryEffects();
+    await runRound(plan, { dryRun: true }, effects);
+    expect(summaryLines).toContain("JAS-1 waits, and its comment would be created:");
+    expect(summaryLines).toContain(`- ${OUT_OF_TRIES}`);
+  });
+
+  it("tries the next ticket as Vercel's test, not the one out of tries", () => {
+    const old = comment("c1", START_LINE, "2026-11-01T06:00:00.000Z");
+    const read = snapshot({ issues: [issue("JAS-1"), issue("JAS-2")], statuses: [refusal("2026-11-02T05:00:00Z")], comments: { "JAS-1": [old, { ...old, id: "c2" }] } });
+    expect(planRound(read, AT_0630, RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-2"]);
+  });
+});
+
 describe("In Review", () => {
   const inReview = (body: string | null) =>
     runningTickets(snapshot({ issues: [issue("JAS-5", { status: "In Review" })], pulls: [pull(9, "claude/jas-5-x", body)] }), AT_0630);
