@@ -68,11 +68,13 @@ export async function saveMatchNoteAction(
 // in the player's own timezone.
 export async function saveDayNoteAction(day: string, note: string): Promise<SaveNoteResult> {
   if (!isDayKey(day) || !isNoteDay(day, Date.now())) {
-    // A player only gets this from a page left open for days, and reloading
-    // moves By day on to days that save.
+    // A player only sees this once the day has dropped out of By day's
+    // weeks: on a page left open for a day and a half or more, or with a
+    // clock days off. Reloading won't bring the day back, so the message
+    // doesn't suggest it. Their text stays in the box, so they can copy it.
     return {
       status: "failed",
-      message: "Couldn't save the note for this day. Reload the page and try again.",
+      message: `Notes can only be saved on days in the last ${LOG_DAYS / 7} weeks.`,
     };
   }
   const cleaned = cleanNote(note);

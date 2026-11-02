@@ -61,10 +61,7 @@ describe("toggleMyPlayer", () => {
 
 const DAY = 24 * 60 * 60 * 1000;
 
-const REFUSED = {
-  status: "failed",
-  message: "Couldn't save the note for this day. Reload the page and try again.",
-};
+const REFUSED = { status: "failed", message: "Notes can only be saved on days in the last 4 weeks." };
 
 // Where the server might run: UTC, as Vercel does, and each end of the range
 // of timezones in use. Etc/GMT+12 is UTC-12; the sign is backwards in these
