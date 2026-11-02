@@ -35,11 +35,27 @@ export default function PrivacyPage() {
         <li>The analysis Turnpoint computes from those matches</li>
       </ul>
       <p>
+        A saved game covers everyone who played in it, not only the player looked up: every
+        player&apos;s Riot ID, PUUID (Riot&apos;s permanent player ID) and stats from that game,
+        usually ten players. They are kept for as long as the match is.
+      </p>
+      <p>
         Turnpoint also saves recent ranked games of players sampled from every rank, so it can
-        compare your games with theirs. From those games it keeps every player&apos;s
-        end-of-game numbers, such as kills and damage, and each team&apos;s totals at every
-        minute, such as gold and towers, without names or player IDs, to train its game score
-        and win chance.
+        compare your games with theirs. They are picked from Riot&apos;s ranked ladders, whether
+        or not they have ever used the site. For each one it keeps their PUUID, region and rank
+        tier, and a short summary of each of their games, such as their champion, result and
+        gold lead at 10 minutes. To train its game score and win chance, it also keeps every
+        player&apos;s end-of-game numbers from those games, such as kills and damage, and each
+        team&apos;s totals at every minute, such as gold and towers. Those training rows have
+        no names or PUUIDs, but they keep each game&apos;s match ID, so they can be traced back
+        to the game.
+      </p>
+      <p>
+        These games aren&apos;t kept for a set time. They are collected by a job that is run by
+        hand, and only that job deletes them. For each player it samples, it drops their games
+        that are no longer among their latest 20 ranked games. At the end of the run, it deletes
+        the summaries and minute-by-minute totals of games played more than 60 days before.
+        The end-of-game numbers are never deleted.
       </p>
       <p>
         Finished matches never change, so they are kept. For the season&apos;s champion stats,
@@ -85,6 +101,12 @@ export default function PrivacyPage() {
         While you&apos;re signed in, your browser keeps a sign-in cookie so you don&apos;t have
         to sign in on every page. Signing out removes it.
       </p>
+      <p>
+        Pressing Sign in also saves a few small helper cookies before Google or Discord opens,
+        even if you then cancel. They hold a random code that lets Turnpoint finish signing you
+        in safely, and they identify nobody. They last up to 400 days, or until you sign out.
+        You can also remove them by clearing this site&apos;s cookies in your browser.
+      </p>
 
       <h2>AI recaps</h2>
       <p>
@@ -111,6 +133,18 @@ export default function PrivacyPage() {
         attached, to keep the whole site within its monthly budget.
       </p>
 
+      <h2>AI apps (MCP)</h2>
+      <p>
+        Turnpoint has a public address, /api/mcp on this site, that AI apps such as Claude can
+        connect to. MCP (Model Context Protocol) is a standard way for AI apps to use a
+        website&apos;s tools. Through it, an AI app can look up a player&apos;s rank and recent
+        games and read Turnpoint&apos;s analysis of a game: the same public game data the
+        website shows, with no sign-in. It saves nothing beyond what opening the same pages on
+        the website would save. Turnpoint receives only the lookups the app makes, such as a
+        Riot ID and region, not your conversation with it. Your questions and the answers go to
+        whichever AI app you connected, under that app&apos;s own privacy policy.
+      </p>
+
       <h2>Stored in your browser</h2>
       <p>
         Turnpoint remembers the last few players you searched for, so you can click back to
@@ -118,6 +152,11 @@ export default function PrivacyPage() {
         storage. When you click into a search, your browser sends the Riot IDs on it to Turnpoint, which
         uses them only to read each player&apos;s saved rank and doesn&apos;t keep them. Remove a
         player with the × next to their name.
+      </p>
+      <p>
+        When you search for a player, the search is held in this tab&apos;s session storage
+        until their profile opens, so they can be added to Recent. It stays in your browser,
+        and closing the tab clears it.
       </p>
       <p>
         Players you pin with the star are saved and looked up the same way, so they stay in that
@@ -157,8 +196,9 @@ export default function PrivacyPage() {
         </li>
       </ul>
       <p>
-        Turnpoint does not sell data, show ads or use cookies to track you. The only cookie
-        it sets is the sign-in cookie above, and only if you sign in.
+        Turnpoint does not sell data, show ads or use cookies to track you. The only cookies
+        it sets are the sign-in cookie and the helper cookies above, and only once you press
+        Sign in.
       </p>
 
       <h2>Removing your data</h2>

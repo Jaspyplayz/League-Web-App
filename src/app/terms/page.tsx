@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // pages of legal wording, just clear expectations.
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of use" updated="October 13, 2026">
+    <LegalPage title="Terms of use" updated="November 2, 2026">
       <p>
         By using Turnpoint you agree to these terms. If you don&apos;t agree, please don&apos;t
         use the site.
@@ -31,6 +31,11 @@ export default function TermsPage() {
           Don&apos;t send automated or bulk requests to the site, for example scripts that look up
           players in a loop. Turnpoint shares a limited number of Riot API requests between all
           visitors.
+        </li>
+        <li>
+          You can connect an AI app such as Claude to Turnpoint&apos;s MCP address, /api/mcp,
+          and ask it about players and games the way you&apos;d look them up yourself. The rule
+          above covers that address too: no scripts, loops or bulk lookups through it.
         </li>
         <li>Don&apos;t try to break, overload or get around the site&apos;s security.</li>
         <li>Follow Riot Games&apos; own terms when you use their game data.</li>
