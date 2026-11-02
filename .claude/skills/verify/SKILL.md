@@ -38,6 +38,7 @@ npm run shot -- --pr 155 --tab "Replay" "/player/kr/Hide%20on%20bush-KR1/match/K
 ```
 
 - `--light` and `--phone` cover the issue template's "on a phone, and in light mode" criterion. `--phone` is a Pixel 7 screen.
+- `--viewport` saves only the first screen instead of the whole page, for checking a page yourself: a long page saved whole shrinks until you can't read it. Leave it off for a PR's evidence.
 - `--tab <name>` clicks a tab (`role="tab"`) after the page loads. Only the match page has them.
 - `--expect <outcome>` saves a page that isn't `ok` on purpose, for a PR that changes one: `--expect not-found /no-such-page` for the 404 page.
 - Several paths in one run share the same options. Files are named after the site, the path and the options, such as `pr155-how-it-works-light-phone.png`, or `league-web-app-…` for the live site and `localhost-…` for a dev server, so a before and an after don't overwrite each other. `--out <dir>` changes the folder.
