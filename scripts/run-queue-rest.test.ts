@@ -35,7 +35,7 @@ import {
 } from "./run-queue-rest";
 
 const REPO = "Jaspyplayz/League-Web-App";
-const JASPER = "61230bd5-f5cf-47d8-805e-700a2b469b07";
+const JASPER = "00000000-0000-4000-8000-00000000000a";
 const RUN = "https://github.com/Jaspyplayz/League-Web-App/actions/runs/1";
 const AT_0630 = new Date("2026-11-02T06:30:00Z");
 const AT_0730 = new Date("2026-11-02T07:30:00Z");
