@@ -164,12 +164,12 @@ describe("decide", () => {
     expect(failed(decide(pr({ body: tiny, files }), main(), big))).toEqual(["Reviewer cleared the PR"]);
   });
 
-  it.each(["docs/.claude/skills/x/SKILL.md", "docs/adr/.cursor/rules/x.md"])(
+  // On the panel list since JAS-191, so they need the reviewer and the panel.
+  it.each(["docs/.claude/skills/x/SKILL.md", "docs/adr/.cursor/rules/x.md", "src/lib/x/eslint.config.mjs"])(
     "refuses a tiny PR that changes %s as risky and unreviewed",
     (file) => {
       const tiny = body({ tier: "tiny. Docs only.", criteria: [], review: [] });
       expect(failed(decide(pr({ body: tiny, files: [file] }), main()))).toEqual([
-        "No files Jasper merges",
         "Reviewer cleared the PR",
         "Interrogate panel ran",
         "Acceptance criteria ticked",
@@ -505,22 +505,18 @@ describe("decide", () => {
       expect(detail(decide(pr(), main()), "Interrogate panel ran")).toBe("not needed: no risky tier and no risky paths");
     });
 
-    // Acceptance criterion 2: these stay Jasper's whatever the tier and verdicts.
+    // Migrations and the merge gates' own code stay Jasper's whatever the tier
+    // and verdicts (JAS-191's second criterion).
     it.each([
       "drizzle/0013_notes.sql",
       "drizzle.config.ts",
       "src/db/schema.ts",
-      ".github/workflows/ci.yml",
-      ".claude/skills/code-review-and-quality/SKILL.md",
-      ".claude/agents/reviewer.md",
-      "eslint-rules/no-green-classes.mjs",
-      "eslint.config.js",
-      "playwright.config.ts",
-      "e2e/preview-login.ts",
-      "src/app/themes.test.ts",
-      "package.json",
       "scripts/can-merge-gates.ts",
       "scripts/risky-paths.ts",
+      ".github/workflows/agent-merge.yml",
+      ".github/workflows/agent-merge-sweep.yml",
+      ".github/workflows/reviewer.yml",
+      ".claude/agent-merge.json",
     ])("still refuses %s with a panel line and a clean verdict at the head, in every tier", (file) => {
       for (const tier of ["tiny. One line.", "normal. One line.", "risky. One line."]) {
         const files = ["src/app/sign-in/page.tsx", file];
@@ -528,6 +524,71 @@ describe("decide", () => {
         expect(failed(decision)).toEqual(["No files Jasper merges"]);
         expect(detail(decision, "No files Jasper merges")).toContain(file);
       }
+    });
+
+    // These were Jasper's until JAS-191 and now merge once the panel and the
+    // reviewer clear the head, in every tier.
+    it.each([
+      ".claude/skills/code-review-and-quality/SKILL.md",
+      ".claude/agents/reviewer.md",
+      "eslint-rules/no-green-classes.mjs",
+      "eslint.config.js",
+      "playwright.config.ts",
+      "e2e/preview-login.ts",
+      "src/app/themes.test.ts",
+      "package-lock.json",
+      "scripts/run-queue-pick.ts",
+    ])("merges %s with a panel line and a clean verdict at the head, in every tier", (file) => {
+      for (const tier of ["tiny. One line.", "normal. One line.", "risky. One line."]) {
+        const files = ["src/app/sign-in/page.tsx", file];
+        const decision = decide(pr({ body: risky([panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`], tier), files }), main());
+        expect(failed(decision)).toEqual([]);
+      }
+    });
+
+    // JAS-191's first criterion: a check's own files merge once the panel and
+    // the reviewer clear the head commit, and not without either.
+    describe.each([".github/workflows/ci.yml", ".claude/hooks/check-before-commit.mjs", "package.json"])("a PR that changes %s", (file) => {
+      const files = [file, "docs/workflow.md"];
+      const verdict = `Reviewer agent at ${HEAD}: no blockers`;
+
+      it("merges once the panel and the reviewer clear the head", () => {
+        const decision = decide(pr({ body: body({ review: [panel(HEAD), "", verdict] }), files }), main());
+        expect(failed(decision)).toEqual([]);
+        expect(detail(decision, "No files Jasper merges")).toBe("none of the 2 changed paths is on Jasper's list in scripts/risky-paths.ts");
+      });
+
+      it("refuses it without the panel", () => {
+        const decision = decide(pr({ body: body({ review: [verdict] }), files }), main());
+        expect(failed(decision)).toEqual(["Interrogate panel ran"]);
+        expect(detail(decision, "Interrogate panel ran")).toContain(file);
+      });
+
+      it("refuses it without the reviewer", () => {
+        expect(failed(decide(pr({ body: body({ review: [panel(HEAD)] }), files }), main()))).toEqual(["Reviewer cleared the PR"]);
+      });
+
+      it("refuses it when the file changed after the panel and the reviewer cleared an earlier commit", () => {
+        const since = (sha: string) => (sha === OLDER ? { commits: 1, lines: changes({ [file]: 1 }), files, created: [] } : undefined);
+        const decision = decide(pr({ body: body({ review: [panel(OLDER), "", `Reviewer agent at ${OLDER}: no blockers`] }), files }), main(), history({ since }, files));
+        expect(failed(decision)).toEqual(["Reviewer cleared the PR"]);
+        expect(detail(decision, "Reviewer cleared the PR")).toContain(`${file} changed after the verdict`);
+      });
+    });
+
+    // JAS-191's third criterion. Dependabot's PRs change package.json,
+    // package-lock.json and .github/workflows/, which are off Jasper's list
+    // now, so only "Built by Claude Code" keeps them, and anyone else's, his.
+    it.each<[string, Partial<PrSnapshot>]>([
+      ["it comes from a fork", { isCrossRepository: true }],
+      ["Dependabot opened it on its own branch", { headRefName: "dependabot/npm_and_yarn/next-16.1.0", author: { login: "app/dependabot", isBot: true } }],
+      ["a bot opened it on a claude/ branch", { author: { login: "app/some-bot", isBot: true } }],
+      ["a person opened it on their own branch", { headRefName: "jasper/try-ci" }],
+      ["its Builder line names another builder", { body: body({ builder: "Cursor chat on Grok 4.7.", review: [panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`] }) }],
+    ])("still refuses a PR that changes CI and dependencies when %s, with the panel and the reviewer", (_, overrides) => {
+      const files = ["package.json", "package-lock.json", ".github/workflows/ci.yml"];
+      const decision = decide(pr({ body: body({ review: [panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`] }), files, ...overrides }), main());
+      expect(failed(decision)).toEqual(["Built by Claude Code"]);
     });
 
     it("lets Claude merge the verify and postmortem skills' Markdown after the panel", () => {
