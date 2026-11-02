@@ -57,3 +57,11 @@ A gate's tests build its inputs by hand, so they pass for the cases the builder 
 - **Root cause:** the builder tried six redirect shapes in a real browser, all caught, and wrote the result as true of every redirect. The real-browser run stayed in a temp folder, and the repo's tests fed the check made-up requests that hold the same belief, so nothing could show it false.
 - **Rung:** check
 - **Fix:** commit 208756f on JAS-142's branch: the check also watches Chrome's own reports, and the real-browser test `the check on redirects > catches a keepalive fetch's redirect` in `e2e/preview-secret.spec.ts` fails when that watch is removed. The one shape still missed, a keepalive whose page leaves at once, is listed in decision record 0006.
+
+## 2026-11-02
+
+- **What happened:** JAS-146 let Claude merge the verify and postmortem skills' `SKILL.md` after the panel, guarded by a test that a `SKILL.md` runs no shell command as it loads. The test refused a ```` ```! ```` block only at the start of a line and `` !` `` only at a line's start or after a space, so a block in a list item or after text, or `` (!`cmd`) ``, passed it while Claude Code runs them. It should have refused every form the loader runs.
+- **Evidence:** the reviewer agent at f962b12, blocker 1, and all three panel models at the same commit: `isPlainSkill` in `scripts/risky-paths.test.ts` returned true for a list item holding a ```` ```! ```` block while Claude Code 2.1.316's pattern ```` /```!\s*\n?([\s\S]*?)\n?```/g ```` matches it, and for `` Branch (!`git branch`) `` while 2.1.42's `` /(?<!\w|\$|`)!`([^`]+)`/g `` does.
+- **Root cause:** the builder wrote the guard and its test cases from Claude Code's docs, which describe a block "opened with ```!" and an inline form after whitespace, and never ran the loader's own patterns, which were in the installed binaries all along.
+- **Rung:** check
+- **Fix:** `scripts/risky-paths.test.ts` in JAS-146's PR: the guard refuses `` !` `` and ```` ```! ```` anywhere, and "refuses a SKILL.md with %s" holds the shapes the loader runs (a list item, a quote, after text, one line, after a colon, in brackets). Putting f962b12's line back fails 6 of them.
