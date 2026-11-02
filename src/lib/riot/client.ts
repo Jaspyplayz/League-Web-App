@@ -69,8 +69,8 @@ export async function riotGet<T>(host: string, path: string): Promise<T> {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       // The body arrives after the status, so a 200 can still break off
-      // partway or come back as broken JSON. Reading it here sends that
-      // down the same path as a network error.
+      // partway, run out the timeout, or come back as broken JSON. Reading
+      // it here sends that down the same path as a network error.
       if (res.ok) return (await res.json()) as T;
     } catch (cause) {
       // Network error, timeout or unreadable body: worth another try.

@@ -34,16 +34,25 @@ function respond(status: number, body: unknown = {}, headers: Record<string, str
   return new Response(JSON.stringify(body), { status, headers });
 }
 
-// A 200 whose body can't be read: the connection drops partway through, which
-// Node's fetch reports as a TypeError when the body is read.
-function bodyBreaksOff() {
-  const body = new ReadableStream({
-    start(controller) {
-      controller.error(new TypeError("terminated"));
+// A 200 whose body starts arriving, then fails with `error` before it ends.
+function bodyFailsWith(error: Error) {
+  const chunks = [new TextEncoder().encode('{"puuid": "ab')];
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      const chunk = chunks.shift();
+      if (chunk) controller.enqueue(chunk);
+      else controller.error(error);
     },
   });
   return new Response(body, { status: 200 });
 }
+
+// How Node's fetch fails a body read when the connection drops partway.
+const bodyBreaksOff = () => bodyFailsWith(new TypeError("terminated"));
+
+// How it fails one when the 8 second timeout runs out partway through the body.
+const bodyTimesOut = () =>
+  bodyFailsWith(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
 
 // A 200 whose body arrives but isn't JSON, such as a cut-off object.
 function bodyIsNotJson() {
@@ -107,6 +116,7 @@ describe("riotGet", () => {
 
   it.each([
     ["breaks off", bodyBreaksOff],
+    ["times out", bodyTimesOut],
     ["isn't JSON", bodyIsNotJson],
   ])("retries a 200 whose body %s, then returns the next reply", async (_, broken) => {
     fetchMock.mockResolvedValueOnce(broken()).mockResolvedValueOnce(respond(200, [1]));
