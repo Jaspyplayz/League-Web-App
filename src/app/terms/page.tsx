@@ -34,8 +34,10 @@ export default function TermsPage() {
         </li>
         <li>
           You can connect an AI app such as Claude to Turnpoint&apos;s MCP address, /api/mcp,
-          and ask it about players and games the way you&apos;d look them up yourself. The rule
-          above covers that address too: no scripts, loops or bulk lookups through it.
+          and ask it about players and games the way you&apos;d look them up yourself, even
+          when one question takes the app a few lookups. That&apos;s the only automated use
+          allowed. Don&apos;t use the address, yourself or through an AI app, for scripts, loops
+          or bulk lookups, such as working through many players.
         </li>
         <li>Don&apos;t try to break, overload or get around the site&apos;s security.</li>
         <li>Follow Riot Games&apos; own terms when you use their game data.</li>
