@@ -480,6 +480,17 @@ describe("In Review", () => {
   it("doesn't count with no open PR, since its PR merged or closed", () => {
     expect(runningTickets(snapshot({ issues: [issue("JAS-5", { status: "In Review" })] }), AT_0630)).toEqual([]);
   });
+
+  it("frees the slot of a builder that finished within 2 hours of the queue's start comment", () => {
+    const started = { "JAS-5": [comment("c1", START_LINE, "2026-11-02T05:50:00.000Z")] };
+    const finished = snapshot({ issues: [issue("JAS-5", { status: "In Review" })], pulls: [pull(9, "claude/jas-5-x", "**Ready to merge:** yes at 4d2a4fe")], comments: started });
+    expect(runningTickets(finished, AT_0630)).toEqual([]);
+    expect(runningTickets({ ...finished, pulls: [] }, AT_0630)).toEqual([]);
+    // Before its builder moves it, the start comment still holds it.
+    for (const status of ["Ready", "Todo", "Backlog"]) {
+      expect(runningTickets(snapshot({ issues: [issue("JAS-5", { status })], comments: started }), AT_0630).map((ticket) => ticket.id)).toEqual(["JAS-5"]);
+    }
+  });
 });
 
 describe("a dry run", () => {

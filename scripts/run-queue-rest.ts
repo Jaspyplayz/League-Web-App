@@ -22,6 +22,10 @@ export const REFUSAL_HOLDS_FOR_MS = 60 * 60 * 1000;
 const PROJECT = "Turnpoint";
 const MAX_BLOCKER_ROUNDS = 10;
 const FINISHED: readonly Status[] = ["Done", "Canceled", "Duplicate"];
+// A builder moves its ticket to In Progress, then In Review, and from then on
+// the status says whether it's still working, so a builder that finished in
+// 40 minutes frees its slot. Before that, the queue's start comment holds it.
+const BEFORE_BUILDER: readonly Status[] = ["Backlog", "Todo", "Ready"];
 const TICKET_ID = /^JAS-\d+$/;
 
 // Linear refuses a query over 10,000 complexity points, and each ticket's 20
@@ -303,7 +307,7 @@ export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why
     } else if (issue.state.name === "In Review" && working.length > 0) {
       const prs = listOf(working.map((number) => `PR ${number}`));
       running.push({ id, why: `it's In Review, and ${prs} ${working.length === 1 ? "isn't" : "aren't"} marked ready or left for Jasper` });
-    } else if (startedAt) {
+    } else if (startedAt && BEFORE_BUILDER.includes(issue.state.name)) {
       running.push({ id, why: `the queue started a builder on it at ${utc(startedAt)}, under 2 hours ago` });
     }
   }
