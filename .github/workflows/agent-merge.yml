@@ -12,9 +12,10 @@ run-name: Agent merge ${{ github.event.workflow_run.head_branch || inputs.branch
 # the one that merges. After a merge it starts CI on main (JAS-123).
 #
 # A workflow_run workflow always runs as this file is on main, never a PR's
-# copy, and the job checks out main. The PR's code is never checked out or
-# run here, so no PR can change what a run from a check does with its write
-# token. A run started by name is different: GitHub uses the copy on the ref
+# copy, and the job checks out main. A PR's own code is never checked out or
+# run here. What earlier merges put on main does run, so the steps below
+# refuse or skip the files that would change which code the gates load
+# (decision record 0032). A run started by name is different: GitHub uses the copy on the ref
 # it's started on. The sweep always starts it on main, and the job's `if` skips
 # any other ref. A branch's edited copy could drop that `if`, so what guards
 # this route is who has write access to the repo, as with any workflow a branch
@@ -99,10 +100,34 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - run: npm ci
+      # Claude can merge package.json, .npmrc and tsconfig.json after the panel,
+      # so these steps stop the ones found so far from changing
+      # which code runs below with the token (decision record 0032). npx runs
+      # package.json's own bin ahead of node_modules/.bin, and a package scope
+      # with exports, imports or workspaces, or a node_modules/ folder beside the
+      # gates, can stand in for zod, which every gate imports.
+      - name: Refuse files that would change what the gates load
+        run: |
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const fields = ["bin", "exports", "imports", "workspaces"].filter((key) => key in require("./package.json"));
+            const tracked = execFileSync("git", ["ls-files", "scripts/node_modules", "scripts/package.json"], { encoding: "utf8" }).trim();
+            if (fields.length > 0 || tracked !== "") {
+              console.error(`package.json fields: ${fields.join(", ") || "none"}; under scripts/: ${tracked || "nothing"}`);
+              process.exit(1);
+            }
+          '
+      # An .npmrc could set node-options, npm-shrinkwrap.json would replace the
+      # lockfile, and an install script could rewrite the gates on disk. The
+      # dependencies come from main's lockfile, which stays Jasper's.
+      - run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts
       - run: npx tsx scripts/can-merge-action.ts
         env:
           # npm ci above runs without the token in its environment.
           GH_TOKEN: ${{ github.token }}
           # gh fills in can-merge's {owner}/{repo} from this.
           GH_REPO: ${{ github.repository }}
+          # tsx reads this in place of tsconfig.json, here and in the can-merge
+          # run the script starts, so tsconfig.json's paths can't swap a module
+          # the gates import, such as zod.
+          TSX_TSCONFIG_PATH: scripts/can-merge.tsconfig.json

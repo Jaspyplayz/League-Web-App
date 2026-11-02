@@ -44,6 +44,10 @@ import {
 } from "./can-merge-rest";
 
 const USAGE = "Usage: npm run can-merge -- <pr number> [--merge]";
+// The files a local run most needs to match main's: the gates, the lists, and
+// package.json, which defines `npm run can-merge`. It isn't all a run reads
+// (decision record 0032), and it isn't JASPERS_PATHS, which says who merges a
+// change.
 const GATE_CODE = ["scripts/can-merge*", "scripts/risky-paths*", "package.json"];
 
 function run(command: string, args: string[], input?: string): string {
