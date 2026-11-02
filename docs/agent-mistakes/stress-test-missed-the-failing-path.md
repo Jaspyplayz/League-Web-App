@@ -8,4 +8,4 @@ A builder suspects a race and runs a load test to check it, but the test's traff
 - **Evidence:** reviewer blocker 1 on PR 306 at 5a1383d (`scripts/shot.ts:121-123` with `e2e/preview-login.ts:39-43`). Reproduced at 5a1383d with 8 runs at once on 4 cores: `--pr 1 /xloop /` crashed in 3 of 4 with `request.allHeaders: Target page, context or browser has been closed` though nothing leaked, and `--pr 1 /hoploop /` crashed in 3 of 4 without printing the LEAK line.
 - **Root cause:** the builder took "busy" pages as enough load without checking that their requests went through the read that can fail, and closed pages before the read although `e2e/preview-login.ts:26-31` warns about reads after close and the other three callers read first. Nothing runs `shot.ts` in a test.
 - **Rung:** none yet
-- **Fix:** the code is fixed in PR 306: `shot.ts` keeps every page open, removes the route, then reads the list before the browser closes. For the class, none yet, as a first occurrence.
+- **Fix:** the code is fixed in PR 306: `shot.ts` keeps every page open and reads the list before the browser closes. For the class, none yet, as a first occurrence.

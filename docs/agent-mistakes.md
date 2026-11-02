@@ -57,6 +57,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A browser test's locator matches more than it names](agent-mistakes/browser-locator-matches-more-than-it-names.md) | 2 | none yet |
 | [A page checked only the way an ordinary browser loads it](agent-mistakes/page-checked-one-way-it-loads.md) | 1 | check |
 | [A stress test that never reached the path it was meant to stress](agent-mistakes/stress-test-missed-the-failing-path.md) | 1 | none yet |
+| [A check's premise switched off before the check reads](agent-mistakes/check-premise-switched-off-first.md) | 1 | none yet |
 
 ## Rules and what enforces them
 

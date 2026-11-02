@@ -195,12 +195,15 @@ async function main() {
       // to another site always says where. A screenshot saved on that run is
       // still a true picture, but the run fails.
       //
-      // First stop adding the secret, so from here on only a later hop of a
-      // request already sent can carry it, and a route still reading a
-      // request's headers when the browser closes can't crash the run. Then
-      // read the list while every page is still open (see visit).
-      await context.unrouteAll({ behavior: "ignoreErrors" });
+      // Read the list while every page is still open (see visit) and the route
+      // still adds the secret: recordLeaks counts a redirect off the preview as
+      // a leak because the route put the secret on its chain. A request sent
+      // without it would meet Vercel's login, a redirect to vercel.com, and be
+      // counted as a leak that never happened.
       const leaks = await leaked();
+      // Then remove the route, so one still reading a request's headers when
+      // the browser closes can't crash the run.
+      await context.unrouteAll({ behavior: "ignoreErrors" });
       if (leaks.length) {
         console.log(`LEAK: the bypass secret went to other sites: ${leaks.join(", ")}`);
         process.exitCode = 1;
