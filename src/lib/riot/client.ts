@@ -26,7 +26,8 @@ export class RiotApiError extends Error {
 }
 
 const TIMEOUT_MS = 8_000;
-// Waits between attempts when Riot returns a 5xx or the request fails.
+// Waits between attempts when Riot returns a 5xx, the request fails or the
+// reply's body can't be read.
 const RETRY_DELAYS_MS = [250, 1_000];
 // Riot sometimes omits Retry-After; this is the fallback.
 const DEFAULT_RETRY_AFTER_S = 10;
@@ -67,16 +68,18 @@ export async function riotGet<T>(host: string, path: string): Promise<T> {
         headers: { "X-Riot-Token": key },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
+      // The body arrives after the status, so a 200 can still break off
+      // partway, run out the timeout, or come back as broken JSON. Reading
+      // it here sends that down the same path as a network error.
+      if (res.ok) return (await res.json()) as T;
     } catch (cause) {
-      // Network error or timeout: worth another try.
+      // Network error, timeout or unreadable body: worth another try.
       if (attempt < RETRY_DELAYS_MS.length) {
         await sleep(RETRY_DELAYS_MS[attempt]);
         continue;
       }
       throw new RiotApiError("unavailable", `Request to ${host} failed: ${String(cause)}`);
     }
-
-    if (res.ok) return (await res.json()) as T;
 
     if (res.status >= 500 && attempt < RETRY_DELAYS_MS.length) {
       await sleep(RETRY_DELAYS_MS[attempt]);

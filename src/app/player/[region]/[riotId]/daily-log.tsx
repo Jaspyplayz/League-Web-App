@@ -44,6 +44,9 @@ import { useFocus } from "./insights/focus";
 type Props = {
   games: LogGame[];
   ranks: LogRankPoint[];
+  // Profile.stored. False on a server this profile isn't saved for, where
+  // Turnpoint saves no ranks, so the days show no LP (JAS-147).
+  stored: boolean;
   // The signed-in player's notes by day, or null when this isn't their
   // profile (then no notes or note boxes show).
   notes: ReadDayNotesResult | null;
@@ -51,7 +54,7 @@ type Props = {
   playerPath: string;
 };
 
-export function DailyLog({ games, ranks, notes, player, playerPath }: Props) {
+export function DailyLog({ games, ranks, stored, notes, player, playerPath }: Props) {
   // The server can't know the viewer's timezone, so it renders a short
   // placeholder and the browser draws the days right after the page loads.
   const inBrowser = useSyncExternalStore(
@@ -66,7 +69,16 @@ export function DailyLog({ games, ranks, notes, player, playerPath }: Props) {
   const days = useMemo(() => groupDays(games, ranks), [games, ranks]);
 
   if (!inBrowser) return <p className="text-quiet">Loading your days…</p>;
-  return <ByDayView days={days} now={now} notes={notes} player={player} playerPath={playerPath} />;
+  return (
+    <ByDayView
+      days={days}
+      now={now}
+      stored={stored}
+      notes={notes}
+      player={player}
+      playerPath={playerPath}
+    />
+  );
 }
 
 function noChanges() {
@@ -78,12 +90,14 @@ function noChanges() {
 export function ByDayView({
   days: fetched,
   now,
+  stored,
   notes,
   player,
   playerPath,
 }: {
   days: LogDay[];
   now: number;
+  stored: boolean;
   notes: ReadDayNotesResult | null;
   player: string;
   playerPath: string;
@@ -134,6 +148,7 @@ export function ByDayView({
                       <DayPanel
                         day={day}
                         now={now}
+                        stored={stored}
                         focus={focus}
                         note={notes?.ok ? (notes.byDay[day.day] ?? "") : null}
                         notesFailed={notes?.ok === false}
@@ -149,9 +164,19 @@ export function ByDayView({
       </div>
       <p className="text-note text-quiet">
         Wins, losses and game scores come from your Riot match history, for the last{" "}
-        {LOG_DAYS / 7} weeks. LP comes from the rank Turnpoint saves each time this profile
-        updates, so a day with no update in between says &ldquo;LP not recorded&rdquo;. Remakes
-        are left out.
+        {LOG_DAYS / 7} weeks.{" "}
+        {stored ? (
+          <>
+            LP comes from the rank Turnpoint saves each time this profile updates, so a day with no
+            update in between says &ldquo;LP not recorded&rdquo;.
+          </>
+        ) : (
+          <>
+            Turnpoint saves ranks only on the server this profile is saved for, so this page shows no
+            LP.
+          </>
+        )}{" "}
+        Remakes are left out.
       </p>
     </>
   );
@@ -362,6 +387,7 @@ function LpText({ lp }: { lp: number }) {
 function DayPanel({
   day,
   now,
+  stored,
   focus,
   note,
   notesFailed,
@@ -369,6 +395,9 @@ function DayPanel({
 }: {
   day: LogDay;
   now: number;
+  // On another server's page every ranked day would say "LP not recorded",
+  // so the footnote says why once instead.
+  stored: boolean;
   focus: Focus | null;
   // The saved note ("" for none), or null when there's no note box: this
   // isn't the player's own profile, or their notes couldn't be read.
@@ -407,7 +436,7 @@ function DayPanel({
             {day.lp !== null ? (
               <LpText lp={day.lp} />
             ) : (
-              day.ranked > 0 && <span className="text-quiet">LP not recorded</span>
+              stored && day.ranked > 0 && <span className="text-quiet">LP not recorded</span>
             )}
           </p>
         </div>

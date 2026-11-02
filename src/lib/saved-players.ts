@@ -1,5 +1,5 @@
 import { isRegion, type Region } from "./regions";
-import type { Division, Tier } from "./tiers";
+import { isDivision, isTier, type Division, type Tier } from "./tiers";
 
 // Two short lists of players, kept in your own browser (localStorage), so they
 // need no account. The server never stores them; clicking into a search sends
@@ -123,3 +123,25 @@ export type SavedPlayerDetails = {
   ranks: Record<string, SavedRank | null>;
   you: SavedPlayer | null;
 };
+
+// The route's answer, checked before the box shows it. Null for anything else,
+// such as a page still open from before a deploy that changed the answer, so
+// the box treats it like a failed read instead of drawing a broken row. Checked
+// by hand, like the lists above, rather than with zod, which would add 8 KB
+// (zod/mini) to 23 KB (zod), gzipped, to the script every page loads, since the
+// header's search is on every page.
+export function parseSavedPlayerDetails(data: unknown): SavedPlayerDetails | null {
+  if (typeof data !== "object" || data === null) return null;
+  const { ranks, you } = data as Record<string, unknown>;
+  if (you !== null && !isSavedPlayer(you)) return null;
+  if (typeof ranks !== "object" || ranks === null || Array.isArray(ranks)) return null;
+  if (!Object.values(ranks).every((rank) => rank === null || isSavedRank(rank))) return null;
+  // Every value was checked just above.
+  return { ranks: ranks as SavedPlayerDetails["ranks"], you };
+}
+
+function isSavedRank(value: unknown): value is SavedRank {
+  if (typeof value !== "object" || value === null) return false;
+  const { tier, division } = value as Record<string, unknown>;
+  return typeof tier === "string" && isTier(tier) && typeof division === "string" && isDivision(division);
+}

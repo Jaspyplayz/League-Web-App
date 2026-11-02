@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SavedPlayer, SavedRank } from "@/lib/saved-players";
-import { SavedPlayersBox } from "./saved-players-box";
+import { fetchDetails, SavedPlayersBox } from "./saved-players-box";
 
 const faker: SavedPlayer = { region: "kr", gameName: "Hide on bush", tagLine: "KR1" };
 const unknown: SavedPlayer = { region: "na", gameName: "Never Seen", tagLine: "NA1" };
@@ -29,6 +29,30 @@ function box({
     />,
   );
 }
+
+describe("fetchDetails", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const serverAnswers = (body: unknown, status = 200) =>
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(body, { status })));
+
+  it("sends the players and gives back the route's answer", async () => {
+    const answer = { ranks: { "kr/hide on bush#kr1": { tier: "CHALLENGER", division: "I" } }, you: me };
+    serverAnswers(answer);
+    expect(await fetchDetails([faker])).toEqual(answer);
+    expect(fetch).toHaveBeenCalledWith("/api/saved-players", expect.objectContaining({ body: JSON.stringify([faker]) }));
+  });
+
+  // A page open from before a deploy could get one. Null keeps the box's last answer.
+  it("gives null for an answer in the wrong shape", async () => {
+    serverAnswers({ ranks: { "kr/hide on bush#kr1": { tier: "UNRANKED", division: "I" } }, you: { region: "na" } });
+    expect(await fetchDetails([faker])).toBeNull();
+  });
+
+  it("gives null for a failed read", async () => {
+    serverAnswers(null, 503);
+    expect(await fetchDetails([faker])).toBeNull();
+  });
+});
 
 describe("SavedPlayersBox", () => {
   it("shows the Recent and Pinned tabs with their counts, starting on Recent", () => {

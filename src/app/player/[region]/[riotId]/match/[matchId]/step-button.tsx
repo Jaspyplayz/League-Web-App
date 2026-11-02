@@ -1,26 +1,33 @@
-import type { ReactNode } from "react";
-
-// A square icon button, like the replay's previous, play and next buttons.
-// `children` is the icon's SVG path, drawn in a 24 by 24 box.
+// An icon button for stepping through a game: the replay's previous and next,
+// and Game review's first, previous, next and last.
 export function StepButton({
   label,
+  icon,
   disabled = false,
+  unavailable,
   onClick,
-  children,
+  className,
 }: {
   label: string;
+  // The icon's SVG path, drawn in a 24 by 24 box.
+  icon: string;
+  // A disabled button leaves the tab order. An unavailable one stays in it,
+  // marked only with aria-disabled.
   disabled?: boolean;
+  unavailable?: boolean;
   onClick: () => void;
-  children: ReactNode;
+  // Its size and fill, one step off what it sits on.
+  className: string;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
+      aria-disabled={unavailable}
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex size-10 items-center justify-center rounded-md bg-panel text-main hover:bg-divider disabled:opacity-40 disabled:hover:bg-panel"
+      className={`flex items-center justify-center rounded-md ${className}`}
     >
       <svg
         width="18"
@@ -33,7 +40,7 @@ export function StepButton({
         strokeLinejoin="round"
         aria-hidden="true"
       >
-        {children}
+        <path d={icon} />
       </svg>
     </button>
   );

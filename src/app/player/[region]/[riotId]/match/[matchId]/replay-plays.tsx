@@ -23,7 +23,9 @@ import {
 } from "@/lib/analyzer/plays";
 import type { ReplayData } from "@/lib/analyzer/replay";
 import { stretchAt, type TempoTimeline } from "@/lib/analyzer/tempo";
+import { formatPercentTenths } from "@/lib/percent";
 import type { ReplayRequest } from "./review-links";
+import { Switch } from "./switch";
 
 // The old grade pill, which nothing draws now. It's kept so replay.test.tsx can
 // check the plays list doesn't go back to it.
@@ -218,7 +220,8 @@ export function PlayDetails({
         ))}
       </ul>
       <p className="text-main">
-        Your team&apos;s chance to win went from {percent(play.before)} to {percent(play.after)}.
+        Your team&apos;s chance to win went from {formatPercentTenths(play.before)} to{" "}
+        {formatPercentTenths(play.after)}.
         {tone === "ahead"
           ? " You were up tempo just before it."
           : tone === "behind"
@@ -308,19 +311,17 @@ export function ReplayPlays({
               : `Your ${yours === 1 ? "play" : `${yours} plays`}: ${listNames(counts)}.`}
           </p>
         </div>
-        <div role="group" aria-label="Which plays" className={`${SWITCH} bg-raised`}>
-          {[false, true].map((mineOnly) => (
-            <button
-              key={String(mineOnly)}
-              type="button"
-              aria-pressed={yoursOnly === mineOnly}
-              onClick={() => setYoursOnly(mineOnly)}
-              className={`${SWITCH_BUTTON} ${yoursOnly === mineOnly ? SWITCH_ON : SWITCH_OFF}`}
-            >
-              {mineOnly ? "Yours" : "All"}
-            </button>
-          ))}
-        </div>
+        <Switch
+          label="Which plays"
+          options={[
+            { value: false, name: "All" },
+            { value: true, name: "Yours" },
+          ]}
+          value={yoursOnly}
+          onChange={setYoursOnly}
+          look="solid"
+          className="bg-raised"
+        />
       </div>
 
       {shown.length === 0 ? (
@@ -363,14 +364,6 @@ export function ReplayPlays({
   );
 }
 
-// A pressed-or-not switch, like "All | Yours" and the replay's speeds: the
-// pressed one in the text colour, as the Review board's buttons are. Each
-// use adds its own fill, one step off what it sits on.
-export const SWITCH = "inline-flex gap-1 rounded-md p-1 text-note";
-export const SWITCH_BUTTON = "min-h-8 rounded-sm px-3 py-1";
-export const SWITCH_ON = "bg-main font-medium text-page";
-export const SWITCH_OFF = "text-quiet hover:text-main";
-
 // Marks the plays you were in.
 function YouTag({ className = "" }: { className?: string }) {
   return (
@@ -380,11 +373,6 @@ function YouTag({ className = "" }: { className?: string }) {
       You
     </span>
   );
-}
-
-// 0.5234 -> "52.3%".
-function percent(chance: number): string {
-  return `${(chance * 100).toFixed(1)}%`;
 }
 
 // What kind of play it was, by its biggest objective, or a fight: crossed

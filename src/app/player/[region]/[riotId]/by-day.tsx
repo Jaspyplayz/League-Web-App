@@ -48,6 +48,7 @@ export async function ByDay({
   tagLine,
   playerPath,
   queue,
+  stored,
 }: {
   region: Region;
   puuid: string;
@@ -55,6 +56,7 @@ export async function ByDay({
   tagLine: string;
   playerPath: string; // e.g. "/player/na/Name-TAG"
   queue: QueueFilter; // the queue choice beside the List / By day switch
+  stored: boolean; // Profile.stored: the profile is saved for this region
 }) {
   // React's lint rule warns that reading the clock gives different output
   // each render. This is a Server Component, rendered once per request.
@@ -72,7 +74,11 @@ export async function ByDay({
   const [{ timelines }, dd, history, notes, recaps] = await Promise.all([
     loadTimelines(region, trendMatches, TIMELINES_PER_VIEW),
     getDataDragon().catch(() => null),
-    loadRankHistory(puuid, new Date(now)),
+    // The saved ranks belong to the region the profile is saved for. On
+    // another region's page they'd give these games LP from that other
+    // server's climb, so the days show no LP, like the rank card draws no
+    // graph there (JAS-41).
+    stored ? loadRankHistory(puuid, new Date(now)) : [],
     loadNotes(puuid, dayKey(now - (LOG_DAYS + 2) * DAY_S * 1000)),
     readRecapHeadlines(
       puuid,
@@ -129,6 +135,7 @@ export async function ByDay({
       <DailyLog
         games={games}
         ranks={ranks}
+        stored={stored}
         notes={notes}
         player={playerKey(region, gameName, tagLine)}
         playerPath={playerPath}

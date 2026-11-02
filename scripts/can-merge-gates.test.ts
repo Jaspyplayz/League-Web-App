@@ -511,7 +511,7 @@ describe("decide", () => {
       "drizzle.config.ts",
       "src/db/schema.ts",
       ".github/workflows/ci.yml",
-      ".claude/skills/verify-turnpoint-ux/SKILL.md",
+      ".claude/skills/code-review-and-quality/SKILL.md",
       ".claude/agents/reviewer.md",
       "eslint-rules/no-green-classes.mjs",
       "eslint.config.js",
@@ -530,8 +530,8 @@ describe("decide", () => {
       }
     });
 
-    it("lets Claude merge the verify skill's feature notes after the panel", () => {
-      const files = [".claude/skills/verify-turnpoint-ux/features/review-path.md"];
+    it("lets Claude merge the verify and postmortem skills' Markdown after the panel", () => {
+      const files = [".claude/skills/verify-turnpoint-ux/features/review-path.md", ".claude/skills/verify/SKILL.md", ".claude/skills/postmortem/SKILL.md"];
       const without = decide(pr({ files }), main());
       expect(failed(without)).toEqual(["Interrogate panel ran"]);
       const withPanel = decide(pr({ body: body({ review: [panel(HEAD), "", `Reviewer agent at ${HEAD}: no blockers`] }), files }), main());

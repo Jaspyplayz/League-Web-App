@@ -7,6 +7,7 @@ import {
   addRecentPlayer,
   hasPlayer,
   MAX_PINNED_PLAYERS,
+  parseSavedPlayerDetails,
   PINNED_PLAYERS_KEY,
   RECENT_PLAYERS_KEY,
   removePlayer,
@@ -20,43 +21,43 @@ import { CloseIcon, StarIcon } from "./icons";
 import { RankBadge } from "./rank-badge";
 import { updateSavedPlayers, useSavedPlayers } from "./saved-players";
 
-// Null for any failure, so the box keeps what it has and asks again next time.
-async function fetchDetails(body: string): Promise<SavedPlayerDetails | null> {
+// Null for any failure, an answer that isn't the expected shape included, so
+// the box keeps what it has and asks again next time.
+export async function fetchDetails(players: SavedPlayer[]): Promise<SavedPlayerDetails | null> {
   try {
     const response = await fetch("/api/saved-players", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body,
+      body: JSON.stringify(players),
     });
-    return response.ok ? ((await response.json()) as SavedPlayerDetails) : null;
+    return response.ok ? parseSavedPlayerDetails(await response.json()) : null;
   } catch {
     return null;
   }
 }
 
 // This browser's two lists, plus what the server knows about them. The server
-// is asked only once the box is `wanted`, so a page view costs no query, and on
-// every opening after that, so a new rank or a new "This is me" shows up. The
+// is asked only once the box is `wanted`, so a page view costs no query, then
+// on every opening after that, so a new rank or a new "This is me" shows up,
+// and whenever a list changes while the box is open, such as after a pin. The
 // last answer stays on screen until the next one lands. A signed-in player's own
 // row comes from the same answer, so it opens the box even with nothing saved.
 export function useSavedPlayersBox(wanted: boolean) {
   const recent = useSavedPlayers(RECENT_PLAYERS_KEY);
   const pinned = useSavedPlayers(PINNED_PLAYERS_KEY);
-  // Sorted, so moving a player around the lists doesn't ask again.
-  const everyone = new Map([...recent, ...pinned].map((p) => [savedPlayerKey(p), p]));
-  const asking = JSON.stringify([...everyone.keys()].sort().map((key) => everyone.get(key)));
 
   const [details, setDetails] = useState<SavedPlayerDetails | null>(null);
   useEffect(() => {
     if (!wanted) return;
     let current = true;
-    fetchDetails(asking).then((found) => {
+    // A player on both lists is asked about once.
+    fetchDetails([...recent, ...pinned.filter((p) => !hasPlayer(recent, p))]).then((found) => {
       if (current && found) setDetails(found);
     });
     return () => {
       current = false;
     };
-  }, [wanted, asking]);
+  }, [wanted, recent, pinned]);
 
   const you = details?.you ?? null;
   return {
@@ -64,7 +65,7 @@ export function useSavedPlayersBox(wanted: boolean) {
     pinned,
     you,
     ranks: details?.ranks ?? {},
-    hasAny: you !== null || everyone.size > 0,
+    hasAny: you !== null || recent.length > 0 || pinned.length > 0,
   };
 }
 

@@ -4,7 +4,7 @@ The win chance is each team's chance of winning at every minute of a finished Su
 
 The code is in [`src/lib/analyzer/win-chance.ts`](../src/lib/analyzer/win-chance.ts), the trained model is [`src/lib/analyzer/win-chance-model.json`](../src/lib/analyzer/win-chance-model.json), and [`scripts/train-win-chance.ts`](../scripts/train-win-chance.ts) trains it. The strip and eval bar are in `match/[matchId]/board.tsx` and the swings in `match/[matchId]/win-chance.tsx`, fed by `matchWinChance` in [`src/lib/win-chance.ts`](../src/lib/win-chance.ts).
 
-It only ever runs on finished games. Riot's developer policy doesn't allow predictions during a live game.
+It only ever runs on finished games. League's [policy](https://developer.riotgames.com/docs/lol#game-policy) refuses products that "provide any game-session-specific information that would be previously unknown to the player". The rule doesn't name win predictions, but a chance to win shown during a live game would be information the player doesn't have, so Turnpoint keeps it to finished games.
 
 ## How it works
 

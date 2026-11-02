@@ -5,6 +5,7 @@ import { useId, useSyncExternalStore } from "react";
 import { isRegion, type Region } from "@/lib/regions";
 import { hoverFade } from "./header-style";
 import { ChevronDownIcon, SearchIcon } from "./icons";
+import { SavedPlayersBox } from "./saved-players-box";
 import { RegionOptions, usePlayerSearch } from "./search-form";
 
 // The header's search (JAS-86): a region chip, the Riot ID box and a search
@@ -49,7 +50,7 @@ export function HeaderSearch({ region = "na" }: { region?: Region }) {
   // useId, not fixed ids, because the not-found page shows the big search
   // too and two boxes can't share one id.
   const errorId = useId();
-  const { error, pending, formProps, riotIdProps, boxOpen, box } = usePlayerSearch(errorId);
+  const { error, pending, formProps, riotIdProps, boxOpen, boxProps } = usePlayerSearch(errorId);
   const placeholder = usePlaceholder();
 
   return (
@@ -99,7 +100,11 @@ export function HeaderSearch({ region = "na" }: { region?: Region }) {
         </p>
       ) : (
         // -inset-x-px: past the form's 1px border, to line up with its edges.
-        box && <div className="absolute -inset-x-px top-full z-30">{box}</div>
+        boxOpen && (
+          <div className="absolute -inset-x-px top-full z-30">
+            <SavedPlayersBox {...boxProps} />
+          </div>
+        )
       )}
     </form>
   );

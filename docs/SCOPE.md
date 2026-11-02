@@ -23,7 +23,7 @@ This doc is the plan for the first version. It will change as we build.
 3. **Match detail**: all 10 players, items, damage, and the standout analysis for the searched player (lead/deficit chart and turning points).
 4. **Insights tab** on the profile: trends across recent games.
 
-Out of scope for v1: user accounts, live game scouting, mobile app, every queue type beyond ranked solo/flex and normal draft. The only live data is the profile's "In game" badge (spectator-v5): it says the looked-up player is in a game, with the mode and minutes, and never shows the other players or their champions, which Riot's policy treats as scouting.
+Out of scope for v1: user accounts, live game scouting, mobile app, every queue type beyond ranked solo/flex and normal draft. The only live data is the profile's "In game" badge (spectator-v5): it says the looked-up player is in a game, with the mode and minutes, and never shows the other players or their champions. League's [policy](https://developer.riotgames.com/docs/lol#game-policy) refuses products that "provide any game-session-specific information that would be previously unknown to the player", and Turnpoint treats who someone is playing with or against right now as that kind of information.
 
 ## Data model sketch
 
@@ -60,8 +60,8 @@ Champion, item and rune names and images come from Data Dragon (static files), n
 ## Riot API notes
 
 - Endpoints: `account-v1` (Riot ID to PUUID), `summoner-v4`, `league-v4` (rank), `match-v5` (match list, match, timeline).
-- Rate limits on a dev key are about 20 requests/second and 100 per 2 minutes. One profile load can need 20+ match calls, so caching and request queuing are core work, not an afterthought.
-- Dev keys expire every 24 hours. Apply for a production key once there's a public prototype.
+- Rate limits on a personal key are 20 requests a second and 100 every 2 minutes, per region ([portal](https://developer.riotgames.com/docs/portal#web-apis_personal-api-keys)). One profile load can need 20+ match calls, so caching and request queuing are core work, not an afterthought.
+- Development keys expire every 24 hours, and a personal key is only for "just the developer or a small private community". A public site needs a production key first, and open alpha or beta tests count as public ([portal](https://developer.riotgames.com/docs/portal#web-apis_personal-api-keys)). Build the prototype in private, then apply with it.
 - The API key stays server-side only (Next.js route handlers / server components), never in the browser.
 
 ## Stack
@@ -87,4 +87,4 @@ All free tiers. Local development runs with `npm run dev` against the free Supab
 2. Riot client with rate limiting, player lookup, profile page.
 3. Database schema, match caching, match detail page.
 4. Match analyzer: lane-opponent comparison, turning points, insights tab.
-5. Tests, README with screenshots and architecture diagram, production key application.
+5. Tests, README with screenshots and architecture diagram, production key application. Until that key is approved, keep the site to you and a small private community: a personal key can't run a public site, open alpha or beta tests included ([portal](https://developer.riotgames.com/docs/portal#web-apis_personal-api-keys)).
