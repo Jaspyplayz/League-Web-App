@@ -176,6 +176,14 @@ describe("By day's notes", () => {
     expect(html).not.toContain("Stop forcing level 2 fights.");
   });
 
+  it("reads no notes when the account hasn't marked any profile", async () => {
+    vi.mocked(readMyPlayer).mockResolvedValue({ ok: true, player: null });
+    const log = await byDayLog(true);
+    expect(readMyPlayer).toHaveBeenCalledWith("user-1");
+    expect(readDayNotes).not.toHaveBeenCalled();
+    expect(log.notes).toBeNull();
+  });
+
   // #167: a failed read can't say whose profile this is, so it shows no note
   // box and says the notes couldn't be loaded.
   it("says the notes couldn't be loaded when it can't read which profile is the account's", async () => {
