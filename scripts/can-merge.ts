@@ -89,7 +89,7 @@ function readPr(number: string): { pr: Pr; history: ReviewHistory } {
   // GitHub's base commit also covers a merged PR, whose head is already in main.
   const files = [...new Set([...changedPaths("origin/main", sha), ...changedPaths(pull.base.sha, sha)])];
   // Every run of every check, not only GitHub's latest of each name, since
-  // toChecks picks the latest of each workflow and name itself.
+  // toChecks picks the latest of each workflow, event and name itself.
   const runs = CheckRunPage.parse(api(`repos/{owner}/{repo}/commits/${sha}/check-runs?filter=all&per_page=100`));
   const workflows = WorkflowRunPage.parse(api(`repos/{owner}/{repo}/actions/runs?head_sha=${sha}&per_page=100`));
   const status = StatusPage.parse(api(`repos/{owner}/{repo}/commits/${sha}/status?per_page=100`));
