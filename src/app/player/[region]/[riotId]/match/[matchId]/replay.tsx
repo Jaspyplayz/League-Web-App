@@ -40,14 +40,11 @@ import {
   PlayMarks,
   PlayNow,
   ReplayPlays,
-  SWITCH,
-  SWITCH_BUTTON,
-  SWITCH_OFF,
-  SWITCH_ON,
 } from "./replay-plays";
 import { ReplayScoreboard, type ItemInfo, type ReplayPerson } from "./replay-scoreboard";
 import { useReviewLinks } from "./review-links";
 import { StepButton } from "./step-button";
+import { Switch } from "./switch";
 import {
   JunglerMarks,
   joinRuns,
@@ -439,19 +436,14 @@ export function Replay({
                   </span>
                 </div>
               )}
-              <div role="group" aria-label="Playback speed" className={`${SWITCH} bg-panel`}>
-                {SPEEDS.map((x) => (
-                  <button
-                    key={x}
-                    type="button"
-                    aria-pressed={speed === x}
-                    onClick={() => setSpeed(x)}
-                    className={`${SWITCH_BUTTON} tabular-nums ${speed === x ? SWITCH_ON : SWITCH_OFF}`}
-                  >
-                    {x}×
-                  </button>
-                ))}
-              </div>
+              <Switch
+                label="Playback speed"
+                options={SPEEDS.map((x) => ({ value: x, name: `${x}×` }))}
+                value={speed}
+                onChange={setSpeed}
+                look="solid"
+                className="bg-panel tabular-nums"
+              />
             </div>
           </div>
           {current && (
