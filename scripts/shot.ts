@@ -11,6 +11,9 @@
 // working (Vercel's login, the expired Riot key notice, a 404, an error page)
 // is not saved: the run prints what it saw and exits with an error. --expect
 // saves one of those on purpose, for a PR that changes the 404 page.
+//
+// On a preview, the run also fails, naming the site, if the bypass secret went
+// to any site other than the preview.
 
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -18,7 +21,7 @@ import { parseArgs } from "node:util";
 import { chromium, type BrowserContext, type Page } from "@playwright/test";
 import { SAMPLE_MATCH_HREF } from "@/lib/sample-match";
 import { THEME_KEY } from "@/lib/theme";
-import { passPreviewLogin } from "../e2e/preview-login";
+import { passPreviewLogin, recordLeaks } from "../e2e/preview-login";
 import { loadEnv, previewUrl } from "./preview";
 import { browserFor } from "./shot-device";
 import { classify, OUTCOMES, type Outcome } from "./shot-outcome";
@@ -172,17 +175,30 @@ async function main() {
   const site = options.pr ? `pr${options.pr}` : new URL(origin).hostname.split(".")[0];
 
   const browser = await chromium.launch();
+  // Only a preview gets the secret, so a --base run has no leak to look for.
+  let leaked = async (): Promise<string[]> => [];
   try {
     const context = await browser.newContext(browserFor(options.phone));
     if (options.light) await context.addInitScript((key) => localStorage.setItem(key, "light"), THEME_KEY);
-    if (preview) await passPreviewLogin(context, preview);
+    if (preview) {
+      await passPreviewLogin(context, preview);
+      // Before any page opens, so it sees every request (decision record 0006).
+      leaked = recordLeaks(context, preview);
+    }
 
     let ok = true;
     if (options.check) ok = await check(context, origin);
     else for (const path of paths) ok = (await shoot(context, origin, site, path)) && ok;
     if (!ok) process.exitCode = 1;
   } finally {
-    await browser.close();
+    // Read the list just before the browser closes, and even when a page threw
+    // partway, so a run that sent the secret to another site always says where.
+    // A screenshot saved on that run is still a true picture, but the run fails.
+    const leaks = await leaked().finally(() => browser.close());
+    if (leaks.length) {
+      console.log(`LEAK: the bypass secret went to other sites: ${leaks.join(", ")}`);
+      process.exitCode = 1;
+    }
   }
 }
 

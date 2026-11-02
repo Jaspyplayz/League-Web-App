@@ -44,7 +44,7 @@ It flags on purpose:
 - **A hop that never reaches the other site**, such as when its name doesn't resolve. The secret didn't go out, but that redirect would send it if the site were up.
 - **A hop first seen mid-chain, in Chrome's reports, that follows a hop on the preview.** A chain that came from another site and only passed through the preview would count too, if the watch attached after its second hop. That's a false alarm on a shape no page uses, and it fails loudly.
 
-It checks only browser requests in a context from the fixture and the verify-turnpoint scripts, which all run Chromium. A spec using Playwright's `request` fixture relies on `maxRedirects: 0` instead, as above.
+It checks only browser requests in a context from the fixture, the verify-turnpoint scripts and `npm run shot` (JAS-219), which all run Chromium. `npm run shot` closes each page once its screenshot is saved, so it reads the list after every page has closed, just before the browser does. A header read still running when its page closes would fail the run with an error rather than hide a leak. On local pages that fetched without stopping, up to 20 at a time, that happened in 0 of 35 runs. A spec using Playwright's `request` fixture relies on `maxRedirects: 0` instead, as above.
 
 The way to close the keepalive gap is the route that fetches each preview request without following redirects, listed under Options. A probe on 2026-11-01 found it stopped the secret on the hop, but fetches and images then never reached the other site, so it changes what pages see. That's left for a decision of its own.
 
