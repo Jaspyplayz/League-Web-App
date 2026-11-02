@@ -700,6 +700,16 @@ describe("a ticket's two tries", () => {
     expect(summaryLines).toContain(`- ${OUT_OF_TRIES}`);
   });
 
+  it("warns in the log about a ticket out of tries, and not about one that waits for another reason", async () => {
+    const old = comment("c1", START_LINE, "2026-11-01T06:00:00.000Z");
+    const read = snapshot({ issues: [issue("JAS-1"), issue("JAS-2", { priority: 0 })], comments: { "JAS-1": [old, { ...old, id: "c2" }] } });
+    const { effects, lines } = recorder();
+    await runRound(planRound(read, AT_0630, RUN), { dryRun: false }, effects);
+    expect(lines.filter((line) => line.startsWith("::warning"))).toEqual([
+      "::warning title=Ticket out of tries::The queue has started JAS-1 2 times, so it won't start it again unless Jasper deletes one of its start comments.",
+    ]);
+  });
+
   it("doesn't move an out-of-tries blocker back to Ready for the ticket it blocks", () => {
     const old = comment("c1", START_LINE, "2026-11-01T06:00:00.000Z");
     const read = snapshot({

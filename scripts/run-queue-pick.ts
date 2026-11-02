@@ -13,6 +13,8 @@
 export const CEILING = 4;
 /** How many times the queue starts one ticket before it stops and waits for Jasper (0026). */
 export const TRIES = 2;
+/** The reason a ticket out of tries waits. */
+export const OUT_OF_TRIES = `It can't start, because the queue has already tried it ${TRIES} times, which is the limit. Deleting one of the queue's start comments on it gives it another try, if Jasper wants one.`;
 
 export type Status = "Backlog" | "Todo" | "Ready" | "In Progress" | "In Review" | "Done" | "Canceled" | "Duplicate";
 export type Priority = "Urgent" | "High" | "Medium" | "Low";
@@ -204,9 +206,7 @@ export function pickTickets(state: QueueState): Picks {
     if (ticket.priority === null) why.push("It has no Priority.");
     if ("why" in touches) why.push(`It can't start, because ${touches.why}.`);
     // Checked here, not after picking, so it takes no slot and holds no files.
-    if (outOfTries.has(ticket.id)) {
-      why.push(`It can't start, because the queue has already tried it ${TRIES} times, which is the limit. Deleting one of the queue's start comments on it gives it another try, if Jasper wants one.`);
-    }
+    if (outOfTries.has(ticket.id)) why.push(OUT_OF_TRIES);
     for (const id of new Set(ticket.blockedBy)) {
       const blocker = checkBlocker(id, tickets, running, outOfTries);
       if (blocker.kind === "waits") why.push(blocker.why);

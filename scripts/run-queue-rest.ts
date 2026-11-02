@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { OpenPulls, READY_LABEL, readyToMerge, type OpenPull } from "./can-merge-action-steps";
 import { field } from "./can-merge-gates";
-import { CEILING, pickTickets, TRIES, type OpenPr, type Status, type Ticket } from "./run-queue-pick";
+import { CEILING, OUT_OF_TRIES, pickTickets, TRIES, type OpenPr, type Status, type Ticket } from "./run-queue-pick";
 
 /** How long the queue's start comment holds a ticket. It matches JAS-29's stall rule; JAS-145 handles the stall. */
 export const START_HOLDS_FOR_MS = 2 * 60 * 60 * 1000;
@@ -698,6 +698,9 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
   }
 
   for (const wait of plan.waits) {
+    if (wait.why.includes(OUT_OF_TRIES)) {
+      log(`::warning title=Ticket out of tries::The queue has started ${wait.id} ${TRIES} times, so it won't start it again unless Jasper deletes one of its start comments.`);
+    }
     if (!dryRun && wait.comment.kind === "create") await effects.createComment(wait.comment.issueUuid, wait.comment.body);
     if (!dryRun && wait.comment.kind === "update") await effects.updateComment(wait.comment.commentId, wait.comment.body);
     for (const line of waitLines(wait, dryRun)) summary(line);
