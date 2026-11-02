@@ -925,6 +925,11 @@ describe(".github/workflows/run-queue.yml", () => {
     ]);
   });
 
+  it("runs the queue job in the run-queue environment, which holds the two secrets, and the merged job in none", () => {
+    expect(queue).toContain("    environment: run-queue");
+    expect(merged.filter((line) => /\benvironment:/.test(line))).toEqual([]);
+  });
+
   it("names the two secrets only in the last step, and gives a dry run no task token", () => {
     const secrets = code.filter((line) => line.includes("secrets."));
     expect(secrets.map((line) => line.trim())).toEqual([
