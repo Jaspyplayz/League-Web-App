@@ -1,6 +1,6 @@
 # 0026: A script picks the tickets, and an Action starts the builders
 
-Status: draft until this PR merges. It records the design of `/run-queue` (JAS-29). None of it is built yet, and a trial on one ticket comes before any code.
+Status: accepted. It records the design of `/run-queue` (JAS-29). The trial ran on one ticket, JAS-143 built the picking script and JAS-144 the Run queue workflow; the failure loop comes next.
 
 ## Context
 
