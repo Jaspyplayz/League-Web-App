@@ -295,6 +295,11 @@ function heldStarts(snapshot: Snapshot, now: Date): Map<string, string> {
   return held;
 }
 
+// "PR 50 and PR 51": the open PRs on a ticket's branches, for a sentence.
+function prList(snapshot: Snapshot, id: string): string {
+  return listOf(prsOf(snapshot, id).map((pull) => `PR ${pull.number}`));
+}
+
 // The open PRs on a ticket's claude/jas-<n>- branches, lowest number first.
 function prsOf(snapshot: Snapshot, id: string): OpenPull[] {
   return snapshot.pulls.filter((pull) => ticketOfBranch(pull.head.ref) === id).sort((a, b) => a.number - b.number);
@@ -447,7 +452,7 @@ export type Plan = {
   /** In the order they were picked, each with its wait comment's edit if it has one. */
   start: { id: string; uuid: string; body: string; waited?: { commentId: string; body: string } }[];
   waits: { id: string; why: string[]; comment: WaitComment }[];
-  /** Lines only for the log, such as a blocker in another project left alone. */
+  /** Notes for the run's summary, such as a blocker in another project left alone. */
   notes: string[];
 };
 
@@ -491,7 +496,7 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   const notes = [
     ...finishedEarly.map(
       (issue) =>
-        `${issue.identifier}'s builder has finished ${listOf(prsOf(snapshot, issue.identifier).map((pull) => `PR ${pull.number}`))}, though Linear still has it ${issue.state.name}, so the queue treats it as In Review.`,
+        `${issue.identifier}'s builder has finished ${prList(snapshot, issue.identifier)}, though Linear still has it ${issue.state.name}, so the queue treats it as In Review.`,
     ),
     ...[...new Set(named.filter((id) => foreign.has(id)))].map((id) => `${id} isn't in project ${PROJECT}, so the queue doesn't move, start or comment on it.`),
   ];
@@ -504,7 +509,7 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
       .map(({ id }): [string, string] => [`It waits for ${id}, which moves to Ready now.`, `It waits for ${id}, which is in another project, so the queue doesn't move it.`]),
     ...finishedEarly.map(({ identifier: id }): [string, string] => [
       `It waits for ${id}, which is In Review.`,
-      `It waits for ${id}, whose builder has finished its PR, which waits to merge.`,
+      `It waits for ${id}, whose builder has finished ${prList(snapshot, id)}, which ${prsOf(snapshot, id).length === 1 ? "waits" : "wait"} to merge.`,
     ]),
   ]);
   let start = picks.start.filter((id) => !foreign.has(id));

@@ -134,14 +134,19 @@ function recorder(fire: (id: string) => FireAnswer = (id) => ({ kind: "started",
   return { effects, calls, lines };
 }
 
-// Effects for a dry run: anything but a log line fails the test.
+// Effects for a dry run: anything but a log or summary line fails the test.
+// `lines` has both, in order; `summaryLines` only what reaches the run's page.
 function dryEffects() {
   const lines: string[] = [];
+  const summaryLines: string[] = [];
   const refuse = (): never => {
     throw new Error("a dry run reached Linear or the cloud task");
   };
-  const effects: Effects = { promote: refuse, createComment: refuse, updateComment: refuse, fire: refuse, log: (line) => lines.push(line), summary: (line) => lines.push(line) };
-  return { effects, lines };
+  const effects: Effects = { promote: refuse, createComment: refuse, updateComment: refuse, fire: refuse, log: (line) => lines.push(line), summary: (line) => {
+    lines.push(line);
+    summaryLines.push(line);
+  } };
+  return { effects, lines, summaryLines };
 }
 
 // Effects that keep each ticket's comments the way Linear does, so a test
@@ -466,7 +471,7 @@ describe("a ticket can't start twice", () => {
     const plan = planRound(read, AT_0630, RUN);
     expect(plan.promote).toEqual([]);
     expect(plan.start).toEqual([]);
-    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([["JAS-1", ["It waits for JAS-9, whose builder has finished its PR, which waits to merge."]]]);
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([["JAS-1", ["It waits for JAS-9, whose builder has finished PR 50, which waits to merge."]]]);
   });
 
   it("gives no slot to a ticket the queue started under 2 hours ago once its builder finished", () => {
@@ -494,11 +499,18 @@ describe("a ticket can't start twice", () => {
 
   it("says in the run's summary why a Ready ticket with a finished PR doesn't start", async () => {
     const read = snapshot({ issues: [issue("JAS-5")], pulls: [pull(9, "claude/jas-5-x", "**Ready to merge:** yes at 4d2a4fe")], files: { 9: [{ filename: "src/JAS-5.ts" }] } });
-    const { effects, lines } = dryEffects();
+    const { effects, summaryLines } = dryEffects();
     await runRound(planRound(read, AT_0630, RUN), { dryRun: true }, effects);
-    expect(lines).toContain("Note: JAS-5's builder has finished PR 9, though Linear still has it Ready, so the queue treats it as In Review.");
-    expect(lines).toContain("No ticket starts this round.");
-    expect(lines.join("\n")).not.toContain("no ticket is Ready");
+    expect(summaryLines).toContain("Note: JAS-5's builder has finished PR 9, though Linear still has it Ready, so the queue treats it as In Review.");
+    expect(summaryLines).toContain("No ticket starts this round.");
+    expect(summaryLines.join("\n")).not.toContain("no ticket is Ready");
+  });
+
+  it("says each waiting Ready ticket's reasons follow, not that no ticket is Ready", async () => {
+    const { effects, summaryLines } = dryEffects();
+    await runRound(planRound(snapshot({ issues: [issue("JAS-2", { priority: 0 })] }), AT_0630, RUN), { dryRun: true }, effects);
+    expect(summaryLines).toContain("No ticket starts this round. Each Ready ticket's reasons are below.");
+    expect(summaryLines.join("\n")).not.toContain("no ticket is Ready");
   });
 
   it("counts no builder on a finished ticket, even with an old PR still open", () => {
