@@ -7,11 +7,28 @@ import {
   type SavedPlayer,
 } from "@/lib/saved-players";
 import { PinButton, updateSavedPlayers } from "./saved-players";
+import { useLocalSetting } from "./use-local-setting";
+
+// The real hook, wrapped so a test can stand in for the browser's side.
+vi.mock("./use-local-setting", async (real) => ({
+  useLocalSetting: vi.fn((await real<typeof import("./use-local-setting")>()).useLocalSetting),
+}));
 
 const faker: SavedPlayer = { region: "kr", gameName: "Hide on bush", tagLine: "KR1" };
 const caps: SavedPlayer = { region: "euw", gameName: "Caps", tagLine: "EUW" };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.mocked(useLocalSetting).mockReset();
+});
+
+// Players' browsers already hold their pins under this name, so reading
+// another one would lose them.
+it("fills the star for a player this browser saved under turnpoint:pinned-players", () => {
+  const pinned = JSON.stringify([faker]);
+  vi.mocked(useLocalSetting).mockImplementation((key) => (key === "turnpoint:pinned-players" ? pinned : null));
+  expect(renderToStaticMarkup(<PinButton {...faker} />)).toContain('aria-pressed="true"');
+});
 
 // A browser's localStorage, kept in a Map, or one that blocks every read and
 // write the way a browser blocking site data does.
