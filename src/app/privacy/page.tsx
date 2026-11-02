@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // same pull request.
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="October 21, 2026">
+    <LegalPage title="Privacy policy" updated="November 2, 2026">
       <p>
         Turnpoint is a free League of Legends stats site built by one student. This page
         explains what data it handles and why. The short version: accounts are optional, and
@@ -92,8 +92,10 @@ export default function PrivacyPage() {
         champions, kills, gold gaps and objective timings, worked out from Riot&apos;s match
         data) to Anthropic, which runs the Claude AI model, and saves the recap it writes. No
         account details, Riot IDs or notes are sent. Anyone looking at that game sees the saved
-        recap. Turnpoint also notes which account asked for each recap, only to limit how many
-        one account can request a day.
+        recap. Turnpoint also notes when your account asks for a recap, including tries that
+        fail, only to limit how many one account can request a day. Deleting your account deletes
+        these notes. Older recaps also note which account asked for them, until that account is
+        deleted.
       </p>
 
       <h2>Ask</h2>
