@@ -192,7 +192,7 @@ describe("parseTouches", () => {
   });
 
   // The third is JAS-190's real line, whose output is a Linear document.
-  it.each(["None", "none.", "None. The output is a Linear document and new tickets.", "None (it only writes in Linear)", "None - it only writes in Linear"])(
+  it.each(["None", "none.", "None. The output is a Linear document and new tickets.", "None.", "None. It only writes in Linear, then stops. Nothing else changes."])(
     "reads **Touches.** %s as a ticket that changes no files",
     (line) => {
       expect(parseTouches(`**Touches.** ${line}`)).toEqual({ files: [] });
@@ -201,6 +201,39 @@ describe("parseTouches", () => {
 
   // "None yet" and the rest don't say the ticket changes no files.
   it.each(["None yet", "None of the old files", "Nonesuch", "No files", "Nothing"])("can't read **Touches.** %s", (line) => {
+    expect(parseTouches(`**Touches.** ${line}`)).toEqual({ why: "its Touches line names no files in backticks" });
+  });
+
+  // Each of these once read as no files, so its ticket would hold nothing and
+  // start beside a builder changing the file it names or isn't sure about.
+  it.each([
+    "None (yet)",
+    "None - TBD",
+    "None, except src/db/schema.ts",
+    "None. Actually it edits src/db/schema.ts",
+    "None - probably src/lib/riot/client.ts",
+    "None (src/db/queries.ts maybe)",
+    "None?",
+    "None (TBD)",
+    "None, not worked out yet",
+    "None/unknown",
+    "None (it only writes in Linear)",
+    "None - it only writes in Linear",
+  ])("can't read **Touches.** %s, since only None or None. and a sentence says no files", (line) => {
+    expect(parseTouches(`**Touches.** ${line}`)).toEqual({ why: "its Touches line names no files in backticks" });
+  });
+
+  it.each([
+    ["a path", "None. It only changes docs/runbook"],
+    ["a question", "None. Is that right?"],
+    ["a file extension", "None. It only changes runbook.md"],
+    ["tbd", "None. The rest is TBD."],
+    ["yet", "None. Not worked out yet."],
+    ["maybe", "None. Maybe later."],
+    ["probably", "None. It probably stays in Linear."],
+    ["unknown", "None. The rest is unknown."],
+    ["except", "None. Nothing changes except the schema."],
+  ])("can't read a None. sentence with %s in it", (_, line) => {
     expect(parseTouches(`**Touches.** ${line}`)).toEqual({ why: "its Touches line names no files in backticks" });
   });
 

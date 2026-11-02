@@ -112,11 +112,7 @@ export function parseTouches(description: string): Touches {
     return { why: "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word" };
   }
   if ((list.match(/`/g) ?? []).length % 2 === 1) return { why: "its Touches line has a backtick with no partner" };
-  // A ticket that changes no files says None, so it holds nothing and blocks
-  // nothing. "None yet" or "None of the old files" doesn't say that, so only
-  // punctuation or the end of the line can follow it, and the checks below
-  // read any other line that starts with the word.
-  if (!list.includes("`") && /^none\s*(?:$|[^\s\w])/i.test(list.trim())) return { files: [] };
+  if (!list.includes("`") && saysNone(list)) return { files: [] };
   const files = [...list.matchAll(/`([^`]*)`/g)].map((match) => match[1].trim());
   if (files.length === 0) return { why: "its Touches line names no files in backticks" };
   if (files.includes("")) return { why: "its Touches line has backticks with nothing in them" };
@@ -126,6 +122,18 @@ export function parseTouches(description: string): Touches {
   }
   // "docs/adr/" and "docs/adr" both mean the folder.
   return { files: files.map((file) => file.replace(/\/$/, "")) };
+}
+
+// A ticket that holds no files blocks nothing, so a mistake here starts it
+// beside a builder changing the file it meant.
+// A ticket that changes no files writes None, or None. followed by a sentence.
+// A sentence with a /, a ?, a file extension or an unsure word such as TBD, yet
+// or maybe makes the ticket wait, and so does anything else after None.
+const NONE_UNSURE = /[/?]|\.[a-z0-9]{1,5}\b|\b(?:tbd|todo|yet|maybe|perhaps|possibly|probably|might|unknown|unsure|actually|except)\b/i;
+
+function saysNone(list: string): boolean {
+  const none = list.trim().match(/^none(?:\.(?:\s+(.+))?)?$/i);
+  return none !== null && !NONE_UNSURE.test(none[1] ?? "");
 }
 
 function notAPath(path: string): string | undefined {

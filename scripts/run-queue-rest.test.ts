@@ -1393,4 +1393,12 @@ describe(".github/ISSUE_TEMPLATE/feature.md", () => {
     expect(touches).toContain("writes None");
     expect(parseTouches(touches)).toEqual({ why: "its Touches line names no files in backticks" });
   });
+
+  it("gives the None rule in the same words as the code and the docs", () => {
+    const rule = "A ticket that changes no files writes None, or None. followed by a sentence. A sentence with a /, a ?, a file extension or an unsure word such as TBD, yet or maybe makes the ticket wait, and so does anything else after None.";
+    const flat = (path: string) => source(path).replace(/\n\s*\/\/ /g, " ");
+    for (const path of ["scripts/run-queue-pick.ts", ".github/ISSUE_TEMPLATE/feature.md", ".claude/skills/run-queue/SKILL.md", "GLOSSARY.md", "docs/agents/issue-tracker.md"]) {
+      expect(flat(path), path).toContain(rule);
+    }
+  });
 });
