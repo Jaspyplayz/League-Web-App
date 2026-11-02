@@ -300,11 +300,9 @@ export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why
     // picker doesn't count a ticket's own PR as a clash, so a second builder
     // would start. One with no open PR has merged or closed it, and Linear
     // hasn't caught up.
-    const working = snapshot.pulls
-      .filter((pull) => ticketOfBranch(pull.head.ref) === id && !builderDone(pull))
-      .map((pull) => pull.number)
-      .sort((a, b) => a - b);
-    const prs = listOf(working.map((number) => `PR ${number}`));
+    const open = snapshot.pulls.filter((pull) => ticketOfBranch(pull.head.ref) === id).sort((a, b) => a.number - b.number);
+    const working = open.filter((pull) => !builderDone(pull));
+    const prs = listOf(working.map((pull) => `PR ${pull.number}`));
     const notDone = `${working.length === 1 ? "isn't" : "aren't"} marked ready or left for Jasper`;
     const startedAt = started.get(id);
     if (issue.state.name === "In Progress") {
@@ -313,6 +311,11 @@ export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why
       running.push({ id, why: `it's In Review, and ${prs} ${notDone}` });
     } else if (working.length > 0) {
       running.push({ id, why: `its ${prs} ${working.length === 1 ? "is" : "are"} open and ${notDone}` });
+    } else if (open.length > 0 && BEFORE_BUILDER.includes(issue.state.name)) {
+      // Its builder finished a PR but couldn't move the ticket on, so Linear
+      // says it can start. A second builder would build it again.
+      const opened = listOf(open.map((pull) => `PR ${pull.number}`));
+      running.push({ id, why: `its builder already opened ${opened}, though Linear still has it ${issue.state.name}` });
     } else if (startedAt && BEFORE_BUILDER.includes(issue.state.name)) {
       running.push({ id, why: `the queue started a builder on it at ${utc(startedAt)}, under 2 hours ago` });
     }

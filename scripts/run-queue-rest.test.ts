@@ -446,6 +446,15 @@ describe("a ticket can't start twice", () => {
     expect(plan.running).toEqual([{ id: "JAS-5", why: "its PR 9 is open and isn't marked ready or left for Jasper" }]);
   });
 
+  it("holds a Ready ticket whose PR is marked ready or left for Jasper, since a second builder would build it again", () => {
+    for (const body of ["**Ready to merge:** yes at 4d2a4fe", "**Ready to merge:** no: Jasper merges this one by hand."]) {
+      const read = snapshot({ issues: [issue("JAS-5")], pulls: [pull(9, "claude/jas-5-x", body)], files: { 9: [{ filename: "src/JAS-5.ts" }] } });
+      const plan = planRound(read, AT_0630, RUN);
+      expect(plan.start).toEqual([]);
+      expect(plan.running).toEqual([{ id: "JAS-5", why: "its builder already opened PR 9, though Linear still has it Ready" }]);
+    }
+  });
+
   it("lets a refused start's comment go after an hour, instead of holding the ticket for 2 like a start comment", () => {
     const read = snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": [comment("c1", `${REFUSED_LINE}\n\nThe cloud task answered HTTP 429.`, "2026-11-02T05:00:00.000Z")] } });
     expect(planRound(read, AT_0630, RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
