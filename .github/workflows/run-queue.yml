@@ -13,8 +13,7 @@ run-name: Run queue${{ inputs.dry_run && ' (dry run)' || '' }}
 on:
   # A PR Agent merge merged. Its merges use github.token, so GitHub starts no
   # workflow for them, and this runs when an Agent merge run finishes instead.
-  # Most of those runs merge nothing, but a run with nothing new to do changes
-  # nothing, and each one is another chance to notice Vercel's limit clearing.
+  # Most of those runs merge nothing, so the merged job below checks first.
   workflow_run:
     workflows: [Agent merge]
     types: [completed]
@@ -36,31 +35,65 @@ on:
   schedule:
     - cron: "41 * * * *"
 
-# Nothing by default; the job asks for only what reading needs.
+# Nothing by default; each job asks for only what reading needs.
 permissions: {}
 
-# One run at a time, so two runs can't both pick a ticket before either one's
-# start comment is on it. A new run never cancels a running one, which may be
-# between its comment and its fire; a queued one is replaced by the newest,
-# which reads the latest state anyway.
-concurrency:
-  group: run-queue
-  cancel-in-progress: false
-
 jobs:
-  queue:
-    # Only main's copy of this file. A workflow_run, push or schedule run
-    # always uses main's, but a run started by name uses the copy on the ref
-    # it names, and a branch's copy could do anything with the secrets below.
-    # A skipped Agent merge run (any branch but claude/) has nothing to report.
+  # Agent merge runs about 40 times an hour on a busy day and merges in few of
+  # those runs. A whole round reads GitHub about 17 times, and github.token's
+  # budget of 1,000 calls an hour is shared with Agent merge, so the queue
+  # runs only when main moved after that Agent merge run started. This job
+  # has no concurrency group, so a run that merged nothing never takes the
+  # queue's place in line.
+  merged:
     if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # main's newest commit
+    outputs:
+      moved: ${{ steps.main.outputs.moved }}
+    steps:
+      # Both times are GitHub's own, in the same ISO 8601 form, so comparing
+      # them as text compares the times.
+      - id: main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          STARTED: ${{ github.event.workflow_run.run_started_at }}
+        run: |
+          committed=$(gh api "repos/$GH_REPO/commits/main" --jq .commit.committer.date)
+          if [[ "$committed" > "$STARTED" ]]; then moved=true; else moved=false; fi
+          echo "main's newest commit is from $committed, and Agent merge started at $STARTED, so moved=$moved."
+          echo "moved=$moved" >> "$GITHUB_OUTPUT"
+
+  queue:
+    needs: merged
+    # Runs after the merged job, or without it for every other way in.
+    # Only on main's ref: a run by name on another branch would use that
+    # branch's copy of this file. That stops a mistake, not an attacker: a
+    # branch can edit this line out, and any branch's workflow can read the
+    # repo's secrets, so what guards the two secrets below is who can push to
+    # this repo, as with Agent merge (docs/adr/0024-a-github-action-runs-can-merge.md).
+    if: >-
+      !cancelled() &&
       github.ref == 'refs/heads/main' &&
       (github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion != 'skipped')
+      needs.merged.outputs.moved == 'true')
     runs-on: ubuntu-latest
     # A run takes about a minute. A hung one would hold the queue for GitHub's
     # default of six hours.
     timeout-minutes: 10
+    # One real run at a time, so two runs can't both pick a ticket before
+    # either one's start comment is on it. A new run never cancels a running
+    # one, which may be between its comment and its fire; a waiting one is
+    # replaced by the newest, which reads the latest state anyway. Dry runs
+    # write nothing, so they have their own line and never replace a real run.
+    concurrency:
+      group: ${{ inputs.dry_run && 'run-queue-dry-run' || 'run-queue' }}
+      cancel-in-progress: false
     # Read-only. Every write goes to Linear or the cloud task, with the two
     # secrets below. A public repo lets any token read these, but naming them
     # keeps this working if the repo goes private.
