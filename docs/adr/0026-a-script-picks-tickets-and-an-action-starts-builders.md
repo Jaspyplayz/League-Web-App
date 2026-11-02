@@ -43,6 +43,7 @@ Bad:
 
 ## Open questions
 
-1. Do Linear's "needs approval" prompts stall a builder with nobody watching? The trial answers this.
-2. What does one builder run cost against Jasper's usage limits? The trial answers this too.
+1. Do Linear's "needs approval" prompts stall a builder with nobody watching? Answered by the trial on 2026-11-01: no tool stopped to ask, and the builder went from the fire to a merged PR alone.
+2. What does one builder run cost against Jasper's usage limits? Still open: the trial's run log has no cost figure.
 3. How does a refused PR get retried? `.github/workflows/agent-merge.yml` notes that GitHub won't run a workflow from a push made with the Action's own token, so CI wouldn't run on it.
+4. Until the failure loop is built, how many times can one ticket start? Tries aren't counted yet, so a ticket whose builder never moves it out of Ready starts again each time the queue's start comment stops holding it, after 2 hours.
