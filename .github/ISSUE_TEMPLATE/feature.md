@@ -13,7 +13,7 @@ about: A player problem with acceptance criteria, for normal and risky changes
 
 **Tier.** Tiny, normal or risky, and why.
 
-**Touches.** Every file the change should make or edit, each in backticks, all on this one line. A folder in backticks covers everything in it. The ticket queue reads this line to start only tickets whose files don't overlap.
+**Touches.** Every file the change should make or edit, each in backticks, all on this one line. A folder in backticks covers everything in it. A ticket that changes no files writes None instead of a list, and can say why after a full stop. The ticket queue reads this line to start only tickets whose files don't overlap.
 
 **Builder.** Claude Code on Opus 5.5, in a local or cloud session. One builder for this ticket.
 

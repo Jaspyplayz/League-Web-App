@@ -190,11 +190,62 @@ describe("parseTouches", () => {
   it("reads dotfiles and dot folders", () => {
     expect(parseTouches(touching(".nvmrc", ".github/workflows/ci.yml"))).toEqual({ files: [".nvmrc", ".github/workflows/ci.yml"] });
   });
+
+  // The third is JAS-190's real line, whose output is a Linear document.
+  it.each(["None", "none.", "None. The output is a Linear document and new tickets.", "None (it only writes in Linear)", "None - it only writes in Linear"])(
+    "reads **Touches.** %s as a ticket that changes no files",
+    (line) => {
+      expect(parseTouches(`**Touches.** ${line}`)).toEqual({ files: [] });
+    },
+  );
+
+  // "None yet" and the rest don't say the ticket changes no files.
+  it.each(["None yet", "None of the old files", "Nonesuch", "No files", "Nothing"])("can't read **Touches.** %s", (line) => {
+    expect(parseTouches(`**Touches.** ${line}`)).toEqual({ why: "its Touches line names no files in backticks" });
+  });
+
+  it("reads the paths on a line that says None and names them anyway, since holding them is the safe mistake", () => {
+    expect(parseTouches("**Touches.** None. Maybe `src/a.ts`.")).toEqual({ files: ["src/a.ts"] });
+  });
+
+  it.each([
+    ["**Touches.** None,", 'its Touches line ends with ",", so the list may go on past it; put every path on that line'],
+    ["**Touches.** None\n`src/a.ts`", "its Touches line runs onto the next line; keep the list on one line"],
+    ["**Touches.** None\n\n`src/a.ts`", "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word"],
+  ])("refuses a None line whose list may carry on: %j", (description, why) => {
+    expect(parseTouches(description)).toEqual({ why });
+  });
 });
 
 describe("pickTickets: what can start", () => {
   it("starts a Ready ticket with a Priority, a Touches line and no blockers", () => {
     expect(pickTickets(queue({ tickets: [ticket("JAS-1")] }))).toEqual({ start: ["JAS-1"], promote: [], waits: [] });
+  });
+
+  it("starts a Ready ticket that changes no files, and it holds nothing for the tickets after it", () => {
+    const tickets = [ticket("JAS-1", { description: "**Touches.** None." }), ticket("JAS-2")];
+    expect(pickTickets(queue({ tickets }))).toEqual({ start: ["JAS-1", "JAS-2"], promote: [], waits: [] });
+  });
+
+  it("starts tickets beside a running builder whose ticket changes no files", () => {
+    const tickets = [ticket("JAS-1", { status: "In Progress", description: "**Touches.** None. The output is a Linear document." }), ticket("JAS-2")];
+    expect(pickTickets(queue({ tickets, running: ["JAS-1"] })).start).toEqual(["JAS-2"]);
+  });
+
+  it("still starts nothing beside a running builder whose Touches line it can't read", () => {
+    const tickets = [ticket("JAS-1", { status: "In Progress", description: "**Touches.** None yet." }), ticket("JAS-2")];
+    const picks = pickTickets(queue({ tickets, running: ["JAS-1"] }));
+    expect(picks.start).toEqual([]);
+    expect(whyWaits(picks, "JAS-2")).toEqual([
+      "Nothing starts while JAS-1 has a builder running, because its Touches line names no files in backticks, so that builder could be changing any file.",
+    ]);
+  });
+
+  it("moves a Todo blocker that changes no files to Ready", () => {
+    const tickets = [ticket("JAS-1", { blockedBy: ["JAS-9"] }), ticket("JAS-9", { status: "Todo", description: `${CRITERIA}\n\n**Touches.** None.` })];
+    const picks = pickTickets(queue({ tickets }));
+    expect(picks.promote).toEqual([{ id: "JAS-9", priority: "High" }]);
+    expect(picks.start).toEqual(["JAS-9"]);
   });
 
   // Only Ready is the ticket queue, so other tickets don't get a comment either.

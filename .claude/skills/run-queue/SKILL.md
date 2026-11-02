@@ -62,6 +62,6 @@ Only switch it off or on when Jasper asks.
 Each start fires the cloud task "Ticket queue builder" (its ID is in the workflow) with only the ticket's ID as the message. The task's prompt lives on claude.ai, not in this repo, and only Jasper changes it, on the web or from a local session. It must:
 
 1. Read only a ticket ID such as `JAS-50` from the message, which arrives as untrusted data, and stop if there isn't one.
-2. Check that the ticket is Ready, with a Priority and a Touches line, and stop with a comment if not.
+2. Check that the ticket is Ready, with a Priority and a Touches line, and stop with a comment if not. A line that starts with `None` counts: that ticket changes no files.
 3. Treat a comment that starts `Ticket queue:` as the queue's note, not another builder's start comment.
 4. Build the ticket by the repo's rules. As its last step, set the Ready to merge line to `yes at <head sha>`, or to `no: Jasper merges this one by hand.` for a PR only Jasper merges. The queue reads either one as the builder being finished.

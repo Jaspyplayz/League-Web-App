@@ -35,6 +35,7 @@ import {
   type Plan,
   type Snapshot,
 } from "./run-queue-rest";
+import { parseTouches } from "./run-queue-pick";
 
 const REPO = "Jaspyplayz/League-Web-App";
 const JASPER = "00000000-0000-4000-8000-00000000000a";
@@ -331,12 +332,19 @@ describe("the saved answers from 2026-11-02", () => {
           "Nothing starts while JAS-40 has a builder running, because its description has no **Touches.** line, so that builder could be changing any file.",
           "Nothing starts while JAS-43 has a builder running, because its description has no **Touches.** line, so that builder could be changing any file.",
           "Nothing starts while JAS-136 has a builder running, because its description has no **Touches.** line, so that builder could be changing any file.",
-          "Nothing starts while JAS-190 has a builder running, because its Touches line names no files in backticks, so that builder could be changing any file.",
           "Vercel is refusing deploys, so nothing starts.",
         ],
         comment: expect.objectContaining({ kind: "create", issueUuid: "uuid-JAS-900" }),
       },
     ]);
+  });
+
+  it("start a written-up Ready ticket beside the real JAS-190, whose Touches line says None", () => {
+    const queue = saved("linear-queue.json") as { data: { issues: { nodes: { identifier: string }[] } } };
+    const jas190 = LinearIssue.parse(queue.data.issues.nodes.find((node) => node.identifier === "JAS-190"));
+    const plan = planRound(snapshot({ issues: [jas190, issue("JAS-900")] }), AT_0630, RUN);
+    expect(plan.running).toEqual([{ id: "JAS-190", why: "it's In Progress" }]);
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-900"]);
   });
 });
 
@@ -1226,5 +1234,15 @@ describe(".claude/skills/run-queue/SKILL.md", () => {
 
   it("doesn't blame a refused start on a usage limit, which the fire docs don't describe", () => {
     expect(skill).not.toMatch(/usage limit/i);
+  });
+});
+
+describe(".github/ISSUE_TEMPLATE/feature.md", () => {
+  // Backticks on this line would make a ticket nobody filled in hold those
+  // words as files, and start.
+  it("says a ticket that changes no files writes None, and its own line can't start a ticket", () => {
+    const touches = source(".github/ISSUE_TEMPLATE/feature.md").split("\n").find((line) => line.startsWith("**Touches.**")) ?? "";
+    expect(touches).toContain("writes None");
+    expect(parseTouches(touches)).toEqual({ why: "its Touches line names no files in backticks" });
   });
 });
