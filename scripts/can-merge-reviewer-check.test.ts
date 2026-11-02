@@ -210,6 +210,12 @@ describe(WORKFLOW, () => {
     ]);
   });
 
+  // The tests read the file line by line. A bare carriage return or a no-break
+  // space would let a real step hide inside what they read as a comment.
+  it("is plain ASCII with \\n line ends, so the tests read the lines GitHub reads", () => {
+    expect(workflow()).toMatch(/^[\x20-\x7E\n]*$/);
+  });
+
   // Text from the PR inside a run step would run as shell code.
   it("reads the event only in its concurrency group, one per trigger", () => {
     expect(workflowLines().filter((line) => /github\b|\$\{\{/.test(line)).map((line) => line.trim())).toEqual([
