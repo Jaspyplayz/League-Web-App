@@ -27,6 +27,16 @@ describe("cleanNote", () => {
     expect(cleanNote("x".repeat(MAX_NOTE_LENGTH + 1))).toEqual({ ok: false });
   });
 
+  // Postgres text can't hold a NUL character (JAS-214).
+  it("drops NUL characters before trimming", () => {
+    expect(cleanNote("\u0000 ward\u0000 river \u0000")).toEqual({ ok: true, text: "ward river" });
+  });
+
+  it("doesn't count NUL characters toward the length", () => {
+    const full = "x".repeat(MAX_NOTE_LENGTH);
+    expect(cleanNote(`${full}\u0000`)).toEqual({ ok: true, text: full });
+  });
+
   it.each([null, undefined, 42, {}])("rejects %j", (value) => {
     expect(cleanNote(value)).toEqual({ ok: false });
   });

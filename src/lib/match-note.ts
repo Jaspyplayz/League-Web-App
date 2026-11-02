@@ -10,10 +10,12 @@ export type CleanedNote = { ok: true; text: string } | { ok: false };
 // Checks a note before saving. Anyone can call the save action with
 // anything, so this doesn't trust the textarea's maxLength. Browsers send
 // line breaks as "\r\n", which would count twice, so those become "\n"
-// first. An empty note is valid: saving one deletes the note.
+// first. Postgres can't save a NUL character and nobody types one, so any
+// are dropped before that. An empty note is valid: saving one deletes the
+// note.
 export function cleanNote(value: unknown): CleanedNote {
   if (typeof value !== "string") return { ok: false };
-  const text = value.replace(/\r\n?/g, "\n").trim();
+  const text = value.replaceAll("\u0000", "").replace(/\r\n?/g, "\n").trim();
   return text.length <= MAX_NOTE_LENGTH ? { ok: true, text } : { ok: false };
 }
 

@@ -39,8 +39,9 @@ export type AskGame = { matchId: string; label: string };
 export type CleanQuestion = { ok: true; text: string } | { ok: false; message: string };
 
 // Trims the question and squeezes runs of spaces and line breaks into one.
+// NUL characters are dropped first: Postgres can't save one, and nobody types one.
 export function cleanQuestion(raw: string): CleanQuestion {
-  const text = raw.replace(/\s+/g, " ").trim();
+  const text = raw.replaceAll("\u0000", "").replace(/\s+/g, " ").trim();
   if (text === "") return { ok: false, message: "Type a question first." };
   if (text.length > MAX_QUESTION_LENGTH) {
     return { ok: false, message: `Questions can be up to ${MAX_QUESTION_LENGTH} characters.` };
