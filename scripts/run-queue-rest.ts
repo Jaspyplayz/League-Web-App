@@ -395,6 +395,9 @@ function refusalHold(comments: LinearComment[], now: Date): string | undefined {
       return { at: comment.createdAt, status, until };
     })
     .filter((refusal) => now.getTime() < refusal.until)
+    // A start that got through after the refusal, such as Jasper's run by
+    // name once he fixed the token, shows the cloud task takes fires again.
+    .filter((refusal) => !comments.some((comment) => isStartComment(comment) && Date.parse(comment.createdAt) > Date.parse(refusal.at)))
     .sort((a, b) => b.until - a.until);
   if (!hold) return undefined;
   const answered = hold.status === undefined ? "" : ` with HTTP ${hold.status}`;

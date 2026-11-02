@@ -516,6 +516,17 @@ describe("a refused start", () => {
     expect(store.fired).toEqual(["JAS-1", "JAS-1", "JAS-2"]);
   });
 
+  it("ends a refusal's hold once a later start got through, so automatic runs resume after Jasper's fix", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1"), issue("JAS-2"), issue("JAS-3")],
+      comments: {
+        "JAS-1": [comment("c1", refusedBody(401, "authentication_error: invalid token"), "2026-11-02T05:00:00.000Z")],
+        "JAS-2": [comment("c2", `${START_LINE}\n\n${RUN}`, "2026-11-02T06:00:00.000Z")],
+      },
+    });
+    expect(planRound(read, AT_0630, RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-1", "JAS-3"]);
+  });
+
   it("holds automatic runs for a day after a refused comment whose HTTP status it can't read", () => {
     const read = snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": [comment("c1", `${REFUSED_LINE}\n\nSomething else.`, "2026-11-02T05:00:00.000Z")] } });
     expect(planRound(read, AT_0630, RUN).start).toEqual([]);
