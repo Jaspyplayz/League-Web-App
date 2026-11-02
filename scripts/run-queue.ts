@@ -62,6 +62,10 @@ function github(path: string): unknown {
     // A PR's file list holds each file's diff, so it can pass Node's default 1 MB.
     const output = execFileSync("gh", ["api", "--paginate", "--slurp", path], {
       encoding: "utf8",
+      // Only what gh needs, so it never holds the Linear key or the task
+      // token. NODE_ENV is there because Next's types require it in any
+      // environment; it holds no secret.
+      env: { NODE_ENV: process.env.NODE_ENV, PATH: process.env.PATH, HOME: process.env.HOME, GH_TOKEN: process.env.GH_TOKEN, GH_REPO: process.env.GH_REPO },
       maxBuffer: 64 * 1024 * 1024,
       stdio: ["ignore", "pipe", "pipe"],
     });

@@ -915,6 +915,19 @@ describe("scripts/run-queue.ts", () => {
     ]);
   });
 
+  it("gives gh only NODE_ENV, PATH, HOME, GH_TOKEN and GH_REPO, so it never holds the Linear key or the task token", () => {
+    expect(code.match(/execFileSync\(/g)).toHaveLength(1);
+    const github = code.slice(code.indexOf("function github("), code.indexOf("async function fire("));
+    const env = github.match(/\benv: \{([^}]*)\}/)?.[1] ?? "";
+    expect(env.split(",").map((entry) => entry.trim())).toEqual([
+      "NODE_ENV: process.env.NODE_ENV",
+      "PATH: process.env.PATH",
+      "HOME: process.env.HOME",
+      "GH_TOKEN: process.env.GH_TOKEN",
+      "GH_REPO: process.env.GH_REPO",
+    ]);
+  });
+
   it("never logs a secret or the environment", () => {
     const logging = lines.filter((line) => /console\.|log\(|summary\(/.test(line));
     expect(logging.length).toBeGreaterThan(0);
