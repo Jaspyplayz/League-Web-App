@@ -305,9 +305,9 @@ describe("the saved answers from 2026-11-02", () => {
     const plan = planRound(await todaysSnapshot(), AT_0630, RUN);
     expect(plan.start).toEqual([]);
     expect(plan.promote).toEqual([]);
-    const { effects, lines } = dryEffects();
+    const { effects, summaryLines } = dryEffects();
     expect(await runRound(plan, { dryRun: true }, effects)).toEqual({ failed: false });
-    expect(lines).toEqual([
+    expect(summaryLines).toEqual([
       "Dry run: this says what the queue would do, and changes nothing.",
       "Vercel refused a deploy at 2026-11-02 06:20 UTC, under an hour ago, so nothing starts this round.",
       "6 tickets have a builder running:",
@@ -474,6 +474,15 @@ describe("a ticket can't start twice", () => {
     expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([["JAS-1", ["It waits for JAS-9, whose builder has finished PR 50, which waits to merge."]]]);
   });
 
+  it("names each finished PR of a blocker, and says they wait to merge", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1", { blockedBy: ["JAS-9"] }), issue("JAS-9", { status: "Todo" })],
+      pulls: [pull(50, "claude/jas-9-x", "**Ready to merge:** no: Jasper merges this one by hand."), pull(51, "claude/jas-9-y", "**Ready to merge:** no: Jasper merges this one by hand.")],
+      files: { 50: [{ filename: "src/JAS-9.ts" }], 51: [{ filename: "src/JAS-9.ts" }] },
+    });
+    expect(planRound(read, AT_0630, RUN).waits.map((wait) => wait.why)).toEqual([["It waits for JAS-9, whose builder has finished PR 50 and PR 51, which wait to merge."]]);
+  });
+
   it("gives no slot to a ticket the queue started under 2 hours ago once its builder finished", () => {
     const read = snapshot({
       issues: [issue("JAS-1"), issue("JAS-2"), issue("JAS-3"), issue("JAS-4"), issue("JAS-5")],
@@ -633,10 +642,10 @@ describe("In Review", () => {
 describe("a dry run", () => {
   it("says what it would start and why each other ticket waits, and touches nothing", async () => {
     const read = snapshot({ issues: [issue("JAS-1"), issue("JAS-2", { priority: 0 })] });
-    const { effects, lines } = dryEffects();
+    const { effects, summaryLines } = dryEffects();
     await runRound(planRound(read, AT_0630, RUN), { dryRun: true }, effects);
-    expect(lines).toContain("Would start a builder on JAS-1.");
-    expect(lines.slice(-2)).toEqual(["JAS-2 waits, and its comment would be created:", "- It has no Priority."]);
+    expect(summaryLines).toContain("Would start a builder on JAS-1.");
+    expect(summaryLines.slice(-2)).toEqual(["JAS-2 waits, and its comment would be created:", "- It has no Priority."]);
   });
 });
 
