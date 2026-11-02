@@ -2,8 +2,8 @@ import { prerender } from "react-dom/static";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SignInPage from "./page";
 
-// signIn() is a server action that talks to Supabase; these tests are about
-// how the page reads the address, so a stand-in is enough.
+// The real signIn() imports Supabase code marked server-only, which can't
+// load in a test, so a stand-in takes its place.
 vi.mock("@/app/auth/actions", () => ({ signIn: vi.fn() }));
 
 // Without these the panel says sign-in isn't set up and never uses ?next=.
@@ -14,9 +14,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 // prerender, not renderToStaticMarkup: it waits for the part behind the
-// page's <Suspense>, where the address is read.
+// page's <Suspense>, where the address is read. When that part throws,
+// prerender doesn't: React draws the stand-in and leaves the rest to the
+// browser. So any error it reports fails the test, and a page that crashed
+// can't pass a test that only checks what's missing.
 async function pageFor(params: Record<string, string | string[]>): Promise<string> {
-  const { prelude } = await prerender(<SignInPage searchParams={Promise.resolve(params)} />);
+  const errors: unknown[] = [];
+  const { prelude } = await prerender(<SignInPage searchParams={Promise.resolve(params)} />, {
+    onError: (error) => void errors.push(error),
+  });
+  if (errors.length > 0) throw errors[0];
   return new Response(prelude).text();
 }
 
