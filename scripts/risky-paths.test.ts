@@ -107,6 +107,7 @@ function tokenProblems(workflow: string): string[] {
 // word itself, not only an `environment:` key. A quoted key, or a YAML anchor
 // used as a key, would get past a check for that. Reading a deployment's
 // environment, as `github.event.deployment.environment`, can't reach them.
+// `secrets: inherit` hands a called workflow every secret without naming one.
 function secretProblems(workflow: string): string[] {
   const code = workflow
     .split("\n")
@@ -115,6 +116,7 @@ function secretProblems(workflow: string): string[] {
   return [
     /(?<![.\w-])environment(?![\w-])/i.test(code) && "asks for a deployment environment",
     /LINEAR_API_KEY|RUN_QUEUE_TASK_TOKEN/i.test(code) && "names one of the queue's secrets",
+    /\bsecrets\b["']?\s*:\s*["']?inherit\b/i.test(code) && "passes every secret to a called workflow",
   ].filter((problem) => problem !== false);
 }
 
@@ -528,6 +530,8 @@ describe("riskyFiles", () => {
     ["the Linear key", "env:\n  KEY: ${{ secrets.LINEAR_API_KEY }}\n"],
     ["the task token by index", "env:\n  KEY: ${{ secrets['RUN_QUEUE_TASK_TOKEN'] }}\n"],
     ["a secret in small letters, which GitHub reads the same", "env:\n  KEY: ${{ secrets.linear_api_key }}\n"],
+    ["a call that passes every secret on", "jobs:\n  x:\n    uses: octo/repo/.github/workflows/y.yml@main\n    secrets: inherit\n"],
+    ["a quoted secrets key and value", 'jobs:\n  x:\n    "secrets": "inherit"\n'],
   ])("would refuse a workflow with %s", (_, text) => {
     expect(secretProblems(text)).not.toEqual([]);
   });
