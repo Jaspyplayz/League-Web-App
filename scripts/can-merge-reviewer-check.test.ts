@@ -170,26 +170,28 @@ describe(WORKFLOW, () => {
     expect(workflow()).toMatch(/^jobs:\n {2}reviewer:$/m);
   });
 
-  it("runs on both PR triggers into main, for every edit and push", () => {
-    const lines = workflowLines();
-    const on = lines.indexOf("on:");
-    const end = lines.findIndex((line, i) => i > on && !line.startsWith(" "));
-    const types = "types: [opened, edited, synchronize, reopened, ready_for_review]";
-    expect(lines.slice(on + 1, end).map((line) => line.trim())).toEqual([
-      "pull_request_target:",
-      "branches: [main]",
+  // Every line of the file, so any new trigger, setting, step or option, even
+  // one above jobs: such as a default shell, changes this test too. Both PR
+  // triggers run on edits, so a new verdict passes the check, and on pushes,
+  // so a new commit checks it again. The whole history keeps the PR's base
+  // commit here.
+  it("runs only main's checkout, node, npm ci and the check script, on both PR triggers, for at most 10 minutes", () => {
+    const types = "    types: [opened, edited, synchronize, reopened, ready_for_review]";
+    expect(workflowLines()).toEqual([
+      "name: Reviewer",
+      "on:",
+      "  pull_request_target:",
+      "    branches: [main]",
       types,
-      "pull_request:",
-      "branches: [main]",
+      "  pull_request:",
+      "    branches: [main]",
       types,
-    ]);
-  });
-
-  // Every line of the job, so any new step, option or setting changes this
-  // test too. The whole history keeps the PR's base commit here.
-  it("runs only main's checkout, node, npm ci and the check script, for at most 10 minutes", () => {
-    const lines = workflowLines();
-    expect(lines.slice(lines.indexOf("jobs:") + 1)).toEqual([
+      "permissions:",
+      "  contents: read",
+      "concurrency:",
+      "  group: reviewer-${{ github.event_name }}-${{ github.event.pull_request.number }}",
+      "  cancel-in-progress: true",
+      "jobs:",
       "  reviewer:",
       "    runs-on: ubuntu-latest",
       "    timeout-minutes: 10",
@@ -213,14 +215,6 @@ describe(WORKFLOW, () => {
     expect(workflowLines().filter((line) => /github\b|\$\{\{/.test(line)).map((line) => line.trim())).toEqual([
       "group: reviewer-${{ github.event_name }}-${{ github.event.pull_request.number }}",
     ]);
-  });
-
-  it("only reads the repo", () => {
-    const lines = workflowLines();
-    const start = lines.indexOf("permissions:");
-    const end = lines.findIndex((line, i) => i > start && !line.startsWith(" "));
-    expect(lines.slice(start + 1, end)).toEqual(["  contents: read"]);
-    expect(lines.filter((line) => /permissions:/.test(line))).toHaveLength(1);
   });
 
   // GitHub counts a skipped job as passing a required check, and a paths
