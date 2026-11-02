@@ -158,7 +158,7 @@ The save happens with Next.js's `after()`, so the visitor never waits for the da
 |---|---|---|
 | Finished matches and timelines | Forever | A game never changes once it's over. |
 | A player's profile (rank, latest match IDs) | 1 day, or until someone clicks Update | Rank changes, but not every minute. Update has a 2 minute cooldown so nobody can spend the rate limit by clicking. |
-| AI recaps | Forever | The match doesn't change, so neither does the recap. Capped at 20 new ones per account per day. |
+| AI recaps | Forever | The match doesn't change, so neither does the recap. Capped at 20 tries per account per day, failed ones included. |
 | Analysis results | Not stored | Recomputed on every visit, so improving the analyzer never means refetching anything. |
 
 The rules live in `src/db/freshness.ts`.

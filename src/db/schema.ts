@@ -437,8 +437,9 @@ export const matchRecaps = pgTable(
     detail: text("detail").notNull(),
     // Which Claude model wrote it, in case recaps are ever rewritten.
     model: text("model").notNull(),
-    // The account that asked for it, to cap recaps per account per day.
-    // Deleting the account keeps the recap but forgets who asked.
+    // The account that asked for it, on recaps saved before recap_tries
+    // (below) took over the daily cap. New recaps leave it empty. Deleting
+    // the account keeps the recap but forgets who asked.
     createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "set null" }),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
@@ -446,6 +447,24 @@ export const matchRecaps = pgTable(
     primaryKey({ columns: [t.matchId, t.puuid] }),
     index("match_recaps_created_by_idx").on(t.createdBy, t.createdAt),
   ],
+).enableRLS();
+
+// One row each time a signed-in account asks for a new recap, saved before
+// Riot or Claude is called (see src/lib/recap-store.ts), so tries sent at the
+// same moment and tries that fail all count toward the daily cap. Only the
+// account and the time. Each try that gets past the count first deletes the
+// account's tries more than a day old, so an account never has more than 20
+// rows. Deleting the account deletes all of them.
+export const recapTries = pgTable(
+  "recap_tries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("recap_tries_user_idx").on(t.userId, t.createdAt)],
 ).enableRLS();
 
 // Questions asked on a player's Ask tab and Claude's answers (see
