@@ -53,7 +53,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A browser test checked only on the dev server](agent-mistakes/browser-test-run-only-on-dev-server.md) | 1 | none yet |
 | [Renamed words on a page break the browser tests](agent-mistakes/renamed-words-break-e2e.md) | 1 | check |
 | [A test that can't pass on Windows](agent-mistakes/test-that-cannot-pass-on-windows.md) | 1 | none yet |
-| [A browser test's locator matches more than it names](agent-mistakes/browser-locator-matches-more-than-it-names.md) | 1 | none yet |
+| [A browser test's locator matches more than it names](agent-mistakes/browser-locator-matches-more-than-it-names.md) | 2 | none yet |
 
 ## Rules and what enforces them
 
