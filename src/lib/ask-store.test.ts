@@ -74,7 +74,7 @@ function fake(prefix: string) {
           steps.push(`${prefix}save`);
           // Each table numbers its own ids, so mixing up the two rows shows.
           const id = `${tableName(table)}-${rowsOf(table).length + 1}`;
-          const saved = { ...row, id, askedAt: new Date() };
+          const saved = { ...row, id };
           rowsOf(table).push(saved);
           return [saved];
         },

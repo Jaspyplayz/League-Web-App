@@ -102,7 +102,7 @@ describe("AskContent", () => {
     );
     vi.mocked(readQuestions).mockResolvedValue({
       ok: true,
-      questions: [{ id: "q1", question: "Why do I lose?", answer: "You die early.", games: [], askedAt: new Date() }],
+      questions: [{ id: "q1", question: "Why do I lose?", answer: "You die early.", games: [] }],
     });
     const html = await render();
     expect(html).toContain("Why do I lose?");
