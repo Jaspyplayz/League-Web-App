@@ -96,7 +96,7 @@ async function fire(ticketId: string): Promise<FireAnswer> {
 async function main() {
   console.log(`Woken by ${oneLine(eventName ?? "a person, outside GitHub Actions", 40)}.`);
   const snapshot = await readSnapshot(repo, linear, github);
-  const plan = planRound(snapshot, new Date(), runUrl);
+  const plan = planRound(snapshot, new Date(), runUrl, { byName: eventName === "workflow_dispatch" });
   const { failed } = await runRound(plan, { dryRun }, {
     ...linearWrites(linear, snapshot.readyStateId),
     fire,

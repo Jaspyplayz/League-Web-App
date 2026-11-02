@@ -16,6 +16,7 @@ import {
   QUEUE_QUERY,
   readSnapshot,
   REFUSED_LINE,
+  refusedBody,
   runRound,
   runningTickets,
   START_LINE,
@@ -456,38 +457,69 @@ describe("a ticket can't start twice", () => {
   });
 
   it("lets a refused start's comment go after an hour, instead of holding the ticket for 2 like a start comment", () => {
-    const read = snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": [comment("c1", `${REFUSED_LINE}\n\nThe cloud task answered HTTP 429.`, "2026-11-02T05:00:00.000Z")] } });
+    const read = snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": [comment("c1", refusedBody(429, "rate_limit_error: slow down"), "2026-11-02T05:00:00.000Z")] } });
     expect(planRound(read, AT_0630, RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
   });
 });
 
 describe("a refused start", () => {
-  it("starts nothing on any ticket for an hour, so a lasting refusal doesn't add a refused comment each run", async () => {
+  // Two Ready tickets and a cloud task that refuses the first fire with this
+  // answer, then starts every builder. Each round reads what the last one wrote.
+  function refusedOnce(answer: FireAnswer) {
     let now = new Date("2026-11-02T06:00:00Z");
-    const store = linearStore(() => now, [{ kind: "refused", status: 429, why: "rate_limit_error: slow down" }]);
-    const tickets = [issue("JAS-1"), issue("JAS-2")];
-    const round = async () => {
-      const plan = planRound(store.read(tickets), now, RUN);
-      await runRound(plan, { dryRun: false }, store.effects);
-      return plan;
+    const store = linearStore(() => now, [answer]);
+    const round = async (at: string, byName = false) => {
+      now = new Date(at);
+      const plan = planRound(store.read([issue("JAS-1"), issue("JAS-2")]), now, RUN, { byName });
+      return { plan, ...(await runRound(plan, { dryRun: false }, store.effects)) };
     };
+    return { store, round };
+  }
 
-    await round();
+  it("after the hourly fire limit, starts nothing on its own for an hour, so a lasting limit doesn't add a refused comment each run", async () => {
+    const { store, round } = refusedOnce({ kind: "refused", status: 429, why: "rate_limit_error: slow down" });
+    await round("2026-11-02T06:00:00Z");
     expect(store.fired).toEqual(["JAS-1"]);
 
-    now = new Date("2026-11-02T06:10:00Z");
-    const held = await round();
+    const held = await round("2026-11-02T06:10:00Z");
     expect(store.fired).toEqual(["JAS-1"]);
     expect(store.all().filter((posted) => posted.body.startsWith(START_LINE))).toEqual([]);
-    const why = "The cloud task refused a start at 2026-11-02 06:00 UTC, so nothing starts until 2026-11-02 07:00 UTC.";
-    expect(held.waits.map((wait) => [wait.id, wait.why])).toEqual([
+    const why =
+      "The cloud task refused a start at 2026-11-02 06:00 UTC with HTTP 429, so nothing starts on its own until 2026-11-02 07:00 UTC. A run by name (/run-queue) tries again sooner.";
+    expect(held.plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
       ["JAS-1", [why]],
       ["JAS-2", [why]],
     ]);
 
-    now = new Date("2026-11-02T07:01:00Z");
-    await round();
+    await round("2026-11-02T07:01:00Z");
     expect(store.fired).toEqual(["JAS-1", "JAS-1", "JAS-2"]);
+  });
+
+  it("after a refusal only Jasper can fix, starts nothing on its own for a day instead of failing a run each hour, and a run by name tries again", async () => {
+    const { store, round } = refusedOnce({ kind: "refused", status: 401, why: "authentication_error: invalid token" });
+    expect((await round("2026-11-02T06:00:00Z")).failed).toBe(true);
+    expect(store.fired).toEqual(["JAS-1"]);
+
+    const held = await round("2026-11-02T08:00:00Z");
+    expect(held.failed).toBe(false);
+    expect(store.fired).toEqual(["JAS-1"]);
+    // No new start or refused comment, only each held ticket's one wait comment.
+    expect(store.all().map((posted) => posted.body.split("\n")[0])).toEqual([REFUSED_LINE, WAIT_LINE, WAIT_LINE]);
+    const why =
+      "The cloud task refused a start at 2026-11-02 06:00 UTC with HTTP 401, which only Jasper can fix, so nothing starts on its own until 2026-11-03 06:00 UTC. A run by name (/run-queue) tries again sooner.";
+    expect(held.plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-1", [why]],
+      ["JAS-2", [why]],
+    ]);
+
+    await round("2026-11-02T08:00:00Z", true);
+    expect(store.fired).toEqual(["JAS-1", "JAS-1", "JAS-2"]);
+  });
+
+  it("holds automatic runs for a day after a refused comment whose HTTP status it can't read", () => {
+    const read = snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": [comment("c1", `${REFUSED_LINE}\n\nSomething else.`, "2026-11-02T05:00:00.000Z")] } });
+    expect(planRound(read, AT_0630, RUN).start).toEqual([]);
+    expect(planRound(read, new Date("2026-11-03T05:01:00Z"), RUN).start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
   });
 });
 
@@ -953,6 +985,13 @@ describe("scripts/run-queue.ts", () => {
     const summary = code.slice(code.indexOf("function summary("), code.indexOf("async function linear("));
     expect(summary).toContain("console.log(line);");
     expect(summary).toContain("appendFileSync(file, `${line}\\n\\n`);");
+  });
+
+  it("tells the round when Jasper started the run by name, so his try after a fix doesn't wait out a refusal", () => {
+    expect(code).toContain("GITHUB_EVENT_NAME: eventName");
+    expect(lines.filter((line) => line.includes("planRound(")).map((line) => line.trim())).toEqual([
+      'const plan = planRound(snapshot, new Date(), runUrl, { byName: eventName === "workflow_dispatch" });',
+    ]);
   });
 
   it("never logs a secret or the environment", () => {
