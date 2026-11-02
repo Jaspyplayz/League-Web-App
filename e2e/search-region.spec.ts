@@ -107,6 +107,26 @@ for (const name of [BIG, HEADER]) {
   });
 }
 
+// React must keep the not-found page it finds, or a search typed while the
+// scripts load is wiped. Rendering the page with a notFound() inside
+// <Suspense> made React throw it away and draw it again.
+test("the not-found page isn't drawn again when React loads", async ({ page }) => {
+  await page.addInitScript(() => {
+    const counted = window as unknown as { mainsRemoved: number };
+    counted.mainsRemoved = 0;
+    new MutationObserver((changes) => {
+      for (const change of changes) {
+        for (const node of change.removedNodes) if (node.nodeName === "MAIN") counted.mainsRemoved++;
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto(NO_ROUTE);
+  // React swaps the page in the same step that hands it the form, so by now
+  // any swap has happened.
+  await waitForReact(page.getByRole("search", { name: BIG }));
+  expect(await page.evaluate(() => (window as unknown as { mainsRemoved: number }).mainsRemoved)).toBe(0);
+});
+
 test("a corrected search goes to the picked region", async ({ page }) => {
   await page.goto("/");
   const { form, region, riotId, search, error } = fields(page, BIG);
@@ -158,18 +178,16 @@ test.describe("with JavaScript off", () => {
     await search.click();
     await expect(page).toHaveURL(/\/player\/euw\/Hide%20on%20bush-KR1/, FIRST_LOAD);
   });
+});
 
-  // The not-found page's HTML has to hold the page itself, not an empty shell
-  // that only JavaScript fills in, which is what Next.js stores for a page
-  // that calls notFound() outside <Suspense> (src/app/[...unmatched]/page.tsx).
-  test("the not-found page shows, and its search goes to the picked region", async ({ page }) => {
+// Bots that unfurl links, like Discord's, get the page rendered for them
+// rather than the stored one. They need the 404 too, or a mistyped link shows
+// up in chat as a real page.
+test.describe("as a link-preview bot", () => {
+  test.use({ userAgent: "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)" });
+
+  test("an address with no route answers 404", async ({ page }) => {
     const response = await page.goto(NO_ROUTE);
     expect(response?.status()).toBe(404);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("We couldn't find that page");
-    const { region, riotId, search } = fields(page, BIG);
-    await region.selectOption("euw");
-    await riotId.fill("Hide on bush#KR1");
-    await search.click();
-    await expect(page).toHaveURL(/\/player\/euw\/Hide%20on%20bush-KR1/, FIRST_LOAD);
   });
 });

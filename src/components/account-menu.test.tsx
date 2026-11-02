@@ -15,7 +15,8 @@ vi.mock("@/lib/supabase/config", () => ({ supabaseConfig: () => ({ url: "x", key
 // The real link reads the address, which needs Next's router.
 // The stand-in records hideOnSignInPage, so a test can check the header asks
 // for it (sign-in-link.test.tsx checks what the real link does with it). It's
-// a span: lint wants <Link> for any <a> to one of the site's addresses.
+// a span because src/app/[...unmatched] makes lint read any <a href="/..."> as
+// a link to a page, which should be a <Link>.
 vi.mock("./sign-in-link", () => ({
   SignInLink: ({ hideOnSignInPage }: { hideOnSignInPage?: boolean }) => (
     <span data-hide-on-sign-in-page={String(Boolean(hideOnSignInPage))}>Sign in</span>
