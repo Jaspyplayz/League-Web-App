@@ -25,6 +25,7 @@ import {
   toTicket,
   vercelState,
   WAIT_LINE,
+  WAITED_LINE,
   type Effects,
   type FireAnswer,
   type LinearCall,
@@ -168,8 +169,12 @@ function linearStore(clock: () => Date, answers: FireAnswer[] = []) {
     log: () => {},
     summary: () => {},
   };
-  const read = (issues: LinearIssue[]) =>
-    snapshot({ issues, comments: Object.fromEntries(issues.map((ticket) => [ticket.identifier, (comments[ticket.id] ?? []).map((posted) => ({ ...posted }))])) });
+  const read = (issues: LinearIssue[], extra: Partial<Snapshot> = {}) =>
+    snapshot({
+      issues,
+      comments: Object.fromEntries(issues.map((ticket) => [ticket.identifier, (comments[ticket.id] ?? []).map((posted) => ({ ...posted }))])),
+      ...extra,
+    });
   const all = () => Object.values(comments).flat();
   return { effects, fired, read, all };
 }
@@ -654,6 +659,44 @@ describe("blockers and wait comments", () => {
     };
     const plan = planRound(snapshot({ issues: [issue("JAS-1", { priority: 0 })], comments }), AT_0630, RUN);
     expect(plan.waits[0].comment).toMatchObject({ kind: "update", commentId: "older" });
+  });
+
+  it("edits a started ticket's wait comment to say a builder started, and a later wait gets a new one", async () => {
+    let now = new Date("2026-11-02T06:30:00Z");
+    const store = linearStore(() => now);
+    const round = (extra: Partial<Snapshot>) => runRound(planRound(store.read([issue("JAS-1")], extra), now, RUN), { dryRun: false }, store.effects);
+
+    await round({ statuses: [refusal("2026-11-02T06:20:00Z")] });
+    now = new Date("2026-11-02T07:30:00Z");
+    await round({});
+    expect(store.all().map((posted) => [posted.id, posted.body])).toEqual([
+      ["c1", `${WAITED_LINE}\n\nThe queue started its cloud session at 2026-11-02 07:30 UTC.`],
+      ["c2", expect.stringMatching(new RegExp(`^${START_LINE}`))],
+    ]);
+
+    now = new Date("2026-11-02T10:00:00Z");
+    await round({ statuses: [refusal("2026-11-02T09:50:00Z")] });
+    expect(store.all().map((posted) => [posted.id, posted.body.split("\n")[0]])).toEqual([
+      ["c1", WAITED_LINE],
+      ["c2", START_LINE],
+      ["c3", WAIT_LINE],
+    ]);
+  });
+
+  it("leaves the wait comment alone when the start is refused or gets no answer", async () => {
+    const read = snapshot({ issues: [issue("JAS-1")], comments: { "JAS-1": [comment("w1", `${WAIT_LINE}\n\n- An old reason.`, "2026-11-02T05:00:00.000Z")] } });
+    const answers: FireAnswer[] = [
+      { kind: "refused", status: 429, why: "rate_limit_error: slow down" },
+      { kind: "no answer", why: "The operation was aborted due to timeout" },
+    ];
+    for (const answer of answers) {
+      const { effects, calls } = recorder(() => answer);
+      await runRound(planRound(read, AT_0630, RUN), { dryRun: false }, effects);
+      expect(calls.filter((call) => call.includes("w1"))).toEqual([]);
+    }
+    const { effects, calls } = recorder();
+    await runRound(planRound(read, AT_0630, RUN), { dryRun: false }, effects);
+    expect(calls.filter((call) => call.includes("w1"))).toEqual([`updateComment w1: ${WAITED_LINE}`]);
   });
 
   it("never moves, starts or comments on a blocker in another project", () => {

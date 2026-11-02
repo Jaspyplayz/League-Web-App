@@ -342,6 +342,7 @@ export function vercelState(statuses: CommitStatus[], now: Date): VercelState {
 export const START_LINE = "Ticket queue: starting a cloud builder on this ticket.";
 export const REFUSED_LINE = "Ticket queue: a builder start was refused.";
 export const WAIT_LINE = "Ticket queue: this ticket waits.";
+export const WAITED_LINE = "Ticket queue: this ticket waited, then a builder started on it.";
 
 const isStartComment = (comment: LinearComment) => comment.body.trimStart().startsWith(START_LINE);
 
@@ -354,6 +355,10 @@ function startBody(runUrl: string): string {
 
 export function refusedBody(status: number, why: string): string {
   return `${REFUSED_LINE}\n\nThe cloud task answered HTTP ${status}: ${why}\n\nThis doesn't count as a try. A later run tries again.`;
+}
+
+function waitedBody(at: Date): string {
+  return `${WAITED_LINE}\n\nThe queue started its cloud session at ${utc(at.toISOString())}.`;
 }
 
 function waitBody(why: string[]): string {
@@ -388,8 +393,8 @@ export type Plan = {
   vercel: VercelState;
   running: { id: string; why: string }[];
   promote: { id: string; uuid: string; priority: "Urgent" | "High"; moveToReady: boolean; body: string }[];
-  /** In the order they were picked. */
-  start: { id: string; uuid: string; body: string }[];
+  /** In the order they were picked, each with its wait comment's edit if it has one. */
+  start: { id: string; uuid: string; body: string; waited?: { commentId: string; body: string } }[];
   waits: { id: string; why: string[]; comment: WaitComment }[];
   /** Lines only for the log, such as a blocker in another project left alone. */
   notes: string[];
@@ -473,7 +478,10 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string): Plan {
       const blocks = round.filter((ticket) => ticket.blockedBy.includes(id)).map((ticket) => ticket.id).sort(byTicketNumber);
       return { id, uuid: issueOf(id).id, priority, moveToReady, body: promoteBody(priority, moveToReady, blocks) };
     }),
-    start: start.map((id) => ({ id, uuid: issueOf(id).id, body: startBody(runUrl) })),
+    start: start.map((id) => {
+      const wait = waitCommentOf(snapshot.comments[id] ?? []);
+      return { id, uuid: issueOf(id).id, body: startBody(runUrl), waited: wait && { commentId: wait.id, body: waitedBody(now) } };
+    }),
     waits: waits.map(({ id, why }) => ({ id, why, comment: waitComment(issueOf(id), why, snapshot.comments[id] ?? []) })),
     notes,
   };
@@ -484,11 +492,15 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string): Plan {
 function waitComment(issue: LinearIssue, why: string[], comments: LinearComment[]): WaitComment {
   if (why.length === 1 && why[0] === ALREADY_RUNNING) return { kind: "none" };
   const body = waitBody(why);
-  const existing = [...comments]
-    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
-    .find((comment) => comment.body.trimStart().startsWith(WAIT_LINE));
+  const existing = waitCommentOf(comments);
   if (!existing) return { kind: "create", issueUuid: issue.id, body };
   return sameText(existing.body, body) ? { kind: "same" } : { kind: "update", commentId: existing.id, body };
+}
+
+// The oldest, so the queue keeps editing the same comment even if a second
+// one ever appears.
+function waitCommentOf(comments: LinearComment[]): LinearComment | undefined {
+  return [...comments].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).find((comment) => comment.body.trimStart().startsWith(WAIT_LINE));
 }
 
 export type FireAnswer =
@@ -580,6 +592,8 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
     const answer = await effects.fire(ticket.id);
     if (answer.kind === "started") {
       summary(`Started a builder on ${ticket.id}: ${answer.sessionUrl}`);
+      // A wait comment left as it was would tell the builder its ticket waits.
+      if (ticket.waited) await effects.updateComment(ticket.waited.commentId, ticket.waited.body);
     } else if (answer.kind === "refused") {
       // Said before the comment is edited, so a Linear failure there can't hide it.
       const { reason, jasperFixes } = refusalReason(answer.status, answer.why);
