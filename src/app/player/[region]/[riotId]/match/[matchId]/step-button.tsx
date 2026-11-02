@@ -1,3 +1,5 @@
+// An icon button for stepping through a game: the replay's previous and next,
+// and Game review's first, previous, next and last.
 export function StepButton({
   label,
   icon,
@@ -14,6 +16,7 @@ export function StepButton({
   disabled?: boolean;
   unavailable?: boolean;
   onClick: () => void;
+  // Its size and fill, one step off what it sits on.
   className: string;
 }) {
   return (

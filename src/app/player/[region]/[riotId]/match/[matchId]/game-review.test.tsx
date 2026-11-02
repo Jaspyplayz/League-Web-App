@@ -73,7 +73,12 @@ function review(overrides: Partial<GameReviewProps> = {}) {
 // There's no browser in these tests (e2e/smoke.spec.ts clicks the real thing),
 // so this walks what a component returns to find its buttons, drawing the
 // components inside it, such as StepButton, which have no hooks.
-type ButtonProps = { onClick: () => void; "aria-label": string; "aria-disabled": boolean };
+type ButtonProps = {
+  onClick: () => void;
+  "aria-label": string;
+  "aria-disabled": boolean;
+  disabled: boolean;
+};
 function buttons(node: ReactNode): ReactElement<ButtonProps>[] {
   if (Array.isArray(node)) return node.flatMap(buttons);
   if (!isValidElement<{ children?: ReactNode }>(node)) return [];
@@ -128,6 +133,16 @@ describe("the step buttons", () => {
     expect(off(0)).toEqual(["First play", "Previous play"]);
     expect(off(1)).toEqual([]);
     expect(off(2)).toEqual(["Next play", "Last play"]);
+  });
+
+  // A disabled button would drop keyboard focus when you step onto the last
+  // play, so the ends are only marked.
+  it("stay enabled at the ends, so they keep keyboard focus", () => {
+    for (const selected of [0, 2]) {
+      const marked = steps(selected).filter((b) => b.props["aria-disabled"]);
+      expect(marked).toHaveLength(2);
+      for (const b of marked) expect(b.props.disabled).toBe(false);
+    }
   });
 
   it("do nothing at the ends", () => {

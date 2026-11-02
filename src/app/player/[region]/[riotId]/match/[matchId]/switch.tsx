@@ -1,3 +1,9 @@
+// Pressed buttons in a strip, for choosing what the board or the replay shows.
+
+// The match page has two looks for the pressed button. The board's lifts it
+// to the panel's fill; the replay's fills it with the text colour, as the
+// Review board's main buttons are. Making them one would change how one of
+// them looks, so that's a design call, not a tidy-up.
 const LOOKS = {
   lifted: {
     strip: "flex gap-0.5 p-0.5",
@@ -24,6 +30,8 @@ export function Switch<T extends string | number | boolean>({
   value: T;
   onChange: (value: T) => void;
   look: keyof typeof LOOKS;
+  // The strip's fill, one step off what it sits on, and any other classes
+  // the whole strip needs.
   className: string;
 }) {
   const { strip, button, pressed } = LOOKS[look];
