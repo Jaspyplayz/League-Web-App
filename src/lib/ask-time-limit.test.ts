@@ -11,7 +11,9 @@ import { waitTimeFor } from "@/lib/riot/rate-limit-store";
 // src/app/account/actions.ts). So what's left of maxDuration has to cover
 // that lookup at its slowest, plus the sign-in check and saving the cost.
 // This times the real Riot client with Riot not answering and the rate limit
-// full, so a longer Riot timeout or another retry fails here. The waits for a
+// full, so a longer Riot timeout or another retry fails here. The 15 s it
+// leaves for the sign-in check and saving is an allowance, not a measurement:
+// neither has a timeout of its own (decision record 0030). The waits for a
 // turn, and how long each rate-limit check takes, come from the mock below,
 // so a longer cap on waiting (MAX_WAIT_MS in client.ts) doesn't.
 
@@ -57,7 +59,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("leaves room in the match page's maxDuration for the slowest Riot lookup, and saving", async () => {
+it("leaves room in the match page's maxDuration for the slowest Riot lookup", async () => {
   const start = Date.now();
   const lookup = getAccount("na", { gameName: "Jaspy", tagLine: "CA1" }).catch((error: unknown) => error);
   await vi.runAllTimersAsync();
@@ -68,9 +70,10 @@ it("leaves room in the match page's maxDuration for the slowest Riot lookup, and
   const lookupMs = Date.now() - start;
 
   const page = readFileSync("src/app/player/[region]/[riotId]/match/[matchId]/page.tsx", "utf8");
-  const maxDuration = Number(/export const maxDuration = (\d+);/.exec(page)?.[1]) * 1000;
+  const maxDuration = Number(/^export const maxDuration = (\d+);/m.exec(page)?.[1]) * 1000;
   expect(maxDuration, "the match page's maxDuration, as a number").toBeGreaterThan(0);
-  // The rest is for the sign-in check before, and reserve() and settle()
-  // in src/lib/ask-store.ts, each a short database call.
+  // What's left over is the allowance for the sign-in check before, and
+  // reserve() and settle() in src/lib/ask-store.ts, each a short database
+  // call.
   expect(maxDuration - lookupMs - ASK_TIME_LIMIT_MS).toBeGreaterThanOrEqual(15_000);
 });

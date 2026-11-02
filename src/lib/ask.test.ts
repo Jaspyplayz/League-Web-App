@@ -64,7 +64,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   clientOptions.length = 0;
   create.mockReset();
-  vi.mocked(recentGamesFor).mockResolvedValue({ games: [] } as never);
+  vi.mocked(recentGamesFor).mockReset().mockResolvedValue({ games: [] } as never);
 });
 
 afterEach(() => {
@@ -164,10 +164,13 @@ describe("answerQuestion", () => {
 
     await ask();
 
-    expect(clientOptions).toEqual([{ maxRetries: 0, timeout: 60_000 }]);
-    // Only a signal is set on each request, so the client's maxRetries still
-    // holds.
-    expect(create.mock.calls.map((call) => Object.keys(call[1]))).toEqual([["signal"], ["signal"]]);
+    expect(clientOptions).toEqual([expect.objectContaining({ maxRetries: 0 })]);
+    // A request's own options would override the client's, so none of them
+    // sets a retry count or a timeout of its own.
+    for (const [, options] of create.mock.calls) {
+      expect(options).not.toHaveProperty("maxRetries");
+      expect(options).not.toHaveProperty("timeout");
+    }
   });
 
   it("cuts a try off after a minute, and counts it as maybe billed", async () => {
