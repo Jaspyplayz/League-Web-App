@@ -12,8 +12,8 @@ import { takeTurn, type HostState } from "./rate-limit";
 // database (a fresh local checkout, or the database is down) every request is
 // let through, and Riot's own "too many requests" answer still stops us.
 
-// A turn should cost a few milliseconds. If the database takes longer than
-// this, skip the check rather than make the page wait.
+// A turn should cost a few milliseconds. If a request's answer hasn't come
+// back after this long, the request goes ahead rather than make the page wait.
 const DB_TIMEOUT_MS = 1_000;
 
 const limits = tables.riotRateLimits;
@@ -22,40 +22,50 @@ const limits = tables.riotRateLimits;
 // With one transaction each, they all queued behind the same locked row, the
 // last ones passed DB_TIMEOUT_MS and went to Riot without waiting their turn,
 // and Riot answered "too many requests" (Sentry TURNPOINT-6). So each server
-// runs one check per host at a time, and that check takes a turn for everyone
-// who asked while the one before it ran.
-const waiting = new Map<string, ((waitMs: number) => void)[]>();
+// runs one check per host at a time, and that check takes a turn for every
+// request that asked while the one before it ran: a batch.
+type Batch = {
+  answers: ((waitMs: number) => void)[];
+  // Set once a request in the batch has run out of time, so that's reported
+  // once, not once for every request in it.
+  timedOut: boolean;
+};
+const nextBatch = new Map<string, Batch>();
 const checking = new Set<string>();
 
 // Asks for permission to send one request to `host`. Returns 0 when the
 // request may go now (and counts it), or how many milliseconds to wait.
 export async function waitTimeFor(host: string): Promise<number> {
   if (!process.env.DATABASE_URL) return 0;
-  const answer = new Promise<number>((resolve) => {
-    const callers = waiting.get(host) ?? [];
-    callers.push(resolve);
-    waiting.set(host, callers);
-  });
+  const batch = nextBatch.get(host) ?? { answers: [], timedOut: false };
+  nextBatch.set(host, batch);
+  const answer = new Promise<number>((resolve) => batch.answers.push(resolve));
   if (!checking.has(host)) void checkUntilNobodyWaits(host);
-  // This caller may first wait for the check ahead of its own, so it gets its
-  // own time limit. Past it the request goes ahead, and its check still
-  // counts it when it finishes, as long as the window has room.
-  return withTimeout(answer).catch(() => 0);
+  // This request may first wait for the check ahead of its own, so it gets
+  // its own time limit, and past it the request goes ahead. Its check's time
+  // limit can't end sooner, so this is where a slow check is reported.
+  return withTimeout(answer).catch((error: unknown) => {
+    if (!batch.timedOut) {
+      Sentry.captureException(error, { tags: { host }, extra: { requests: batch.answers.length } });
+    }
+    batch.timedOut = true;
+    return 0;
+  });
 }
 
 async function checkUntilNobodyWaits(host: string) {
   checking.add(host);
   try {
-    for (let callers = waiting.get(host); callers; callers = waiting.get(host)) {
-      waiting.delete(host);
-      // Past the time limit the next check starts anyway, so one stuck on a
-      // dead connection can't hold the host up; this one finishes on its own.
-      // A slow or failed check is reported once, not once per caller.
-      const waits = await withTimeout(takeTurns(host, callers.length)).catch((error: unknown) => {
-        Sentry.captureException(error);
-        return callers.map(() => 0);
-      });
-      callers.forEach((resolve, i) => resolve(waits[i]));
+    // Let calls started together, like the Riot calls a page starts in
+    // parallel, join the first batch instead of queueing behind a batch of one.
+    await Promise.resolve();
+    for (let batch = nextBatch.get(host); batch; batch = nextBatch.get(host)) {
+      nextBatch.delete(host);
+      // Past the time limit every request in this batch has already gone
+      // ahead, so the next check starts and this one finishes on its own.
+      const answers = batch.answers;
+      const waits = await withTimeout(takeTurns(host, answers.length)).catch(() => answers.map(() => 0));
+      answers.forEach((answer, i) => answer(waits[i]));
     }
   } finally {
     checking.delete(host);
@@ -63,32 +73,44 @@ async function checkUntilNobodyWaits(host: string) {
 }
 
 // Takes `count` turns on `host` in one transaction, in order, and returns
-// each one's wait: 0 to go now, or milliseconds to wait.
+// each one's wait: 0 to go now, or milliseconds to wait. If the database
+// fails, every request goes ahead, and the error is reported even when the
+// check was already given up on, since it says why.
 async function takeTurns(host: string, count: number): Promise<number[]> {
-  return getDb().transaction(async (tx) => {
-    // Make sure the host has a row, then lock it. Two servers asking at
-    // the same moment take turns here, so they can't both use the last
-    // request left in a window.
-    await tx.insert(limits).values({ host }).onConflictDoNothing();
-    const [row] = await tx.select().from(limits).where(eq(limits.host, host)).for("update");
+  try {
+    return await getDb().transaction(async (tx) => {
+      // A check that was given up on can still hold the row, if its
+      // connection died after locking it. Wait for that lock no longer than a
+      // request waits, then give the connection back, so stuck checks can't
+      // fill the pool and hold up the page's other queries.
+      await tx.execute(sql.raw(`set local lock_timeout = ${DB_TIMEOUT_MS}`));
+      // Make sure the host has a row, then lock it. Two servers asking at
+      // the same moment take turns here, so they can't both use the last
+      // request left in a window.
+      await tx.insert(limits).values({ host }).onConflictDoNothing();
+      const [row] = await tx.select().from(limits).where(eq(limits.host, host)).for("update");
 
-    let state: HostState = {
-      windows: row.windows,
-      cooldownUntil: row.cooldownUntil?.getTime() ?? 0,
-    };
-    const now = Date.now();
-    const waits = Array.from({ length: count }, () => {
-      const turn = takeTurn(state, now);
-      if (!turn.allowed) return turn.waitMs;
-      state = turn.next;
-      return 0;
+      let state: HostState = {
+        windows: row.windows,
+        cooldownUntil: row.cooldownUntil?.getTime() ?? 0,
+      };
+      const now = Date.now();
+      const waits: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const turn = takeTurn(state, now);
+        if (turn.allowed) state = turn.next;
+        waits.push(turn.allowed ? 0 : turn.waitMs);
+      }
+
+      if (waits.includes(0)) {
+        await tx.update(limits).set({ windows: state.windows }).where(eq(limits.host, host));
+      }
+      return waits;
     });
-
-    if (waits.includes(0)) {
-      await tx.update(limits).set({ windows: state.windows }).where(eq(limits.host, host));
-    }
-    return waits;
-  });
+  } catch (error) {
+    Sentry.captureException(error, { tags: { host }, extra: { requests: count } });
+    return Array<number>(count).fill(0);
+  }
 }
 
 // Tells every server to leave `host` alone until `until`, after Riot said
