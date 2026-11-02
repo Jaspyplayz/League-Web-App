@@ -5,11 +5,18 @@ import type { ErrorEvent } from "@sentry/nextjs";
 // "\nparams: " and every value sent with it: account IDs, PUUIDs, private
 // notes, Ask questions and answers. /privacy says only the player sees
 // those, so each report keeps the query, whose values are just $1, $2 and so
-// on, and drops the rest. A cause Sentry adds from the error is in the same
-// list, so it's cut too.
+// on, and drops the rest. Sentry lists an error and its causes side by side,
+// so a failed query is cut wherever it sits in that chain.
+//
+// Sentry also keeps console output as breadcrumbs (a trail of what happened
+// before the error), with the logged error in full. Nothing logs a failed
+// query today, but if something did, that breadcrumb is dropped.
 function dropQueryParams(event: ErrorEvent): ErrorEvent {
   for (const exception of event.exception?.values ?? []) {
     if (exception.value) exception.value = exception.value.split("\nparams:")[0];
+  }
+  if (event.breadcrumbs) {
+    event.breadcrumbs = event.breadcrumbs.filter((crumb) => !crumb.message?.includes("\nparams:"));
   }
   return event;
 }

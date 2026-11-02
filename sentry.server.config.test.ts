@@ -21,17 +21,19 @@ const db = drizzle.mock({ schema });
 const ACCOUNT_ID = "ACCOUNT-ID-MARKER";
 const PUUID = "PUUID-MARKER";
 
-// The error Drizzle throws when a query fails, wrapping the driver's error,
-// and the report Sentry builds from it: the cause, then the error itself.
-function reportOfFailed(query: { toSQL(): { sql: string; params: unknown[] } }): ErrorEvent {
+// The error Drizzle throws when a query fails, wrapping the driver's error.
+function failed(query: { toSQL(): { sql: string; params: unknown[] } }): DrizzleQueryError {
   const { sql, params } = query.toSQL();
-  const cause = new Error("connect ECONNREFUSED 127.0.0.1:6543");
-  const error = new DrizzleQueryError(sql, params, cause);
+  return new DrizzleQueryError(sql, params, new Error("connect ECONNREFUSED 127.0.0.1:6543"));
+}
+
+// The report Sentry builds from it: the cause, then the error itself.
+function reportOf(error: DrizzleQueryError): ErrorEvent {
   return {
     type: undefined,
     exception: {
       values: [
-        { type: "Error", value: cause.message },
+        { type: "Error", value: (error.cause as Error).message },
         { type: "Error", value: error.message },
       ],
     },
@@ -45,9 +47,12 @@ async function send(event: ErrorEvent) {
 describe("Sentry's server setup", () => {
   it.each([
     {
+      // Notes can run over several lines, so the marker is on the second.
       write: "a match note",
       marker: "PRIVATE-NOTE-MARKER",
-      query: db.insert(schema.matchNotes).values({ userId: ACCOUNT_ID, matchId: "NA1_1", text: "PRIVATE-NOTE-MARKER" }),
+      query: db
+        .insert(schema.matchNotes)
+        .values({ userId: ACCOUNT_ID, matchId: "NA1_1", text: "Ward river first\nPRIVATE-NOTE-MARKER" }),
     },
     {
       write: "a day note",
@@ -81,7 +86,7 @@ describe("Sentry's server setup", () => {
       query: db.insert(schema.userPlayers).values({ userId: ACCOUNT_ID, puuid: PUUID }),
     },
   ])("keeps the values of $write that failed out of the report", async ({ marker, query }) => {
-    const event = reportOfFailed(query);
+    const event = reportOf(failed(query));
     // The marker is in Drizzle's message before beforeSend runs.
     expect(JSON.stringify(event)).toContain(marker);
 
@@ -94,14 +99,34 @@ describe("Sentry's server setup", () => {
     expect(sent).toContain("connect ECONNREFUSED");
   });
 
+  // Sentry's console breadcrumb holds the logged error in full, in its message
+  // and again in its data.
+  it("drops a logged failed query from the breadcrumbs", async () => {
+    const error = failed(db.insert(schema.dayNotes).values({ userId: ACCOUNT_ID, day: "2026-11-01", text: "DAY-NOTE-MARKER" }));
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: { values: [{ type: "TypeError", value: "Cannot read properties of undefined" }] },
+      breadcrumbs: [
+        { category: "console", message: "Riot answered 429" },
+        { category: "console", message: `save failed ${error}`, data: { arguments: ["save failed", error] } },
+      ],
+    };
+
+    const sent = await send(event);
+    expect(JSON.stringify(sent)).not.toContain("DAY-NOTE-MARKER");
+    expect(sent?.breadcrumbs).toEqual([{ category: "console", message: "Riot answered 429" }]);
+  });
+
   it("leaves other errors as they were", async () => {
     const event: ErrorEvent = {
       type: undefined,
       exception: { values: [{ type: "TypeError", value: "Cannot read properties of undefined" }] },
+      breadcrumbs: [{ category: "console", message: "Riot answered 429" }],
     };
     expect(await send(event)).toEqual({
       type: undefined,
       exception: { values: [{ type: "TypeError", value: "Cannot read properties of undefined" }] },
+      breadcrumbs: [{ category: "console", message: "Riot answered 429" }],
     });
   });
 
