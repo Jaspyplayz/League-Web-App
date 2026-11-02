@@ -64,7 +64,7 @@ These stay as they were: the "Built by Claude Code" gate, so Dependabot's PRs, a
 Good:
 
 - Re-run over Claude's 60 merged PRs from 227 to 290, 15 touch Jasper's list instead of 22. Eight of the 15 changed the gates or their tests (240, 241, 242, 243, 250, 251, 275, 276).
-- A PR that changes a check, a hook, a skill or a dependency merges once its panel and reviewer clear it, without waiting for Jasper.
+- A PR that changes a check, a hook, a skill or `package.json` merges once its panel and reviewer clear it, without waiting for Jasper.
 - A nested `eslint.config` needs the panel and the reviewer.
 - The Agent merge job refuses or ignores each route above that would change what it runs.
 
@@ -72,7 +72,7 @@ Bad:
 
 - **An agent can loosen a check and merge that.** CI, lint rules, the test configs, the commit hook, the look tests, the reviewer agent's instructions and the skills it loads can all be weakened by a PR Claude merges, with only the panel and the reviewer reading it. What the gates read can change: `can-merge` needs `check` to pass, and a PR can change what `check` runs, including whether it runs the two tests above. Jasper accepted this, since his click wasn't checking either.
 - **The reviewer clears changes to itself.** A PR that edits `.claude/agents/reviewer.md`, or a skill it loads, is reviewed by the agent as it was before the edit, and the next PR by the edited one.
-- **A Claude PR that adds or updates a dependency waits for Jasper**, since it changes `package-lock.json`. None of the 60 PRs counted above did. A folder of the gates' own, with its own manifest and lockfile, would let the app's lockfile go to the panel list.
+- **A Claude PR that adds or updates a dependency waits for Jasper**, since it changes `package-lock.json`. None of the 60 PRs counted above did. A new `npm-shrinkwrap.json`, which is on the panel list, would change the app's dependencies in CI, on Vercel and on Jasper's computer without him, since npm reads it in place of the lockfile; the Agent merge job deletes it, so the gates' dependencies don't change. A folder of the gates' own, with its own manifest and lockfile, would let the app's lockfile go to the panel list.
 - **Jasper's own computer runs files Claude can merge.** The hooks `.claude/settings.json` names (`pstack-context.mjs` at every session start, and the commit hook) and `package.json`'s scripts, `npm run db:migrate` included, run there with his `gh` login and `.env.local`. A scheduled task pulls main every 30 minutes, so a merged change reaches his next session. Hooks run outside the deny rules, so a merged hook could merge a PR past `can-merge`. So could `npm run can-merge` itself: it reads the root `tsconfig.json`, since only the workflow sets `TSX_TSCONFIG_PATH`.
 - **The deny rules don't cover every way to merge.** The GitHub connector's merge tools, `gh -R <repo> pr merge` and a GraphQL merge all get past them. They catch mistakes, as before.
 - **Other jobs that run the repo's code with a secret** read `package.json`, `.npmrc` and `tsconfig.json` from main the way Agent merge did before this record. The reviewer check runs the PR's own copy until the open reviewer-check PR moves it to main's; the run-queue workflow in another open PR holds Linear and task tokens. Each needs the same three steps.
