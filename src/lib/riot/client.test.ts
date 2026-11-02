@@ -34,6 +34,22 @@ function respond(status: number, body: unknown = {}, headers: Record<string, str
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+// A 200 whose body can't be read: the connection drops partway through, which
+// Node's fetch reports as a TypeError when the body is read.
+function bodyBreaksOff() {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.error(new TypeError("terminated"));
+    },
+  });
+  return new Response(body, { status: 200 });
+}
+
+// A 200 whose body arrives but isn't JSON, such as a cut-off object.
+function bodyIsNotJson() {
+  return new Response('{"puuid": "ab', { status: 200 });
+}
+
 // Runs riotGet while fast-forwarding through its retry waits.
 async function call(host = "americas", path = "/x") {
   const promise = riotGet(host, path);
@@ -47,6 +63,7 @@ describe("riotGet", () => {
     fetchMock.mockResolvedValueOnce(respond(200, { puuid: "abc" }));
 
     await expect(call("americas", "/riot/account/v1/x")).resolves.toEqual({ puuid: "abc" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://americas.api.riotgames.com/riot/account/v1/x");
@@ -86,6 +103,23 @@ describe("riotGet", () => {
     fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
     fetchMock.mockResolvedValueOnce(respond(200, "ok"));
     await expect(call()).resolves.toBe("ok");
+  });
+
+  it.each([
+    ["breaks off", bodyBreaksOff],
+    ["isn't JSON", bodyIsNotJson],
+  ])("retries a 200 whose body %s, then returns the next reply", async (_, broken) => {
+    fetchMock.mockResolvedValueOnce(broken()).mockResolvedValueOnce(respond(200, [1]));
+    await expect(call("na1")).resolves.toEqual([1]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The retry is a request Riot counts, so it takes its turn too.
+    expect(waitTimeFor.mock.calls).toEqual([["na1"], ["na1"]]);
+  });
+
+  it("gives up as unavailable after three 200s whose body fails to read", async () => {
+    fetchMock.mockImplementation(async () => bodyBreaksOff());
+    await expect(call()).rejects.toMatchObject({ kind: "unavailable" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("on a 429, reports Retry-After and pauses that host only", async () => {
