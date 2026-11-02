@@ -21,9 +21,12 @@ afterEach(() => vi.unstubAllEnvs());
 async function pageFor(params: Record<string, string | string[]>): Promise<string> {
   const errors: unknown[] = [];
   const { prelude } = await prerender(<SignInPage searchParams={Promise.resolve(params)} />, {
-    onError: (error) => void errors.push(error),
+    onError: (error) => {
+      errors.push(error);
+    },
   });
   if (errors.length > 0) throw errors[0];
+  // prelude is a stream of the page's HTML; a Response reads it as one string.
   return new Response(prelude).text();
 }
 
