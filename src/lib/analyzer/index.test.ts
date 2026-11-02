@@ -109,6 +109,13 @@ describe("analyzeMatch on a timeline missing players", () => {
     expect(analyzeMatch(game.match, game.timeline, "golden-player-7")).toBeNull();
   });
 
+  it("returns null when a saved frame has a gap, which the database gives back as null", () => {
+    const game = stomp();
+    const players: unknown[] = game.timeline.frames[5].players;
+    players[3] = null; // participant 4 at 5:00
+    expect(analyzeMatch(game.match, game.timeline, "golden-player-7")).toBeNull();
+  });
+
   it("still analyzes the same game when every frame has every player", () => {
     const game = stomp();
     expect(analyzeMatch(game.match, game.timeline, "golden-player-7")?.teamGold).toHaveLength(

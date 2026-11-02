@@ -182,9 +182,11 @@ export function analyzeMatch(
 }
 
 // Frames list players by participantId (players[0] is participant 1), so a
-// player is missing when their spot in a frame is empty.
+// player is missing when their spot in a frame is empty. `!= null` catches
+// both an empty spot (undefined) and a gap saved to the database, which
+// comes back as null.
 function framesHoldEveryPlayer(frames: TrimmedFrame[], participants: Participant[]): boolean {
   return frames.every((frame) =>
-    participants.every((p) => frame.players[p.participantId - 1] !== undefined),
+    participants.every((p) => frame.players[p.participantId - 1] != null),
   );
 }
