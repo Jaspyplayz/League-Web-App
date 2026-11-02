@@ -8,7 +8,8 @@ import { createSupabaseClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
-  const next = safeNextPath(searchParams.get("next"));
+  // Every copy, not get()'s first: a ?next= sent twice goes home, as on /sign-in.
+  const next = safeNextPath(searchParams.getAll("next"));
 
   const supabase = await createSupabaseClient();
   if (code && supabase) {

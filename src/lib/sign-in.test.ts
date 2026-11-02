@@ -24,6 +24,10 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/player/../?tab=insights")).toBe("/?tab=insights");
   });
 
+  it("keeps a lone value read with getAll", () => {
+    expect(safeNextPath(["/?tab=insights"])).toBe("/?tab=insights");
+  });
+
   it.each([
     null,
     undefined,
@@ -36,12 +40,26 @@ describe("safeNextPath", () => {
     "/.//evil.com",
     "/%2e%2e//evil.com",
     "player",
+    // The URL parser throws on these, which used to show the error page.
+    "//[",
+    "//a b",
+    "//:",
+    "/\\[",
   ])(
     "sends %j home instead",
     (next) => {
       expect(safeNextPath(next)).toBe("/");
     },
   );
+
+  it("sends ?next= sent twice, or not at all, home", () => {
+    expect(safeNextPath(["/a", "/b"])).toBe("/");
+    expect(safeNextPath([])).toBe("/");
+  });
+
+  it("still checks a lone value read with getAll", () => {
+    expect(safeNextPath(["//evil.com"])).toBe("/");
+  });
 });
 
 describe("cleanName", () => {

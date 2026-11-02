@@ -10,7 +10,8 @@ export const metadata: Metadata = {
   title: "Sign in",
 };
 
-type SearchParams = Promise<{ next?: string; error?: string }>;
+// A value that's in the address twice comes as an array.
+type SearchParams = Promise<{ next?: string | string[]; error?: string | string[] }>;
 
 // The page's link style, the same as How it works: the text colour with a
 // quiet underline, since blue means you and red the opponent.

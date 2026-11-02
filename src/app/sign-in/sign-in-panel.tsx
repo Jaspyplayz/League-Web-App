@@ -19,14 +19,25 @@ const ERRORS: Record<string, string> = {
   callback: "Signing in didn't finish. If you pressed Cancel, that's fine: try again any time.",
 };
 
+// Object.hasOwn, not ERRORS[error]: every object also answers to names like
+// "__proto__", "constructor" and "toString", so a crafted ?error= would find
+// one of those instead of a message, and drawing "__proto__" throws. Anything
+// that isn't one of ours, an ?error= sent twice included, gets the start
+// message.
+function errorMessage(error: string | string[]): string {
+  return typeof error === "string" && Object.hasOwn(ERRORS, error) ? ERRORS[error] : ERRORS.start;
+}
+
+// next and error come straight from the address, so either can be an array
+// when it's there twice.
 export function SignInPanel({
   configured,
   next,
   error,
 }: {
   configured: boolean;
-  next?: string;
-  error?: string;
+  next?: string | string[];
+  error?: string | string[];
 }) {
   if (!configured) {
     return (
@@ -48,7 +59,7 @@ export function SignInPanel({
           >
             !
           </span>
-          <span>{ERRORS[error] ?? ERRORS.start}</span>
+          <span>{errorMessage(error)}</span>
         </p>
       )}
       {/* Each button is its own small form, so it works before any JavaScript
