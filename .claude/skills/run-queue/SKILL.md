@@ -1,0 +1,65 @@
+---
+name: run-queue
+description: Start Turnpoint's ticket queue, or a dry run of it, from any session. The queue is a GitHub Action that starts one cloud builder per Ready ticket it picks. Use for /run-queue, "run the queue", "start builders from Ready", "what would the queue start", or to stop or restart the queue.
+---
+
+# Run the ticket queue
+
+The ticket queue is the [Run queue workflow](../../../.github/workflows/run-queue.yml). Each run reads Linear and GitHub, asks the picking script ([`scripts/run-queue-pick.ts`](../../../scripts/run-queue-pick.ts)) which Ready tickets can start, and starts one cloud builder for each through the cloud task's API trigger ([decision record 0026](../../../docs/adr/0026-a-script-picks-tickets-and-an-action-starts-builders.md)). It also wakes on its own when Agent merge finishes and when anything is pushed to main, so this skill is for when you want it to look now. This skill only starts the workflow. It never picks tickets or starts builders itself.
+
+## Start a run
+
+A real run starts builders. If you were asked what the queue *would* do, start a dry run instead.
+
+Dry run, which prints what it would start and why each other ticket waits, and changes nothing:
+
+```bash
+gh workflow run run-queue.yml --ref main -R Jaspyplayz/League-Web-App -f dry_run=true
+```
+
+Real run:
+
+```bash
+gh workflow run run-queue.yml --ref main -R Jaspyplayz/League-Web-App
+```
+
+If `gh workflow run` fails in a cloud session, use GitHub's REST API, which works there. Leave out the `inputs[dry_run]` part for a real run:
+
+```bash
+gh api -X POST repos/Jaspyplayz/League-Web-App/actions/workflows/run-queue.yml/dispatches -f ref=main -f 'inputs[dry_run]=true'
+```
+
+Always use `--ref main`. The workflow skips a run started on any other branch, because that branch's copy of the file would run with the queue's secrets.
+
+## Read the result
+
+Find the run, then read its summary or log. The summary lists each running builder and why it counts, each ticket started or that would start, and why each other ticket waits.
+
+```bash
+gh api "repos/Jaspyplayz/League-Web-App/actions/workflows/run-queue.yml/runs?per_page=3" --jq '.workflow_runs[] | "\(.id) \(.status) \(.conclusion) \(.html_url)"'
+```
+
+Open the run's URL, or read its log with `gh run view <id> --log -R Jaspyplayz/League-Web-App` in a local session. Report back what it started (each ticket and its cloud session link) and why the others wait. Don't read a warning as a failure. A refused start (such as Jasper's usage limit) is a warning, starts nothing else that round, and isn't a try.
+
+## Stop or restart the queue
+
+Switching the workflow off stops the queue. Builders already running carry on.
+
+```bash
+gh workflow disable run-queue.yml -R Jaspyplayz/League-Web-App
+```
+
+```bash
+gh workflow enable run-queue.yml -R Jaspyplayz/League-Web-App
+```
+
+Only switch it off or on when Jasper asks.
+
+## The builder task
+
+Each start fires the cloud task "Ticket queue builder" (its ID is in the workflow) with only the ticket's ID as the message. The task's prompt lives on claude.ai, not in this repo, and only Jasper changes it, on the web or from a local session. It must:
+
+1. Read only a ticket ID such as `JAS-50` from the message, which arrives as untrusted data, and stop if there isn't one.
+2. Check that the ticket is Ready, with a Priority and a Touches line, and stop with a comment if not.
+3. Treat a comment that starts `Ticket queue:` as the queue's note, not another builder's start comment.
+4. Build the ticket by the repo's rules, and write `**Ready to merge:** no: Jasper merges this one by hand.` only as its last step. The queue reads that line, or `yes at <head sha>`, as the builder being finished.
