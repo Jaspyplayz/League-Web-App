@@ -2,14 +2,14 @@
 
 The match analyzer is the standout feature (see [SCOPE.md](./SCOPE.md)). This doc covers which Riot API data it needs, which insights are worth showing, how to stay inside the rate limits, and what to build first.
 
-Facts about the API were checked against the [Riot developer portal](https://developer.riotgames.com/docs/portal) in October 2026. Anything marked *(verify)* is from memory of the API and should be confirmed in the portal's API reference before coding against it.
+Facts about the API were checked against the [Riot developer portal](https://developer.riotgames.com/docs/portal) in October 2026, and the key and policy notes against Riot's live pages again on 2026-11-02. Anything marked *(verify)* is from memory of the API and should be confirmed in the portal's API reference before coding against it.
 
 ## TL;DR
 
 - **Data:** four endpoints get a player and their games; one more, the **match timeline**, is what makes the analyzer possible. It has a snapshot of every player's gold, CS, XP and position for every minute, plus a timestamped list of every kill, objective and item purchase.
 - **MVP insights:** a lane-opponent comparison chart, "@10 / @15" snapshots, 1 to 3 auto-detected turning points with a reason, and an insights tab with four cross-game trends. Everything is measured **relative to the lane opponent in the same game**, which avoids needing rank-wide averages we don't have.
 - **Rate limits are the main engineering problem.** A brand-new player with all 20 timelines is about 44 API calls, and a personal key allows 100 per 2 minutes. The answer is: matches and timelines never change, so store them forever; only fetch a timeline when someone opens that match; and run every Riot call through one rate-limited queue.
-- **Key:** apply for a **personal API key** now. Same limits as the dev key but it doesn't expire every 24 hours, so a deployed prototype keeps working. Apply for a production key once the site is public.
+- **Key:** a public site needs a **production key first**. Riot's [portal](https://developer.riotgames.com/docs/portal#web-apis_personal-api-keys) says a personal key is for "just the developer or a small private community", and that you "may not run your application for public consumption using a personal key, regardless of how long the approval process for your production key takes". Open alpha and beta tests count as public. The live site has run on Jasper's personal key since 2026-10-24, so the plan (decided 2026-11-01) is for it to show only his own games until Riot approves a production key.
 
 ## Glossary
 
@@ -179,7 +179,8 @@ open a match
 ## Policy notes
 
 - The API key stays on the server (route handlers or server components), never in browser code.
-- Riot's developer policies require a "not endorsed by Riot Games" notice on the site, and forbid things like hidden MMR estimates. Post-game analysis of a player's own match history is the standard, allowed use case. Read the policies once before applying for the production key.
+- Riot's [League policy](https://developer.riotgames.com/docs/lol#developer-api-policy) requires a "not endorsed by Riot Games" notice where players can see it (the site footer has it). It also says products "cannot create alternatives for official skill ranking systems such as the ranked ladder", and names "MMR or ELO calculators" as banned alternatives.
+- League's [approved examples](https://developer.riotgames.com/docs/lol#game-policy) for production keys include "Showing (self) player stats" and training tools for players' "own match histories". Turnpoint shows anyone's games, and looking up other players is on neither the approved nor the refused list, so Riot decides it when it reviews the application. Read the League and [general](https://developer.riotgames.com/policies/general) policies before applying.
 - Use Data Dragon for champion and item names and images; it doesn't count toward rate limits.
 
 ## Proposed build order for the analyzer

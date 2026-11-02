@@ -91,7 +91,7 @@ All three are logistic regression trained offline on saved games, written from s
 | **Game score** ([docs](docs/game-score.md)) | Ten stats per player (KDA, kill participation, damage share, CS, vision...), compared with the player's role | A 0 to 100 percentile among players in that role | Picks the winning side from stats alone 81% of the time on 35,326 games it didn't train on |
 | **Phase ratings** ([docs](docs/phase-ratings.md)) | The same recipe, on each player's stats in one phase of the game | Early, mid and late game ratings | Cross-validated on 1,923 Oceania ranked games (fewer last long enough for mid and late): picks the winner 62% of the time from the early game alone, 73% from mid and 81% from late |
 
-The win chance's learned weights are worth a look: kills and towers are worth almost nothing on their own, because the gold they pay is already in the gold lead. [docs/win-chance.md](docs/win-chance.md) walks through one real minute of a game by hand. Win chance only ever runs on finished games, since Riot's policy doesn't allow predictions during a live game.
+The win chance's learned weights are worth a look: kills and towers are worth almost nothing on their own, because the gold they pay is already in the gold lead. [docs/win-chance.md](docs/win-chance.md) walks through one real minute of a game by hand. Win chance only ever runs on finished games, because League's [policy](https://developer.riotgames.com/docs/lol#game-policy) bars game-session information the player wouldn't already know.
 
 ## Tech stack
 
@@ -140,7 +140,7 @@ flowchart LR
 
 - **The API key never reaches the browser.** All Riot calls happen on the server. Files that touch a secret import `server-only`, and a custom ESLint rule keeps Riot hosts out of every other folder.
 - **Cache forever what never changes.** A finished match and its timeline are stored once in Postgres. Only things that change (rank, the latest match list) expire, after a day or when you press Update.
-- **One client for every Riot call.** A development key allows 100 requests every 2 minutes, and loading one new player can take 20+ calls. The client takes a turn from a counter in Postgres before each call, so every server on Vercel shares one budget, and it backs off for as long as Riot asks after a `429`.
+- **One client for every Riot call.** The site's personal key allows 100 requests every 2 minutes per region, and loading one new player can take 20+ calls. The client takes a turn from a counter in Postgres before each call, so every server on Vercel shares one budget, and it backs off for as long as Riot asks after a `429`.
 - **The analyzer is pure functions.** No network, no database, which makes it easy to test, and it runs on the stored match every time, so improving it never means refetching anything.
 - **Models ship as JSON.** Training runs offline from a script; the site only loads the learned weights.
 
@@ -231,7 +231,7 @@ Turnpoint is built with [Claude Code](https://claude.com/claude-code) as a pair 
 
 ## What's next
 
-- A Riot production API key, then sign-in with a Riot account.
+- A Riot production API key. The live site runs on a personal key, which Riot's [portal](https://developer.riotgames.com/docs/portal#web-apis_personal-api-keys) allows for "just the developer or a small private community" but not a public site, so it will show only Jasper's own games until Riot approves a production key. Sign-in with a Riot account comes after that, since Riot only offers it with a production key.
 - A fairer win chance evaluation that leaves out each game's final minutes.
 - The site in Korean, Spanish and Portuguese.
 
