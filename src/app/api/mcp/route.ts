@@ -78,6 +78,14 @@ const handler = createMcpHandler(
   },
   {
     serverInfo: { name: "Turnpoint", version: "1.0.0" },
+    // The three tools above never change while the site runs, so say so. The
+    // MCP SDK says by default that the tool list can change, and a client on
+    // the 2026-07-28 protocol then opens a `subscriptions/listen` request to
+    // hear about changes. That request is a stream the server keeps open
+    // until the client leaves, so on Vercel each one ran to the 300 s
+    // function limit (JAS-44). With this off, clients don't ask, and one that
+    // asks anyway gets an answer that ends straight away.
+    capabilities: { tools: { listChanged: false } },
     instructions:
       "Turnpoint analyzes League of Legends games. Start with look_up_player or recent_games, then analyze_game on a matchId. Answers include links to the game's page on Turnpoint; share them.",
   },
