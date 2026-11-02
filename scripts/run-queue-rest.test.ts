@@ -369,6 +369,102 @@ describe("vercelState", () => {
     expect(vercelState([], AT_0630)).toEqual({ kind: "ok" });
     expect(vercelState([{ ...refusal("2026-11-02T06:20:00Z"), context: "CI" }], AT_0630)).toEqual({ kind: "ok" });
   });
+
+  // The first is real, on 2026-11-02. No commit read that day had a status
+  // for a failed build, so nothing but a success shows Vercel deploying.
+  it.each([
+    ["failure", "Canceled from the Vercel Dashboard"],
+    ["failure", "Some wording nobody has seen"],
+    ["error", "Some wording nobody has seen"],
+    ["failure", null],
+  ])("counts a finished %s saying %s as a refusal", (state, description) => {
+    const status: CommitStatus = { context: "Vercel", state, description, updated_at: "2026-11-02T06:00:00Z" };
+    expect(vercelState([status], AT_0630)).toEqual({ kind: "refusing", since: "2026-11-02T06:00:00Z" });
+  });
+
+  it("isn't cleared by a failure more than an hour after the refusal, since only a success shows a deploy", () => {
+    const statuses = [refusal("2026-11-02T04:00:00Z"), vercel("failure", "Canceled from the Vercel Dashboard", "2026-11-02T05:10:00Z")];
+    expect(vercelState(statuses, AT_0630)).toEqual({ kind: "testing", since: "2026-11-02T05:10:00Z" });
+  });
+});
+
+// The real statuses from 2026-11-02: commit 73a9c95's deploy, the last before
+// Vercel paused the whole account, then commit 30a181c's, the first answer
+// after that, which linked to
+// vercel.com/knowledge/why-is-my-account-deployment-blocked.
+describe("a blocked Vercel account", () => {
+  const BLOCKED_AT = "2026-11-02T13:01:43Z";
+  const LAST_DEPLOY = vercel("success", "Deployment has completed", "2026-11-02T12:35:14Z");
+  const accountBlocked = vercel("failure", "Account is blocked.", BLOCKED_AT);
+  const JUST_AFTER = new Date("2026-11-02T13:10:00Z");
+  const DAYS_LATER = new Date("2026-11-09T13:10:00Z");
+  const three = (statuses: CommitStatus[] = [LAST_DEPLOY, accountBlocked], extra: Partial<Snapshot> = {}) =>
+    snapshot({ issues: [issue("JAS-1"), issue("JAS-2"), issue("JAS-3")], statuses, ...extra });
+
+  it("reads the real status as blocked, not as Vercel working", () => {
+    expect(vercelState([LAST_DEPLOY, accountBlocked], JUST_AFTER)).toEqual({ kind: "blocked", since: BLOCKED_AT });
+  });
+
+  it("stays blocked however long it lasts, with no hour that runs out", () => {
+    expect(vercelState([accountBlocked], DAYS_LATER)).toEqual({ kind: "blocked", since: BLOCKED_AT });
+  });
+
+  it("names the newest block, and a later refusal or a status still deploying doesn't clear it", () => {
+    const statuses = [accountBlocked, vercel("failure", "Account is blocked.", "2026-11-02T13:13:03Z"), refusal("2026-11-02T14:00:00Z"), vercel("pending", "Vercel is deploying your app", "2026-11-02T15:00:00Z")];
+    expect(vercelState(statuses, DAYS_LATER)).toEqual({ kind: "blocked", since: "2026-11-02T13:13:03Z" });
+  });
+
+  it("is cleared by a success more than an hour after the block", () => {
+    expect(vercelState([accountBlocked, vercel("success", "Deployment has completed", "2026-11-02T15:00:00Z")], DAYS_LATER)).toEqual({ kind: "ok" });
+  });
+
+  // PR 276's deploy finished 30 seconds after a refusal. One doing the same
+  // after a block ends the block, and goes on as any refusal does, so at most
+  // one test starts until a deploy finishes more than an hour later.
+  it("treats a success within the hour as ending the block but not as Vercel working", () => {
+    const statuses = [accountBlocked, vercel("success", "Deployment has completed", "2026-11-02T13:02:13Z")];
+    expect(vercelState(statuses, JUST_AFTER)).toEqual({ kind: "refusing", since: BLOCKED_AT });
+    expect(vercelState(statuses, DAYS_LATER)).toEqual({ kind: "testing", since: BLOCKED_AT });
+  });
+
+  it.each([
+    ["minutes", JUST_AFTER],
+    ["days", DAYS_LATER],
+  ])("starts nothing on an automatic run %s after the block, not even a test, and says why", (_, now) => {
+    const plan = planRound(three(), now, RUN);
+    expect(plan.start).toEqual([]);
+    const why = "Vercel blocked the account at 2026-11-02 13:01 UTC, which only Jasper can fix, so nothing starts on its own until a deploy succeeds. A run by name (/run-queue) starts one test.";
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-1", [why]],
+      ["JAS-2", [why]],
+      ["JAS-3", [why]],
+    ]);
+  });
+
+  it("starts one test on a run by name, even beside a running builder", () => {
+    const read = three(undefined, { issues: [issue("JAS-1"), issue("JAS-2"), issue("JAS-9", { status: "In Progress" })] });
+    const plan = planRound(read, DAYS_LATER, RUN, { byName: true });
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-2", ["Vercel blocked the account at 2026-11-02 13:01 UTC, so only JAS-1 starts this round, as a test, until a preview deploys."]],
+    ]);
+  });
+
+  it("warns in the log and says so on the run's page, and starts nothing", async () => {
+    const { effects, calls, lines } = recorder();
+    await runRound(planRound(three(), JUST_AFTER, RUN), { dryRun: false }, effects);
+    expect(calls.filter((call) => call.startsWith("fire"))).toEqual([]);
+    expect(lines.filter((line) => line.startsWith("::warning"))).toEqual([
+      "::warning title=Vercel account blocked::Vercel blocked the account at 2026-11-02 13:01 UTC, which only Jasper can fix. Nothing starts on its own until a deploy succeeds, and a run by name starts one test.",
+    ]);
+    expect(lines).toContain("Vercel blocked the account at 2026-11-02 13:01 UTC, which only Jasper can fix, so nothing starts on its own until a deploy succeeds.");
+  });
+
+  it("gives no warning when the account isn't blocked", async () => {
+    const { effects, lines } = recorder();
+    await runRound(planRound(three([LAST_DEPLOY]), JUST_AFTER, RUN), { dryRun: false }, effects);
+    expect(lines.filter((line) => line.startsWith("::warning"))).toEqual([]);
+  });
 });
 
 describe("reading Linear's answers", () => {

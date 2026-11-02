@@ -338,25 +338,38 @@ export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why
   return running.sort((a, b) => byTicketNumber(a.id, b.id));
 }
 
-export type VercelState = { kind: "ok" } | { kind: "refusing"; since: string } | { kind: "testing"; since: string };
+export type VercelState = { kind: "ok" } | { kind: "refusing"; since: string } | { kind: "testing"; since: string } | { kind: "blocked"; since: string };
+
+const newestOf = (statuses: CommitStatus[]) => statuses.map((status) => status.updated_at).reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
 
 // Vercel's last word on deploys, from the "Vercel" statuses on main and each
-// open PR. Vercel only answers when something is pushed, so an old refusal
-// can't hold the queue shut forever: after an hour, one ticket starts as a
-// test (Jasper's default on JAS-144). "pending" (still deploying) says
-// nothing yet. A deploy that was already building when the limit hit can
-// still finish after the first refusal, as PR 276's did 30 seconds after one
-// on 2026-11-02, so only a deploy that finished more than an hour after the
-// newest refusal shows Vercel deploying again.
+// open PR. Only a success shows Vercel deploying. Every other finished status
+// counts as a refusal: of the 534 on old commits read on 2026-11-02, the 52
+// failures said rate limited, "Account is blocked." or canceled from the
+// dashboard, and none named a failed build, so there's no wording to tell one
+// apart. Vercel only answers when something is pushed, so an old refusal can't
+// hold the queue shut forever: after an hour, one ticket starts as a test
+// (Jasper's default on JAS-144). "pending" (still deploying) says nothing yet.
+// A deploy that was already building when the limit hit can still finish after
+// the first refusal, as PR 276's did 30 seconds after one on 2026-11-02, so
+// only a deploy that finished more than an hour after the newest refusal shows
+// Vercel deploying again.
+//
+// A blocked account, as Vercel's pause for going over its Active CPU limit at
+// 13:01 UTC on 2026-11-02, is one only Jasper can fix, so no hour runs it out.
+// It lasts until a later success, and after that it's a refusal like any other.
 export function vercelState(statuses: CommitStatus[], now: Date): VercelState {
   const finished = statuses.filter((status) => status.context === "Vercel" && ["success", "failure", "error"].includes(status.state));
-  const refusals = finished.filter((status) => /rate limited/i.test(status.description ?? ""));
+  const deployed = finished.filter((status) => status.state === "success");
+  const refusals = finished.filter((status) => status.state !== "success");
   if (refusals.length === 0) return { kind: "ok" };
-  const since = refusals.map((status) => status.updated_at).reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
-  const deployedSince = finished.some(
-    (status) => !refusals.includes(status) && Date.parse(status.updated_at) - Date.parse(since) > REFUSAL_HOLDS_FOR_MS,
-  );
-  if (deployedSince) return { kind: "ok" };
+  const blocks = refusals.filter((status) => /^account is blocked\b/i.test(status.description ?? ""));
+  if (blocks.length > 0) {
+    const blockedSince = newestOf(blocks);
+    if (!deployed.some((status) => Date.parse(status.updated_at) > Date.parse(blockedSince))) return { kind: "blocked", since: blockedSince };
+  }
+  const since = newestOf(refusals);
+  if (deployed.some((status) => Date.parse(status.updated_at) - Date.parse(since) > REFUSAL_HOLDS_FOR_MS)) return { kind: "ok" };
   return now.getTime() - Date.parse(since) < REFUSAL_HOLDS_FOR_MS ? { kind: "refusing", since } : { kind: "testing", since };
 }
 
@@ -532,6 +545,14 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
     start = [];
   }
 
+  // A builder started on a blocked account can't deploy, so automatic runs
+  // start nothing, not even a test, however long it lasts.
+  if (vercel.kind === "blocked" && !byName) {
+    const why = `Vercel blocked the account at ${utc(vercel.since)}, which only Jasper can fix, so nothing starts on its own until a deploy succeeds. A run by name (/run-queue) starts one test.`;
+    waits.push(...start.map((id) => ({ id, why: [why] })));
+    start = [];
+  }
+
   // Testing: one ticket starts, and its builder's first push shows whether
   // Vercel deploys again. While any builder runs, however long it takes,
   // nothing else starts, so each round doesn't start one more test. Times
@@ -539,12 +560,13 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   // Vercel's newest refusal past its start comment. So one dead builder stalls
   // the queue, which costs nothing, where more tests would spend usage. A run
   // by name is the way out: a person starts one test past that hold.
-  if (vercel.kind === "testing") {
+  if (vercel.kind === "testing" || vercel.kind === "blocked") {
+    const said = vercel.kind === "blocked" ? "Vercel blocked the account" : "Vercel refused a deploy";
     const busy = byName ? undefined : running[0];
     const keep = busy ? [] : start.slice(0, 1);
     const why = busy
-      ? `Vercel refused a deploy at ${utc(vercel.since)}, and ${busy.id} has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.`
-      : `Vercel refused a deploy at ${utc(vercel.since)}, so only ${keep[0]} starts this round, as a test, until a preview deploys.`;
+      ? `${said} at ${utc(vercel.since)}, and ${busy.id} has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.`
+      : `${said} at ${utc(vercel.since)}, so only ${keep[0]} starts this round, as a test, until a preview deploys.`;
     waits.push(...start.slice(keep.length).map((id) => ({ id, why: [why] })));
     start = keep;
   }
@@ -606,6 +628,7 @@ export type Effects = {
 function vercelLine(vercel: VercelState): string {
   if (vercel.kind === "ok") return `Vercel isn't refusing deploys, so up to ${CEILING} builders can run.`;
   if (vercel.kind === "refusing") return `Vercel refused a deploy at ${utc(vercel.since)}, under an hour ago, so nothing starts this round.`;
+  if (vercel.kind === "blocked") return `Vercel blocked the account at ${utc(vercel.since)}, which only Jasper can fix, so nothing starts on its own until a deploy succeeds.`;
   return `Vercel refused a deploy at ${utc(vercel.since)}, over an hour ago, so one ticket at most starts, as a test.`;
 }
 
@@ -638,6 +661,9 @@ export async function runRound(plan: Plan, { dryRun }: { dryRun: boolean }, effe
 
   if (dryRun) summary("Dry run: this says what the queue would do, and changes nothing.");
   summary(vercelLine(plan.vercel));
+  if (plan.vercel.kind === "blocked") {
+    log(`::warning title=Vercel account blocked::Vercel blocked the account at ${utc(plan.vercel.since)}, which only Jasper can fix. Nothing starts on its own until a deploy succeeds, and a run by name starts one test.`);
+  }
   if (plan.running.length === 0) summary("No ticket has a builder running.");
   else summary(`${plan.running.length === 1 ? "1 ticket has" : `${plan.running.length} tickets have`} a builder running:`);
   for (const { id, why } of plan.running) summary(`- ${id}: ${why}.`);

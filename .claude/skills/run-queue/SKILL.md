@@ -9,7 +9,7 @@ The [Run queue workflow](../../../.github/workflows/run-queue.yml) works the tic
 
 ## Start a run
 
-A real run starts builders. If you were asked what the queue *would* do, start a dry run instead. A run by name skips the hold after a refused start, so while a refusal only Jasper can fix holds the queue (the last run failed with one), don't start a real run until he says it's fixed. A run by name also gets past Vercel's test hold. An hour after Vercel refuses a deploy, the queue starts one ticket as a test, and any running builder holds new tests, so one dead builder stalls the queue. A real run by name starts one test anyway, which is the way out.
+A real run starts builders. If you were asked what the queue *would* do, start a dry run instead. A run by name skips the hold after a refused start, so while a refusal only Jasper can fix holds the queue (the last run failed with one), don't start a real run until he says it's fixed. A run by name also gets past Vercel's test hold. An hour after Vercel refuses a deploy, the queue starts one ticket as a test, and any running builder holds new tests, so one dead builder stalls the queue. A real run by name starts one test anyway, which is the way out. When Vercel has blocked the account (its status says `Account is blocked.`, and the run has a warning that says so), only Jasper can fix it, so nothing starts on its own until a later deploy succeeds, with no test and no hour that runs it out. A real run by name starts one test there too, so don't start one until he says it's fixed.
 
 Dry run, which prints what it would start and why each other ticket waits, and changes nothing:
 
