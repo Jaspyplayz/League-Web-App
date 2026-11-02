@@ -681,6 +681,21 @@ describe("Vercel's test mode", () => {
     ]);
   });
 
+  it("starts no second test while the first test's builder still runs, past its start comment's 2 hours", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1", { status: "In Progress" }), issue("JAS-2"), issue("JAS-3")],
+      statuses: [refusal("2026-11-02T05:00:00Z")],
+      comments: { "JAS-1": [comment("c1", START_LINE, "2026-11-02T05:30:00.000Z")] },
+    });
+    const plan = planRound(read, new Date("2026-11-02T08:00:00Z"), RUN);
+    expect(plan.start).toEqual([]);
+    const why = "Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 started at 2026-11-02 05:30 UTC as a test, so nothing else starts until a preview deploys.";
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-2", [why]],
+      ["JAS-3", [why]],
+    ]);
+  });
+
   it("starts no second test while the first one's start comment holds", () => {
     const testStarted = three({ "JAS-9": [comment("c9", START_LINE, "2026-11-02T06:10:00.000Z")] });
     const plan = planRound({ ...testStarted, issues: [...testStarted.issues, issue("JAS-9", { status: "In Progress" })] }, AT_0630, RUN);

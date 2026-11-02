@@ -281,7 +281,7 @@ function heldStarts(snapshot: Snapshot, now: Date): Map<string, string> {
     if (!inTurnpoint(issue) || FINISHED.includes(issue.state.name)) continue;
     for (const comment of snapshot.comments[issue.identifier] ?? []) {
       const at = Date.parse(comment.createdAt);
-      if (!comment.body.trimStart().startsWith(START_LINE) || now.getTime() - at >= START_HOLDS_FOR_MS) continue;
+      if (!isStartComment(comment) || now.getTime() - at >= START_HOLDS_FOR_MS) continue;
       const newest = held.get(issue.identifier);
       if (!newest || at > Date.parse(newest)) held.set(issue.identifier, comment.createdAt);
     }
@@ -342,6 +342,8 @@ export function vercelState(statuses: CommitStatus[], now: Date): VercelState {
 export const START_LINE = "Ticket queue: starting a cloud builder on this ticket.";
 export const REFUSED_LINE = "Ticket queue: a builder start was refused.";
 export const WAIT_LINE = "Ticket queue: this ticket waits.";
+
+const isStartComment = (comment: LinearComment) => comment.body.trimStart().startsWith(START_LINE);
 
 // The picker's words for a Ready ticket that already has a builder.
 const ALREADY_RUNNING = "A builder is already running on it.";
@@ -444,13 +446,18 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string): Plan {
   }
 
   // Testing: one ticket starts, and its builder's first push shows whether
-  // Vercel deploys again. While that test's start comment holds its ticket,
-  // nothing else starts, so each round doesn't start one more test.
+  // Vercel deploys again. While a builder the queue started after the
+  // refusal still runs, however long it takes, nothing else starts, so each
+  // round doesn't start one more test.
   if (vercel.kind === "testing") {
-    const test = [...heldStarts(snapshot, now)].find(([, at]) => Date.parse(at) > Date.parse(vercel.since));
+    const since = Date.parse(vercel.since);
+    const [test] = running.flatMap(({ id }) => {
+      const started = (snapshot.comments[id] ?? []).find((comment) => isStartComment(comment) && Date.parse(comment.createdAt) > since);
+      return started ? [{ id, at: started.createdAt }] : [];
+    });
     const keep = test ? [] : start.slice(0, 1);
     const why = test
-      ? `Vercel refused a deploy at ${utc(vercel.since)}, and ${test[0]} started at ${utc(test[1])} as a test, so nothing else starts until a preview deploys.`
+      ? `Vercel refused a deploy at ${utc(vercel.since)}, and ${test.id} started at ${utc(test.at)} as a test, so nothing else starts until a preview deploys.`
       : `Vercel refused a deploy at ${utc(vercel.since)}, so only ${keep[0]} starts this round, as a test, until a preview deploys.`;
     waits.push(...start.slice(keep.length).map((id) => ({ id, why: [why] })));
     start = keep;
