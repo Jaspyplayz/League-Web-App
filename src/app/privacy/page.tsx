@@ -38,7 +38,7 @@ export default function PrivacyPage() {
         A saved game covers everyone who played in it, not only the player looked up: every
         player&apos;s Riot ID, PUUID (the ID Riot gives Turnpoint for that player, which stays
         the same if they change their Riot ID) and stats from that game. That&apos;s ten players
-        in most games and 16 in Arena. They are kept for as long as the match is, and finished
+        in most games, and more in Arena. They are kept for as long as the match is, and finished
         matches are kept with no end date.
       </p>
       <p>
