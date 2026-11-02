@@ -17,7 +17,7 @@ import type { Region } from "@/lib/regions";
 import { RiotApiError } from "@/lib/riot/client";
 import type { Account } from "@/lib/riot/types";
 
-// Answers a question about one player's games with Claude, for the Ask tab.
+// Answers a question about one player's games with Claude, for the Ask panel.
 // Claude gets two tools, the same ones the MCP server offers
 // (src/lib/mcp/tools.ts): a list of recent games and the analysis of one
 // game. It decides which to call, reads the results and writes the answer.
@@ -49,7 +49,7 @@ const TRY_TIMEOUT_MS = 60_000;
 // cut off, and a try cut off partway may still be billed.
 const MIN_TRY_MS = 20_000;
 
-// Without the key, the Ask tab says it isn't available.
+// Without the key, the Ask panel says it isn't available.
 export function askEnabled(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
