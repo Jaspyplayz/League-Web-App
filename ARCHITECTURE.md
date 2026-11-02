@@ -162,7 +162,7 @@ The rules live in `src/db/freshness.ts`.
 
 ## Staying inside Riot's rate limit
 
-A development key allows 20 requests a second and 100 every 2 minutes, per region, and a brand new player can take 20 or more. Four things keep Turnpoint inside that:
+The site's personal key allows 20 requests a second and 100 every 2 minutes, per region ([portal](https://developer.riotgames.com/docs/portal#web-apis_personal-api-keys)), and a brand new player can take 20 or more. Four things keep Turnpoint inside that:
 
 1. **The cache.** Most visits cost zero Riot calls.
 2. **A budget per page.** Insights and season stats fetch only a few missing games per visit and fill in the rest over the next few loads, so a 100-game view can't use the whole allowance at once. The daily season sync spends about 60 calls a run, lists included (70 at worst).
@@ -180,11 +180,11 @@ The game score and win chance are trained offline by scripts (`npm run train-sco
 These are fine for a portfolio site's traffic, and are the next things to fix before a production Riot key brings more:
 
 - **Every Riot request costs a database round trip** for the shared count, a few milliseconds next to Riot's hundreds. At much higher traffic, Redis would be the usual home for a counter like this.
-- **The limits are written in the code** (`RIOT_LIMITS`), set for a development key. A production key allows more, so they need changing when the key does.
+- **The limits are written in the code** (`RIOT_LIMITS`), set for the personal key the live site runs on. That key is only for "just the developer or a small private community", so the plan is for the live site to show only Jasper's own games until Riot approves a production key, the next step. A production key starts at 500 requests every 10 seconds and 30,000 every 10 minutes ([portal](https://developer.riotgames.com/docs/portal#web-apis_production-api-keys)), so `RIOT_LIMITS` changes with the key, to the numbers in the `X-App-Rate-Limit` header Riot sends back.
 - **`/api/mcp` has no request limit.** An AI app looking up many new players could spend the Riot allowance for everyone.
 - **Crawlers are only asked to stay out.** Each profile links to the 90 or so players in its games, and a new player costs about 15 to 35 Riot calls and saves their games for good, so a crawler following those links could use up the allowance and fill the database. `src/app/robots.ts` asks crawlers to skip `/player/` and `/api/` (link preview bots on Discord, X and LinkedIn may open player pages, since they only open the one pasted link). On a profile, only the plain page (no `?queue=` or `?games=`) loads more of the season's games; the Champions tab does too, on each of its game-mode links. Polite crawlers like Google's follow robots.txt; others don't. For one that ignores it, the biggest cost is the match list: each game-mode tab has a URL for every 10 games up to 200 (`?games=10` to `?games=200`, reaching back two months), and each URL loads up to 20 unsaved games (`MISSING_PER_VIEW` in `src/lib/more-games.ts`), so up to 200 unsaved games per tab per player. Without a database (a fresh local checkout) nothing is remembered, so a URL loads every game it lists. Vercel's bot protection (a dashboard setting) would be the next step.
 - **One free database.** Supabase's free tier holds 500 MB and has no downloadable backups. Matches can be fetched again, but accounts, goals and notes can't.
-- **No uptime check.** Sentry reports errors, but nothing alerts when the site is down or the daily dev key has expired.
+- **No uptime check.** Sentry reports errors, but nothing alerts when the site is down or the Riot key stops working.
 
 ## Saying it in an interview
 

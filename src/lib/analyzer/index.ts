@@ -24,7 +24,7 @@ import { findObjectives, type Objective } from "./objectives";
 import { pathingVsLanes, type Pathing } from "./pathing";
 import { replayData, type ReplayData } from "./replay";
 import { tempoTimeline, type TempoTimeline } from "./tempo";
-import type { TrimmedTimeline } from "./trim";
+import type { TrimmedFrame, TrimmedTimeline } from "./trim";
 import { findTurningPoints, type TurningPoint } from "./turning-points";
 
 // Bump when the analysis changes in a way that should replace saved results.
@@ -107,7 +107,7 @@ export function findPlayerByRiotId(
 
 // `championLabel` turns Riot's internal champion names ("MonkeyKing") into
 // display names ("Wukong") for the sentences. Returns null if the player
-// isn't in the match.
+// isn't in the match, or if the timeline is missing some of its players.
 export function analyzeMatch(
   match: Match,
   timeline: TrimmedTimeline,
@@ -117,6 +117,11 @@ export function analyzeMatch(
   const { participants } = match.info;
   const me = findPlayer(match, puuid);
   if (!me) return null;
+  // Everything below reads each player's numbers from every frame, and one
+  // missing player crashed the whole match page (Sentry TURNPOINT-4: an
+  // 18-player Arena game, when a trimmed timeline keeps players 1 to 10).
+  // Saying no here lets the page show the scoreboard instead.
+  if (!framesHoldEveryPlayer(timeline.frames, participants)) return null;
 
   const opponent = findOpponent(participants, me);
   const { frames, events } = timeline;
@@ -174,4 +179,14 @@ export function analyzeMatch(
     tempo: jungle ? tempoTimeline(timeline, participants, jungle.meId, jungle.enemyJunglerId) : null,
     replay: replayData(timeline, participants, me.teamId),
   };
+}
+
+// Frames list players by participantId (players[0] is participant 1), so a
+// player is missing when their spot in a frame is empty. `!= null` catches
+// both an empty spot (undefined) and a gap saved to the database, which
+// comes back as null.
+function framesHoldEveryPlayer(frames: TrimmedFrame[], participants: Participant[]): boolean {
+  return frames.every((frame) =>
+    participants.every((p) => frame.players[p.participantId - 1] != null),
+  );
 }
