@@ -219,10 +219,11 @@ describe("npm run can-merge, on real git with GitHub faked", { timeout: 60_000 }
 
   type Call = { args: string[]; input?: string };
 
-  // Runs the real script on `pr` in `cwd`, once origin's main is `main`.
-  function canMerge(pr: Pr, { main = shas.main, cwd = checkout, merge = false, checkRuns = 2 } = {}) {
+  // Runs the real script on `pr` in `cwd`, once origin's main is `main`. `gh`
+  // replaces some of GitHub's answers.
+  function canMerge(pr: Pr, { main = shas.main, cwd = checkout, merge = false, checkRuns = 2, gh = {} } = {}) {
     git(origin, "update-ref", "refs/heads/main", main);
-    writeFileSync(answersFile, JSON.stringify(answers(pr, checkRuns)));
+    writeFileSync(answersFile, JSON.stringify({ ...answers(pr, checkRuns), ...gh }));
     rmSync(logFile, { force: true });
     const result = spawnSync(process.execPath, [TSX, "--require", fakeGh, SCRIPT, String(pr.number), ...(merge ? ["--merge"] : [])], {
       cwd,
@@ -240,37 +241,57 @@ describe("npm run can-merge, on real git with GitHub faked", { timeout: 60_000 }
       code: result.status,
       out,
       fails: out.split(/\r?\n/).filter((line) => line.startsWith("FAIL")),
-      // The merge requests it sent GitHub.
-      merges: calls
-        .filter(({ args }) => args.includes("PUT"))
-        .map(({ args, input }) => ({ path: args.find((arg) => arg.startsWith("repos/")), body: JSON.parse(input ?? "null") })),
+      // What it asked GitHub to change: each PUT or POST, in order.
+      sent: calls
+        .filter(({ args }) => args.includes("--method"))
+        .map(({ args, input }) => ({
+          request: `${args[args.indexOf("--method") + 1]} ${args.find((arg) => arg.startsWith("repos/"))}`,
+          body: JSON.parse(input ?? "null"),
+        })),
     };
   }
+
+  const MERGE_REQUESTS = [
+    "PUT repos/{owner}/{repo}/pulls/1/merge",
+    "POST repos/{owner}/{repo}/issues/1/comments",
+    "POST repos/{owner}/{repo}/issues/1/labels",
+  ];
 
   it("passes a clean PR, and merges nothing without --merge", () => {
     const run = canMerge(habits);
     expect(run.fails).toEqual([]);
     expect(run.out).toContain("PASS  No files Jasper merges: none of the 1 changed paths is on Jasper's list");
     expect(run.out).toContain("Every gate passed for #1.");
-    expect(run.merges).toEqual([]);
+    expect(run.sent).toEqual([]);
     expect(run.code).toBe(0);
   });
 
-  it("merges a clean PR with --merge, at the commit it checked and with the marker", () => {
+  it("merges a clean PR with --merge, at the commit it checked and with the marker, then comments and labels it", () => {
     const run = canMerge(habits, { merge: true });
-    expect(run.merges).toEqual([
-      {
-        path: "repos/{owner}/{repo}/pulls/1/merge",
-        body: {
-          sha: habits.head,
-          merge_method: "merge",
-          commit_title: "Merge pull request #1 from Jaspyplayz/claude/jas-1-habits",
-          commit_message: `Add habits\n\n${MERGE_MARKER}`,
-        },
-      },
-    ]);
+    expect(run.sent.map(({ request }) => request)).toEqual(MERGE_REQUESTS);
+    const [merge, comment, label] = run.sent.map(({ body }) => body);
+    expect(merge).toEqual({
+      sha: habits.head,
+      merge_method: "merge",
+      commit_title: "Merge pull request #1 from Jaspyplayz/claude/jas-1-habits",
+      commit_message: `Add habits\n\n${MERGE_MARKER}`,
+    });
+    expect(comment.body).toContain(`Claude Code merged this at ${habits.head}`);
+    expect(comment.body).toContain("- PASS  No files Jasper merges");
+    expect(label).toEqual({ labels: [MERGED_BY_CLAUDE] });
     expect(run.out).toContain(`Merged #1: merge commit ${MERGE_COMMIT}`);
     expect(run.code).toBe(0);
+  });
+
+  // The revert gate finds Claude's merges by the marker, so a merge without
+  // it is one nobody would count. The PR is merged by then, so the run still
+  // comments and labels, then fails so the Agent merge run goes red.
+  it("fails after the merge when the merge commit lacks the marker", () => {
+    const run = canMerge(habits, { merge: true, gh: { [`repos/{owner}/{repo}/commits/${MERGE_COMMIT}`]: "Merge pull request #1\n\nAdd habits" } });
+    expect(run.sent.map(({ request }) => request)).toEqual(MERGE_REQUESTS);
+    expect(run.out).toContain(`Couldn't check the merge commit's marker: "${MERGE_MARKER}" is missing, so the revert gate can't see it`);
+    expect(run.out).toContain("#1 is merged, but these steps failed (errors above): check the merge commit's marker. Tell Jasper.");
+    expect(run.code).toBe(1);
   });
 
   it.each([
@@ -279,7 +300,7 @@ describe("npm run can-merge, on real git with GitHub faked", { timeout: 60_000 }
   ])("refuses %s, and doesn't merge it with --merge", (_, pr, why) => {
     const run = canMerge(pr(), { merge: true });
     expect(run.fails).toEqual([`FAIL  No files Jasper merges: ${why}`]);
-    expect(run.merges).toEqual([]);
+    expect(run.sent).toEqual([]);
     expect(run.code).toBe(REFUSED_EXIT_CODE);
   });
 
