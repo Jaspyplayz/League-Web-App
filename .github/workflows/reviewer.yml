@@ -6,7 +6,22 @@ name: Reviewer
 # 0017). Main's ruleset requires this check, so nobody can merge before the
 # review. Editing the description reruns it, so adding the verdict line
 # passes it, and a push reruns it, so a big new commit needs a new review.
+#
+# The check runs main's copy of the script and its packages, never the PR's,
+# so a PR can't change what judges it (JAS-43, decision record 0029). It only
+# reads the PR: its description from the event file, and its commits through
+# git diff.
 on:
+  # GitHub runs this trigger from main's copy of this file, whatever the PR
+  # changes, so even a PR that edits this file gets main's check.
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  # This trigger runs the PR's own copy of this file. It gave the PR that added
+  # pull_request_target a check, since main had no copy with that trigger yet,
+  # and it still starts Agent merge on the PR's branch. It can't loosen the
+  # check: GitHub keeps the newest run of each workflow and event apart, and
+  # the ruleset needs every one of them to pass (PR 278).
   pull_request:
     branches: [main]
     types: [opened, edited, synchronize, reopened, ready_for_review]
@@ -14,22 +29,30 @@ on:
 permissions:
   contents: read
 
-# A newer edit or push replaces a run still in progress.
+# A newer edit or push replaces a run still in progress. Each trigger has its
+# own group, so the two runs for one edit or push don't cancel each other.
 concurrency:
-  group: reviewer-${{ github.event.pull_request.number }}
+  group: reviewer-${{ github.event_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   reviewer:
     runs-on: ubuntu-latest
     steps:
-      # The whole history, so the PR's base and head commits are both here.
+      # Main, never the PR's head, so the script and package.json below are
+      # main's. The whole history, so the PR's base commit and origin/main are
+      # here, and the PR's commits too unless it's from a fork; the script
+      # fetches a fork's head itself. No token is left in .git/config.
       - uses: actions/checkout@v7
         with:
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
+      # No npm cache: a pull_request_target run shares main's cache, so it
+      # neither restores nor saves one.
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
+          package-manager-cache: false
       - run: npm ci
       - run: npx tsx scripts/can-merge-reviewer-check.ts

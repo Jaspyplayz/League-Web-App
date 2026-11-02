@@ -158,10 +158,10 @@ describe(WORKFLOW, () => {
     expect(workflow()).toMatch(/^jobs:\n {2}reviewer:$/m);
   });
 
-  // pull_request_target runs main's copy of this file. pull_request runs the
-  // PR's copy, and stays only so the PR that added pull_request_target got a
-  // check. Both run on edits, so a new verdict line passes the check, and on
-  // pushes, so a new commit checks it again.
+  // pull_request_target runs main's copy of this file, so a PR can't change
+  // it. pull_request runs the PR's copy, which GitHub keeps apart from main's
+  // run (PR 278). Both run on edits, so a new verdict line passes the check,
+  // and on pushes, so a new commit checks it again.
   it("runs main's copy of the workflow on every PR into main, edit and push", () => {
     const lines = code();
     const on = lines.indexOf("on:");
