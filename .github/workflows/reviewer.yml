@@ -6,7 +6,20 @@ name: Reviewer
 # 0017). Main's ruleset requires this check, so nobody can merge before the
 # review. Editing the description reruns it, so adding the verdict line
 # passes it, and a push reruns it, so a big new commit needs a new review.
+#
+# Both triggers check out main and run main's copy of the script and its
+# packages. On pull_request_target GitHub also runs main's copy of this file,
+# so a PR can't change what that run checks (JAS-43, decision record 0032).
 on:
+  # GitHub runs this trigger from main's copy of this file, whatever the PR
+  # changes, so even a PR that edits this file gets main's check.
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  # This trigger runs the PR's own copy of this file, so it isn't the guard.
+  # A pull_request_target workflow runs only from main, so the PR that added
+  # that trigger needed this one for its own check. Decision record 0032 says
+  # when it can go.
   pull_request:
     branches: [main]
     types: [opened, edited, synchronize, reopened, ready_for_review]
@@ -14,22 +27,30 @@ on:
 permissions:
   contents: read
 
-# A newer edit or push replaces a run still in progress.
+# Each trigger has its own group, so the two runs for one edit or push don't
+# cancel each other.
 concurrency:
-  group: reviewer-${{ github.event.pull_request.number }}
+  group: reviewer-${{ github.event_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   reviewer:
     runs-on: ubuntu-latest
+    # A run takes about a minute. A hung one would leave the check pending for
+    # GitHub's default of six hours.
+    timeout-minutes: 10
     steps:
-      # The whole history, so the PR's base and head commits are both here.
+      # The whole history, so the PR's base commit and origin/main are here.
       - uses: actions/checkout@v7
         with:
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
+      # No npm cache. A pull_request_target run would read and write main's
+      # cache, so this job turns caching off.
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
+          package-manager-cache: false
       - run: npm ci
       - run: npx tsx scripts/can-merge-reviewer-check.ts
