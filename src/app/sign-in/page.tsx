@@ -3,16 +3,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Panel } from "@/components/ui/panel";
 import { QUESTIONS_PER_DAY } from "@/lib/ask-rules";
-import { loneValue } from "@/lib/sign-in";
-import { supabaseConfig } from "@/lib/supabase/config";
-import { SignInPanel } from "./sign-in-panel";
+import { SignInOptions, type SearchParams } from "./sign-in-options";
 
 export const metadata: Metadata = {
   title: "Sign in",
 };
-
-// A value that's in the address twice comes as an array.
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 // The page's link style, the same as How it works: the text colour with a
 // quiet underline, since blue means you and red the opponent.
@@ -64,18 +59,5 @@ export default function SignInPage({ searchParams }: { searchParams: SearchParam
         </p>
       </div>
     </main>
-  );
-}
-
-// Reads the address, then hands plain values to the panel, so the panel can
-// be rendered in a test without a request (sign-in-panel.test.tsx).
-async function SignInOptions({ searchParams }: { searchParams: SearchParams }) {
-  const { next, error } = await searchParams;
-  return (
-    <SignInPanel
-      configured={supabaseConfig() !== null}
-      next={loneValue(next)}
-      error={loneValue(error)}
-    />
   );
 }
