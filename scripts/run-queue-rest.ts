@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { OpenPulls, READY_LABEL, readyToMerge, type OpenPull } from "./can-merge-action-steps";
 import { field } from "./can-merge-gates";
-import { CEILING, OUT_OF_TRIES, pickTickets, TRIES, type OpenPr, type Status, type Ticket } from "./run-queue-pick";
+import { CEILING, OUT_OF_TRIES, parseTouches, pickTickets, TRIES, type OpenPr, type Status, type Ticket } from "./run-queue-pick";
 
 /** How long the queue's start comment holds a ticket. It matches JAS-29's stall rule; JAS-145 handles the stall. */
 export const START_HOLDS_FOR_MS = 2 * 60 * 60 * 1000;
@@ -566,12 +566,20 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   if (vercel.kind === "testing" || vercel.kind === "blocked") {
     const said = vercel.kind === "blocked" ? "Vercel blocked the account" : "Vercel refused a deploy";
     const busy = byName ? undefined : running[0];
-    const keep = busy ? [] : start.slice(0, 1);
+    // A builder with no files never pushes, so no preview comes. One can still
+    // start when no other is waiting, but it shows nothing.
+    const hasFiles = (id: string) => {
+      const touches = parseTouches(issueOf(id).description ?? "");
+      return "files" in touches && touches.files.length > 0;
+    };
+    const test = busy ? undefined : (start.find(hasFiles) ?? start[0]);
     const why = busy
       ? `${said} at ${utc(vercel.since)}, and ${busy.id} has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.`
-      : `${said} at ${utc(vercel.since)}, so only ${keep[0]} starts this round, as a test, until a preview deploys.`;
-    waits.push(...start.slice(keep.length).map((id) => ({ id, why: [why] })));
-    start = keep;
+      : test && hasFiles(test)
+        ? `${said} at ${utc(vercel.since)}, so only ${test} starts this round, as a test, until a preview deploys.`
+        : `${said} at ${utc(vercel.since)}, so only ${test} starts this round. It changes no files, so it deploys nothing and can't show whether Vercel deploys again.`;
+    waits.push(...start.filter((id) => id !== test).map((id) => ({ id, why: [why] })));
+    start = test ? [test] : [];
   }
 
   const promoted = new Set(promote.map((promotion) => promotion.id));

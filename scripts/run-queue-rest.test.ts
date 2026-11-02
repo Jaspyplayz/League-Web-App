@@ -451,6 +451,18 @@ describe("a blocked Vercel account", () => {
     ]);
   });
 
+  it("takes a ticket with files as a run by name's test, ahead of a higher one with none", () => {
+    const read = three(undefined, { issues: [issue("JAS-1", { priority: 2, description: "**Touches.** None." }), issue("JAS-2")] });
+    const plan = planRound(read, DAYS_LATER, RUN, { byName: true });
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-2"]);
+    expect(plan.waits.map((wait) => wait.id)).toEqual(["JAS-1"]);
+  });
+
+  it("starts a ticket with no files on a run by name when no other is waiting", () => {
+    const read = three(undefined, { issues: [issue("JAS-1", { description: "**Touches.** None." })] });
+    expect(planRound(read, DAYS_LATER, RUN, { byName: true }).start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
+  });
+
   it("warns in the log and says so on the run's page, and starts nothing", async () => {
     const { effects, calls, lines } = recorder();
     await runRound(planRound(three(), JUST_AFTER, RUN), { dryRun: false }, effects);
@@ -1201,6 +1213,33 @@ describe("Vercel's test mode", () => {
     expect(plan.start).toEqual([]);
     expect(plan.waits.map((wait) => wait.why)).toEqual([
       ["Vercel refused a deploy at 2026-11-02 07:15 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test."],
+    ]);
+  });
+
+  // A builder with no files never pushes, so no preview comes.
+  it("takes a ticket with files as the test, ahead of a higher one with none", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1", { priority: 2, description: "**Touches.** None." }), issue("JAS-2"), issue("JAS-3")],
+      statuses: [refusal("2026-11-02T05:00:00Z")],
+    });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-2"]);
+    const why = "Vercel refused a deploy at 2026-11-02 05:00 UTC, so only JAS-2 starts this round, as a test, until a preview deploys.";
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-1", [why]],
+      ["JAS-3", [why]],
+    ]);
+  });
+
+  it("starts a ticket with no files when no other is waiting, and says it shows nothing", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1", { description: "**Touches.** None." }), issue("JAS-2", { description: "**Touches.** None." })],
+      statuses: [refusal("2026-11-02T05:00:00Z")],
+    });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-2", ["Vercel refused a deploy at 2026-11-02 05:00 UTC, so only JAS-1 starts this round. It changes no files, so it deploys nothing and can't show whether Vercel deploys again."]],
     ]);
   });
 
