@@ -104,7 +104,7 @@ function decide(snapshot: PrSnapshot, state: MainState, git: ReviewHistory = his
 // reads the list also checks that ok agrees with it.
 function failed(decision: Decision): string[] {
   const names = decision.gates.filter((gate) => !gate.pass).map((gate) => gate.name);
-  expect(decision.ok).toBe(names.length === 0);
+  expect(decision.ok, `ok with failing gates: ${names.join(", ") || "none"}`).toBe(names.length === 0);
   return names;
 }
 
@@ -742,6 +742,8 @@ describe("decide", () => {
     ["another check failed", [...passing, { kind: "run", name: "CodeQL", workflow: "", state: "failure" }], "CodeQL failed"],
     // In the CI workflow but not named check, so it isn't the required one.
     ["another job in the CI workflow failed", [...passing, { kind: "run", name: "extra", workflow: "CI", state: "failure" }], "extra failed"],
+    // Named smoke but from another workflow, so it isn't the required one either.
+    ["a smoke run from another workflow failed", [...passing, { kind: "run", name: "smoke", workflow: "Quick smoke", state: "failure" }], "smoke failed"],
     [
       "another check is running",
       [...passing, { kind: "run", name: "dependency-review", workflow: "Dependency review", state: "pending" }],
