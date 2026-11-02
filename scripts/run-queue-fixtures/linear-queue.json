@@ -1,152 +1,295 @@
 {
   "data": {
-    "viewer": { "id": "61230bd5-f5cf-47d8-805e-700a2b469b07" },
+    "viewer": {
+      "id": "00000000-0000-4000-8000-00000000000a"
+    },
     "issues": {
-      "pageInfo": { "hasNextPage": false, "endCursor": null },
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
       "nodes": [
         {
           "id": "23afe496-3a19-4c83-a029-f8f47462d37c",
           "identifier": "JAS-144",
-          "title": "/run-queue: the Action that reads the queue and starts builders",
-          "description": "**Player problem.** None: no player sees this. The picking script only decides. Something has to wake it, give it real tickets and start the cloud builders it chose, with Jasper's app closed.\n\n**What to build.** A GitHub Action that uses no Claude. It reads Linear and GitHub, runs the picking script, applies the result and starts one cloud builder per picked ticket through the cloud task's API trigger.\n\n**What wakes it**\n\n* A merged PR. Agent merge's merges won't start another workflow, because they use `github.token`, so this listens for Agent merge finishing with `workflow_run`, and for `pull_request` closed for Jasper's own merges.\n* `/run-queue`: a small skill that runs `gh workflow run`, so it works from any session.\n* An hourly `schedule`. Scheduled runs can be delayed or dropped, so it can't be the only way in.\n\n**Acceptance criteria**\n\n- [ ] A dry run (`workflow_dispatch` with a dry-run input) prints what it would start and why each other ticket waits, and changes nothing.\n- [ ] Each picked ticket gets one fire with only its ID in the message. The builder re-checks that the ticket is Ready.\n- [ ] A ticket can't start twice. In the trial, the builder's start comment came about 2 minutes 20 seconds after the fire (12:30:36 to 12:32:58 UTC), so the Action comments on the ticket before firing, and a later run skips a ticket with a recent comment of that kind. Runs share one `concurrency` group.\n- [ ] Blockers in Todo move to Ready and High, and waiting tickets get one comment, not one per run.\n- [ ] A refused fire (such as Jasper's usage limit) starts nothing else that round, doesn't count as a try, and shows in the run's log.\n- [ ] Secrets never appear in logs. The workflow holds names only, and asks for only the permissions it needs.\n- [ ] Switching off the Action stops the queue, and the docs say so.\n- [ ] One real run on one tiny ticket, with the run log and ticket linked in the PR.\n\n**Also in this ticket (from** <issue id=\"8d9dd66a-2ce3-44db-951d-dc621e783d57\" href=\"https://linear.app/jaspy/issue/JAS-29/run-queue-a-coordinator-that-starts-up-to-4-cloud-builders-from-ready\">JAS-29</issue>**)**\n\n* Add the Touches line to `.github/ISSUE_TEMPLATE/feature.md`.\n* Add the command to `CLAUDE.md`, and the files to the map in `ARCHITECTURE.md`.\n\n**To settle when building**\n\n* **When Vercel counts as refusing.** Vercel only answers when something is pushed, so an old refusal would hold the queue shut forever. Default unless Jasper changes it: Vercel is refusing if its newest status on main or an open PR says \"Deployment rate limited\" and is under an hour old. After that, start one ticket as a test, and go back to the full ceiling once that preview is Ready. On 2026-11-01 it accepted deploys at about 12:38 and 12:41 UTC and refused at 12:48, so one success proves little.\n* **The cloud task.** The trial's task is named as a trial, says so in its prompt, and has `run_once_at` 2026-12-31 because the API needs a date. Find out whether it stops accepting fires once that date passes, then update it or replace it. API triggers are only added on the web, so that part is Jasper's.\n* **How many fires are allowed.** The API trigger is a research preview, so check its limits against the live docs.\n\n**Out of scope.** Tries, stalls and failures (next ticket), and live-site errors.\n\n**Tier.** Risky. Jasper merges it, because it adds a workflow under `.github/` and a skill under `.claude/`.\n\n**Touches.** `.github/workflows/run-queue.yml`, `.github/ISSUE_TEMPLATE/feature.md`, `.claude/skills/run-queue/SKILL.md`, `scripts/run-queue.ts`, `scripts/run-queue-rest.ts`, `scripts/run-queue-rest.test.ts`, `scripts/run-queue-fixtures/`, `docs/workflow.md`, `CLAUDE.md`, `ARCHITECTURE.md`\n\n**Builder.** Claude Code on Opus 5.5. Changing the cloud task needs a local session. One builder for this ticket.\n\n**Jasper adds.** Two GitHub secrets, with values he sets himself: `RUN_QUEUE_TASK_TOKEN` and `LINEAR_API_KEY`. The PR gives him the commands.\n\n**Plan** (the builder fills in before coding). Files, data, tests, docs to update.\n\n**How we'll verify.** Tests that read saved Linear and GitHub answers, a dry run on the real queue, then the one real run. Nothing changes on any page, so no screenshots.",
+          "title": "JAS-144 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** `.github/workflows/run-queue.yml`, `.github/ISSUE_TEMPLATE/feature.md`, `.claude/skills/run-queue/SKILL.md`, `scripts/run-queue.ts`, `scripts/run-queue-rest.ts`, `scripts/run-queue-rest.test.ts`, `scripts/run-queue-fixtures/`, `docs/workflow.md`, `CLAUDE.md`, `ARCHITECTURE.md`",
           "createdAt": "2026-11-01T12:55:54.439Z",
           "priority": 2,
-          "state": { "name": "In Progress" },
-          "project": { "name": "Turnpoint" },
+          "state": {
+            "name": "In Progress"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
           "assignee": null,
-          "labels": { "nodes": [] },
-          "children": { "nodes": [] },
+          "labels": {
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
           "inverseRelations": {
-            "nodes": [{ "type": "blocks", "issue": { "id": "10c0353a-9a1b-4a26-9842-18c1e9069081", "identifier": "JAS-143" } }]
+            "nodes": [
+              {
+                "type": "blocks",
+                "issue": {
+                  "id": "10c0353a-9a1b-4a26-9842-18c1e9069081",
+                  "identifier": "JAS-143"
+                }
+              }
+            ]
           }
         },
         {
           "id": "a0857ba8-1733-4935-bb4f-fcaa3494c06c",
           "identifier": "JAS-165",
-          "title": "Prove the Agent merge sweep on a real cancelled run, once JAS-164 merges",
-          "description": "**Player problem.** None: no player sees this. <issue id=\"c7d5d86f-8a94-4cf9-b1d5-350b705f0552\" href=\"https://linear.app/jaspy/issue/JAS-164/find-out-why-agent-merge-runs-get-cancelled-so-a-ready-pr-cant-sit\">JAS-164</issue>'s fix can't run until it's on main, because `schedule` and `workflow_dispatch` use main's copy of a workflow. Merging its PR closes <issue id=\"c7d5d86f-8a94-4cf9-b1d5-350b705f0552\" href=\"https://linear.app/jaspy/issue/JAS-164/find-out-why-agent-merge-runs-get-cancelled-so-a-ready-pr-cant-sit\">JAS-164</issue>, so this ticket holds the two criteria that are left. `/run-queue` shouldn't rely on the sweep until this passes.\n\n**Acceptance criteria**\n\n- [ ] A real Agent merge run's name shows its branch: link the run.\n- [ ] The sweep runs on its schedule and picks a PR whose Ready line names its head: link the sweep's run and the Agent merge run it started.\n- [ ] A tiny PR with every gate passing and its Ready line set merges with no person after its Agent merge run is cancelled: link the cancelled run, the run that merged it and the PR. It merges through `can-merge`, so the PR has the gates comment and the `merged-by-claude` label.\n- [ ] Note how late the schedule ran against its 15 minutes, and put the number on this ticket.\n- [ ] Note on <issue id=\"c7d5d86f-8a94-4cf9-b1d5-350b705f0552\" href=\"https://linear.app/jaspy/issue/JAS-164/find-out-why-agent-merge-runs-get-cancelled-so-a-ready-pr-cant-sit\">JAS-164</issue> whether any other `canceled by @Jaspyplayz` runs have appeared since it merged, with their run names, since each now shows its branch.\n\n**How to prove the cancel.** Open a docs-only tiny PR, let its checks finish, then set `**Ready to merge:** yes at <head sha>`. That edit reruns Reviewer, which starts Agent merge. Cancel that one run while it's in `npm ci`, with `gh run cancel <id> --repo Jaspyplayz/League-Web-App`. That's the only run this ticket may cancel. Then wait: the next sweep should start a new run with no person involved.\n\n**If it fails.** Say so on this ticket with the run links. If Agent merge stopped starting at all, or the job's `if` skips what it should run, revert <issue id=\"c7d5d86f-8a94-4cf9-b1d5-350b705f0552\" href=\"https://linear.app/jaspy/issue/JAS-164/find-out-why-agent-merge-runs-get-cancelled-so-a-ready-pr-cant-sit\">JAS-164</issue>'s PR first, since that's the workflow that merges Claude's PRs.\n\n**Out of scope.** Finding what caused the cancels. `can-merge`'s gates. `/run-queue`'s own wake-ups (<issue id=\"23afe496-3a19-4c83-a029-f8f47462d37c\" href=\"https://linear.app/jaspy/issue/JAS-144/run-queue-the-action-that-reads-the-queue-and-starts-builders\">JAS-144</issue>).\n\n**Tier.** Tiny: the PR is a one-line docs change, and the work is the proof.\n\n**Touches.** `docs/SETUP.md`, one line, chosen by the builder. It isn't on either risky list or a rule file, so the PR stays tiny and can merge through `can-merge`.\n\n**Builder.** Claude Code on Opus 5.5. This can run in a cloud session or a local one. Move it to Ready once <issue id=\"c7d5d86f-8a94-4cf9-b1d5-350b705f0552\" href=\"https://linear.app/jaspy/issue/JAS-164/find-out-why-agent-merge-runs-get-cancelled-so-a-ready-pr-cant-sit\">JAS-164</issue>'s PR has merged.\n\n**How we'll verify.** The run links above.\n\n**Watch out for Linear.** Linear closed this ticket at 04:11:41 UTC on 2026-11-02, two seconds after its parent fix merged, because that PR's description named this ticket in plain text. Keep every other open ticket's number out of this ticket's PR description. This ticket's own PR will close it when it merges, so post the two notes above as soon as the merge lands, and reopen it if any criterion is still unmet.",
+          "title": "JAS-165 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** `docs/SETUP.md`, one line, chosen by the builder. It isn't on either risky list or a rule file, so the PR stays tiny and can merge through `can-merge`.",
           "createdAt": "2026-11-02T03:21:57.826Z",
           "priority": 2,
-          "state": { "name": "In Progress" },
-          "project": { "name": "Turnpoint" },
+          "state": {
+            "name": "In Progress"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
           "assignee": null,
-          "labels": { "nodes": [{ "name": "Bug" }] },
-          "children": { "nodes": [] },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Bug"
+              }
+            ]
+          },
+          "children": {
+            "nodes": []
+          },
           "inverseRelations": {
-            "nodes": [{ "type": "blocks", "issue": { "id": "c7d5d86f-8a94-4cf9-b1d5-350b705f0552", "identifier": "JAS-164" } }]
+            "nodes": [
+              {
+                "type": "blocks",
+                "issue": {
+                  "id": "c7d5d86f-8a94-4cf9-b1d5-350b705f0552",
+                  "identifier": "JAS-164"
+                }
+              }
+            ]
           }
         },
         {
           "id": "65c93597-614d-4772-a870-b4ca03b7ac66",
           "identifier": "JAS-190",
-          "title": "Full codebase audit with ultracode, then one refactor ticket per finding",
-          "description": "**Player problem.** Bugs, security gaps and code that's hard to explain can sit unnoticed until a player hits them, Riot looks at the site, or an interviewer reads the code.\n\n**What to do, in order**\n\n1. **Audit (this ticket).** A read-only, multi-agent review of one fixed commit. Agents try to disprove each finding before it counts.\n2. **Refactor (the tickets this one creates).** One small ticket per finding worth fixing. This ticket changes no code itself, because a single giant refactor would break the rule of small PRs on one topic and block the queue's other branches.\n\n**When to start**\n\n* **Before the weekly limit resets on Nov 4 at 9 am EST.** This is Jasper's reason for the ticket: on 2026-11-02 only 20% of the week was used with about 2 days left, and the rest goes unused at the reset.\n* **It doesn't wait for the queue.** The audit only reads, so it can run while other branches are open. It reads one fixed commit on main, and a finding on a file an open PR changes gets re-checked after that PR merges.\n* **Run in batches and check the limit between them.** Stop and report what's done if the limit passes 70%, so the queue's builders still have room. Claude picked that number and Jasper can change it. Usage credits were off, so a big run can't charge extra.\n* **Refactor tickets stay in Todo until** <issue id=\"4709d1cb-7248-4391-9348-05339dd8a4e3\" href=\"https://linear.app/jaspy/issue/JAS-145/run-queue-put-failed-tickets-back-on-the-queue\">JAS-145</issue> **has merged,** because that's what handles failed builds and a refactor means many PRs. Jasper can ask for one by name before then.\n* **The Riot application.** Jasper planned to submit it the week of 2026-11-01. Report security and privacy findings first so he can decide whether to wait for those fixes. The application doesn't wait for this ticket unless he says so.\n\n**Acceptance criteria**\n\n- [ ] The report names the commit it read, every area it covered and every area it left out, so nothing reads as covered when it wasn't.\n- [ ] It covers security and secrets, the server-only rule for Riot and database code, bugs, tests that prove nothing, dead code, code that's hard to explain in an interview, and docs that disagree with the code.\n- [ ] Every finding has a `path:line`, what goes wrong, how it was checked and how serious it is.\n- [ ] The report is a Linear document attached to this ticket. No branch is pushed and no file in the repo changes.\n- [ ] Each finding worth fixing becomes a Todo ticket with the Feature or fix sections, a Priority and a Touches line, security first. Findings not worth fixing are listed with the reason.\n- [ ] A finding that needs an architecture change, a new dependency or a loosened check becomes a question for Jasper, not a ticket ready to build.\n- [ ] The report says how much of the weekly limit the audit used, so the next audit can be sized from a real number.\n\n**Out of scope**\n\n* Any code change in this ticket.\n* The three models' code and training, such as `scripts/train-*.ts`, `scripts/check-score.ts`, `src/lib/analyzer/win-chance*`, `src/lib/analyzer/phase-score*` and the `*-model.json` files, because the model redesign plans to retrain all three.\n* Live-site data and anything that needs production secrets. The audit reads code only.\n\n**Tier.** This ticket opens no PR. Each refactor ticket picks its own tier.\n\n**Touches.** None. The output is a Linear document and new tickets.\n\n**Builder.** Claude Code on Opus 5.5, in a local session. Jasper's message starting it must include \"ultracode\", because that's what allows the multi-agent run. So this stays in Todo: don't move it to Ready, and don't let a builder take it unasked. One builder for this ticket.\n\n**Plan** (the builder fills in before starting). The list of areas, how agents are split across them, and what's left out and why.\n\n**How we'll verify.** `git status` is clean and no new branch exists afterwards, every finding in the report survived its check, and the number of tickets created matches the report.",
+          "title": "JAS-190 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** None. The output is a Linear document and new tickets.",
           "createdAt": "2026-11-02T05:12:11.271Z",
           "priority": 3,
-          "state": { "name": "In Progress" },
-          "project": { "name": "Turnpoint" },
+          "state": {
+            "name": "In Progress"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
           "assignee": null,
-          "labels": { "nodes": [{ "name": "Improvement" }] },
-          "children": { "nodes": [] },
-          "inverseRelations": { "nodes": [] }
+          "labels": {
+            "nodes": [
+              {
+                "name": "Improvement"
+              }
+            ]
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "nodes": []
+          }
         },
         {
           "id": "4f1a4e2d-4125-4710-909b-d2ed080b2b36",
           "identifier": "JAS-159",
-          "title": "Wellness: the rate-limit check times out after 1000 ms (Sentry TURNPOINT-6)",
-          "description": "From the wellness run on 2026-11-01 (check 6, open problems, ranked under \"Players hit it\").\n\n**Evidence.** Sentry [TURNPOINT-6](<https://jaspys-team.sentry.io/issues/TURNPOINT-6>): \"Error: Rate limit check took over 1000 ms\", unresolved and escalating. 41 events, 2 users, first seen 2026-10-25, last seen 2026-10-29. Thrown from `src/lib/riot/rate-limit-store.ts:74` (the `DB_TIMEOUT_MS` race), handled, and reported by `Sentry.captureException` in the same file. The events come from cold starts in Vercel `iad1`: in the latest one, `app_start_time` is 4 s before the event.\n\n**To find out.** Whether the 1000 ms limit trips on the first database connection of a cold function (the pooler handshake) rather than on a slow query, and what the page does when it trips: falls back to the in-memory limiter, or fails the Riot call. Then either warm the connection, give the first check a longer limit, or stop reporting an expected fallback as an error.\n\n**Suggested tier.** Risky (`src/lib/riot/` is on the risky list).\n**Skill.** `debugging-and-error-recovery` (poteto-mode's bug playbook).",
+          "title": "JAS-159 (title left out of this saved copy)",
+          "description": "",
           "createdAt": "2026-11-01T14:15:34.076Z",
           "priority": 0,
-          "state": { "name": "In Review" },
-          "project": { "name": "Turnpoint" },
-          "assignee": { "id": "61230bd5-f5cf-47d8-805e-700a2b469b07" },
-          "labels": { "nodes": [] },
-          "children": { "nodes": [] },
-          "inverseRelations": { "nodes": [] }
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "nodes": []
+          }
         },
         {
           "id": "547997b5-6c52-4648-83f1-d9ea20b6c673",
           "identifier": "JAS-40",
-          "title": "Wellness: Ask can spend more than it records when Vercel stops the function",
-          "description": "Found by the 2026-10-29 wellness run (check 1, thermos), range 3db64a2..0e76a79.\n\n**Evidence:** `src/lib/ask.ts:139-182` runs up to 8 rounds, each up to 2 tries of 60 s plus up to a 10 s pause, with `max_tokens: 8000`. The Ask page sets `maxDuration = 180` (`src/app/player/[region]/[riotId]/ask/page.tsx:30`). When Vercel kills the function, the row keeps only `HOLD_MICROS` (50 cents), but the rounds Anthropic already billed can cost more than that. The comment in `src/lib/ask-store.ts` says the hold \"is usually more than the question cost\", but nothing enforces it.\n\n**Failure path:** long, tool-heavy questions overshoot the $5 account cap and the $20 site cap a little each time.\n\n**Suggested fix:** check a deadline in the round loop so it stops starting rounds at about 150 s, and/or grow the hold for each round started.\n\n**Suggested tier:** risky (Claude API spending).\n**Skill:** `poteto-mode`, with `tdd` for the deadline.",
+          "title": "JAS-40 (title left out of this saved copy)",
+          "description": "",
           "createdAt": "2026-10-29T09:25:07.631Z",
           "priority": 0,
-          "state": { "name": "In Review" },
-          "project": { "name": "Turnpoint" },
-          "assignee": { "id": "61230bd5-f5cf-47d8-805e-700a2b469b07" },
-          "labels": { "nodes": [] },
-          "children": { "nodes": [] },
-          "inverseRelations": { "nodes": [] }
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "nodes": []
+          }
         },
         {
           "id": "54004ffb-d064-4895-8500-2577a2e42283",
           "identifier": "JAS-39",
-          "title": "Wellness: recap daily cap can be raced, and failed tries never count",
-          "description": "Found by the 2026-10-29 wellness run (check 1, thermos), range 3db64a2..0e76a79.\n\n**Evidence:** `src/lib/recap-store.ts:66-96` (called from `writeRecapAction`, `src/app/account/actions.ts:85-100`). The `RECAPS_PER_DAY` count runs outside any lock or transaction, and the `match_recaps` row is inserted only after `writeRecap` (Claude Haiku) returns. Tries where `writeRecap` returns null or throws never write a row, so they never count. There is no monthly site-wide recap budget, unlike Ask's $20.\n\n**Failure path:** a signed-in user fires `writeRecapAction` in parallel over many different match IDs (any public profile lists them). Every call sees fewer than 20 and calls Claude, plus up to 2 Riot calls each (match and timeline). Result: unbounded Haiku spend and a drained shared Riot limit, repeatable each day.\n\n**Suggested fix:** reserve inside a transaction with an advisory lock, like Ask's `reserve()` in `src/lib/ask-store.ts`; record the attempt before calling Claude; optionally add a monthly site cap.\n\n**Suggested tier:** risky (Claude API spending, a store in `src/lib/`).\n**Skill:** `poteto-mode` (it routes to `tdd` for the race test), with `security-and-hardening`.",
+          "title": "JAS-39 (title left out of this saved copy)",
+          "description": "",
           "createdAt": "2026-10-29T09:25:04.121Z",
           "priority": 0,
-          "state": { "name": "In Review" },
-          "project": { "name": "Turnpoint" },
-          "assignee": { "id": "61230bd5-f5cf-47d8-805e-700a2b469b07" },
-          "labels": { "nodes": [] },
-          "children": { "nodes": [] },
-          "inverseRelations": { "nodes": [] }
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "nodes": []
+          }
         },
         {
           "id": "0715ad1d-860f-493e-9599-fc0e7d8846e3",
           "identifier": "JAS-200",
-          "title": "Run the phone home journey at 390px wide",
-          "description": "**Player problem.** The `ux-phone-home` journey checks that the home page doesn't scroll sideways on a phone, but it runs at 412px wide, so a home-page element between 391 and 412px wide passes the check and still scrolls sideways on a 390px iPhone.\n\nThe journey (`.claude/skills/verify-turnpoint-ux/scripts/drive.ts`) runs on Playwright's unmodified `devices[\"Pixel 7\"]`, which `.claude/skills/verify-turnpoint/scripts/runner.ts` picks for every `phone: true` journey. Pixel 7 is 412×915. The design rules (`.claude/rules/design.md`, Process) check every page at 390px wide, and `npm run shot -- --phone` (`scripts/shot-device.ts`, `PHONE_WIDTH = 390`) already shoots at 390. The other three phone journeys in `drive.ts` (`ux-saved-players-phone`, `ux-saved-players-sample-match`, `ux-game-review-phone`) call `page.setViewportSize({ width: 390, height: 844 })` first; `ux-phone-home` doesn't. The reviewer on PR 279 (<issue id=\"a2498a0d-f56a-4dde-991c-44c70b78c2a3\" href=\"https://linear.app/jaspy/issue/JAS-120/say-phone-is-390px-wide-in-the-verify-skill\">JAS-120</issue>) found it.\n\n**Acceptance criteria**\n\n- [ ] Given `ux-phone-home` runs, when it checks for sideways scroll, the page is 390px wide: the journey's `notes.clientWidth` is 390, not 412.\n- [ ] `features/phone-home.md` says the journey runs on Pixel 7 at 390px, and its Proof line names the screenshots the journey now saves.\n- [ ] The `ux-phone-home` row in the verify-turnpoint-ux `SKILL.md` table says \"Pixel 7 at 390px\", like the other phone rows.\n- [ ] `npx tsx .claude/skills/verify-turnpoint-ux/scripts/drive.ts --base https://league-web-app.vercel.app ux-phone-home` passes.\n- [ ] Sample game, phone, light mode: not a page change, so only the phone width applies (the criteria above).\n\n**Out of scope.** Narrowing the phone device in `runner.ts` for every journey; the other journeys; phones narrower than 390px (320px).\n\n**Tier.** Normal: a change in `.claude/` that tightens a check. `drive.ts` and `SKILL.md` are on Jasper's list in `scripts/risky-paths.ts` (`.claude/skills/`), so Jasper merges it. They're rule files, so the reviewer agent runs.\n\n**Builder.** Claude Code on Opus 5.5, in a cloud session. One builder for this ticket.\n\n**Plan.** Call `page.setViewportSize({ width: 390, height: 844 })` at the start of the journey's first step, the same way the other three phone journeys do, and name the step \"open home at 390px\" like theirs. That keeps all four phone journeys alike, and leaves `runner.ts` alone, since changing the shared device would also change the height of the three journeys that already narrow. Update `phone-home.md` (preconditions, Proof file name, Gotchas) and the `SKILL.md` row.\n\n**How we'll verify.** Run the journey on the live site and read `notes.clientWidth` in its `result.json`; run `npm run lint`, `npm run typecheck`, `npm test` and `npm run build`; the reviewer agent.\n\nTouches: `.claude/skills/verify-turnpoint-ux/scripts/drive.ts`, `.claude/skills/verify-turnpoint-ux/features/phone-home.md`, `.claude/skills/verify-turnpoint-ux/features/README.md` (its feature list said \"on a Pixel 7\"), `.claude/skills/verify-turnpoint-ux/SKILL.md`",
+          "title": "JAS-200 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\nTouches: `.claude/skills/verify-turnpoint-ux/scripts/drive.ts`, `.claude/skills/verify-turnpoint-ux/features/phone-home.md`, `.claude/skills/verify-turnpoint-ux/features/README.md` (its feature list said \"on a Pixel 7\"), `.claude/skills/verify-turnpoint-ux/SKILL.md`",
           "createdAt": "2026-11-02T06:04:31.389Z",
           "priority": 4,
-          "state": { "name": "In Review" },
-          "project": { "name": "Turnpoint" },
-          "assignee": { "id": "61230bd5-f5cf-47d8-805e-700a2b469b07" },
-          "labels": { "nodes": [{ "name": "Improvement" }] },
-          "children": { "nodes": [] },
-          "inverseRelations": { "nodes": [] }
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "Improvement"
+              }
+            ]
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "nodes": []
+          }
         },
         {
           "id": "1d26ce79-b50d-44e7-b8ee-2bddb911ca0f",
           "identifier": "JAS-43",
-          "title": "Wellness: the required reviewer check runs the PR's own copy of its script",
-          "description": "Found by the 2026-10-29 wellness run (check 1, thermos), range 3db64a2..0e76a79.\n\n**Evidence:** `.github/workflows/reviewer.yml:25-35` runs on `pull_request`, checks out the PR head, and runs `npx tsx scripts/can-merge-reviewer-check.ts` from it.\n\n**Failure path:** a PR that edits that script, `scripts/can-merge-gates.ts` or the workflow can make the required `reviewer` check pass with no reviewer verdict. `can-merge` itself refuses changed gate code and risky paths, so the gap is Jasper's manual merges of risky PRs, where a green `reviewer` check looks trustworthy.\n\n**Suggested fix:** run the check script from the base commit (`github.event.pull_request.base.sha`) while still reading the head's PR text, or use `pull_request_target` with no head code checked out.\n\n**Suggested tier:** normal (tightens a check in `.github/`; it's on the risky list, so Jasper merges). Possibly related: <issue id=\"08fcb9aa-19ce-4325-b0af-f7bdff57abcc\" href=\"https://linear.app/jaspy/issue/JAS-14/turnpoint-can-merge-leftovers-from-the-180-review\">JAS-14</issue>.\n**Skill:** `poteto-mode`, with `security-and-hardening`.",
+          "title": "JAS-43 (title left out of this saved copy)",
+          "description": "",
           "createdAt": "2026-10-29T09:25:18.854Z",
           "priority": 0,
-          "state": { "name": "In Review" },
-          "project": { "name": "Turnpoint" },
-          "assignee": { "id": "61230bd5-f5cf-47d8-805e-700a2b469b07" },
-          "labels": { "nodes": [] },
-          "children": { "nodes": [] },
-          "inverseRelations": { "nodes": [] }
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "nodes": []
+          }
         },
         {
           "id": "1b58c8ab-1455-4abf-9cb7-d69baa01756e",
           "identifier": "JAS-136",
-          "title": "Searching from the 404 page crashes with \"Something went wrong\"",
-          "description": "**Player problem.** A player who lands on a bad address is told to search again, and any search from that page, even a correct one, replaces it with \"Something went wrong\".\n\nTo reproduce on the live site: open `/no-such-page`, type `Hide on bush#KR1` and press Search, in the big form or the header's. Seen on 2026-11-01 on the live site and on PR 262's preview.\n\n**What was seen**\n\n* The search posts to the page's own address and gets `404 /no-such-page`, so `searchPlayer` never runs and the error page shows.\n* `/player/xx/Bad-Name` and `/player/kr/Hide%20on%20bush-KR1/match/NOPE_1` also show the not-found page, but their routes exist. Searches from them post with a 200 and reach the player's page.\n* So this affects only addresses no route matches.\n* It passes on `npm run dev`, so a local check doesn't show it. Only a production build or a preview does.\n\n**Acceptance criteria**\n\n- [ ] Given `/no-such-page`, when a player searches a valid Riot ID in either form, they land on that player's page.\n- [ ] Given `/no-such-page`, when a player searches `NoTag` in either form, the error shows and the picked region stays.\n- [ ] Given `/no-such-page`, it still shows \"We couldn't find that page\" with a 404 status.\n- [ ] Works on a phone and in light mode.\n\n**Out of scope.** The look of the 404 page, and other server actions.\n\n**Tier.** Builder's call once the fix is known.\n\n**Builder.** Claude Code on Opus 5.5, in a local or cloud session. One builder for this ticket.\n\n**Plan** (the builder fills in before coding). A guess, not tested: a catch-all route that calls `notFound()` might give these addresses a route that can take the post. Check that it keeps the 404 status.\n\n**How we'll verify.** Add `/no-such-page` to the forms in `e2e/search-region.spec.ts`, which left it out for this reason, and run it on the preview.",
+          "title": "JAS-136 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.",
           "createdAt": "2026-11-01T09:19:32.308Z",
           "priority": 0,
-          "state": { "name": "In Review" },
-          "project": { "name": "Turnpoint" },
-          "assignee": { "id": "61230bd5-f5cf-47d8-805e-700a2b469b07" },
-          "labels": { "nodes": [] },
-          "children": { "nodes": [] },
-          "inverseRelations": { "nodes": [] }
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "nodes": []
+          }
         },
         {
           "id": "c2133cfb-fc66-4e0f-bb4e-d37032e7efd7",
           "identifier": "JAS-146",
-          "title": "Let Claude merge low-risk skill changes after the panel",
-          "description": "**Player problem.** None: no player sees this. Under today's list, 30 of the last 60 merged Claude PRs (<pull-request id=\"816ec066-341a-428a-ba4a-96464efaf9e0\" href=\"https://linear.app/jaspy/review/add-tested-and-not-tested-sections-to-the-pr-template-b71ff292f7ad\">Jaspyplayz/League-Web-App#205</pull-request> to <pull-request id=\"8a947a44-90d8-411e-996a-dc1d8e03fd76\" href=\"https://linear.app/jaspy/review/remove-two-unused-callback-parameters-the-wellness-run-found-jas-50-88d7ef97a4db\">Jaspyplayz/League-Web-App#266</pull-request>, 2026-10-29 to 11-01) would need Jasper to merge them. `.claude/skills/` was the most common reason (16 PRs) and the only reason for 8: <pull-request id=\"787748f2-28ab-4239-b22a-956c3956e50c\" href=\"https://linear.app/jaspy/review/add-the-game-review-column-to-the-match-summary-jas-108-bb45bb9b81f3\">Jaspyplayz/League-Web-App#260</pull-request>, <pull-request id=\"5e10f6fe-b43b-44be-b181-e48929e3deb7\" href=\"https://linear.app/jaspy/review/restyle-the-profile-top-and-the-matches-list-jas-111-b577706da317\">Jaspyplayz/League-Web-App#259</pull-request>, <pull-request id=\"236103d8-692a-4ea2-bd79-0b9d78c5e4fb\" href=\"https://linear.app/jaspy/review/build-the-review-board-on-the-match-summary-jas-107-ef9dad94dd9f\">Jaspyplayz/League-Web-App#257</pull-request>, <pull-request id=\"a5ada631-8314-43f1-ba0d-0191450be135\" href=\"https://linear.app/jaspy/review/open-saved-players-in-a-box-under-the-search-with-rank-badges-jas-116-aa92ea67ce3d\">Jaspyplayz/League-Web-App#256</pull-request>, <pull-request id=\"b6d16c93-7bd2-4c96-bc0d-564d29dd1049\" href=\"https://linear.app/jaspy/review/build-the-new-header-logo-and-theme-switch-and-drop-settings-jas-101-b84d7fb3d50b\">Jaspyplayz/League-Web-App#237</pull-request>, <pull-request id=\"2e10c7a5-2115-42ed-b1bb-daaa38f624cb\" href=\"https://linear.app/jaspy/review/tell-the-verify-skill-why-a-page-can-look-stuck-in-the-built-in-68bcb36e3f19\">Jaspyplayz/League-Web-App#229</pull-request>, <pull-request id=\"94b29cd2-ab90-4a53-b381-872d64f5a562\" href=\"https://linear.app/jaspy/review/remove-the-explain-back-quiz-61dce546872a\">Jaspyplayz/League-Web-App#220</pull-request> and <pull-request id=\"e31018e2-fb07-4d9e-9ee2-452bef85ba0b\" href=\"https://linear.app/jaspy/review/postmortem-skill-in-the-repo-started-by-the-builder-on-its-own-jas-63-8792ae05e8f2\">Jaspyplayz/League-Web-App#214</pull-request>. He said on 2026-11-01 that a lot of the list isn't really risky, and asked for this ticket. Those four days were heavy on infrastructure work, so a normal stretch would send him fewer.\n\n**What to build.** In `scripts/risky-paths.ts`, Markdown files in five named skill folders move from Jasper's list to the panel list: Claude merges them only after the interrogate panel and the reviewer clear them.\n\n* **The folders:** `verify`, `verify-turnpoint`, `verify-turnpoint-ux`, `explain-back` and `postmortem`. Each of the 8 PRs above changed one of these.\n* **Also moved:** `.claude/skills/THIRD-PARTY-NOTICES.md`, which is only credits, because <pull-request id=\"94b29cd2-ab90-4a53-b381-872d64f5a562\" href=\"https://linear.app/jaspy/review/remove-the-explain-back-quiz-61dce546872a\">Jaspyplayz/League-Web-App#220</pull-request> and <pull-request id=\"e31018e2-fb07-4d9e-9ee2-452bef85ba0b\" href=\"https://linear.app/jaspy/review/postmortem-skill-in-the-repo-started-by-the-builder-on-its-own-jas-63-8792ae05e8f2\">Jaspyplayz/League-Web-App#214</pull-request> changed it too.\n* **How:** an exemption checked in `owner()`, like `FEATURE_NOTE`, because the `.claude/` catch-all at the end of `JASPERS_PATHS` would otherwise still match. `FEATURE_NOTE` may fold into it.\n\n**Acceptance criteria**\n\n- [ ] A Markdown file directly in, or under `features/` of, a named folder returns `jaspers: false` and still appears in `riskyFiles`, so the panel and reviewer rules still apply.\n- [ ] These stay on Jasper's list, each with a test: scripts and any other non-Markdown file in those folders; a `CLAUDE` or `AGENTS` file; a `.claude/` folder or a skill nested inside one of them; every other skill folder, including `code-review-and-quality`, the other skills `.claude/agents/reviewer.md` loads, `interrogate` and `poteto-mode`; and a brand-new skill folder.\n- [ ] A path that tries to escape the rule, such as `..`, a different case or a backslash, doesn't get the exemption.\n- [ ] The rest of `JASPERS_PATHS` is unchanged, including `scripts/can-merge`, `scripts/risky-paths`, `.github/`, hooks, settings and agents.\n- [ ] The test count doesn't fall. The test \"lets Claude merge the verify skill's feature notes after the panel, and nothing else in .claude/skills/\" says the opposite of this ticket, so it's rewritten, and the PR says exactly what changed in it.\n- [ ] The PR re-runs the count over <pull-request id=\"816ec066-341a-428a-ba4a-96464efaf9e0\" href=\"https://linear.app/jaspy/review/add-tested-and-not-tested-sections-to-the-pr-template-b71ff292f7ad\">Add Tested and Not tested sections to the PR template</pull-request> to <pull-request id=\"8a947a44-90d8-411e-996a-dc1d8e03fd76\" href=\"https://linear.app/jaspy/review/remove-two-unused-callback-parameters-the-wellness-run-found-jas-50-88d7ef97a4db\">Remove two unused callback parameters the wellness run found (JAS-50)</pull-request> and reports the real result. Expect at most 7 of the 8 to come off Jasper's list, because <pull-request id=\"5e10f6fe-b43b-44be-b181-e48929e3deb7\" href=\"https://linear.app/jaspy/review/restyle-the-profile-top-and-the-matches-list-jas-111-b577706da317\">Restyle the profile top and the Matches list (JAS-111)</pull-request> changed `.claude/skills/verify-turnpoint-ux/scripts/drive.ts`.\n\n**Out of scope.** The rest of the list, the panel list, and any skill's contents. Widening to more skills is a later decision, made on what this one shows.\n\n**Trade-off.** This loosens a check, and Jasper approved that for these folders. `SKILL.md` files and READMEs steer agents and can say what counts as a pass, which is why `FEATURE_NOTE` left them out. They'd still get the panel and the reviewer. The `verify` skills can't change `can-merge`'s gates, only the guidance on evidence.\n\n**Tier.** Risky. Jasper merges it, because it changes `scripts/risky-paths.ts`.\n\n**Touches.** `scripts/risky-paths.ts`, `scripts/risky-paths.test.ts`, `docs/adr/0025-risky-prs-merge-after-the-panel.md`\n\n**Clashes.** <issue id=\"10c0353a-9a1b-4a26-9842-18c1e9069081\" href=\"https://linear.app/jaspy/issue/JAS-143/run-queue-the-picking-script-and-its-tests\">JAS-143</issue> also changes `scripts/risky-paths.ts` and its test, so these two can't run at once. Neither depends on the other.\n\n**Builder.** Claude Code on Opus 5.5, in a local or cloud session. One builder for this ticket.\n\n**Plan** (the builder fills in before coding).\n\n* `scripts/risky-paths.ts`: `FEATURE_NOTE` folds into a `PANEL_SKILLS` list (`verify`, `verify-turnpoint`, `verify-turnpoint-ux`, `postmortem`) and a check in `owner()`. It exempts a Markdown file directly in, or in `features/` of, one of those folders, plus `.claude/skills/THIRD-PARTY-NOTICES.md`. Exact case only and no backslash in the file name, so `.claude/skills/Verify/` or `Features/` stays Jasper's (on Linux that's a different, brand-new skill folder). CLAUDE and AGENTS files stay Jasper's anywhere; a SKILL file stays Jasper's unless it's the folder's own `SKILL.md` spelled exactly that way, since on Windows or a Mac `skill.md` would replace it.\n* `scripts/risky-paths.test.ts`: the old feature-notes test is rewritten, plus a test per acceptance criterion. New guard: Claude Code's docs say a SKILL.md can grant tools without asking (`allowed-tools`), register `hooks` for the rest of the session, fork into another `agent`, and run shell commands as it loads (`` !`cmd` `` or a ```` ```! ```` block). That's what a script can do, which is why scripts stay Jasper's. So a test keeps each named skill's `SKILL.md` to `name: <its folder>` and a one-line `description`, with no command. The test file is on Jasper's list, so loosening that needs him.\n* Docs: a new decision record 0028 that amends 0025, and an \"Amended by\" note on 0025's Status line. `docs/workflow.md` says a merged record isn't edited, so 0025's Decision text stays as written. It answers 0025's open question 1 (the other verify feature folders).\n* Count: re-run over PRs 205 to 266 with main's file and this branch's, with both paths of each rename, as `can-merge` does.\n\n**Departures from the ticket, for Jasper to overrule:** (1) `explain-back` is left out. PR 220 deleted it, so the only thing naming it would do is let a re-created `explain-back` skill merge without Jasper, which is a brand-new skill folder that criterion 2 keeps his. Adding it back is one word. (2) The new decision record above, beyond the Touches line. (3) A different case such as `Features/x.md` now stays Jasper's, though today's test lets it through, per criterion 3.\n\n**How we'll verify.** `npx vitest run scripts/risky-paths.test.ts`, the count above, then lint, typecheck, test and build. Nothing changes on any page, so no screenshots.",
+          "title": "JAS-146 (title left out of this saved copy)",
+          "description": "**Acceptance criteria**\n\n- [ ] Left out of this saved copy.\n\n**Touches.** `scripts/risky-paths.ts`, `scripts/risky-paths.test.ts`, `docs/adr/0025-risky-prs-merge-after-the-panel.md`",
           "createdAt": "2026-11-01T13:13:20.837Z",
           "priority": 4,
-          "state": { "name": "In Review" },
-          "project": { "name": "Turnpoint" },
-          "assignee": { "id": "61230bd5-f5cf-47d8-805e-700a2b469b07" },
-          "labels": { "nodes": [] },
-          "children": { "nodes": [] },
-          "inverseRelations": { "nodes": [] }
+          "state": {
+            "name": "In Review"
+          },
+          "project": {
+            "name": "Turnpoint"
+          },
+          "assignee": {
+            "id": "00000000-0000-4000-8000-00000000000a"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "children": {
+            "nodes": []
+          },
+          "inverseRelations": {
+            "nodes": []
+          }
         }
       ]
     }
