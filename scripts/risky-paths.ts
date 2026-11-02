@@ -49,6 +49,7 @@ export const JASPERS_PATHS: readonly RiskyPath[] = [
   { pattern: "e2e/fixtures.ts", why: "the check that the preview's secret stays on the preview" },
   { pattern: "e2e/preview-login.ts", why: "the code that sends the preview's secret" },
   { pattern: "e2e/preview-secret.spec.ts", why: "the check that the preview's secret stays on the preview" },
+  { pattern: "scripts/preview-login", why: "the test of the check that the preview's secret stays on the preview" },
   { pattern: "package.json", why: "the commands CI runs, and dependencies" },
   { pattern: "package-lock.json", why: "dependencies" },
   { pattern: ".npmrc", why: "how npm ci installs, in every workflow" },

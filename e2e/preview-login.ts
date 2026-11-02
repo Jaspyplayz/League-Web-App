@@ -1,11 +1,12 @@
-import type { BrowserContext } from "@playwright/test";
+import type { BrowserContext, Request } from "@playwright/test";
 
 // Vercel's preview protection lets a request through when it carries the
 // "Protection Bypass for Automation" secret. That secret opens every preview,
 // so it goes only to the preview's own origin. Playwright's extraHTTPHeaders
 // would also send it with every image from Data Dragon and every report to
 // Sentry (#156). A redirect from the preview to another site still carries it,
-// and e2e/fixtures.ts fails the test when that happens.
+// and e2e/fixtures.ts fails the test if that redirect finishes before the
+// check (JAS-142 has the gaps).
 export async function passPreviewLogin(context: BrowserContext, origin: string) {
   const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (!secret) return;
@@ -21,9 +22,18 @@ type Sent = { origin: string; secret: boolean };
 
 // Headers a route adds show up only once the request has gone out, so read
 // them when it finishes, not when it starts.
+//
+// The function this returns ends the recording, so it can be called only once.
+// A request that finishes later isn't checked, and neither is one that fails, so
+// a leak in either would go unseen (JAS-142). A later one can't be read safely:
+// the browser may be closing by then, so the read would reject with nothing
+// waiting for it, and Playwright fails the running test for any unhandled
+// rejection (JAS-141). A second call fails instead of
+// answering from the old list, which could hide a leak that came after the first.
 export function recordSent(context: BrowserContext): () => Promise<Sent[]> {
   const sent: Promise<Sent>[] = [];
-  context.on("requestfinished", (request) => {
+  let ended = false;
+  const onFinished = (request: Request) => {
     const url = new URL(request.url());
     if (!url.protocol.startsWith("http")) return;
     sent.push(
@@ -31,8 +41,14 @@ export function recordSent(context: BrowserContext): () => Promise<Sent[]> {
         .allHeaders()
         .then((headers) => ({ origin: url.origin, secret: "x-vercel-protection-bypass" in headers })),
     );
-  });
-  return () => Promise.all(sent);
+  };
+  context.on("requestfinished", onFinished);
+  return async () => {
+    if (ended) throw new Error("This recording has ended. Start a new one to check later requests.");
+    ended = true;
+    context.off("requestfinished", onFinished);
+    return Promise.all(sent);
+  };
 }
 
 // Playwright also adds a route's headers to the redirects a request follows,
