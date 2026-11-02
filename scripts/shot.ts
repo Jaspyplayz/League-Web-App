@@ -201,13 +201,13 @@ async function main() {
       // without it would meet Vercel's login, a redirect to vercel.com, and be
       // counted as a leak that never happened.
       const leaks = await leaked();
-      // Then remove the route, so one still reading a request's headers when
-      // the browser closes can't crash the run.
-      await context.unrouteAll({ behavior: "ignoreErrors" });
       if (leaks.length) {
         console.log(`LEAK: the bypass secret went to other sites: ${leaks.join(", ")}`);
         process.exitCode = 1;
       }
+      // Then remove the route, so one still reading a request's headers when
+      // the browser closes can't crash the run.
+      await context.unrouteAll({ behavior: "ignoreErrors" });
     }
   } finally {
     await browser.close();
