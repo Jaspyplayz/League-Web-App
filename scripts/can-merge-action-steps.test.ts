@@ -504,8 +504,11 @@ describe(".github/workflows/agent-merge-sweep.yml", () => {
     // The workflow's filter, in JS: the same pattern, then the same check that
     // the commit it names starts the head's SHA. The pattern has no
     // backslashes, so it reads the same here, in jq and through any shell. jq
-    // can't run here, so the first line pins the comparison this copies.
-    expect(text).toContain("any(. as $named | $head | startswith($named))");
+    // can't run here, so these two lines pin everything around the pattern: the
+    // head it compares with, the lowercasing, and the comparison this copies.
+    const filter = text.replace(/\s+/g, " ");
+    expect(filter).toContain('select(.head.sha as $head | (.body // "") | [match(');
+    expect(filter).toContain('"gi").captures[0].string | ascii_downcase] | any(. as $named | $head | startswith($named)))');
     const written = text.match(/match\("(.+)"; "gi"\)/)?.[1];
     expect(written).toBeDefined();
     expect(written).not.toContain("\\");
