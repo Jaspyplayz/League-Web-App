@@ -116,11 +116,15 @@ describe("parseTouches", () => {
     expect(parseTouches("This also touches: `src/a.ts`")).toEqual({ why: "its description has no **Touches.** line" });
   });
 
-  // The files on the next line would be lost, so the ticket would hold fewer than it changes.
-  it("refuses a Touches line that runs onto the next line", () => {
-    expect(parseTouches("**Touches.** `scripts/a.ts`,\n`CLAUDE.md`")).toEqual({
-      why: "its Touches line runs onto the next line; keep the list on one line",
-    });
+  // The files on the next line or paragraph would be lost, so the ticket
+  // would hold fewer than it changes. Enter in Linear's editor makes a new paragraph.
+  it.each([
+    ["the next line", "**Touches.** `scripts/a.ts`,\n`CLAUDE.md`"],
+    ["the next paragraph", "**Touches.** `scripts/a.ts`,\n\n`CLAUDE.md`, `docs/workflow.md`"],
+    ["a paragraph that starts with a path", "**Touches.** `scripts/a.ts`\n\n`CLAUDE.md`"],
+    ["a trailing comma", "**Touches.** `scripts/a.ts`, `CLAUDE.md`,\n\n**Builder.** Claude Code."],
+  ])("refuses a Touches list carried on to %s", (_, description) => {
+    expect(parseTouches(description)).toEqual({ why: "its Touches line runs onto the next line; keep the list on one line" });
   });
 
   it("reads a Touches line with another label straight after it", () => {
@@ -135,10 +139,14 @@ describe("parseTouches", () => {
     expect(parseTouches("**Touches.** `src/a.ts`, ` `")).toEqual({ why: "its Touches line has backticks with nothing in them" });
   });
 
-  // Each of these would hold less than the ticket really changes, since only
-  // exact paths are compared.
+  // A folder holds everything inside it, so both spellings mean the same.
+  it("reads a folder with or without a slash at the end", () => {
+    expect(parseTouches(touching("docs/adr/", "docs/agents"))).toEqual({ files: ["docs/adr", "docs/agents"] });
+  });
+
+  // Each of these would hold less than the ticket really changes, since a
+  // pattern or an odd spelling never equals the path a PR lists.
   it.each([
-    ["scripts/", "is a folder, not a file"],
     ["src/**/*.ts", "is a pattern, not a file"],
     ["src/a?.ts", "is a pattern, not a file"],
     ["src/{a,b}.ts", "isn't a file path"],
@@ -417,8 +425,8 @@ describe("pickTickets: the ceiling", () => {
     const tickets = ["JAS-1", "JAS-2", "JAS-3", "JAS-4", "JAS-5", "JAS-6"].map((id) => ticket(id));
     const picks = pickTickets(queue({ tickets }));
     expect(picks.start).toEqual(["JAS-1", "JAS-2", "JAS-3", "JAS-4"]);
-    expect(whyWaits(picks, "JAS-5")).toEqual(["4 builders are running or starting, the ceiling."]);
-    expect(whyWaits(picks, "JAS-6")).toEqual(["4 builders are running or starting, the ceiling."]);
+    expect(whyWaits(picks, "JAS-5")).toEqual(["4 builders are running or starting, and the ceiling is 4."]);
+    expect(whyWaits(picks, "JAS-6")).toEqual(["4 builders are running or starting, and the ceiling is 4."]);
   });
 
   it("counts running builders toward it", () => {
@@ -426,13 +434,20 @@ describe("pickTickets: the ceiling", () => {
     const tickets = [...running, ticket("JAS-1"), ticket("JAS-2")];
     const picks = pickTickets(queue({ tickets, running: ["JAS-11", "JAS-12", "JAS-13"] }));
     expect(picks.start).toEqual(["JAS-1"]);
-    expect(whyWaits(picks, "JAS-2")).toEqual(["4 builders are running or starting, the ceiling."]);
+    expect(whyWaits(picks, "JAS-2")).toEqual(["4 builders are running or starting, and the ceiling is 4."]);
   });
 
   it("starts nothing with 4 builders running", () => {
     const running = ["JAS-11", "JAS-12", "JAS-13", "JAS-14"];
     const tickets = [...running.map((id) => ticket(id, { status: "In Progress" })), ticket("JAS-1")];
     expect(pickTickets(queue({ tickets, running })).start).toEqual([]);
+  });
+
+  // A builder started by hand can put the count over the ceiling.
+  it("says how many are running when that's over the ceiling", () => {
+    const running = ["JAS-11", "JAS-12", "JAS-13", "JAS-14", "JAS-15"];
+    const tickets = [...running.map((id) => ticket(id, { status: "In Progress" })), ticket("JAS-1")];
+    expect(whyWaits(pickTickets(queue({ tickets, running })), "JAS-1")).toEqual(["5 builders are running or starting, and the ceiling is 4."]);
   });
 
   // No builder is running on it, but its files stay held until Jasper merges it.
@@ -482,11 +497,38 @@ describe("pickTickets: blockers", () => {
   });
 
   // So a ticket nobody can start yet doesn't pull work into the queue.
-  it("moves no blocker for a ticket that can't start for its own reasons", () => {
-    const tickets = [ticket("JAS-2", { priority: null, blockedBy: ["JAS-1"] }), ticket("JAS-1", { status: "Todo" })];
+  it.each<[string, Partial<Ticket>, string]>([
+    ["no Priority", { priority: null }, "It has no Priority."],
+    ["no Touches line", { description: CRITERIA }, "It can't start, because its description has no **Touches.** line."],
+    ["sub-tickets", { hasSubTickets: true }, "It can't start, because it has sub-tickets, so it's a plan that no PR builds."],
+  ])("moves no blocker for a ticket that can't start, here for %s", (_, overrides, own) => {
+    const tickets = [ticket("JAS-2", { blockedBy: ["JAS-1"], ...overrides }), ticket("JAS-1", { status: "Todo" })];
     const picks = pickTickets(queue({ tickets }));
     expect(picks.promote).toEqual([]);
-    expect(whyWaits(picks, "JAS-2")).toEqual(["It has no Priority.", "It waits for JAS-1, which is Todo."]);
+    expect(whyWaits(picks, "JAS-2")).toEqual([own, "It waits for JAS-1, which is Todo."]);
+  });
+
+  // The Priority it gets as it moves counts, so the chain goes on past it.
+  it("moves a chain past a Todo blocker that had no Priority", () => {
+    const tickets = [
+      ticket("JAS-3", { blockedBy: ["JAS-2"] }),
+      ticket("JAS-2", { status: "Todo", priority: null, blockedBy: ["JAS-1"] }),
+      ticket("JAS-1", { status: "Todo" }),
+    ];
+    expect(pickTickets(queue({ tickets })).promote.map((moved) => moved.id)).toEqual(["JAS-2", "JAS-1"]);
+  });
+
+  // Two Todo tickets that block each other mustn't loop forever.
+  it("ends on two Todo blockers that block each other, and starts neither", () => {
+    const tickets = [
+      ticket("JAS-3", { blockedBy: ["JAS-1"] }),
+      ticket("JAS-1", { status: "Todo", blockedBy: ["JAS-2"] }),
+      ticket("JAS-2", { status: "Todo", blockedBy: ["JAS-1"] }),
+    ];
+    const picks = pickTickets(queue({ tickets }));
+    expect(picks.start).toEqual([]);
+    expect(whyWaits(picks, "JAS-1")).toEqual(["It waits for JAS-2, which moves to Ready now."]);
+    expect(whyWaits(picks, "JAS-2")).toEqual(["It waits for JAS-1, which moves to Ready now."]);
   });
 
   it("moves a chain of Todo blockers in one round and starts the first", () => {
@@ -565,16 +607,30 @@ describe("pickTickets: blockers", () => {
     expect(whyWaits(picks, "JAS-2")).toEqual(["It waits for JAS-1, which can't move to Ready, because it has no Acceptance criteria section."]);
   });
 
-  it("reads a ## Acceptance criteria heading too", () => {
-    const description = `## Acceptance criteria\n\n- [ ] It works.\n\n${touching("src/JAS-1.ts")}`;
-    const tickets = [ticket("JAS-2", { blockedBy: ["JAS-1"] }), ticket("JAS-1", { status: "Todo", description })];
-    expect(pickTickets(queue({ tickets })).promote).toEqual([{ id: "JAS-1", priority: "High" }]);
-  });
+  // A real ticket starts with **Player problem.**, so the label is found on any line.
+  it.each(["## Acceptance criteria", "**Acceptance criteria.**", "**Acceptance criteria:**", "Acceptance criteria:"])(
+    "reads an Acceptance criteria section labelled %s",
+    (label) => {
+      const description = `**Player problem.** None.\n\n${label}\n\n- [ ] It works.\n\n${touching("src/JAS-1.ts")}`;
+      const tickets = [ticket("JAS-2", { blockedBy: ["JAS-1"] }), ticket("JAS-1", { status: "Todo", description })];
+      expect(pickTickets(queue({ tickets })).promote).toEqual([{ id: "JAS-1", priority: "High" }]);
+    },
+  );
 
-  // The 0027 rules are about moving a ticket, so one Jasper put in Ready himself starts.
+  // Jasper's own two kinds are about who moves a ticket, so one he put in Ready himself starts.
   it("starts a Postmortem: ticket Jasper moved to Ready himself", () => {
     const tickets = [ticket("JAS-1", { title: "Postmortem: Merge Danger lines rated lower than the diff" })];
     expect(pickTickets(queue({ tickets })).start).toEqual(["JAS-1"]);
+  });
+
+  // No PR builds these, and a builder's branch would close the ticket on merge.
+  it.each<[string, Partial<Ticket>, string]>([
+    ["a wayfinder ticket", { labels: ["wayfinder:map"] }, "it's a wayfinder ticket, which no PR builds"],
+    ["a parent ticket", { hasSubTickets: true }, "it has sub-tickets, so it's a plan that no PR builds"],
+  ])("doesn't start %s that reached Ready", (_, overrides, why) => {
+    const picks = pickTickets(queue({ tickets: [ticket("JAS-1", overrides)] }));
+    expect(picks.start).toEqual([]);
+    expect(whyWaits(picks, "JAS-1")).toEqual([`It can't start, because ${why}.`]);
   });
 
   // Decision record 0027 keeps these for Jasper, and the queue moves tickets as Claude Code.

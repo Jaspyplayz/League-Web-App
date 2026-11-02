@@ -72,27 +72,34 @@ export type Picks = {
 export type Touches = { files: string[] } | { why: string };
 
 // Tickets write "**Touches.**", like the template's other labels. Decision
-// record 0027 and docs/agents/issue-tracker.md say "Touches:", so that counts too.
+// record 0027 and docs/agents/issue-tracker.md say "Touches:", so that counts
+// too, and the Acceptance criteria label is read the same ways.
 const TOUCHES_LINE = /^\s*(?:\*\*touches[.:]\*\*|touches:)(.*)$/i;
+const CRITERIA_LINE = /^\s*(?:\*\*acceptance criteria[.:]?\*\*|acceptance criteria:|#{1,6}\s*acceptance criteria\b)/im;
 
 /**
- * The files on a ticket's Touches line, each in backticks. Words outside the
- * backticks are skipped, since a ticket can add a note after its list. Exact
- * paths only: anything that can't be compared file by file makes the ticket
- * wait instead of holding fewer files than it changes.
+ * The paths on a ticket's Touches line, each in backticks. Words outside the
+ * backticks are skipped, since a ticket can add a note after its list. A path
+ * names a file, or a folder that holds everything inside it. Anything else,
+ * such as a pattern, can't be compared with a PR's files, so it makes the
+ * ticket wait instead of holding fewer files than it changes.
  */
 export function parseTouches(description: string): Touches {
   const lines = description.split(/\r?\n/);
   const found = lines.flatMap((line, i) => {
     const match = line.match(TOUCHES_LINE);
-    return match ? [{ list: match[1], next: lines[i + 1] ?? "" }] : [];
+    return match ? [{ list: match[1], after: lines.slice(i + 1) }] : [];
   });
   if (found.length === 0) return { why: "its description has no **Touches.** line" };
   // Like can-merge's fields: with two, the queue can't tell which one is meant.
   if (found.length > 1) return { why: `its description has ${found.length} Touches lines` };
-  const [{ list, next }] = found;
-  // A list that wraps onto the next line would lose the files there.
-  if (next.trim() !== "" && !next.trim().startsWith("**")) {
+  const [{ list, after }] = found;
+  // A list carried on to the next line or paragraph would lose the files
+  // there: a trailing comma, a next line that isn't another label, or a next
+  // paragraph that starts with a path.
+  const next = (after[0] ?? "").trim();
+  const nextParagraph = after.find((line) => line.trim() !== "")?.trim() ?? "";
+  if (/,\s*$/.test(list) || (next !== "" && !next.startsWith("**")) || nextParagraph.startsWith("`")) {
     return { why: "its Touches line runs onto the next line; keep the list on one line" };
   }
   if ((list.match(/`/g) ?? []).length % 2 === 1) return { why: "its Touches line has a backtick with no partner" };
@@ -100,16 +107,16 @@ export function parseTouches(description: string): Touches {
   if (files.length === 0) return { why: "its Touches line names no files in backticks" };
   if (files.includes("")) return { why: "its Touches line has backticks with nothing in them" };
   for (const file of files) {
-    const problem = notAFile(file);
+    const problem = notAPath(file);
     if (problem) return { why: `\`${file}\` on its Touches line ${problem}` };
   }
-  return { files };
+  // "docs/adr/" and "docs/adr" both mean the folder.
+  return { files: files.map((file) => file.replace(/\/$/, "")) };
 }
 
-function notAFile(path: string): string | undefined {
+function notAPath(path: string): string | undefined {
   if (/[\s\\,;:]/.test(path)) return "isn't a file path";
   if (/[*?{}]/.test(path)) return "is a pattern, not a file";
-  if (path.endsWith("/")) return "is a folder, not a file";
   // A leading "/", "//", or a "." or ".." step would never equal the path a PR lists.
   if (/^\/|\/\/|(^|\/)\.{1,2}(\/|$)/.test(path)) return "isn't a plain path from the repo root";
   return undefined;
@@ -168,7 +175,9 @@ export function pickTickets(state: QueueState): Picks {
 
     // What the ticket itself is missing, all listed so one fix covers them.
     const touches = parseTouches(ticket.description);
+    const plan = noPrBuilds(ticket);
     const why: string[] = [];
+    if (plan) why.push(`It can't start, because ${plan}.`);
     if (ticket.priority === null) why.push("It has no Priority.");
     if ("why" in touches) why.push(`It can't start, because ${touches.why}.`);
     for (const id of new Set(ticket.blockedBy)) {
@@ -187,7 +196,7 @@ export function pickTickets(state: QueueState): Picks {
       const busy = running.size + picks.start.length;
       if (stopAll.length > 0) why.push(...stopAll);
       else if (clashes.length > 0) why.push(...clashes);
-      else if (busy >= CEILING) why.push(`${busy} builders are running or starting, the ceiling.`);
+      else if (busy >= CEILING) why.push(`${busy} builders are running or starting, and the ceiling is ${CEILING}.`);
       else {
         picks.start.push(ticket.id);
         holders.push({ ticket: ticket.id, files: lowerCase(touches.files), says: `${ticket.id}, picked this round, will change` });
@@ -243,7 +252,7 @@ function blockersToPromote(ready: Ticket[], tickets: Map<string, Ticket>, runnin
   const waiting = inQueueOrder([...ready]).filter((ticket) => !running.has(ticket.id));
   for (let i = 0; i < waiting.length; i++) {
     const ticket = waiting[i];
-    if (ticket.priority === null || "why" in parseTouches(ticket.description)) continue;
+    if (ticket.priority === null || "why" in parseTouches(ticket.description) || noPrBuilds(ticket)) continue;
     for (const id of new Set(ticket.blockedBy)) {
       const blocker = checkBlocker(id, tickets, running);
       const current = tickets.get(id);
@@ -256,24 +265,31 @@ function blockersToPromote(ready: Ticket[], tickets: Map<string, Ticket>, runnin
   return promote;
 }
 
+// Decision record 0027: a wayfinder ticket or a to-spec parent never goes to
+// Ready, because no PR builds it. One that got there anyway doesn't start,
+// since its builder's branch would close it on merge.
+function noPrBuilds(ticket: Ticket): string | undefined {
+  if (ticket.labels.some((label) => /^wayfinder:/i.test(label))) return "it's a wayfinder ticket, which no PR builds";
+  if (ticket.hasSubTickets) return "it has sub-tickets, so it's a plan that no PR builds";
+  return undefined;
+}
+
 // Decision record 0027: Claude Code moves a Backlog or Todo ticket to Ready
 // once it has the Feature or fix sections, a Priority and a Touches line,
 // except the ones Jasper keeps. The queue moves tickets for Claude Code, so
 // it checks the parts it can read: the Acceptance criteria section stands for
 // the template's sections, and a Todo ticket gets its Priority as it moves.
-// These rules are about moving a ticket, so a ticket Jasper put in Ready
-// himself, such as a Postmortem: one, starts like any other.
+// Jasper's own two kinds are about who moves a ticket, so one he put in Ready
+// himself, such as a Postmortem: ticket, starts like any other.
 function whyNotReady(blocker: Ticket): string[] {
   if (/^\s*(postmortem|wellness):/i.test(blocker.title)) return ["only Jasper moves Postmortem: and Wellness: tickets"];
   if (blocker.assignedToJasper) return ["it's assigned to Jasper, so only he moves it"];
-  if (blocker.labels.some((label) => /^wayfinder:/i.test(label))) return ["it's a wayfinder ticket, which no PR builds"];
-  if (blocker.hasSubTickets) return ["it has sub-tickets, so it's a plan that no PR builds"];
+  const plan = noPrBuilds(blocker);
+  if (plan) return [plan];
   const touches = parseTouches(blocker.description);
   return [
     ...(blocker.status === "Backlog" && blocker.priority === null ? ["it has no Priority"] : []),
-    ...(/^\s*(?:\*\*acceptance criteria\*\*|#{1,6}\s*acceptance criteria\b)/im.test(blocker.description)
-      ? []
-      : ["it has no Acceptance criteria section"]),
+    ...(CRITERIA_LINE.test(blocker.description) ? [] : ["it has no Acceptance criteria section"]),
     ...("why" in touches ? [touches.why] : []),
   ];
 }
