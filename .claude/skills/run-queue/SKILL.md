@@ -9,7 +9,7 @@ The ticket queue is the [Run queue workflow](../../../.github/workflows/run-queu
 
 ## Start a run
 
-A real run starts builders. If you were asked what the queue *would* do, start a dry run instead.
+A real run starts builders. If you were asked what the queue *would* do, start a dry run instead. A run by name skips the hold after a refused start, so while a refusal only Jasper can fix holds the queue (the last run failed with one), don't start a real run until he says it's fixed.
 
 Dry run, which prints what it would start and why each other ticket waits, and changes nothing:
 

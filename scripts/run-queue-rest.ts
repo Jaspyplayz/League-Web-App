@@ -295,18 +295,25 @@ function heldStarts(snapshot: Snapshot, now: Date): Map<string, string> {
   return held;
 }
 
+// The open PRs on a ticket's claude/jas-<n>- branches, lowest number first.
+function prsOf(snapshot: Snapshot, id: string): OpenPull[] {
+  return snapshot.pulls.filter((pull) => ticketOfBranch(pull.head.ref) === id).sort((a, b) => a.number - b.number);
+}
+
 /** The Turnpoint tickets with a builder working on them now, and why the queue thinks so. */
 export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why: string }[] {
   const started = heldStarts(snapshot, now);
   const running: { id: string; why: string }[] = [];
   for (const issue of snapshot.issues.filter(inTurnpoint)) {
     const id = issue.identifier;
+    // A finished ticket has no builder, even with an old PR left open.
+    if (FINISHED.includes(issue.state.name)) continue;
     // A builder still working on any of its PRs is still running, whatever the
     // ticket's status: one whose Linear writes failed leaves it Ready, and the
     // picker doesn't count a ticket's own PR as a clash, so a second builder
     // would start. One with no open PR has merged or closed it, and Linear
     // hasn't caught up.
-    const open = snapshot.pulls.filter((pull) => ticketOfBranch(pull.head.ref) === id).sort((a, b) => a.number - b.number);
+    const open = prsOf(snapshot, id);
     const working = open.filter((pull) => !builderDone(pull));
     const prs = listOf(working.map((pull) => `PR ${pull.number}`));
     const notDone = `${working.length === 1 ? "isn't" : "aren't"} marked ready or left for Jasper`;
@@ -317,12 +324,7 @@ export function runningTickets(snapshot: Snapshot, now: Date): { id: string; why
       running.push({ id, why: `it's In Review, and ${prs} ${notDone}` });
     } else if (working.length > 0) {
       running.push({ id, why: `its ${prs} ${working.length === 1 ? "is" : "are"} open and ${notDone}` });
-    } else if (open.length > 0 && BEFORE_BUILDER.includes(issue.state.name)) {
-      // Its builder finished a PR but couldn't move the ticket on, so Linear
-      // says it can start. A second builder would build it again.
-      const opened = listOf(open.map((pull) => `PR ${pull.number}`));
-      running.push({ id, why: `its builder already opened ${opened}, though Linear still has it ${issue.state.name}` });
-    } else if (startedAt && BEFORE_BUILDER.includes(issue.state.name)) {
+    } else if (startedAt && open.length === 0 && BEFORE_BUILDER.includes(issue.state.name)) {
       running.push({ id, why: `the queue started a builder on it at ${utc(startedAt)}, under 2 hours ago` });
     }
   }
@@ -461,7 +463,17 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
     if (!issue) throw new Error(`The picker named ${id}, which the queue didn't read.`);
     return issue;
   };
-  const tickets = snapshot.issues.map((issue) => toTicket(issue, snapshot.viewerId));
+  // A ticket whose builder finished its PR but couldn't move it on in Linear
+  // would start a second builder. The picker sees it as In Review instead, so
+  // it never starts and takes no slot, as decision record 0026 says a
+  // finished PR doesn't, while that PR's files stay held.
+  const finishedEarly = snapshot.issues.filter(
+    (issue) => inTurnpoint(issue) && BEFORE_BUILDER.includes(issue.state.name) && prsOf(snapshot, issue.identifier).length > 0 && prsOf(snapshot, issue.identifier).every(builderDone),
+  );
+  const tickets = snapshot.issues.map((issue): Ticket => {
+    const ticket = toTicket(issue, snapshot.viewerId);
+    return finishedEarly.includes(issue) ? { ...ticket, status: "In Review" } : ticket;
+  });
   const running = runningTickets(snapshot, now);
   const vercel = vercelState(snapshot.statuses, now);
   const picks = pickTickets({
@@ -475,9 +487,13 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   // The queue builds Turnpoint, so it never moves, starts or comments on one.
   const foreign = new Set(snapshot.issues.filter((issue) => !inTurnpoint(issue)).map((issue) => issue.identifier));
   const named = [...picks.promote.map((promotion) => promotion.id), ...picks.start, ...picks.waits.map((wait) => wait.id)];
-  const notes = [...new Set(named.filter((id) => foreign.has(id)))].map(
-    (id) => `${id} isn't in project ${PROJECT}, so the queue doesn't move, start or comment on it.`,
-  );
+  const notes = [
+    ...finishedEarly.map(
+      (issue) =>
+        `${issue.identifier}'s builder has finished ${listOf(prsOf(snapshot, issue.identifier).map((pull) => `PR ${pull.number}`))}, though Linear still has it ${issue.state.name}, so the queue treats it as In Review.`,
+    ),
+    ...[...new Set(named.filter((id) => foreign.has(id)))].map((id) => `${id} isn't in project ${PROJECT}, so the queue doesn't move, start or comment on it.`),
+  ];
   const promote = picks.promote.filter((promotion) => !foreign.has(promotion.id));
   const unmoved = new Map(
     picks.promote

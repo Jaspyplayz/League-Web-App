@@ -447,13 +447,25 @@ describe("a ticket can't start twice", () => {
     expect(plan.running).toEqual([{ id: "JAS-5", why: "its PR 9 is open and isn't marked ready or left for Jasper" }]);
   });
 
-  it("holds a Ready ticket whose PR is marked ready or left for Jasper, since a second builder would build it again", () => {
+  it("never starts a Ready ticket whose PR is marked ready or left for Jasper, and gives it no builder slot", () => {
     for (const body of ["**Ready to merge:** yes at 4d2a4fe", "**Ready to merge:** no: Jasper merges this one by hand."]) {
       const read = snapshot({ issues: [issue("JAS-5")], pulls: [pull(9, "claude/jas-5-x", body)], files: { 9: [{ filename: "src/JAS-5.ts" }] } });
       const plan = planRound(read, AT_0630, RUN);
       expect(plan.start).toEqual([]);
-      expect(plan.running).toEqual([{ id: "JAS-5", why: "its builder already opened PR 9, though Linear still has it Ready" }]);
+      expect(plan.running).toEqual([]);
+      expect(plan.notes).toEqual(["JAS-5's builder has finished PR 9, though Linear still has it Ready, so the queue treats it as In Review."]);
     }
+  });
+
+  it("counts no builder on a finished ticket, even with an old PR still open", () => {
+    const read = snapshot({
+      issues: [issue("JAS-1", { blockedBy: ["JAS-9"] }), issue("JAS-9", { status: "Canceled", description: "No Touches line." })],
+      pulls: [pull(50, "claude/jas-9-old")],
+      files: { 50: [{ filename: "src/old.ts" }] },
+    });
+    const plan = planRound(read, AT_0630, RUN);
+    expect(plan.running).toEqual([]);
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-1"]);
   });
 
   it("lets a refused start's comment go after an hour, instead of holding the ticket for 2 like a start comment", () => {
