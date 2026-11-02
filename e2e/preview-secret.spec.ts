@@ -80,47 +80,54 @@ test.describe("the check on redirects", () => {
 
   const via = (site: string, to: string) => `${site}/go?to=${encodeURIComponent(to)}`;
 
-  type From = "page" | "new tab" | "worker";
+  type Case = {
+    url: () => string;
+    lastHop: string;
+    init?: RequestInit;
+    newTab?: boolean;
+    addToEveryRequest?: boolean;
+    noChromeWatch?: boolean;
+  };
 
-  const cases: { name: string; url: () => string; lastHop: string; init?: RequestInit; from?: From; addToEveryRequest?: boolean; carries: boolean }[] = [
+  const cases: (Case & { name: string; carries: boolean })[] = [
     { name: "catches a redirect whose last hop fails", url: () => via(preview, `${other}/die`), lastHop: "/die", carries: true },
     { name: "catches a redirect still running at the check", url: () => via(preview, `${other}/hang`), lastHop: "/hang", carries: true },
     { name: "catches a redirect that answers", url: () => via(preview, `${other}/ok`), lastHop: "/ok", carries: true },
     { name: "catches a keepalive fetch's redirect", url: () => via(preview, `${other}/ok`), lastHop: "/ok", init: { keepalive: true }, carries: true },
-    { name: "catches a keepalive fetch from a new tab's first script", url: () => via(preview, `${other}/ok`), lastHop: "/ok", init: { keepalive: true }, from: "new tab", carries: true },
-    // Only Playwright's request event sees this one: a page's Chrome session
-    // doesn't report what a worker sends.
-    { name: "catches a redirect from a worker", url: () => via(preview, `${other}/hang`), lastHop: "/hang", from: "worker", carries: true },
+    { name: "catches a keepalive fetch from a new tab's first script", url: () => via(preview, `${other}/ok`), lastHop: "/ok", init: { keepalive: true }, newTab: true, carries: true },
+    // Chrome's reports cover what the event reports on a page, so this turns them
+    // off to test the event by itself. /hang keeps the finished-request read out too.
+    { name: "catches a redirect with only Playwright's request event", url: () => via(preview, `${other}/hang`), lastHop: "/hang", noChromeWatch: true, carries: true },
     { name: "catches a secret a config adds to every request", url: () => `${other}/ok`, lastHop: "/ok", init: { mode: "no-cors" }, addToEveryRequest: true, carries: true },
     { name: "passes a request to another site", url: () => `${other}/ok`, lastHop: "/ok", init: { mode: "no-cors" }, carries: false },
     { name: "passes a chain that only passes through the preview", url: () => via(other, via(preview, `${other}/ok`)), lastHop: "/ok", init: { mode: "no-cors" }, carries: false },
   ];
 
-  async function runCheck(browser: Browser, url: string, lastHop: string, init: RequestInit = {}, from: From = "page", addToEveryRequest = false) {
+  async function runCheck(browser: Browser, { url, lastHop, init = {}, newTab, addToEveryRequest, noChromeWatch }: Case) {
     heard.length = 0;
     // How the first leak happened: playwright.config.ts set this for every request.
     const extraHTTPHeaders = addToEveryRequest ? { "x-vercel-protection-bypass": "made-up-for-this-test" } : undefined;
     const context = await browser.newContext({ baseURL: preview, extraHTTPHeaders });
     await passPreviewLogin(context, preview);
+    if (noChromeWatch) context.newCDPSession = () => Promise.reject(new Error("Chrome's reports are off for this test"));
     const leaked = recordLeaks(context, preview);
     const page = await context.newPage();
     await page.goto("/page");
-    const script = (site: string) => `${site}/script?keepalive=${init.keepalive ?? false}&to=${encodeURIComponent(url)}`;
-    if (from === "new tab") await page.evaluate((u) => void window.open(u), script(preview));
-    else if (from === "worker") await page.evaluate((u) => void new Worker(URL.createObjectURL(new Blob([`fetch(${JSON.stringify(u)}).catch(() => {})`]))), url);
-    else await page.evaluate(([u, i]) => void fetch(u as string, i as RequestInit).catch(() => {}), [url, init]);
+    const address = url();
+    if (newTab) await page.evaluate((u) => void window.open(u), `${preview}/script?keepalive=${init.keepalive ?? false}&to=${encodeURIComponent(address)}`);
+    else await page.evaluate(([u, i]) => void fetch(u as string, i as RequestInit).catch(() => {}), [address, init]);
     await expect.poll(() => heard.some((h) => h.url === `${other}${lastHop}`)).toBe(true);
-    // A failing hop reports its failure after the server has heard it.
-    await page.waitForTimeout(100);
+    // A failing hop, or a new tab's keepalive, is reported after the server hears it.
+    await page.waitForTimeout(500);
     const answer = await leaked();
     const secretAtOther = heard.filter((h) => h.url.startsWith(other)).some((h) => h.secret);
     await context.close();
     return { answer, secretAtOther };
   }
 
-  for (const { name, url, lastHop, init, from, addToEveryRequest, carries } of cases) {
+  for (const { name, carries, ...input } of cases) {
     test(name, async ({ browser }) => {
-      const { answer, secretAtOther } = await runCheck(browser, url(), lastHop, init, from, addToEveryRequest);
+      const { answer, secretAtOther } = await runCheck(browser, input);
       expect(secretAtOther, "the other site's server got the secret").toBe(carries);
       expect(answer).toEqual(carries ? [other] : []);
     });
@@ -128,7 +135,7 @@ test.describe("the check on redirects", () => {
 
   test("passes a redirect when no secret is set", async ({ browser }) => {
     delete process.env[SECRET];
-    const { answer, secretAtOther } = await runCheck(browser, via(preview, `${other}/ok`), "/ok");
+    const { answer, secretAtOther } = await runCheck(browser, { url: () => via(preview, `${other}/ok`), lastHop: "/ok" });
     expect(secretAtOther, "the other site's server got the secret").toBe(false);
     expect(answer).toEqual([]);
   });
