@@ -119,12 +119,36 @@ describe("parseTouches", () => {
   // The files on the next line or paragraph would be lost, so the ticket
   // would hold fewer than it changes. Enter in Linear's editor makes a new paragraph.
   it.each([
-    ["the next line", "**Touches.** `scripts/a.ts`,\n`CLAUDE.md`"],
-    ["the next paragraph", "**Touches.** `scripts/a.ts`,\n\n`CLAUDE.md`, `docs/workflow.md`"],
-    ["a paragraph that starts with a path", "**Touches.** `scripts/a.ts`\n\n`CLAUDE.md`"],
-    ["a trailing comma", "**Touches.** `scripts/a.ts`, `CLAUDE.md`,\n\n**Builder.** Claude Code."],
-  ])("refuses a Touches list carried on to %s", (_, description) => {
-    expect(parseTouches(description)).toEqual({ why: "its Touches line runs onto the next line; keep the list on one line" });
+    ["the next line", "**Touches.** `scripts/a.ts`\n`CLAUDE.md`", "its Touches line runs onto the next line; keep the list on one line"],
+    [
+      "a paragraph that starts with a path",
+      "**Touches.** `scripts/a.ts`\n\n`CLAUDE.md`",
+      "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word",
+    ],
+    [
+      "a bullet that starts with a path",
+      "**Touches.** `scripts/a.ts`\n\n- `CLAUDE.md`",
+      "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word",
+    ],
+    [
+      "the next paragraph, after a comma",
+      "**Touches.** `scripts/a.ts`,\n\n`CLAUDE.md`, `docs/workflow.md`",
+      'its Touches line ends with ",", so the list may go on past it; put every path on that line',
+    ],
+    [
+      "a list after a colon",
+      "**Touches.** `scripts/a.ts`, and these:\n\n- `CLAUDE.md`\n- `docs/workflow.md`",
+      'its Touches line ends with ":", so the list may go on past it; put every path on that line',
+    ],
+  ])("refuses a Touches list carried on to %s", (_, description, why) => {
+    expect(parseTouches(description)).toEqual({ why });
+  });
+
+  it.each([
+    ["a paragraph that starts with a word", "**Touches.** `scripts/a.ts`\n\nThe Action reads `CLAUDE.md` later."],
+    ["a code block", "**Touches.** `scripts/a.ts`\n\n```ts\nconst x = 1;\n```"],
+  ])("reads a Touches line followed by %s", (_, description) => {
+    expect(parseTouches(description)).toEqual({ files: ["scripts/a.ts"] });
   });
 
   it("reads a Touches line with another label straight after it", () => {
@@ -617,6 +641,13 @@ describe("pickTickets: blockers", () => {
     },
   );
 
+  // Only a line that starts with the label counts, not a sentence that mentions it.
+  it("doesn't count a sentence that mentions acceptance criteria", () => {
+    const description = `**Player problem.** None. The acceptance criteria: to be written.\n\n${touching("src/JAS-1.ts")}`;
+    const tickets = [ticket("JAS-2", { blockedBy: ["JAS-1"] }), ticket("JAS-1", { status: "Todo", description })];
+    expect(pickTickets(queue({ tickets })).promote).toEqual([]);
+  });
+
   // Jasper's own two kinds are about who moves a ticket, so one he put in Ready himself starts.
   it("starts a Postmortem: ticket Jasper moved to Ready himself", () => {
     const tickets = [ticket("JAS-1", { title: "Postmortem: Merge Danger lines rated lower than the diff" })];
@@ -638,13 +669,24 @@ describe("pickTickets: blockers", () => {
     ["a Postmortem: ticket", { title: "Postmortem: Tier line's reason names a second tier word" }, "only Jasper moves Postmortem: and Wellness: tickets"],
     ["a Wellness: ticket", { title: "Wellness: remove two unused variables" }, "only Jasper moves Postmortem: and Wellness: tickets"],
     ["a ticket assigned to Jasper", { assignedToJasper: true }, "it's assigned to Jasper, so only he moves it"],
-    ["a wayfinder ticket", { labels: ["wayfinder:task"] }, "it's a wayfinder ticket, which no PR builds"],
-    ["a parent ticket", { hasSubTickets: true }, "it has sub-tickets, so it's a plan that no PR builds"],
   ])("doesn't move %s", (_, blocker, why) => {
     const tickets = [ticket("JAS-2", { blockedBy: ["JAS-1"] }), ticket("JAS-1", { status: "Todo", ...blocker })];
     const picks = pickTickets(queue({ tickets }));
     expect(picks.promote).toEqual([]);
     expect(whyWaits(picks, "JAS-2")).toEqual([`It waits for JAS-1, which can't move to Ready, because ${why}.`]);
+  });
+
+  // No PR builds these, wherever they sit, so they're neither moved nor rated up.
+  it.each<[string, Status, Partial<Ticket>, string]>([
+    ["a wayfinder ticket in Todo", "Todo", { labels: ["wayfinder:task"] }, "it's a wayfinder ticket, which no PR builds"],
+    ["a parent ticket in Todo", "Todo", { hasSubTickets: true }, "it has sub-tickets, so it's a plan that no PR builds"],
+    ["a wayfinder map in Ready", "Ready", { labels: ["wayfinder:map"], priority: "Low" }, "it's a wayfinder ticket, which no PR builds"],
+    ["a parent ticket in Ready", "Ready", { hasSubTickets: true, priority: "Low" }, "it has sub-tickets, so it's a plan that no PR builds"],
+  ])("neither moves nor rates up %s", (_, status, blocker, why) => {
+    const tickets = [ticket("JAS-2", { blockedBy: ["JAS-1"] }), ticket("JAS-1", { status, ...blocker })];
+    const picks = pickTickets(queue({ tickets }));
+    expect(picks.promote).toEqual([]);
+    expect(whyWaits(picks, "JAS-2")).toEqual([`It waits for JAS-1, which won't be built, because ${why}.`]);
   });
 
   it("moves a blocker two tickets share once", () => {

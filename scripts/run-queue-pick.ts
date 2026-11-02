@@ -94,13 +94,18 @@ export function parseTouches(description: string): Touches {
   // Like can-merge's fields: with two, the queue can't tell which one is meant.
   if (found.length > 1) return { why: `its description has ${found.length} Touches lines` };
   const [{ list, after }] = found;
-  // A list carried on to the next line or paragraph would lose the files
-  // there: a trailing comma, a next line that isn't another label, or a next
-  // paragraph that starts with a path.
+  // A list carried on past its line would lose the files there: one that
+  // ends in "," or ":", a next line that isn't another label, or a next
+  // paragraph that starts with a path, also after a bullet (not a code fence).
+  const end = list.trim().slice(-1);
+  if (end === "," || end === ":") {
+    return { why: `its Touches line ends with "${end}", so the list may go on past it; put every path on that line` };
+  }
   const next = (after[0] ?? "").trim();
+  if (next !== "" && !next.startsWith("**")) return { why: "its Touches line runs onto the next line; keep the list on one line" };
   const nextParagraph = after.find((line) => line.trim() !== "")?.trim() ?? "";
-  if (/,\s*$/.test(list) || (next !== "" && !next.startsWith("**")) || nextParagraph.startsWith("`")) {
-    return { why: "its Touches line runs onto the next line; keep the list on one line" };
+  if (/^(?:[-*+>]\s*|\d+[.)]\s*)?`(?!``)/.test(nextParagraph)) {
+    return { why: "the paragraph after its Touches line starts with a path, so the list may go on there; start that paragraph with a word" };
   }
   if ((list.match(/`/g) ?? []).length % 2 === 1) return { why: "its Touches line has a backtick with no partner" };
   const files = [...list.matchAll(/`([^`]*)`/g)].map((match) => match[1].trim());
@@ -231,6 +236,8 @@ function checkBlocker(id: string, tickets: Map<string, Ticket>, running: Set<str
   // A ticket that blocks others is High under Jasper's Priority rule (JAS-29),
   // but an Urgent one stays Urgent.
   const priority = blocker.priority === "Urgent" ? "Urgent" : "High";
+  const plan = noPrBuilds(blocker);
+  if (plan) return { kind: "waits", why: `It waits for ${id}, which won't be built, because ${plan}.` };
   if (blocker.status === "Ready") return { kind: "buildable", status: blocker.status, priority };
   if (blocker.status !== "Todo" && blocker.status !== "Backlog") {
     return { kind: "waits", why: `It waits for ${id}, which is ${blocker.status}.` };
@@ -284,8 +291,6 @@ function noPrBuilds(ticket: Ticket): string | undefined {
 function whyNotReady(blocker: Ticket): string[] {
   if (/^\s*(postmortem|wellness):/i.test(blocker.title)) return ["only Jasper moves Postmortem: and Wellness: tickets"];
   if (blocker.assignedToJasper) return ["it's assigned to Jasper, so only he moves it"];
-  const plan = noPrBuilds(blocker);
-  if (plan) return [plan];
   const touches = parseTouches(blocker.description);
   return [
     ...(blocker.status === "Backlog" && blocker.priority === null ? ["it has no Priority"] : []),
