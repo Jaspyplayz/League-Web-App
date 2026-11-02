@@ -36,6 +36,7 @@ async function fakeAnswers(page: Page, answers: { status?: number; json?: unknow
   return seen;
 }
 
+// Home only: it has no header search, so this is the one box there.
 const riotId = (page: Page) => page.getByRole("textbox", { name: "Riot ID" });
 const recentTab = (page: Page) => page.getByRole("tab", { name: /^Recent/ });
 
@@ -115,12 +116,15 @@ test("a search error doesn't follow you to the player you pick", async ({ page }
   await fakeAnswers(page, [{ json: { ranks: {}, you: null } }]);
   await openHomeWithSaved(page, [me]);
   await page.goto("/privacy");
-  await riotId(page).fill("no tag here");
+  // The header's box by name: Riot doesn't know this player, so their page can
+  // turn into the player-not-found page, which has a Riot ID box of its own.
+  const headerBox = page.getByRole("search", { name: "Search a player" }).getByRole("textbox", { name: "Riot ID" });
+  await headerBox.fill("no tag here");
   await page.keyboard.press("Enter");
   const error = page.getByRole("alert").filter({ hasText: "#" });
   await expect(error).toBeVisible(FIRST_LOAD);
 
-  await riotId(page).fill("");
+  await headerBox.fill("");
   await page.getByRole("link", { name: /Turnpoint Tester/ }).click();
   await expect(page).toHaveURL(/\/player\/na\//, FIRST_LOAD);
   await expect(error).toBeHidden();
@@ -131,7 +135,7 @@ test("a search error doesn't follow you to the player you pick", async ({ page }
       if (document.body.innerText.includes("Add the tag after a #")) sessionStorage.setItem("sawOldError", "yes");
     }).observe(document.body, { childList: true, subtree: true, characterData: true });
   });
-  await riotId(page).fill("Other Name#NA1");
+  await headerBox.fill("Other Name#NA1");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/Other%20Name-NA1/, FIRST_LOAD);
   expect(await page.evaluate(() => sessionStorage.getItem("sawOldError"))).toBeNull();

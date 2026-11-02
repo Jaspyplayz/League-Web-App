@@ -265,3 +265,19 @@ _Avoid_: Incident report, root-cause analysis
 **Rung**:
 One level of the fix ladder: design, check, rule file or skill, or CLAUDE.md line.
 _Avoid_: Level, tier (a review tier in docs/workflow.md, or a player's rank tier)
+
+**Ticket queue**:
+The tickets in Ready, waiting for a builder.
+_Avoid_: Queue on its own (a game mode's old name), backlog
+
+**Priority**:
+How much a ticket matters next to the others: urgent, high, medium or low.
+_Avoid_: Triage (sorting tickets or a review's findings), importance
+
+**Touches line**:
+The files a ticket should change, listed before a builder takes it, so two tickets that share a file don't run together.
+_Avoid_: Plan (what the builder writes once it has the ticket)
+
+**Try**:
+One builder's run at a ticket, ending when that builder stops. A ticket gets two.
+_Avoid_: Attempt, retry, review round
