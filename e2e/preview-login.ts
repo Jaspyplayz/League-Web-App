@@ -1,4 +1,4 @@
-import type { BrowserContext, Request } from "@playwright/test";
+import type { BrowserContext, Page, Request } from "@playwright/test";
 
 // Vercel's preview protection lets a request through when it carries the
 // "Protection Bypass for Automation" secret. That secret opens every preview,
@@ -56,31 +56,55 @@ function firstHop(request: Request): Request {
   return from ? firstHop(from) : request;
 }
 
-// This lists the sites other than `origin` that got the secret, in two ways.
+type OnHop = (firstUrl: string, hopUrl: string) => void;
+
+// Playwright reports no redirect for a keepalive fetch: its first hop looks like
+// a plain 200, and the later hop fires nothing. Chrome's own protocol shows it,
+// so this asks there too, for each page.
+async function watchChromeRedirects(context: BrowserContext, page: Page, onHop: OnHop) {
+  const chrome = await context.newCDPSession(page);
+  const firstUrls = new Map<string, string>();
+  chrome.on("Network.requestWillBeSent", ({ requestId, request }) => {
+    const first = firstUrls.get(requestId) ?? request.url;
+    firstUrls.set(requestId, first);
+    onHop(first, request.url);
+  });
+  await chrome.send("Network.enable");
+}
+
+// This lists the sites other than `origin` that got the secret, in three ways.
 //
 // Reading each finished request's headers catches a secret sent anywhere, such
 // as by a config that adds it to every request, but not on a request still
 // running at the check or one that failed.
 //
-// A redirect has neither gap. A route runs only on a chain's first request, and
-// Playwright adds its headers to every later hop, so with a secret set, a hop
-// off `origin` in a chain that started there carries it (JAS-142). The hop's
-// `request` event says so as it starts, without asking the browser, so a hop that
-// later fails or never answers still counts, and nothing can reject as the
-// browser closes.
+// Redirects don't need that read. A route runs only on a chain's first request,
+// and Playwright adds its headers to every later hop, so with a secret set, a hop
+// off `origin` in a chain that started there carries it (JAS-142). That's known
+// as the hop starts, so a hop that later fails or never answers still counts. Two
+// ways report hops. Playwright's `request` event asks the browser nothing, so it
+// can't reject as the browser closes. Attaching to Chrome can, so that failure is
+// caught: a page that closes first has nothing left to watch.
 export function recordLeaks(context: BrowserContext, origin: string): () => Promise<string[]> {
   const sent = recordSent(context);
   const redirectedTo = new Set<string>();
-  const onRequest = (request: Request) => {
-    const site = new URL(request.url()).origin;
-    if (site !== origin && new URL(firstHop(request).url()).origin === origin) redirectedTo.add(site);
+  const onHop: OnHop = (firstUrl, hopUrl) => {
+    const site = new URL(hopUrl).origin;
+    if (site !== origin && new URL(firstUrl).origin === origin) redirectedTo.add(site);
   };
+  const onRequest = (request: Request) => onHop(firstHop(request).url(), request.url());
+  const onPage = (page: Page) => void watchChromeRedirects(context, page, onHop).catch(() => {});
   // With no secret there's no route, so a redirect off the site carries nothing,
   // such as a preview sending a run with no secret to Vercel's login.
-  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) context.on("request", onRequest);
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+    context.on("request", onRequest);
+    context.on("page", onPage);
+    context.pages().forEach(onPage);
+  }
   return async () => {
-    context.off("request", onRequest);
     const gotHeader = (await sent()).filter((r) => r.secret && r.origin !== origin).map((r) => r.origin);
+    context.off("request", onRequest);
+    context.off("page", onPage);
     return [...new Set([...gotHeader, ...redirectedTo])];
   };
 }

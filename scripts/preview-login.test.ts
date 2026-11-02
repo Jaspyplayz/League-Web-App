@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import type { BrowserContext, Request } from "@playwright/test";
+import type { BrowserContext, Page, Request } from "@playwright/test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { recordLeaks, recordSent } from "../e2e/preview-login";
 
@@ -11,14 +11,25 @@ const OTHER = "https://other.example";
 const SECRET = { "x-vercel-protection-bypass": "value" };
 const CLOSED = "request.allHeaders: Target page, context or browser has been closed";
 
-function fakeContext() {
+function fakeContext(openPages: Page[] = []) {
   const events = new EventEmitter();
+  const chrome = new EventEmitter();
+  const newCDPSession = vi.fn(async () => Object.assign(chrome, { send: async () => {} }));
   return {
-    context: events as unknown as BrowserContext,
+    context: Object.assign(events, { pages: () => openPages, newCDPSession }) as unknown as BrowserContext,
     finish: (request: Request) => events.emit("requestfinished", request),
     start: (request: Request) => events.emit("request", request),
+    openPage: (page: Page) => events.emit("page", page),
+    newCDPSession,
+    // Chrome numbers a chain's requests with one id, and reports each hop under it.
+    chromeHop: (requestId: string, url: string) => chrome.emit("Network.requestWillBeSent", { requestId, request: { url } }),
+    listeners: () => events.listenerCount("request") + events.listenerCount("page"),
   };
 }
+
+const PAGE = {} as Page;
+// Lets an attach to Chrome finish, so its listener is on before a hop arrives.
+const attached = () => new Promise((resolve) => setTimeout(resolve));
 
 function fakeRequest(url: string, allHeaders: () => Promise<Record<string, string>>, redirectedFrom: Request | null = null) {
   return { url: () => url, allHeaders: vi.fn(allHeaders), redirectedFrom: () => redirectedFrom } as unknown as Request;
@@ -144,15 +155,77 @@ describe("recordLeaks", () => {
       await expect(leaked()).resolves.toEqual([]);
     });
 
-    it("stops counting redirects when the check starts", async () => {
+    it("counts a redirect that starts while the check waits for its reads, then stops listening", async () => {
       withSecret();
-      const { context, start } = fakeContext();
+      const { context, start, finish, listeners } = fakeContext();
       const leaked = recordLeaks(context, PREVIEW);
+      let answer: (headers: Record<string, string>) => void = () => {};
+      finish(fakeRequest(`${PREVIEW}/`, () => new Promise((resolve) => (answer = resolve))));
 
       const check = leaked();
       start(chain(`${PREVIEW}/go`, `${OTHER}/late`));
+      answer(SECRET);
 
-      await expect(check).resolves.toEqual([]);
+      await expect(check).resolves.toEqual([OTHER]);
+      expect(listeners()).toBe(0);
+    });
+
+    describe("in what Chrome reports", () => {
+      it("names a site a redirect goes to on a page opened after the recording starts", async () => {
+        withSecret();
+        const { context, openPage, chromeHop } = fakeContext();
+        const leaked = recordLeaks(context, PREVIEW);
+        openPage(PAGE);
+        await attached();
+
+        chromeHop("1", `${PREVIEW}/go`);
+        chromeHop("1", `${OTHER}/keepalive`);
+
+        await expect(leaked()).resolves.toEqual([OTHER]);
+      });
+
+      // verify-turnpoint's runner opens its page before it starts recording.
+      it("watches a page that was already open", async () => {
+        withSecret();
+        const { context, chromeHop } = fakeContext([PAGE]);
+        const leaked = recordLeaks(context, PREVIEW);
+        await attached();
+
+        chromeHop("1", `${PREVIEW}/go`);
+        chromeHop("1", `${OTHER}/keepalive`);
+
+        await expect(leaked()).resolves.toEqual([OTHER]);
+      });
+
+      it("keeps each chain's first address apart from the others'", async () => {
+        withSecret();
+        const { context, chromeHop } = fakeContext([PAGE]);
+        const leaked = recordLeaks(context, PREVIEW);
+        await attached();
+
+        chromeHop("1", `${OTHER}/go`);
+        chromeHop("2", `${PREVIEW}/page`);
+        chromeHop("1", `${PREVIEW}/go`);
+        chromeHop("1", `${OTHER}/there`);
+
+        await expect(leaked()).resolves.toEqual([]);
+      });
+
+      // A page can close before the attach finishes. Playwright fails the running
+      // test for any unhandled rejection (JAS-141), so this one has to be caught.
+      it("still answers when attaching to a page fails as it closes", async () => {
+        withSecret();
+        const { context, newCDPSession } = fakeContext([PAGE]);
+        newCDPSession.mockRejectedValueOnce(new Error(CLOSED));
+        const unhandled = vi.fn();
+        process.on("unhandledRejection", unhandled);
+        const leaked = recordLeaks(context, PREVIEW);
+        await attached();
+        process.off("unhandledRejection", unhandled);
+
+        await expect(leaked()).resolves.toEqual([]);
+        expect(unhandled).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -160,12 +233,13 @@ describe("recordLeaks", () => {
   // carries nothing, and calling that a leak would fail a harmless run.
   it("ignores a redirect off the preview when no secret is set", async () => {
     vi.stubEnv("VERCEL_AUTOMATION_BYPASS_SECRET", "");
-    const { context, start } = fakeContext();
+    const { context, start, newCDPSession } = fakeContext([PAGE]);
     const leaked = recordLeaks(context, PREVIEW);
 
     start(chain(`${PREVIEW}/go`, `${OTHER}/login`));
 
     await expect(leaked()).resolves.toEqual([]);
+    expect(newCDPSession).not.toHaveBeenCalled();
   });
 
   it("rejects a second read", async () => {
