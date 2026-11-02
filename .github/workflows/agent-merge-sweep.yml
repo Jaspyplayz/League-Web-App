@@ -4,8 +4,8 @@ name: Agent merge sweep
 # run is cancelled and no check is left to start another. On 2026-11-02 at
 # least 24 runs were cancelled, cause unknown, and PR 269 sat with every gate
 # passing until Jasper merged it by hand (JAS-164). This starts Agent merge
-# again for each PR still marked ready, so a cancelled run needs no person to
-# recover.
+# again for each PR still marked ready at its head and touched in the last day,
+# so a cancelled run needs no person to recover.
 #
 # It can't merge anything itself. can-merge still decides, in the run this
 # starts, and that run waits its turn behind any other run for the same branch.

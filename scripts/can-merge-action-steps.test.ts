@@ -4,6 +4,7 @@ import {
   AgentMergeEvent,
   ATTEMPTS,
   branchToTry,
+  hasMergeConflict,
   mainCiDispatchArgs,
   mergePull,
   OpenPulls,
@@ -201,6 +202,9 @@ describe("pullsToMerge", () => {
     // WorkflowRunEvent here, types and tests would still pass, and every run
     // the sweep starts would crash on this line.
     expect(script).toContain('const event = AgentMergeEvent.parse(JSON.parse(readFileSync(eventPath, "utf8")));');
+    // The real conflict check, so a no-op here can't pass for the notice.
+    expect(script).toContain("return hasMergeConflict(api(`repos/${repository}/pulls/${number}`) as { mergeable?: unknown });");
+    expect(script).toContain("hasConflict: () => hasConflict(number),");
     expect(script.match(/spawnSync\(/g)).toHaveLength(1);
     expect(script.match(/mergePull\(/g)).toHaveLength(1);
     // The one call that starts CI on main, so a no-op or another ref fails here.
@@ -242,6 +246,18 @@ function fakeRun(statuses: (number | null)[], { merged = [] as boolean[], dispat
   });
   return { ...result, calls, summary, log };
 }
+
+describe("hasMergeConflict", () => {
+  it("is true only when GitHub says the PR can't merge", () => {
+    expect(hasMergeConflict({ mergeable: false })).toBe(true);
+    expect(hasMergeConflict({ mergeable: true })).toBe(false);
+  });
+
+  it("isn't a conflict while GitHub is still working it out, so can-merge goes ahead", () => {
+    expect(hasMergeConflict({ mergeable: null })).toBe(false);
+    expect(hasMergeConflict({})).toBe(false);
+  });
+});
 
 describe("mergePull with a merge conflict", () => {
   it("leaves a notice and passes, without running can-merge, so the sweep can't turn runs red every 15 minutes", () => {
@@ -487,7 +503,9 @@ describe(".github/workflows/agent-merge-sweep.yml", () => {
   it("never misses a PR readyToMerge would pass, and skips one saying no or naming an old head", () => {
     // The workflow's filter, in JS: the same pattern, then the same check that
     // the commit it names starts the head's SHA. The pattern has no
-    // backslashes, so it reads the same here, in jq and through any shell.
+    // backslashes, so it reads the same here, in jq and through any shell. jq
+    // can't run here, so the first line pins the comparison this copies.
+    expect(text).toContain("any(. as $named | $head | startswith($named))");
     const written = text.match(/match\("(.+)"; "gi"\)/)?.[1];
     expect(written).toBeDefined();
     expect(written).not.toContain("\\");

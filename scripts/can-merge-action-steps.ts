@@ -118,6 +118,12 @@ export function pullsToMerge(
   return { ready, held };
 }
 
+// GitHub's mergeable field for one PR: false with a merge conflict, and null
+// while it's still working that out, when can-merge goes ahead as usual.
+export function hasMergeConflict(pull: { mergeable?: unknown }): boolean {
+  return pull.mergeable === false;
+}
+
 export type Outcome = "passed" | "refused" | "crashed";
 
 // What can-merge's exit code means. A refusal is normal: most runs finish

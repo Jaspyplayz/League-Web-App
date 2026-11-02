@@ -64,7 +64,8 @@ jobs:
     # is replaced by the newest, which reads the latest state anyway. This
     # doesn't stop a cancel from outside: at least 24 runs on 2026-11-02 were
     # cancelled with the note "canceled by @Jaspyplayz", cause unknown
-    # (JAS-164). So the sweep starts another run for any PR still marked ready.
+    # (JAS-164). So the sweep starts another run for any PR still marked ready
+    # at its head and touched in the last day.
     concurrency:
       group: agent-merge-${{ github.event.workflow_run.head_branch || inputs.branch }}
       cancel-in-progress: false

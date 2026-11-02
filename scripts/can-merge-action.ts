@@ -11,7 +11,7 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
-import { AgentMergeEvent, branchToTry, mainCiDispatchArgs, mergePull, OpenPulls, openPullsPath, pullsToMerge, whatStartedRun } from "./can-merge-action-steps";
+import { AgentMergeEvent, branchToTry, hasMergeConflict, mainCiDispatchArgs, mergePull, OpenPulls, openPullsPath, pullsToMerge, whatStartedRun } from "./can-merge-action-steps";
 
 const eventPath = process.env.GITHUB_EVENT_PATH;
 const repository = process.env.GITHUB_REPOSITORY;
@@ -40,12 +40,11 @@ function isMerged(number: number): boolean {
   }
 }
 
-// Whether GitHub says the PR has a merge conflict. It answers null while it's
-// still working that out, and then can-merge goes ahead as usual. If GitHub
-// can't say, assume not.
+// Whether GitHub says the PR has a merge conflict. If GitHub can't say, assume
+// not, and can-merge goes ahead as usual.
 function hasConflict(number: number): boolean {
   try {
-    return (api(`repos/${repository}/pulls/${number}`) as { mergeable?: unknown }).mergeable === false;
+    return hasMergeConflict(api(`repos/${repository}/pulls/${number}`) as { mergeable?: unknown });
   } catch {
     return false;
   }
