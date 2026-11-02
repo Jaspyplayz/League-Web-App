@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SWITCH_FILE } from "./can-merge-gates";
-import { jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, PANEL_SKILLS, riskyFiles } from "./risky-paths";
+import { jaspersFiles, JASPERS_PATHS, matchesPattern, PANEL_PATHS, PANEL_SKILLS, riskyFiles, type RiskyPath } from "./risky-paths";
 
 const RISKY_PATHS = [...JASPERS_PATHS, ...PANEL_PATHS];
 
@@ -407,6 +407,23 @@ describe("riskyFiles", () => {
     ".claude/skills/verify/features/README.MD",
   ])("keeps %s Jasper's, which tries to step around the exemption", (path) => {
     expect(jaspersFiles([path]).map((file) => file.path)).toEqual([path]);
+  });
+
+  // The carve-out is only for paths that nothing narrower on Jasper's list
+  // names, so an entry Jasper adds for one of these skills wins, wherever it
+  // goes in the list. The test adds one at each end and takes it out again.
+  it.each([
+    ["first", 0],
+    ["last", JASPERS_PATHS.length],
+  ])("keeps a listed skill Jasper's when his list names it, with the entry %s", (_, at) => {
+    const list = JASPERS_PATHS as RiskyPath[];
+    list.splice(at, 0, { pattern: ".claude/skills/postmortem/", why: "an entry Jasper added" });
+    try {
+      expect(jaspersFiles([".claude/skills/postmortem/SKILL.md"]).map((file) => file.path)).toEqual([".claude/skills/postmortem/SKILL.md"]);
+    } finally {
+      list.splice(at, 1);
+    }
+    expect(jaspersFiles([".claude/skills/postmortem/SKILL.md"])).toEqual([]);
   });
 
   // A SKILL.md can grant tools without asking (allowed-tools), add hooks for

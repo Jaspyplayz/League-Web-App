@@ -170,12 +170,12 @@ type Owner = { why: string; jaspers: boolean };
 // panel pattern that also matches, such as src/db/schema.ts inside src/db/.
 function owner(path: string): Owner | undefined {
   if (NESTED_AGENT_CONFIG.test(path)) return { why: "agent skills or rules below the repo root", jaspers: true };
-  const jaspers = JASPERS_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
-  // Only where .claude/skills/ is the entry that matched, so a narrower entry
-  // on Jasper's list, added later, still wins.
-  const carvedOut = jaspers?.pattern === ".claude/skills/" ? skillOnPanel(path) : undefined;
+  const matches = JASPERS_PATHS.filter(({ pattern }) => matchesPattern(pattern, path));
+  // Only where .claude/skills/ and the .claude/ catch-all are the entries that
+  // match, so a narrower entry added to Jasper's list, anywhere in it, wins.
+  const carvedOut = matches.every(({ pattern }) => pattern === ".claude/skills/" || pattern === ".claude/") ? skillOnPanel(path) : undefined;
   if (carvedOut) return { why: carvedOut, jaspers: false };
-  if (jaspers) return { why: jaspers.why, jaspers: true };
+  if (matches.length > 0) return { why: matches[0].why, jaspers: true };
   const panel = PANEL_PATHS.find(({ pattern }) => matchesPattern(pattern, path));
   return panel ? { why: panel.why, jaspers: false } : undefined;
 }

@@ -16,7 +16,7 @@ A `SKILL.md` does more than steer. Claude Code's skill docs (read 2026-11-02) sa
 
 ## Decision
 
-`PANEL_SKILLS` in `scripts/risky-paths.ts` names `verify`, `verify-turnpoint`, `verify-turnpoint-ux` and `postmortem`. It's carved out of the `.claude/skills/` entry on Jasper's list, and only where that entry is the one that matches, so a narrower entry added to his list later still wins. These go to the panel:
+`PANEL_SKILLS` in `scripts/risky-paths.ts` names `verify`, `verify-turnpoint`, `verify-turnpoint-ux` and `postmortem`. It's carved out of the `.claude/skills/` entry on Jasper's list, and only where that entry and the `.claude/` catch-all are the only ones that match, so a narrower entry Jasper adds wins wherever it sits in the list. These go to the panel:
 
 - In one of those folders, its `SKILL.md`, and a `README.md` or a note named in lower-case words joined by hyphens, like `match-page.md`. The same in its `features/`, apart from `SKILL.md`. This reverses 0025's choice to keep the README Jasper's.
 - `.claude/skills/THIRD-PARTY-NOTICES.md`: the copied skills' credits, and notes on how they fit this repo (the repo's rules win over a skill's, and the copied folders aren't edited).
