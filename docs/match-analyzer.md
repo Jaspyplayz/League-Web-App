@@ -113,6 +113,8 @@ All analysis lives in pure TypeScript functions (input: match JSON + timeline JS
 
 A game that isn't analyzed shows its scoreboard and the message, and its row on the profile has no "Analysis" link. The share image, recaps, Ask and the MCP server's `analyze_game` all check `isAnalyzable` first. Saved games keep Riot's whole match in `matches.raw`, so games saved before this check have `mapId` too.
 
+`analyzeMatch` also checks the timeline once it's loaded: every frame must hold every player in the game, since a frame lists players by participant ID and the analysis reads each one every minute. If one is missing it returns null, and the match page shows the scoreboard with "This game's timeline is missing some players, so it couldn't be analyzed." Before the map check existed, an 18-player Arena game reached the analyzer with a timeline that keeps players 1 to 10, and the page crashed (Sentry TURNPOINT-4). No saved Summoner's Rift game has a short frame, so this is a backstop, not something players should see.
+
 ### Finding the lane opponent
 
 1. Find the player's `teamPosition` in the match payload.

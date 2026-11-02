@@ -17,7 +17,8 @@ import { matchWinChance } from "@/lib/win-chance";
 // (src/lib/recap-store.ts) and the MCP server (src/lib/mcp/tools.ts).
 //
 // Returns null when the player isn't in the match or the game isn't analyzed
-// (see whyNotAnalyzed). Costs one Riot call if the timeline isn't saved yet.
+// (see whyNotAnalyzed), or its timeline is missing some players. Costs one
+// Riot call if the timeline isn't saved yet.
 export async function loadMatchFacts(
   region: Region,
   match: Match,
@@ -32,7 +33,8 @@ export async function loadMatchFacts(
     savedSoloTier(puuid),
   ]);
   const label = (name: string) => championName(dd, name);
-  const analysis = analyzeMatch(match, timeline, puuid, label)!;
+  const analysis = analyzeMatch(match, timeline, puuid, label);
+  if (!analysis) return null; // the timeline is missing some players
   // The same rank's model as the match page, so the swings match it.
   const swings = matchWinChance(match, timeline, me.teamId, tier)?.swings ?? null;
   const score = scoreGame(match).get(me.participantId) ?? null;
