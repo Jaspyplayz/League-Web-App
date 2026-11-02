@@ -137,9 +137,10 @@ jobs:
       # Claude can merge package.json, .npmrc and tsconfig.json after the panel,
       # so these steps stop the ones found so far from changing which code runs
       # below with the secrets, as the Agent merge job does (decision record
-      # 0032). npx runs package.json's own bin ahead of node_modules/.bin, and a
-      # package scope with exports, imports or workspaces, or a node_modules/
-      # folder beside the scripts, can stand in for zod.
+      # 0032). A package scope with exports, imports or workspaces, or a
+      # node_modules/ folder beside the scripts, can stand in for zod. This is
+      # Agent merge's check word for word, so it also refuses a bin, which npx
+      # would run there.
       - name: Refuse files that would change what the queue loads
         run: |
           node -e '
@@ -156,7 +157,10 @@ jobs:
       # The dependencies come from main's lockfile, which stays Jasper's. This
       # runs without the secrets in its environment.
       - run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts
-      - run: npx tsx scripts/run-queue.ts
+      # By its path, not npx: npm 11 runs a file from package.json's bin or
+      # directories.bin ahead of node_modules/.bin, and Claude can merge
+      # package.json.
+      - run: ./node_modules/.bin/tsx scripts/run-queue.ts
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

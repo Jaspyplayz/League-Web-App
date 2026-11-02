@@ -1355,6 +1355,12 @@ describe(".github/workflows/run-queue.yml", () => {
     });
   });
 
+  // npm 11 runs a file from package.json's directories.bin ahead of
+  // node_modules/.bin, which the install guard above doesn't look for.
+  it("never runs npx, which could run a file package.json names", () => {
+    expect(code.filter((line) => /\bnpx\b/.test(line))).toEqual([]);
+  });
+
   it("reads the queue's last run from the environment the queue job runs in", () => {
     expect(queue).toContain("    environment: run-queue");
     expect(merged.join("\n")).toContain("deployments?environment=run-queue&per_page=1");
@@ -1383,7 +1389,7 @@ describe(".github/workflows/run-queue.yml", () => {
       "- uses: actions/checkout@v7",
       "- uses: actions/setup-node@v7",
       "- run: rm -rf .npmrc npm-shrinkwrap.json && npm ci --ignore-scripts",
-      "- run: npx tsx scripts/run-queue.ts",
+      "- run: ./node_modules/.bin/tsx scripts/run-queue.ts",
     ]);
     expect(queue.filter((line) => /^\s*(ref|repository|path|token|cache|persist-credentials|package-manager-cache):/.test(line)).map((line) => line.trim())).toEqual([
       "ref: main",
@@ -1421,7 +1427,8 @@ describe(".github/workflows/run-queue.yml", () => {
       "LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}",
       "RUN_QUEUE_TASK_TOKEN: ${{ !inputs.dry_run && secrets.RUN_QUEUE_TASK_TOKEN || '' }}",
     ]);
-    const lastStep = code.indexOf("      - run: npx tsx scripts/run-queue.ts");
+    const lastStep = code.indexOf("      - run: ./node_modules/.bin/tsx scripts/run-queue.ts");
+    expect(lastStep).toBeGreaterThan(-1);
     expect(secrets.every((line) => code.indexOf(line) > lastStep)).toBe(true);
   });
 
