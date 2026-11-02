@@ -1216,6 +1216,60 @@ describe("Vercel's test mode", () => {
     ]);
   });
 
+  it("warns in the log when a running builder holds the test, but not on a run by name or with nothing to start", async () => {
+    const statuses = [refusal("2026-11-02T05:00:00Z")];
+    const stalled = snapshot({ issues: [issue("JAS-1", { status: "In Progress" }), issue("JAS-2")], statuses });
+    const warnings = async (read: Snapshot, byName = false) => {
+      const { effects, lines } = recorder();
+      await runRound(planRound(read, AT_0630, RUN, { byName }), { dryRun: false }, effects);
+      return lines.filter((line) => line.startsWith("::warning"));
+    };
+    expect(await warnings(stalled)).toEqual([
+      "::warning title=Queue stalled in test mode::Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.",
+    ]);
+    expect(await warnings(stalled, true)).toEqual([]);
+    expect(await warnings(snapshot({ issues: [issue("JAS-1", { status: "In Progress" })], statuses }))).toEqual([]);
+  });
+
+  it.each<[string, Partial<Snapshot>, string]>([
+    [
+      "a running builder in test mode",
+      { issues: [issue("JAS-1", { status: "In Progress" }), issue("JAS-2")], statuses: [refusal("2026-11-02T05:00:00Z")] },
+      "Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.",
+    ],
+    [
+      "a blocked account",
+      { issues: [issue("JAS-2")], statuses: [vercel("failure", "Account is blocked.", "2026-11-02T05:00:00Z")] },
+      "Vercel blocked the account at 2026-11-02 05:00 UTC, which only Jasper can fix, so nothing starts on its own until a deploy succeeds. A run by name (/run-queue) starts one test.",
+    ],
+    [
+      "a refused start",
+      { issues: [issue("JAS-2")], comments: { "JAS-2": [comment("c1", refusedBody(429, "slow down"), "2026-11-02T06:00:00.000Z")] } },
+      "The cloud task refused a start at 2026-11-02 06:00 UTC with HTTP 429, so nothing starts on its own until 2026-11-02 07:00 UTC. A run by name (/run-queue) tries again sooner.",
+    ],
+  ])("tells a dry run by name that an automatic run would start nothing, with %s", async (_, read, why) => {
+    const plan = planRound(snapshot(read), AT_0630, RUN, { byName: true });
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-2"]);
+    const { effects, summaryLines } = dryEffects();
+    await runRound(plan, { dryRun: true }, effects);
+    expect(summaryLines).toContain(`An automatic run would start nothing. ${why}`);
+  });
+
+  it("says nothing about automatic runs with no hold, with no ticket to start, or on a real run by name", async () => {
+    const said = (lines: string[]) => lines.filter((line) => line.startsWith("An automatic run"));
+    const dry = async (read: Snapshot) => {
+      const { effects, summaryLines } = dryEffects();
+      await runRound(planRound(read, AT_0630, RUN, { byName: true }), { dryRun: true }, effects);
+      return said(summaryLines);
+    };
+    expect(await dry(snapshot({ issues: [issue("JAS-2")] }))).toEqual([]);
+    expect(await dry(snapshot({ issues: [issue("JAS-1", { status: "In Progress" })], statuses: [refusal("2026-11-02T05:00:00Z")] }))).toEqual([]);
+    const { effects, lines } = recorder();
+    const stalled = snapshot({ issues: [issue("JAS-1", { status: "In Progress" }), issue("JAS-2")], statuses: [refusal("2026-11-02T05:00:00Z")] });
+    await runRound(planRound(stalled, AT_0630, RUN, { byName: true }), { dryRun: false }, effects);
+    expect(said(lines)).toEqual([]);
+  });
+
   // A builder with no files never pushes, so no preview comes.
   it("takes a ticket with files as the test, ahead of a higher one with none", () => {
     const read = snapshot({
