@@ -1,11 +1,16 @@
-name: Probe fast
+name: Probe late
 on:
   pull_request:
     branches: [main]
     types: [opened, edited, synchronize, reopened, ready_for_review]
 permissions: {}
 jobs:
+  wait:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 150
   reviewer:
+    needs: wait
     runs-on: ubuntu-latest
     steps:
       - run: true
