@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { Match } from "@/lib/riot/types";
+import stompGame from "./fixtures/stomp.json";
 import { analyzeMatch, findPlayerByRiotId, isAnalyzable, whyNotAnalyzed } from "./index";
 import { frames, kill, match, participants, SPOTS } from "./test-fixtures";
+import type { TrimmedTimeline } from "./trim";
 
 // A 30-minute game on another map, such as ARAM's Howling Abyss (12).
 function onMap(mapId: number, players = participants()) {
@@ -82,6 +85,42 @@ describe("analyzeMatch", () => {
     expect(odd.series).toBeNull();
     expect(odd.turningPoints).toEqual([]);
     expect(odd.deaths).toHaveLength(1);
+  });
+});
+
+// Sentry TURNPOINT-4: a match page crashed with "Cannot read properties of
+// undefined (reading 'gold')". The game was Arena, with 18 players, but a
+// trimmed timeline only keeps participants 1 to 10, so the frames had nothing
+// for players 11 to 18. The page skips Arena games now, but analyzeMatch
+// should never crash on frames that don't hold every player in the game.
+describe("analyzeMatch on a timeline missing players", () => {
+  // A fresh copy of the golden stomp game each time, since the tests edit it.
+  // Talon, red's jungler, is participant 7.
+  const stomp = () => structuredClone(stompGame) as unknown as { match: Match; timeline: TrimmedTimeline };
+
+  it("returns null for a game with more players than its frames, like that Arena game", () => {
+    const tenPlayerFrames = { frames: frames(20), events: [] };
+    expect(analyzeMatch(arena(18), tenPlayerFrames, "player-3")).toBeNull();
+  });
+
+  it("returns null when one frame of a real game is a player short", () => {
+    const game = stomp();
+    game.timeline.frames[5].players.pop(); // participant 10 at 5:00
+    expect(analyzeMatch(game.match, game.timeline, "golden-player-7")).toBeNull();
+  });
+
+  it("returns null when a saved frame has a gap, which the database gives back as null", () => {
+    const game = stomp();
+    const players: unknown[] = game.timeline.frames[5].players;
+    players[3] = null; // participant 4 at 5:00
+    expect(analyzeMatch(game.match, game.timeline, "golden-player-7")).toBeNull();
+  });
+
+  it("still analyzes the same game when every frame has every player", () => {
+    const game = stomp();
+    expect(analyzeMatch(game.match, game.timeline, "golden-player-7")?.teamGold).toHaveLength(
+      game.timeline.frames.length,
+    );
   });
 });
 

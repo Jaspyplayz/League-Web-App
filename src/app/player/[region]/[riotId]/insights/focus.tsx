@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo } from "react";
 import type { WeaknessId } from "@/lib/analyzer/trends";
+import { readLocalSetting, saveLocalSetting } from "@/lib/local-setting";
 import {
   FOCUS_GOALS,
   FOCUS_KEY,
@@ -14,46 +15,21 @@ import {
 } from "@/lib/focus";
 import { panelClass } from "@/components/ui/panel";
 import { PanelHeading } from "@/components/ui/panel-heading";
+import { useLocalSetting } from "@/components/use-local-setting";
 
 // Focus goals: pick one recurring weakness and see every game after that
 // checked against it. The pick is kept in this browser's localStorage (see
-// src/lib/focus.ts), so these components run in the browser ("use client").
-// The reading and writing works like src/components/saved-players.tsx.
-
-const listeners = new Set<() => void>();
-
-function subscribe(onChange: () => void) {
-  listeners.add(onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    listeners.delete(onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
-
-// localStorage can throw, for example when the browser blocks site data. The
-// focus is an extra; Insights works without it.
-function readSaved(): string | null {
-  try {
-    return localStorage.getItem(FOCUS_KEY);
-  } catch {
-    return null;
-  }
-}
+// src/lib/focus.ts and src/lib/local-setting.ts), so these components run in
+// the browser ("use client").
 
 function save(player: string, focus: Focus | null) {
-  try {
-    localStorage.setItem(FOCUS_KEY, saveFocus(readSaved(), player, focus));
-  } catch {
-    // Not saved this time; nothing else to do.
-  }
-  listeners.forEach((onChange) => onChange());
+  saveLocalSetting(FOCUS_KEY, saveFocus(readLocalSetting(FOCUS_KEY), player, focus));
 }
 
 // The player's focus, or null. The server has no saved focus, so it renders
 // none, and the browser fills it in right after the page loads.
 export function useFocus(player: string): Focus | null {
-  const saved = useSyncExternalStore(subscribe, readSaved, () => null);
+  const saved = useLocalSetting(FOCUS_KEY);
   return useMemo(() => parseFocuses(saved)[player] ?? null, [saved, player]);
 }
 

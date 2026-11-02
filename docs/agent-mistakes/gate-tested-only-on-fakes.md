@@ -50,6 +50,14 @@ A gate's tests build its inputs by hand, so they pass for the cases the builder 
 - **Rung:** check
 - **Fix:** [PR 223](https://github.com/Jaspyplayz/League-Web-App/pull/223): a heading that looks right in the raw body but isn't seen fails the gate, and the test `reads a blockers verdict on a tiny PR when the heading is hidden from the gate by %s` fails on f50720e's gate code.
 
+## 2026-11-01
+
+- **What happened:** the first JAS-142 commit taught the check on the preview's secret to read each redirect hop from Playwright's `request` event, and decision record 0006 said every redirect was caught as its hop started. A keepalive fetch's redirect fires no such event, so the other site got the secret and the test passed. It should have said what it hadn't tried, or tried it.
+- **Evidence:** the reviewer on JAS-142's branch, at 6ec5eae, blocker 1: 10 of 10 tests passed through `e2e/fixtures.ts` while the other site logged `secret=true`, and rerun by hand it was 25 of 25.
+- **Root cause:** the builder tried six redirect shapes in a real browser, all caught, and wrote the result as true of every redirect. The real-browser run stayed in a temp folder, and the repo's tests fed the check made-up requests that hold the same belief, so nothing could show it false.
+- **Rung:** check
+- **Fix:** commit 208756f on JAS-142's branch: the check also watches Chrome's own reports, and the real-browser test `the check on redirects > catches a keepalive fetch's redirect` in `e2e/preview-secret.spec.ts` fails when that watch is removed. The one shape still missed, a keepalive whose page leaves at once, is listed in decision record 0006.
+
 ## 2026-11-02
 
 - **What happened:** JAS-146 let Claude merge the verify and postmortem skills' `SKILL.md` after the panel, guarded by a test that a `SKILL.md` runs no shell command as it loads. The test refused a ```` ```! ```` block only at the start of a line and `` !` `` only at a line's start or after a space, so a block in a list item or after text, or `` (!`cmd`) ``, passed it while Claude Code runs them. It should have refused every form the loader runs.

@@ -3,6 +3,7 @@ import { ChampionIcon } from "@/components/game-icons";
 import { Gap } from "@/components/ui/gap";
 import { Panel } from "@/components/ui/panel";
 import { playedPosition } from "@/lib/analyzer/matchup";
+import { ROLES } from "@/lib/analyzer/score";
 import { teamOrder } from "@/lib/analyzer/team-analysis";
 import { championName, type DataDragon } from "@/lib/ddragon";
 import type { Region } from "@/lib/regions";
@@ -16,8 +17,6 @@ import { Scoreboard } from "./scoreboard";
 // side. Your own row is outlined. Each player links to their own profile. It
 // only draws analyzed games, which are always 5v5.
 
-const LANES = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
-
 // Each lane's two players, or null unless both teams have exactly one player in
 // every lane. A blank or doubled role happens in unusual games, and pairing
 // those by list position would state gold gaps between different roles.
@@ -27,7 +26,7 @@ function pairByLane(allies: Participant[], enemies: Participant[]) {
     return found.length === 1 ? found[0] : null;
   };
   const pairs: { lane: string; ally: Participant; enemy: Participant }[] = [];
-  for (const lane of LANES) {
+  for (const lane of ROLES) {
     const ally = onlyOne(allies, lane);
     const enemy = onlyOne(enemies, lane);
     if (!ally || !enemy) return null;

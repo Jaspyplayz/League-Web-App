@@ -115,6 +115,7 @@ async function Player({ params, searchParams }: { params: Params; searchParams: 
                   tagLine={tagLine}
                   playerPath={playerPath}
                   queue={queue}
+                  stored={profile.value.stored}
                 />
               </Suspense>
             </>

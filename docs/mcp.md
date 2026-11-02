@@ -36,7 +36,7 @@ The MCP server shares the website's Riot key and its 100 requests per 2 minutes.
 
 - **No sign-in.** Everything is read-only and public, the same as the website without signing in. Linking it to your Turnpoint account (to read your notes or Focus goals) would need OAuth, a bigger job.
 - **No new data is stored**, beyond what opening the same pages on the website would save. Questions and answers go to whichever AI app the person connected, under that app's privacy policy.
-- **Riot policy:** it only uses the official Riot API, like the rest of the site. Mention it in the production key application.
+- **Riot policy:** it only uses the official Riot API, like the rest of the site. League's [policy](https://developer.riotgames.com/docs/lol#developer-api-policy) also says "No apps serving as a 'data broker' between our API and another third-party company", and doesn't define the term. Riot hasn't ruled on whether a server that hands the analysis to other companies' AI apps counts, so the production key application asks.
 
 ## Trying it
 
