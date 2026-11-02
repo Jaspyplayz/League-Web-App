@@ -29,6 +29,7 @@ import {
   type ReplayObjective,
 } from "@/lib/analyzer/replay";
 import type { TempoTimeline } from "@/lib/analyzer/tempo";
+import { formatPercent } from "@/lib/percent";
 import { LegendSwatch } from "./legend-swatch";
 import { ReplayMap } from "./replay-map";
 import {
@@ -211,7 +212,7 @@ export function Replay({
     (gold && ours && theirs
       ? `${gold.tone === "even" ? "gold even" : `your team ${gold.text} in gold`}, ${ours.kills} kills to ${theirs.kills}`
       : "") +
-    (chance !== null ? `, ${percent(chance)} chance to win` : "");
+    (chance !== null ? `, ${formatPercent(chance)} chance to win` : "");
 
   const scoreboard = (
     <ReplayScoreboard
@@ -434,7 +435,7 @@ export function Replay({
                       chance > 0.5 ? "text-ahead-soft" : chance < 0.5 ? "text-behind" : "text-main"
                     }`}
                   >
-                    {percent(chance)}
+                    {formatPercent(chance)}
                   </span>
                 </div>
               )}
@@ -490,11 +491,6 @@ export function Replay({
       )}
     </section>
   );
-}
-
-// 0.6143 -> "61%".
-function percent(chance: number): string {
-  return `${Math.round(chance * 100)}%`;
 }
 
 function RowLabel({ className, children }: { className: string; children: string }) {

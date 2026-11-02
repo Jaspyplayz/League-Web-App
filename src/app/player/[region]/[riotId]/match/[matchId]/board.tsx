@@ -25,6 +25,7 @@ import {
   type BoardPlay,
 } from "@/lib/board";
 import type { DiffPoint } from "@/lib/diff-chart";
+import { formatPercent } from "@/lib/percent";
 
 const METRIC_NAMES: Record<Metric, string> = {
   gold: "Gold",
@@ -275,7 +276,7 @@ export function ChanceStrip({
                 type="button"
                 onClick={() => onSelect(i)}
                 aria-pressed={i === selected}
-                aria-label={`${play.clock} ${play.title}, ${play.grade}. Your team's chance to win after it: ${Math.round(play.after * 100)}%`}
+                aria-label={`${play.clock} ${play.title}, ${play.grade}. Your team's chance to win after it: ${formatPercent(play.after)}`}
                 title={`${play.clock} ${play.title}`}
                 // 24px wide, and 44px tall with the invisible ::before, so it's easy
                 // to hit on a phone. Close marks can still overlap, even fully;

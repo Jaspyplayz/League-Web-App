@@ -23,6 +23,7 @@ import {
 } from "@/lib/analyzer/plays";
 import type { ReplayData } from "@/lib/analyzer/replay";
 import { stretchAt, type TempoTimeline } from "@/lib/analyzer/tempo";
+import { formatPercentTenths } from "@/lib/percent";
 import type { ReplayRequest } from "./review-links";
 
 // The old grade pill, which nothing draws now. It's kept so replay.test.tsx can
@@ -218,7 +219,8 @@ export function PlayDetails({
         ))}
       </ul>
       <p className="text-main">
-        Your team&apos;s chance to win went from {percent(play.before)} to {percent(play.after)}.
+        Your team&apos;s chance to win went from {formatPercentTenths(play.before)} to{" "}
+        {formatPercentTenths(play.after)}.
         {tone === "ahead"
           ? " You were up tempo just before it."
           : tone === "behind"
@@ -380,11 +382,6 @@ function YouTag({ className = "" }: { className?: string }) {
       You
     </span>
   );
-}
-
-// 0.5234 -> "52.3%".
-function percent(chance: number): string {
-  return `${(chance * 100).toFixed(1)}%`;
 }
 
 // What kind of play it was, by its biggest objective, or a fight: crossed

@@ -1,6 +1,7 @@
 import { SubHeading } from "@/components/ui/panel-heading";
 import { formatClock } from "@/lib/analyzer/format";
 import { ALL_RANKS, type WinChanceModel } from "@/lib/analyzer/win-chance";
+import { formatPercent } from "@/lib/percent";
 import { describeSwing, type MatchWinChance } from "@/lib/win-chance";
 import { MomentRow } from "./turning-points";
 
@@ -38,7 +39,7 @@ export function BiggestSwings({ swings }: Pick<MatchWinChance, "swings">) {
               good={s.to > s.from}
               clock={formatClock(s.timestamp)}
               title={title}
-              change={`${percent(s.from)} → ${percent(s.to)}`}
+              change={`${formatPercent(s.from)} → ${formatPercent(s.to)}`}
               detail={detail}
             />
           );
@@ -46,8 +47,4 @@ export function BiggestSwings({ swings }: Pick<MatchWinChance, "swings">) {
       </ol>
     </div>
   );
-}
-
-function percent(chance: number): string {
-  return `${Math.round(chance * 100)}%`;
 }

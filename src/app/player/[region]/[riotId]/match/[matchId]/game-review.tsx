@@ -17,6 +17,7 @@ import { SubHeading } from "@/components/ui/panel-heading";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { formatSwing, GRADES } from "@/lib/analyzer/plays";
 import type { BoardPlay } from "@/lib/board";
+import { formatPercentTenths } from "@/lib/percent";
 import { useReviewLinks } from "./review-links";
 
 // One of the score tiles: Overall, Early, Mid or Late.
@@ -236,7 +237,8 @@ function PlayDetail({ play, notes }: { play: BoardPlay; notes: boolean }) {
     <div className="flex flex-col gap-2 py-2 pl-[42px] pr-2">
       <p className="text-note text-quiet tabular-nums">
         {play.grade} {formatSwing(play.swing)}. Your team&apos;s chance to win went from{" "}
-        {percent(play.before)} to {percent(play.after)}.{moment?.tempo ? ` ${moment.tempo}` : ""}
+        {formatPercentTenths(play.before)} to {formatPercentTenths(play.after)}.
+        {moment?.tempo ? ` ${moment.tempo}` : ""}
       </p>
       {moment && (
         <div className="flex flex-col gap-0.5">
@@ -322,9 +324,4 @@ export function StepButtons({
       ))}
     </div>
   );
-}
-
-// 0.5234 -> "52.3%", like the replay's plays list.
-function percent(chance: number): string {
-  return `${(chance * 100).toFixed(1)}%`;
 }
