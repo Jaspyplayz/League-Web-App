@@ -461,7 +461,7 @@ export type Plan = {
 /**
  * Plans one round. `byName` is a run Jasper started by name (/run-queue or
  * the Actions tab), which doesn't wait out a refused start, since that's him
- * trying again after a fix.
+ * trying again after a fix, and starts a test past a running builder.
  */
 export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byName = false }: { byName?: boolean } = {}): Plan {
   const issues = new Map(snapshot.issues.map((issue) => [issue.identifier, issue]));
@@ -536,12 +536,14 @@ export function planRound(snapshot: Snapshot, now: Date, runUrl: string, { byNam
   // Vercel deploys again. While any builder runs, however long it takes,
   // nothing else starts, so each round doesn't start one more test. Times
   // can't pick out the test's builder, since its own refused push moves
-  // Vercel's newest refusal past its start comment.
+  // Vercel's newest refusal past its start comment. So one dead builder stalls
+  // the queue, which costs nothing, where more tests would spend usage. A run
+  // by name is the way out: a person starts one test past that hold.
   if (vercel.kind === "testing") {
-    const [busy] = running;
+    const busy = byName ? undefined : running[0];
     const keep = busy ? [] : start.slice(0, 1);
     const why = busy
-      ? `Vercel refused a deploy at ${utc(vercel.since)}, and ${busy.id} has a builder running, so nothing else starts until it finishes or a preview deploys.`
+      ? `Vercel refused a deploy at ${utc(vercel.since)}, and ${busy.id} has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.`
       : `Vercel refused a deploy at ${utc(vercel.since)}, so only ${keep[0]} starts this round, as a test, until a preview deploys.`;
     waits.push(...start.slice(keep.length).map((id) => ({ id, why: [why] })));
     start = keep;

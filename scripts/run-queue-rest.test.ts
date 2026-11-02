@@ -1065,10 +1065,22 @@ describe("Vercel's test mode", () => {
     });
     const plan = planRound(read, new Date("2026-11-02T08:00:00Z"), RUN);
     expect(plan.start).toEqual([]);
-    const why = "Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys.";
+    const why = "Vercel refused a deploy at 2026-11-02 05:00 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test.";
     expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
       ["JAS-2", [why]],
       ["JAS-3", [why]],
+    ]);
+  });
+
+  // A builder that died leaves its ticket In Progress, which holds new tests for
+  // good, so a person needs a way past it. Only one test starts, as ever.
+  it("lets a run by name past a running builder to start one test", () => {
+    const read = snapshot({ issues: [issue("JAS-1", { status: "In Progress" }), issue("JAS-2"), issue("JAS-3")], statuses: [refusal("2026-11-02T05:00:00Z")] });
+    expect(planRound(read, AT_0630, RUN).start).toEqual([]);
+    const plan = planRound(read, AT_0630, RUN, { byName: true });
+    expect(plan.start.map((ticket) => ticket.id)).toEqual(["JAS-2"]);
+    expect(plan.waits.map((wait) => [wait.id, wait.why])).toEqual([
+      ["JAS-3", ["Vercel refused a deploy at 2026-11-02 05:00 UTC, so only JAS-2 starts this round, as a test, until a preview deploys."]],
     ]);
   });
 
@@ -1091,7 +1103,7 @@ describe("Vercel's test mode", () => {
     expect(plan.vercel).toEqual({ kind: "testing", since: "2026-11-02T07:15:00Z" });
     expect(plan.start).toEqual([]);
     expect(plan.waits.map((wait) => wait.why)).toEqual([
-      ["Vercel refused a deploy at 2026-11-02 07:15 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys."],
+      ["Vercel refused a deploy at 2026-11-02 07:15 UTC, and JAS-1 has a builder running, so nothing else starts until it finishes or a preview deploys. If that builder has died, a run by name (/run-queue) starts one test."],
     ]);
   });
 
