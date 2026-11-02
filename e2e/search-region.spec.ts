@@ -17,10 +17,16 @@ const NO_TAG_ERROR = /^Add the tag after a #/;
 const BIG = "Player lookup";
 const HEADER = "Search a player";
 
-// Not the 404 page: any search from an address with no route crashes (JAS-136).
+// An address no route matches shows the not-found page. On Vercel any search
+// from it crashed into "Something went wrong", though `next dev` and
+// `next start` were fine, so only a preview shows it (JAS-136).
+const NO_ROUTE = "/no-such-page";
+
 const FORMS = [
   { where: "home", path: "/", name: BIG },
   { where: "the header", path: "/how-it-works", name: HEADER },
+  { where: "the not-found page", path: NO_ROUTE, name: BIG },
+  { where: "the not-found page's header", path: NO_ROUTE, name: HEADER },
 ];
 
 // A search sent before React wakes up goes a different way (JAS-139), so wait
@@ -86,6 +92,21 @@ test("the player-not-found page keeps the picked region after a rejected search"
   await expect(region).toHaveValue("euw");
 });
 
+for (const name of [BIG, HEADER]) {
+  test(`the not-found page's "${name}" form sends a search to the player's page`, async ({ page }) => {
+    const response = await page.goto(NO_ROUTE);
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("We couldn't find that page");
+    const { form, region, riotId, search } = fields(page, name);
+    await waitForReact(form);
+
+    await region.selectOption("euw");
+    await riotId.fill("Hide on bush#KR1");
+    await search.click();
+    await expect(page).toHaveURL(/\/player\/euw\/Hide%20on%20bush-KR1/, FIRST_LOAD);
+  });
+}
+
 test("a corrected search goes to the picked region", async ({ page }) => {
   await page.goto("/");
   const { form, region, riotId, search, error } = fields(page, BIG);
@@ -131,6 +152,20 @@ test.describe("with JavaScript off", () => {
 
   test("a search still goes to the picked region", async ({ page }) => {
     await page.goto("/");
+    const { region, riotId, search } = fields(page, BIG);
+    await region.selectOption("euw");
+    await riotId.fill("Hide on bush#KR1");
+    await search.click();
+    await expect(page).toHaveURL(/\/player\/euw\/Hide%20on%20bush-KR1/, FIRST_LOAD);
+  });
+
+  // The not-found page's HTML has to hold the page itself, not an empty shell
+  // that only JavaScript fills in, which is what Next.js stores for a page
+  // that calls notFound() outside <Suspense> (src/app/[...unmatched]/page.tsx).
+  test("the not-found page shows, and its search goes to the picked region", async ({ page }) => {
+    const response = await page.goto(NO_ROUTE);
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("We couldn't find that page");
     const { region, riotId, search } = fields(page, BIG);
     await region.selectOption("euw");
     await riotId.fill("Hide on bush#KR1");

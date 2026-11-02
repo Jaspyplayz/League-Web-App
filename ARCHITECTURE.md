@@ -67,7 +67,9 @@ src/app/          Routes. player/[region]/[riotId]/ is the player page;
                   api/cron/season-sync/ the daily job that saves "This is me"
                   players' new games (docs/database.md);
                   api/saved-players/ what the box under the search reads: ranks and your own row;
-                  robots.ts keeps crawlers off player pages and the API
+                  robots.ts keeps crawlers off player pages and the API;
+                  [...unmatched]/ takes every address no other route matches
+                  and shows not-found.tsx with a 404, so its searches reach a server
 src/components/   React components; ui/ holds small shared pieces, ask/ the Ask panel
 src/lib/          Plain TypeScript helpers, most with a .test.ts next to them
 src/lib/riot/     Server-only Riot client (retries; rate-limit.ts counts requests, shared
