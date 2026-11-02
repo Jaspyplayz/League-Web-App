@@ -102,7 +102,7 @@ src/lib/recap.ts  Claude API call for AI match recaps; recap-store.ts saves them
 src/lib/ask.ts    Claude API agent loop for the Ask panel beside the replay; ask-store.ts saves each question before Claude answers, ask-rules.ts the caps
 src/db/           Drizzle schema, connection, and cache freshness rules
 src/lib/supabase/ Supabase Auth clients (sign-in with Google and Discord); src/proxy.ts keeps sign-ins fresh
-scripts/          Command-line jobs run with tsx (benchmarks, train-score, check-score, train-win-chance, train-phase-score, tempo study, item check, shot for screenshots, remap-puuids after a Riot key change, can-merge and the risky-paths list for Claude Code's own merges, can-merge-action for the Agent merge workflow, wellness for the biweekly check in docs/wellness.md; can-merge-rest.ts turns GitHub's REST answers into what the gates check, tested on the saved answers in can-merge-fixtures/)
+scripts/          Command-line jobs run with tsx (benchmarks, train-score, check-score, train-win-chance, train-phase-score, tempo study, item check, shot for screenshots, review-worktree for a throwaway copy of a branch, remap-puuids after a Riot key change, can-merge and the risky-paths list for Claude Code's own merges, can-merge-action for the Agent merge workflow, wellness for the biweekly check in docs/wellness.md; can-merge-rest.ts turns GitHub's REST answers into what the gates check, tested on the saved answers in can-merge-fixtures/)
 drizzle/          Generated SQL migrations (never edit by hand)
 docs/             Design and research docs, decision records in adr/, and the agent
                   mistakes log in agent-mistakes/ (one file per mistake class,
