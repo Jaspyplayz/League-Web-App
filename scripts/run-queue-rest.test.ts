@@ -648,6 +648,14 @@ describe("blockers and wait comments", () => {
     expect(changed.waits.find((entry) => entry.id === "JAS-1")?.comment).toMatchObject({ kind: "update", commentId: "c1" });
   });
 
+  it("edits a ticket's oldest wait comment when it has two", () => {
+    const comments = {
+      "JAS-1": [comment("newer", `${WAIT_LINE}\n\n- An old reason.`, "2026-11-02T06:10:00.000Z"), comment("older", `${WAIT_LINE}\n\n- An old reason.`, "2026-11-02T06:00:00.000Z")],
+    };
+    const plan = planRound(snapshot({ issues: [issue("JAS-1", { priority: 0 })], comments }), AT_0630, RUN);
+    expect(plan.waits[0].comment).toMatchObject({ kind: "update", commentId: "older" });
+  });
+
   it("never moves, starts or comments on a blocker in another project", () => {
     const read = snapshot({
       issues: [issue("JAS-1", { blockedBy: ["JAS-2", "JAS-3"] }), issue("JAS-2", { status: "Todo", project: "Petri" }), issue("JAS-3", { project: null })],
