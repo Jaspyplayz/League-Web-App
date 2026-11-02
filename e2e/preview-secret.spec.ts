@@ -97,6 +97,8 @@ test.describe("the check on redirects", () => {
     { name: "catches a keepalive fetch from a new tab's first script", url: () => via(preview, `${other}/ok`), lastHop: "/ok", init: { keepalive: true }, newTab: true, carries: true },
     // Chrome's reports cover what the event reports on a page, so this turns them
     // off to test the event by itself. /hang keeps the finished-request read out too.
+    // The event goes missing about 1 run in 200 for an unknown reason, which fails
+    // this test alone, so CI's retry shows it as flaky (decision record 0006).
     { name: "catches a redirect with only Playwright's request event", url: () => via(preview, `${other}/hang`), lastHop: "/hang", noChromeWatch: true, carries: true },
     { name: "catches a secret a config adds to every request", url: () => `${other}/ok`, lastHop: "/ok", init: { mode: "no-cors" }, addToEveryRequest: true, carries: true },
     { name: "passes a request to another site", url: () => `${other}/ok`, lastHop: "/ok", init: { mode: "no-cors" }, carries: false },

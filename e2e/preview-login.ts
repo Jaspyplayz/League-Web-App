@@ -84,9 +84,10 @@ async function watchChromeRedirects(context: BrowserContext, page: Page, onHop: 
 // and Playwright adds its headers to every later hop, so with a secret set, a hop
 // off `origin` in a chain that started there carries it (JAS-142). That's known
 // as the hop starts, so a hop that later fails or never answers still counts. Two
-// ways report hops. Playwright's `request` event asks the browser nothing, so it
-// can't reject as the browser closes. Attaching to Chrome can, so that failure is
-// caught: a page that closes first has nothing left to watch.
+// ways report hops, because either can miss one (decision record 0006).
+// Playwright's `request` event asks the browser nothing, so it can't reject as the
+// browser closes. Attaching to Chrome can, so that failure is caught: a page that
+// closes first has nothing left to watch.
 export function recordLeaks(context: BrowserContext, origin: string): () => Promise<string[]> {
   const sent = recordSent(context);
   const redirectedTo = new Set<string>();
