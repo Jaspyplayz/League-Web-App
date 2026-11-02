@@ -366,14 +366,34 @@ describe("answerQuestion's time limit", () => {
   });
 
   // Riot can be slow to answer the tools, which runs out the clock too.
-  it("stops waiting for the tools at the limit", async () => {
+  it("stops waiting for the tools once there's no time for another round", async () => {
     create.mockImplementationOnce(after(40, askForGames)).mockImplementationOnce(after(40, askForGames));
     vi.mocked(recentGamesFor).mockImplementationOnce(slowGames(10)).mockImplementationOnce(slowGames(60));
 
-    const result = await answerAfter(120);
+    // The second round's tools started at 90 s, and at 100 s a round
+    // would have under 20 s left.
+    const result = await answerAfter(100);
 
     expect(create).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ answer: null, costMicros: 2 * round });
     expect(result).toHaveProperty("error", expect.any(Error));
+  });
+
+  // Otherwise Claude could ask for games it would have no time to read, and
+  // the question would be paid for with no answer.
+  it("makes a round with under a minute left the last, with no more tools", async () => {
+    create
+      .mockImplementationOnce(after(30, askForGames))
+      .mockImplementationOnce(after(30, askForGames))
+      .mockImplementationOnce(after(1, askForGames))
+      .mockImplementationOnce(after(10, answers));
+
+    const result = await answerAfter(120);
+
+    // The third round started at 60 s, with a minute left, and the fourth at
+    // 61 s, with 59.
+    const toolChoices = create.mock.calls.map((call) => call[0].tool_choice.type);
+    expect(toolChoices).toEqual(["auto", "auto", "auto", "none"]);
+    expect(result).toMatchObject({ answer: "You die early in most losses.", costMicros: 4 * round });
   });
 });

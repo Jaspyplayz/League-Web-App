@@ -1,4 +1,4 @@
-# 0029: Ask stops itself before Vercel does, so its cost gets saved
+# 0030: Ask stops itself before Vercel does, so its cost gets saved
 
 Status: draft. It changes [0005](0005-ask-budget.md), which left "a time limit on the agent loop, so it always stops in time to settle" out of scope; that record stays as it was written.
 
@@ -16,7 +16,7 @@ Nothing kept a question under 180 seconds. One round could take 130 (two tries o
 
 ## Decision
 
-`answerQuestion` gets a time limit 120 seconds after it starts (`ASK_TIME_LIMIT_MS`). Each try is aborted after the smaller of 60 seconds and the time left. A try cut off that way may have been billed, so it adds the 50-cent estimate, like any timeout. It's an abort signal rather than the SDK's `timeout` option, because that option only covers the wait until Anthropic's reply starts: a reply that started and then stalled would run on. A round isn't started with under 20 seconds left (`MIN_TRY_MS`), since it would most likely be cut off and could be billed anyway, and the second try is skipped when the pause before it would leave less. The tools' results are waited for only until the limit. When the limit stops a question, `answerQuestion` returns what it cost so far with an error, and `ask-store.ts` saves it like any other failed question.
+`answerQuestion` gets a time limit 120 seconds after it starts (`ASK_TIME_LIMIT_MS`). Each try is aborted after the smaller of 60 seconds and the time left. A try cut off that way may have been billed, so it adds the 50-cent estimate, like any timeout. It's an abort signal rather than the SDK's `timeout` option, because that option only covers the wait until Anthropic's reply starts: a reply that started and then stalled would run on. A round isn't started with under 20 seconds left (`MIN_TRY_MS`), since it would most likely be cut off and could be billed anyway, and the second try is skipped when the pause before it would leave less. A round started with under a minute left is the last one, sent with no tools like the 8th, so Claude answers with what it has read rather than asking for games there'd be no time to send it. The tools' results are waited for only while another round could still start. When the limit stops a question, `answerQuestion` returns what it cost so far with an error, and `ask-store.ts` saves it like any other failed question.
 
 The other 60 seconds of the page's 180 are for what runs outside `answerQuestion`, which the time limit can't see: the sign-in check and the player's Riot lookup before it, and saving the cost after. The lookup alone can take about 31 seconds when Riot is failing (three tries, each up to a 2-second wait for its turn and an 8-second timeout, plus pauses). The wellness run suggested 150 seconds, but that would leave 30, which the lookup alone could use up. A test in `src/lib/ask.test.ts` reads `maxDuration` from the match page and fails if 120 seconds plus 60 no longer fit in it.
 

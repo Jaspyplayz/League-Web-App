@@ -35,13 +35,13 @@ export const ASK_MODEL = "claude-sonnet-5-5";
 const MAX_ROUNDS = 8;
 
 // How long a question may take, from when it starts here. Vercel stops the
-// request at the match page's maxDuration (180 s), and a question stopped
-// that way keeps only the 50-cent estimate it was saved with
-// (src/lib/ask-store.ts), however much its rounds cost by then. So the loop
-// stops itself first and returns what it spent. The other 60 s are for what
-// runs outside it: the sign-in check and the Riot lookup of the player
-// before (Riot alone can take about 31 s when it's failing), and saving the
-// cost after. A test checks they still fit.
+// request at the match page's maxDuration, and a question stopped that way
+// keeps only the 50-cent estimate it was saved with (src/lib/ask-store.ts),
+// however much its rounds cost by then. So the loop stops itself first and
+// returns what it spent. A test checks that maxDuration leaves at least 60 s
+// more, for what runs outside the loop: the sign-in check and the Riot lookup
+// of the player before (Riot alone can take about 31 s when it's failing),
+// and saving the cost after.
 export const ASK_TIME_LIMIT_MS = 120_000;
 // The longest one try waits for Anthropic. Two tries make a round.
 const TRY_TIMEOUT_MS = 60_000;
@@ -151,6 +151,10 @@ export async function answerQuestion(
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     if (timeLeft() < MIN_TRY_MS) return outOfTime();
+    // A round with less than a full try's time left is the last one too: if
+    // Claude asked for more games then, there'd be no time to send it what
+    // they say, and the question would be paid for with no answer.
+    const lastRound = round === MAX_ROUNDS || timeLeft() < TRY_TIMEOUT_MS;
     const sent = await sendRound(client, timeLeft, {
       model: ASK_MODEL,
       max_tokens: 8000,
@@ -163,7 +167,7 @@ export async function answerQuestion(
       system: SYSTEM,
       tools: TOOLS,
       // On the last round, no more tools: answer with what you've read.
-      tool_choice: { type: round === MAX_ROUNDS ? "none" : "auto" },
+      tool_choice: { type: lastRound ? "none" : "auto" },
       messages,
       // If Claude declines (its safety checks can misfire on game talk like
       // "kill" and "execute"), Anthropic retries on a fallback model it picks.
@@ -183,10 +187,14 @@ export async function answerQuestion(
       // The whole reply goes back, thinking included, as the API requires.
       messages.push({ role: "assistant", content: response.content });
       const calls = response.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
-      // A slow Riot can run out the clock too, so stop waiting at the limit.
-      // Claude isn't called again, so whatever the tools still do after that
-      // (reading Riot, saving games to the cache) costs no Claude money.
-      const results = await within(timeLeft(), Promise.all(calls.map((call) => tools.run(call))));
+      // A slow Riot can run out the clock too, so wait for the tools only
+      // while there's still time for another round. Claude isn't called
+      // again, so whatever the tools still do after that (reading Riot,
+      // saving games to the cache) costs no Claude money.
+      const results = await within(
+        timeLeft() - MIN_TRY_MS,
+        Promise.all(calls.map((call) => tools.run(call))),
+      );
       if (results === undefined) return outOfTime();
       // All results in one message, so Claude keeps calling tools in parallel.
       messages.push({ role: "user", content: results });
@@ -207,9 +215,10 @@ export async function answerQuestion(
 // How long to wait before a round's second try: half a second, the SDK's
 // own first pause, unless Anthropic says how long (see pauseBeforeRetry).
 const RETRY_PAUSE_MS = 500;
-// The longest pause Anthropic can ask for that we'll wait out, so a question
-// still fits in the page's time limit. If it asks for longer, the second try
-// will likely be turned down too, which costs nothing.
+// The longest pause Anthropic can ask for that we'll wait out, so one
+// rate-limited round doesn't use up much of the question's time limit. If it
+// asks for longer, the second try will likely be turned down too, which costs
+// nothing.
 const MAX_RETRY_PAUSE_MS = 10_000;
 
 type SentRound =
