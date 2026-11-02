@@ -1,7 +1,8 @@
 // The Agent merge workflow's script (JAS-121, .github/workflows/agent-merge.yml).
-// It reads the workflow_run event GitHub writes, finds the open PR on that
-// branch, and if its builder marked it ready, runs `can-merge --merge` on it
-// from this main checkout, then starts CI on main once it merges. A refusal
+// It reads the event GitHub writes (a check finished, or a run started by name
+// for another try), finds the open PR on that branch, and if its builder
+// marked it ready, runs `can-merge --merge` on it from this main checkout,
+// then starts CI on main once it merges. A refusal
 // leaves a notice and passes; a crash that a second try doesn't fix, or CI
 // that won't start, fails the run, so it shows up for Jasper.
 //
@@ -10,7 +11,7 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
-import { branchToTry, mainCiDispatchArgs, mergePull, OpenPulls, openPullsPath, pullsToMerge, WorkflowRunEvent } from "./can-merge-action-steps";
+import { AgentMergeEvent, branchToTry, hasMergeConflict, mainCiDispatchArgs, mergePull, OpenPulls, openPullsPath, pullsToMerge, whatStartedRun } from "./can-merge-action-steps";
 
 const eventPath = process.env.GITHUB_EVENT_PATH;
 const repository = process.env.GITHUB_REPOSITORY;
@@ -39,7 +40,17 @@ function isMerged(number: number): boolean {
   }
 }
 
-const event = WorkflowRunEvent.parse(JSON.parse(readFileSync(eventPath, "utf8")));
+// Whether GitHub says the PR has a merge conflict. If GitHub can't say, assume
+// not, and can-merge goes ahead as usual.
+function hasConflict(number: number): boolean {
+  try {
+    return hasMergeConflict(api(`repos/${repository}/pulls/${number}`) as { mergeable?: unknown });
+  } catch {
+    return false;
+  }
+}
+
+const event = AgentMergeEvent.parse(JSON.parse(readFileSync(eventPath, "utf8")));
 const target = branchToTry(event, repository);
 if ("skip" in target) {
   summary(`Nothing to merge: ${target.skip}.`);
@@ -60,10 +71,11 @@ let failed = false;
 for (const number of ready) {
   const { failed: thisFailed } = mergePull(number, {
     runCanMerge: (attempt) => {
-      console.log(`\n${event.workflow_run.name} finished on ${target.branch}. Asking can-merge about #${number} (try ${attempt}).\n`);
+      console.log(`\n${whatStartedRun(event)} on ${target.branch}. Asking can-merge about #${number} (try ${attempt}).\n`);
       const result = spawnSync("npx", ["tsx", "scripts/can-merge.ts", String(number), "--merge"], { stdio: "inherit" });
       return { status: result.status, why: result.error ? result.error.message : `exit ${result.status ?? result.signal}` };
     },
+    hasConflict: () => hasConflict(number),
     isMerged: () => isMerged(number),
     waitBeforeRetry: () => execFileSync("sleep", ["30"]),
     startMainCi: () => execFileSync("gh", mainCiDispatchArgs(repository), { encoding: "utf8" }),

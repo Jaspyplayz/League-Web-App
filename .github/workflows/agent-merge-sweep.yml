@@ -1,0 +1,70 @@
+name: Agent merge sweep
+
+# Agent merge starts when one of a PR's checks finishes, so a PR waits if its
+# run is cancelled and no check is left to start another. On 2026-11-02 at
+# least 24 runs were cancelled, cause unknown, and PR 269 sat with every gate
+# passing until Jasper merged it by hand (JAS-164). This starts Agent merge
+# again for each PR still marked ready at its head and touched in the last day,
+# so a cancelled run needs no person to recover.
+#
+# It can't merge anything itself. can-merge still decides, in the run this
+# starts, and that run waits its turn behind any other run for the same branch.
+on:
+  schedule:
+    # Every 15 minutes, away from the top of the hour, when GitHub says it's
+    # most likely to delay or drop a schedule. Even so a run can come late, and
+    # GitHub turns a schedule off after 60 days with no activity in the repo.
+    - cron: "7,22,37,52 * * * *"
+
+# Nothing by default; the job asks for only what it needs.
+permissions: {}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # A public repo lets any token read PRs, but naming it keeps this working
+      # if the repo goes private.
+      pull-requests: read
+      # Starts Agent merge, the same way Agent merge starts CI on main. GitHub
+      # has no narrower permission for that, and it can't push or merge.
+      actions: write
+    steps:
+      # No checkout and no npm ci, so nothing here runs the repo's code and a
+      # quiet sweep takes seconds.
+      #
+      # The filter picks PRs whose Ready line names their head. It's rougher
+      # than readyToMerge in scripts/can-merge-action-steps.ts, which the run
+      # it starts still applies, but a test checks it never misses a line that
+      # passes. It has no backslashes, so it reads the same in any shell.
+      #
+      # updated_at keeps this to PRs touched in the last day. A PR stuck on a
+      # refusal then stops costing a run every 15 minutes, and can't merge
+      # unattended days later on old checks. Any edit or comment starts the day
+      # again.
+      #
+      # A git branch name can't hold a space or a glob character, so the for
+      # loop can't split or expand one. One failed start doesn't skip the rest,
+      # and the run still ends red.
+      - name: Start Agent merge for each PR marked ready at its head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # gh and the filter below both read this.
+          GH_REPO: ${{ github.repository }}
+        run: |
+          branches=$(gh api "repos/$GH_REPO/pulls?state=open&per_page=100" --paginate --jq '
+            .[]
+            | select(.head.ref | startswith("claude/"))
+            | select(.head.repo.full_name == env.GH_REPO)
+            | select(.updated_at > (now - 86400 | todate))
+            | select(.head.sha as $head | (.body // "")
+                | [match("[*][*]Ready to merge:[*][*][^a-z]*yes at ([0-9a-f]{7,40})"; "gi").captures[0].string | ascii_downcase]
+                | any(. as $named | $head | startswith($named)))
+            | .head.ref')
+          failed=0
+          for branch in $branches; do
+            echo "$branch is marked ready at its head. Starting Agent merge for it."
+            gh workflow run agent-merge.yml --ref main -f branch="$branch" || failed=1
+          done
+          exit "$failed"

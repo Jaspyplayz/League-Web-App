@@ -1,4 +1,7 @@
 name: Agent merge
+# Every run's own branch is on main, so its name is the only place to see which
+# PR's branch it's for (JAS-164).
+run-name: Agent merge ${{ github.event.workflow_run.head_branch || inputs.branch }}
 
 # Merges Claude Code's own PRs without a Claude session (JAS-121,
 # docs/adr/0024-a-github-action-runs-can-merge.md). Each time one of a PR's
@@ -10,7 +13,12 @@ name: Agent merge
 #
 # A workflow_run workflow always runs as this file is on main, never a PR's
 # copy, and the job checks out main. The PR's code is never checked out or
-# run here, so no PR can change what this job does with its write token.
+# run here, so no PR can change what a run from a check does with its write
+# token. A run started by name is different: GitHub uses the copy on the ref
+# it's started on. The sweep always starts it on main, and the job's `if` skips
+# any other ref. A branch's edited copy could drop that `if`, so what guards
+# this route is who has write access to the repo, as with any workflow a branch
+# adds (docs/adr/0024-a-github-action-runs-can-merge.md).
 on:
   workflow_run:
     # Every named workflow that reports a check on a PR. Vercel's check comes
@@ -20,27 +28,46 @@ on:
     # finishes, and CodeQL has finished first on every recent Claude PR.
     workflows: [CI, Reviewer, Smoke test, Dependency review]
     types: [completed]
+  # Another try for a PR whose last run didn't finish. The Agent merge sweep
+  # starts these (agent-merge-sweep.yml, JAS-164), and a person can from the
+  # Actions tab.
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: The claude/ branch whose PR to try
+        required: true
+        type: string
 
 # Nothing by default; the job asks for only what merging needs.
 permissions: {}
 
 jobs:
   merge:
-    # Only a successful run on one of Claude's branches in this repo. Anything
-    # else (main, Jasper's branches, Dependabot's, a failed or cancelled run)
-    # shows as a skipped run and never starts a runner, since can-merge
-    # couldn't merge it.
+    # Only a successful run on one of Claude's branches in this repo, or a run
+    # started by name on main for one of Claude's branches. Anything else (main,
+    # Jasper's branches, Dependabot's, a failed or cancelled run) shows as a
+    # skipped run and never starts a runner, since can-merge couldn't merge it.
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
+      (github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      startsWith(inputs.branch, 'claude/')) ||
+      (github.event.workflow_run.conclusion == 'success' &&
       startsWith(github.event.workflow_run.head_branch, 'claude/') &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+      github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
-    # One run per branch at a time, so two checks finishing together can't
-    # both merge or both comment. A running one is never cancelled, since it
-    # may be mid-merge; a queued one is replaced by the newest, which reads
-    # the latest state anyway.
+    # A run normally takes under two minutes. A hung one would hold its branch's
+    # queue for GitHub's default of six hours, and the sweep couldn't help.
+    timeout-minutes: 10
+    # One run per branch at a time, so two checks finishing together, or a
+    # check and a run started by name, can't both merge or both comment. A new
+    # run never cancels a running one, since it may be mid-merge; a queued one
+    # is replaced by the newest, which reads the latest state anyway. This
+    # doesn't stop a cancel from outside: at least 24 runs on 2026-11-02 were
+    # cancelled with the note "canceled by @Jaspyplayz", cause unknown
+    # (JAS-164). So the sweep starts another run for any PR still marked ready
+    # at its head and touched in the last day.
     concurrency:
-      group: agent-merge-${{ github.event.workflow_run.head_branch }}
+      group: agent-merge-${{ github.event.workflow_run.head_branch || inputs.branch }}
       cancel-in-progress: false
     permissions:
       contents: write # merge the PR
