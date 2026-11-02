@@ -283,6 +283,15 @@ describe("npm run can-merge, on real git with GitHub faked", { timeout: 60_000 }
     expect(run.code).toBe(0);
   });
 
+  // GitHub would create a label that doesn't exist, so can-merge only adds
+  // one Jasper made.
+  it("skips the label when the repo doesn't have it", () => {
+    const run = canMerge(habits, { merge: true, gh: { "repos/{owner}/{repo}/labels": "bug\nenhancement" } });
+    expect(run.sent.map(({ request }) => request)).toEqual(MERGE_REQUESTS.slice(0, 2));
+    expect(run.out).toContain(`Skipped the ${MERGED_BY_CLAUDE} label, which doesn't exist on GitHub yet`);
+    expect(run.code).toBe(0);
+  });
+
   // The revert gate finds Claude's merges by the marker, so a merge without
   // it is one nobody would count. The PR is merged by then, so the run still
   // comments and labels, then fails so the Agent merge run goes red.
