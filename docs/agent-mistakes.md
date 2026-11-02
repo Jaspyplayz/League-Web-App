@@ -57,6 +57,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [A browser test's locator matches more than it names](agent-mistakes/browser-locator-matches-more-than-it-names.md) | 2 | none yet |
 | [A refusal retried on every run](agent-mistakes/refusal-retried-every-run.md) | 1 | none yet |
 | [Private text saved in a public fixture](agent-mistakes/private-text-in-a-public-fixture.md) | 1 | none yet |
+| [Prose passed inside a quoted shell string](agent-mistakes/prose-through-a-shell-string.md) | 1 | none yet |
 
 ## Rules and what enforces them
 
