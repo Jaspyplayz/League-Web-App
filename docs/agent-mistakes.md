@@ -59,6 +59,7 @@ One file per mistake class in [`agent-mistakes/`](agent-mistakes/), so two PRs t
 | [Private text saved in a public fixture](agent-mistakes/private-text-in-a-public-fixture.md) | 1 | none yet |
 | [Prose passed inside a quoted shell string](agent-mistakes/prose-through-a-shell-string.md) | 1 | none yet |
 | [A page checked only the way an ordinary browser loads it](agent-mistakes/page-checked-one-way-it-loads.md) | 1 | check |
+| [A workflow's secrets reached by a file Claude can merge](agent-mistakes/secrets-reached-by-a-file-claude-merges.md) | 2 | check |
 
 ## Rules and what enforces them
 
