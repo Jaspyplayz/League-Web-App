@@ -8,9 +8,10 @@ vi.mock("server-only", () => ({}));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 
 // The query chain readMyPlayer runs, ending in `limit`, which answers with
-// the rows or throws.
+// the rows or throws. `where` records its filter for the tests to check.
 const limit = vi.fn();
-const chain = { from: () => chain, innerJoin: () => chain, where: () => chain, limit };
+const where = vi.fn();
+const chain = { from: () => chain, innerJoin: () => chain, where, limit };
 let db: { select: () => typeof chain; delete?: () => { where: (condition: SQL) => Promise<void> } } | null;
 vi.mock("@/lib/match-store", () => ({ database: () => db }));
 
@@ -20,6 +21,7 @@ beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "postgres://test");
   db = { select: () => chain };
   limit.mockReset();
+  where.mockReset().mockReturnValue(chain);
   vi.mocked(Sentry.captureException).mockClear();
 });
 
@@ -31,6 +33,18 @@ describe("readMyPlayer", () => {
   it("returns the marked player", async () => {
     limit.mockResolvedValue([saved]);
     expect(await readMyPlayer("user-1")).toEqual({ ok: true, player: saved });
+  });
+
+  // The server's connection skips row level security (docs/database.md), so
+  // without this filter you'd get whichever account's player came first, and
+  // the header's link to your profile would open someone else's (JAS-256).
+  it("reads only this account's marked player", async () => {
+    limit.mockResolvedValue([saved]);
+    await readMyPlayer("user-1");
+    expect(where).toHaveBeenCalledOnce();
+    const query = new PgDialect().sqlToQuery(where.mock.calls[0][0]);
+    expect(query.sql).toBe('"user_players"."user_id" = $1');
+    expect(query.params).toEqual(["user-1"]);
   });
 
   it("returns no player when none is marked", async () => {

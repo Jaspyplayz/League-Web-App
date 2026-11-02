@@ -37,6 +37,17 @@ describe("ThisIsMeButton", () => {
     expect(html).toContain('name="intent" value="mark"');
   });
 
+  // The account marked someone else, so this profile isn't yours: the button
+  // offers to mark it (which replaces the other), never to clear it (JAS-256).
+  it("offers to mark a profile when the account marked another player", async () => {
+    vi.mocked(readMyPlayer).mockResolvedValue({ ok: true, player: { ...player, puuid: "player-2" } });
+    const html = await render();
+    expect(html).toContain('name="puuid" value="player-1"');
+    expect(html).toContain('name="intent" value="mark"');
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).not.toContain("✓ This is you");
+  });
+
   // #167: a failed read used to look like nothing marked, so this offered
   // "This is me" on your own profile, and clicking it cleared the mark.
   it("offers no button that marks or clears when it can't read what's marked", async () => {
