@@ -1,9 +1,8 @@
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { costMicros, HOLD_MICROS } from "@/lib/ask-rules";
 import { recentGamesFor } from "@/lib/mcp/tools";
 import type { Account } from "@/lib/riot/types";
-import { answerQuestion, ASK_TIME_LIMIT_MS } from "./ask";
+import { answerQuestion } from "./ask";
 
 // A pretend Anthropic client: each test says what each round returns, and
 // `clientOptions` records how the client was set up. APIError is the SDK's
@@ -296,18 +295,10 @@ describe("answerQuestion", () => {
 // question keeps only its 50-cent estimate, even if its rounds cost more.
 // So the loop stops itself first, with what the question cost so far, at
 // ASK_TIME_LIMIT_MS (120 s). Each test below reads the result at 120 s, so
-// one that's still running then fails.
+// one that's still running then fails. ask-time-limit.test.ts checks that the
+// page's maxDuration leaves room for what runs outside the loop.
 describe("answerQuestion's time limit", () => {
   const round = costMicros("claude-sonnet-5-5", usage);
-
-  it("stops in time for the match page to save what the question cost", () => {
-    const page = readFileSync("src/app/player/[region]/[riotId]/match/[matchId]/page.tsx", "utf8");
-    const maxDuration = Number(/export const maxDuration = (\d+);/.exec(page)?.[1]);
-    // The rest is for what runs outside answerQuestion: the sign-in check
-    // and the player's Riot lookup before it (three tries of up to 10 s
-    // each, plus pauses, when Riot is failing), and saving the cost after.
-    expect(ASK_TIME_LIMIT_MS + 60_000).toBeLessThanOrEqual(maxDuration * 1000);
-  });
 
   // The try was cut off, and Anthropic may still bill it.
   it("cuts a try off at the limit, and adds the estimate", async () => {

@@ -12,7 +12,7 @@ The panel puts the game it sits beside first: its first two example questions na
    - `recent_games`: the player's latest games (up to 20) with champion, result, K/D/A and a match ID each.
    - `analyze_game`: the analyzer's facts for one game (lane gaps, win chance swings, deaths, objectives, game score, ganks).
 
-   Each round, Claude either asks for tools, which the server runs and sends back, or writes the answer. After 8 rounds it must answer with what it has. The tools are tied to the player on the page, so Claude can't read anyone else's games.
+   Each round, Claude either asks for tools, which the server runs and sends back, or writes the answer. After 8 rounds, or once under a minute of its time limit is left (below), it must answer with what it has. The tools are tied to the player on the page, so Claude can't read anyone else's games.
 4. The answer, games read, model and cost replace the estimate in `ask_questions` (migration 0018), and the cost in `ask_spend` (0019). Only the account that asked sees its questions.
 
 ### Why the question is saved before Claude answers
@@ -32,10 +32,10 @@ Vercel stops the request at the match page's 3-minute limit (`maxDuration`), and
 
 - No try runs past the limit. Each try is aborted after a minute or at the limit, whichever comes first. One that's cut off adds the 50-cent estimate, like any timeout. An abort is used rather than the SDK's `timeout` option, which only covers the wait for Anthropic's reply to start, not a reply that starts and then stalls.
 - A round isn't started with under 20 seconds left, and a second try isn't made when the pause before it would leave less.
-- A round started with under a minute left is the last one, with no more tools, like the 8th: Claude answers with what it has read. Otherwise it could ask for games there'd be no time to send it, and the question would be paid for with no answer.
+- A round started with under a minute left is the last one, with no more tools, like the 8th: Claude answers with what it has read. Otherwise it could ask for games there'd be no time to send it, and the question would be paid for with no answer. Two costs: a long question's answer rests on the games Claude read in its first minute or so, and that round can't reuse the cached conversation (changing which tools Claude may use drops the cached messages), so it pays the cache-write price for them, about 9 cents more on a 40,000-token conversation.
 - The tools' results are waited for only while there's still time for another round, since a slow Riot can run out the clock too.
 
-The other 60 seconds are for what runs outside `answerQuestion`: the sign-in check and the player's Riot lookup before it (about 31 seconds at worst, when Riot is failing), and saving the cost after. A test in `ask.test.ts` fails if the match page's limit no longer leaves them. If the server stops for another reason, such as a crash, the estimate saved at the start still stays.
+The other 60 seconds are for what runs outside `answerQuestion`: the sign-in check and the player's Riot lookup before it, and saving the cost after. `ask-time-limit.test.ts` runs the real Riot client with Riot not answering and the rate limit full, which takes 40.25 seconds on a pretend clock, and fails unless the match page's limit still leaves 15 seconds after that lookup and the 120 for the sign-in check and saving. So a longer Riot timeout, another retry or a longer wait for a turn fails it too. If the server stops for another reason, such as a crash, the estimate saved at the start still stays.
 
 The reasons and the options considered are in decision records [0005](adr/0005-ask-budget.md) and [0030](adr/0030-ask-stops-before-vercel-does.md), which added the time limit.
 

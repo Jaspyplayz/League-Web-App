@@ -38,10 +38,10 @@ const MAX_ROUNDS = 8;
 // request at the match page's maxDuration, and a question stopped that way
 // keeps only the 50-cent estimate it was saved with (src/lib/ask-store.ts),
 // however much its rounds cost by then. So the loop stops itself first and
-// returns what it spent. A test checks that maxDuration leaves at least 60 s
-// more, for what runs outside the loop: the sign-in check and the Riot lookup
-// of the player before (Riot alone can take about 31 s when it's failing),
-// and saving the cost after.
+// returns what it spent. The rest of maxDuration is for what runs outside
+// the loop: the sign-in check and the player's Riot lookup before it (about
+// 40 s when Riot isn't answering), and saving the cost after.
+// ask-time-limit.test.ts times that lookup and checks it all still fits.
 export const ASK_TIME_LIMIT_MS = 120_000;
 // The longest one try waits for Anthropic. Two tries make a round.
 const TRY_TIMEOUT_MS = 60_000;
