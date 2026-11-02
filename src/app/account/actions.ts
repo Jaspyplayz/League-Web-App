@@ -5,7 +5,7 @@ import { askEnabled } from "@/lib/ask";
 import { cleanQuestion } from "@/lib/ask-rules";
 import { ask, type AskOutcome } from "@/lib/ask-store";
 import { getCurrentUser } from "@/lib/auth";
-import { isDayKey } from "@/lib/daily-log";
+import { isDayKey, LOG_DAYS } from "@/lib/daily-log";
 import { writeDayNote } from "@/lib/day-note-store";
 import { cleanNote, MAX_NOTE_LENGTH, type SaveNoteResult } from "@/lib/match-note";
 import { writeMatchNote } from "@/lib/match-note-store";
@@ -63,10 +63,20 @@ export async function saveMatchNoteAction(
     : { status: "failed", message: "Couldn't save the note. Try again in a moment." };
 }
 
-// The Save button under a day on the Log tab. Same checks as above; the day
-// is "2026-10-16" in the player's own timezone.
+// The Save button under a day in By day. Same checks as above, plus the day
+// must be one By day could be showing (isNoteDay). The day is "2026-10-16"
+// in the player's own timezone.
 export async function saveDayNoteAction(day: string, note: string): Promise<SaveNoteResult> {
-  if (!isDayKey(day)) return { status: "failed", message: "Couldn't save the note for this day." };
+  if (!isDayKey(day) || !isNoteDay(day, Date.now())) {
+    // A player only sees this once the day has dropped out of By day's
+    // weeks: on a page left open for a day and a half or more, or with a
+    // clock days off. Reloading won't bring the day back, so the message
+    // doesn't suggest it. Their text stays in the box, so they can copy it.
+    return {
+      status: "failed",
+      message: `Notes can only be saved on days in the last ${LOG_DAYS / 7} weeks.`,
+    };
+  }
   const cleaned = cleanNote(note);
   if (!cleaned.ok) {
     return { status: "failed", message: `Notes can be up to ${MAX_NOTE_LENGTH} characters.` };
@@ -77,6 +87,33 @@ export async function saveDayNoteAction(day: string, note: string): Promise<Save
   return (await writeDayNote(user.id, day, cleaned.text))
     ? { status: "saved" }
     : { status: "failed", message: "Couldn't save the note. Try again in a moment." };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// "2026-10-16" for the UTC day the time falls on.
+function utcDay(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+// Whether a note can be saved on this day: one By day could be showing.
+// Without this check, a script could save a note on every date from 0100 to
+// 9999 and fill the database (JAS-212).
+//
+// By day shows the player's last LOG_DAYS days, in their browser's timezone,
+// which the server doesn't know. Every timezone in use is between UTC-12 and
+// UTC+14, so the player's today is the server's UTC yesterday, today or
+// tomorrow. So By day can show UTC today minus LOG_DAYS through UTC tomorrow.
+// A spare day on each side covers a page left open since yesterday, or a
+// clock a day fast: UTC today minus LOG_DAYS + 1 through the day after
+// tomorrow.
+//
+// It counts in UTC, not in the server's own timezone. A server set to UTC-12
+// and a player at UTC+14 are 26 hours apart, so their dates can be two days
+// apart.
+function isNoteDay(day: string, now: number): boolean {
+  // "2026-10-16" sorts as plain text, so the edges compare as strings.
+  return day >= utcDay(now - (LOG_DAYS + 1) * DAY_MS) && day <= utcDay(now + 2 * DAY_MS);
 }
 
 // The "Write recap" button on a match page. Signed-in accounts only, so the
